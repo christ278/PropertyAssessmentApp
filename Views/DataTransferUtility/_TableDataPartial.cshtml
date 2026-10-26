@@ -1,0 +1,162 @@
+@using System.Text.Json
+@model List<PropertyAssessmentApp.DTOs.TDNDTO>
+@{
+    int currentPage = ViewBag.CurrentPage ?? 1;
+    int pageSize = ViewBag.PageSize ?? 10;
+    int totalRecords = ViewBag.TotalRecords ?? 0;
+    int totalPages = (int)Math.Ceiling((double)totalRecords / pageSize);
+    if (totalPages == 0) totalPages = 1;
+}
+
+<div>
+    <div class="p-6 pb-4 flex items-center justify-between border-b border-slate-200 dark:border-stone-800">
+        <div class="flex items-center gap-2">
+            <span class="font-extrabold text-slate-900 dark:text-white text-sm">Query Results</span>
+            <span class="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-stone-800 text-[10px] text-slate-500 font-bold">
+                Showing @(totalRecords == 0 ? 0 : (currentPage - 1) * pageSize + 1) to @Math.Min(currentPage * pageSize, totalRecords) of @totalRecords records
+            </span>
+        </div>
+    </div>
+
+    @if (Model == null || !Model.Any())
+    {
+        <div class="p-12 text-center text-slate-400 dark:text-stone-500 space-y-2">
+            <i data-lucide="inbox" class="w-8 h-8 mx-auto text-slate-300 dark:text-stone-600"></i>
+            <p class="font-bold">No records found matching your query filter.</p>
+            <p class="text-[11px]">Try adjusting your search keyword or selecting a different filter parameter.</p>
+        </div>
+    }
+    else
+    {
+        <div class="overflow-x-auto min-h-[260px] pb-8 rounded-2xl">
+            <table class="w-full text-left text-xs font-mono">
+                <thead class="bg-slate-100 dark:bg-stone-950 text-slate-600 dark:text-stone-400 border-b border-slate-200 dark:border-stone-800 font-bold">
+                    <tr>
+                        <th class="hidden sm:table-cell px-3 py-3.5">#</th>
+                        <th class="px-3 sm:px-4 py-3.5">TDN NO.</th>
+                        <th class="hidden md:table-cell px-4 py-3.5">PIN</th>
+                        <th class="px-3 sm:px-4 py-3.5">OWNER / ENTITY</th>
+                        <th class="hidden sm:table-cell px-4 py-3.5">KIND</th>
+                        <th class="hidden lg:table-cell px-4 py-3.5 text-right">MARKET VALUE</th>
+                        <th class="hidden sm:table-cell px-4 py-3.5 text-right">ASSESSED VALUE</th>
+                        <th class="px-2 sm:px-4 py-3.5 text-center">STATUS</th>
+                        <th class="px-2 sm:px-4 py-3.5 text-right">ACTION</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-stone-800/60 text-xs">
+                    @{
+                        int index = (currentPage - 1) * pageSize + 1;
+                    }
+                    @foreach (var item in Model)
+                    {
+                        var jsonDto = Uri.EscapeDataString(JsonSerializer.Serialize(item));
+                        var tdnDisplay = item.TDN ?? item.TDN1 ?? "N/A";
+
+                        <tr class="hover:bg-slate-50/60 dark:hover:bg-stone-800/40 transition-colors">
+                            <td class="hidden sm:table-cell py-3 px-3 font-bold text-slate-400">@index</td>
+                            <td class="py-3 px-3 font-bold text-slate-900 dark:text-white font-mono">
+                                @tdnDisplay
+                                <div class="md:hidden text-[10px] text-slate-400 font-normal">
+                                    @(string.IsNullOrWhiteSpace(item.PIN) ? "" : item.PIN)
+                                </div>
+                            </td>
+                            <td class="hidden md:table-cell py-3 px-3 font-mono text-[11px] text-slate-600 dark:text-stone-400">
+                                @(string.IsNullOrWhiteSpace(item.PIN) ? "Pending Assignment" : item.PIN)
+                            </td>
+                            <td class="py-3 px-3 font-semibold text-slate-800 dark:text-stone-200 max-w-[200px] truncate" title="@item.DisplayName">
+                                @item.DisplayName
+                                <div class="sm:hidden mt-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                                    AV: ₱@((item.TotalAssessedValue ?? 0).ToString("N0")) &bull; @(item.Kind ?? "Land")
+                                </div>
+                            </td>
+                            <td class="hidden sm:table-cell py-3 px-3">
+                                <span class="px-2 py-0.5 rounded-lg text-[10px] font-bold @(item.Kind == "Building" ? "bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-500/10 dark:text-amber-400" : (item.Kind == "Machinery" ? "bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-500/10 dark:text-purple-400" : "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400"))">
+                                    @(item.Kind ?? "Land")
+                                </span>
+                            </td>
+                            <td class="hidden lg:table-cell py-3 px-3 text-right font-mono font-bold text-slate-700 dark:text-stone-300">
+                                ₱@((item.TotalMarketValue ?? 0).ToString("N2"))
+                            </td>
+                            <td class="hidden sm:table-cell py-3 px-3 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                                ₱@((item.TotalAssessedValue ?? 0).ToString("N2"))
+                            </td>
+                            <td class="px-2 sm:px-3 py-3 text-center">
+                                @if (item.isAlreadyExist)
+                                {
+                                    <div class="inline-flex flex-col items-center">
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 dark:bg-stone-800 dark:text-stone-300 dark:border-stone-700">
+                                            <i data-lucide="check" class="w-3 h-3 text-emerald-500"></i> Already Saved
+                                        </span>
+                                        @if (!string.IsNullOrWhiteSpace(item.MigratedBy))
+                                        {
+                                            <span class="text-[9px] text-slate-500 dark:text-stone-400 mt-1 font-mono leading-tight">
+                                                By <strong class="text-slate-700 dark:text-stone-200">@item.MigratedBy</strong>
+                                                @if (item.MigratedDate.HasValue)
+                                                {
+                                                    <span class="block text-[8px] text-slate-400 dark:text-stone-500">@item.MigratedDate.Value.ToString("MM/dd/yyyy hh:mm tt")</span>
+                                                }
+                                            </span>
+                                        }
+                                    </div>
+                                }
+                                else
+                                {
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200 dark:bg-sky-500/10 dark:text-sky-400">
+                                        <i data-lucide="cloud-download" class="w-3 h-3 text-sky-500"></i> Ready to Import
+                                    </span>
+                                }
+                            </td>
+                            <td class="py-3 px-3 text-right">
+                                @if (item.isAlreadyExist)
+                                {
+                                    <button type="button" disabled class="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-400 dark:text-stone-600 font-bold opacity-60 cursor-not-allowed">
+                                        Migrated
+                                    </button>
+                                }
+                                else
+                                {
+                                    <button type="button" 
+                                            onclick="openOwnerMappingModal('@jsonDto')"
+                                            class="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition-all shadow-xs flex items-center gap-1.5 ml-auto">
+                                        <i data-lucide="arrow-right-left" class="w-3.5 h-3.5"></i>
+                                        <span>Transfer & Map</span>
+                                    </button>
+                                }
+                            </td>
+                        </tr>
+                        index++;
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination Controls -->
+        <div class="p-6 pt-4 flex items-center justify-between border-t border-slate-200 dark:border-stone-800">
+            <span class="text-[11px] text-slate-500">
+                Page @currentPage of @totalPages
+            </span>
+            <div class="flex items-center gap-1">
+                <button type="button" 
+                        onclick="loadTable(@(currentPage - 1))" 
+                        class="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-800 font-bold @(currentPage <= 1 ? "opacity-50 cursor-not-allowed" : "hover:bg-slate-50")"
+                        @(currentPage <= 1 ? "disabled" : "")>
+                    Previous
+                </button>
+                @for (int p = Math.Max(1, currentPage - 2); p <= Math.Min(totalPages, currentPage + 2); p++)
+                {
+                    <button type="button" 
+                            onclick="loadTable(@p)" 
+                            class="px-3 py-1.5 rounded-xl font-bold @(p == currentPage ? "bg-emerald-600 text-white" : "border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-800 hover:bg-slate-50")">
+                        @p
+                    </button>
+                }
+                <button type="button" 
+                        onclick="loadTable(@(currentPage + 1))" 
+                        class="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-800 font-bold @(currentPage >= totalPages ? "opacity-50 cursor-not-allowed" : "hover:bg-slate-50")"
+                        @(currentPage >= totalPages ? "disabled" : "")>
+                    Next
+                </button>
+            </div>
+        </div>
+    }
+</div>

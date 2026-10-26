@@ -1,0 +1,575 @@
+@model PropertyAssessmentApp.Models.TaxDeclaration
+
+@{
+    ViewData["Title"] = $"Complete Assessment Record - {Model.TaxDeclarationNumber}";
+}
+
+<div class="space-y-6 font-mono text-xs pb-12">
+
+    <!-- Top Action Navigation Bar -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 no-print">
+        <div class="flex items-center gap-2">
+            <a asp-action="Index" class="px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 hover:bg-slate-50 dark:hover:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold border border-slate-200 dark:border-stone-800 shadow-sm flex items-center gap-2 transition-all">
+                <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                <span>Back to Assessment Records</span>
+            </a>
+            <span class="text-slate-400 dark:text-stone-600 hidden sm:inline">|</span>
+            <span class="text-slate-500 dark:text-stone-400 hidden sm:inline text-[11px]">Full Master Record Viewer</span>
+        </div>
+        <div class="flex items-center gap-2">
+            <button onclick="window.print()" class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-slate-700 dark:text-stone-300 font-bold border border-slate-200 dark:border-stone-700 flex items-center gap-1.5 transition-all">
+                <i data-lucide="printer" class="w-4 h-4"></i>
+                <span>Print Page</span>
+            </button>
+            <a asp-action="Details" asp-route-id="@Model.Id" class="px-4 py-2.5 rounded-xl bg-sky-50 hover:bg-sky-100 dark:bg-sky-500/10 dark:hover:bg-sky-500/20 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-500/30 font-bold flex items-center gap-1.5 transition-all">
+                <i data-lucide="file-text" class="w-4 h-4"></i>
+                <span>Official Certificate</span>
+            </a>
+            <a asp-action="Edit" asp-route-id="@Model.Id" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center gap-1.5 shadow-sm transition-all">
+                <i data-lucide="edit-3" class="w-4 h-4"></i>
+                <span>Edit Record</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Master Header Card -->
+    <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-4">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-200 dark:border-stone-800 pb-4">
+            <div>
+                <div class="flex items-center gap-2 text-[10px] text-emerald-700 dark:text-emerald-400 font-bold uppercase tracking-wider mb-1">
+                    <i data-lucide="layers" class="w-3.5 h-3.5"></i>
+                    <span>Real Property Tax Declaration Master File</span>
+                </div>
+                <div class="flex flex-wrap items-center gap-3">
+                    <h1 class="text-2xl font-black text-slate-900 dark:text-white font-mono">@Model.TaxDeclarationNumber</h1>
+                    
+                    <!-- Property Kind Badge -->
+                    <span class="px-3 py-1 rounded-xl text-xs font-bold @(Model.Kind == PropertyAssessmentApp.Models.PropertyKind.Building ? "bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/30" : (Model.Kind == PropertyAssessmentApp.Models.PropertyKind.Machinery ? "bg-purple-100 dark:bg-purple-500/20 text-purple-800 dark:text-purple-300 border border-purple-300 dark:border-purple-500/30" : "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/30"))">
+                        <i data-lucide="tag" class="w-3 h-3 inline mr-1"></i>@Model.Kind
+                    </span>
+
+                    <!-- Status Badge -->
+                    @switch (Model.Status)
+                    {
+                        case PropertyAssessmentApp.Models.AssessmentStatus.Active:
+                            <span class="px-3 py-1 rounded-xl bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/40 text-xs font-bold uppercase">Active In-Roll</span>
+                            break;
+                        case PropertyAssessmentApp.Models.AssessmentStatus.Pending:
+                            <span class="px-3 py-1 rounded-xl bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-500/40 text-xs font-bold uppercase">Pending Approval</span>
+                            break;
+                        case PropertyAssessmentApp.Models.AssessmentStatus.UnderReassessment:
+                            <span class="px-3 py-1 rounded-xl bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40 text-xs font-bold uppercase">Under Reassessment</span>
+                            break;
+                        case PropertyAssessmentApp.Models.AssessmentStatus.PendingAppeal:
+                            <span class="px-3 py-1 rounded-xl bg-rose-100 dark:bg-rose-500/20 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-500/40 text-xs font-bold uppercase">Pending Appeal</span>
+                            break;
+                        default:
+                            <span class="px-3 py-1 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 text-xs font-bold uppercase">@Model.Status</span>
+                            break;
+                    }
+                </div>
+            </div>
+
+            <!-- Transaction Code & PIN Box -->
+            <div class="flex items-center gap-3">
+                <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-stone-800 border border-slate-200 dark:border-stone-700 text-right">
+                    <span class="block text-[10px] text-slate-400 uppercase font-bold">Transaction</span>
+                    <span class="text-xs font-bold text-slate-900 dark:text-white">@Model.TransactionCodeDisplay</span>
+                </div>
+                <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-stone-800 border border-slate-200 dark:border-stone-700 text-right">
+                    <span class="block text-[10px] text-slate-400 uppercase font-bold">Property Index No. (PIN)</span>
+                    <span class="text-sm font-black text-slate-900 dark:text-white font-mono">@(string.IsNullOrWhiteSpace(Model.PropertyIndexNumber) ? "None Assigned" : Model.PropertyIndexNumber)</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Valuation Summary Stats -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+            <div class="p-4 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
+                <span class="text-[10px] text-slate-400 uppercase font-bold block mb-1">Market Value (FMV)</span>
+                <span class="text-base font-black text-slate-900 dark:text-white font-mono">₱@Model.MarketValue.ToString("N2")</span>
+            </div>
+            <div class="p-4 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
+                <span class="text-[10px] text-slate-400 uppercase font-bold block mb-1">Assessment Level</span>
+                <span class="text-base font-black text-slate-900 dark:text-white font-mono">@Model.AssessmentLevelPercent%</span>
+            </div>
+            <div class="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
+                <span class="text-[10px] text-emerald-700 dark:text-emerald-400 uppercase font-bold block mb-1">Assessed Value (AV)</span>
+                <span class="text-base font-black text-emerald-700 dark:text-emerald-400 font-mono">₱@Model.AssessedValue.ToString("N2")</span>
+            </div>
+            <div class="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+                <span class="text-[10px] text-amber-700 dark:text-amber-400 uppercase font-bold block mb-1">Annual Tax Due (3%)</span>
+                <span class="text-base font-black text-amber-700 dark:text-amber-400 font-mono">₱@Model.AnnualTaxDue.ToString("N2")</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2-COLUMN GRID: ALL RECORD DATA -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        <!-- LEFT COLUMN -->
+        <div class="space-y-6">
+
+            <!-- 1. Owner & Declared Taxpayer Details -->
+            <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-4">
+                <div class="flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-3 font-bold text-slate-900 dark:text-white">
+                    <i data-lucide="user" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                    <span>Owner & Taxpayer Information</span>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div>
+                        <span class="text-[10px] text-slate-400 block font-bold">DECLARED OWNER</span>
+                        <span class="font-bold text-slate-900 dark:text-white text-sm">@Model.OwnerName</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-slate-400 block font-bold">TAX IDENTIFICATION NO. (TIN)</span>
+                        <span class="font-mono text-slate-700 dark:text-stone-300">@(string.IsNullOrWhiteSpace(Model.OwnerTin) ? "--" : Model.OwnerTin)</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-slate-400 block font-bold">CONTACT PHONE</span>
+                        <span class="text-slate-700 dark:text-stone-300">@(string.IsNullOrWhiteSpace(Model.OwnerPhone) ? "--" : Model.OwnerPhone)</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-slate-400 block font-bold">EMAIL ADDRESS</span>
+                        <span class="text-slate-700 dark:text-stone-300">@(string.IsNullOrWhiteSpace(Model.OwnerEmail) ? "--" : Model.OwnerEmail)</span>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <span class="text-[10px] text-slate-400 block font-bold">MAILING ADDRESS</span>
+                        <span class="text-slate-700 dark:text-stone-300">@(string.IsNullOrWhiteSpace(Model.OwnerAddress) ? "--" : Model.OwnerAddress)</span>
+                    </div>
+                </div>
+
+                <!-- Administrator / Possessor -->
+                @if (!string.IsNullOrWhiteSpace(Model.AdminPossessorName))
+                {
+                    <div class="pt-3 border-t border-slate-100 dark:border-stone-800/80 space-y-2">
+                        <span class="text-[10px] text-slate-400 uppercase font-bold block">Administrator / Possessor / Beneficial User</span>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                            <div>
+                                <span class="text-[10px] text-slate-400 block">Name:</span>
+                                <span class="font-bold text-slate-800 dark:text-stone-200">@Model.AdminPossessorName</span>
+                            </div>
+                            <div>
+                                <span class="text-[10px] text-slate-400 block">Contact Phone:</span>
+                                <span class="text-slate-700 dark:text-stone-300">@(string.IsNullOrWhiteSpace(Model.AdminPossessorPhone) ? "--" : Model.AdminPossessorPhone)</span>
+                            </div>
+                            <div class="sm:col-span-2">
+                                <span class="text-[10px] text-slate-400 block">Address:</span>
+                                <span class="text-slate-700 dark:text-stone-300">@(string.IsNullOrWhiteSpace(Model.AdminPossessorAddress) ? "--" : Model.AdminPossessorAddress)</span>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <!-- 2. Property Location & Boundaries -->
+            <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-4">
+                <div class="flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-3 font-bold text-slate-900 dark:text-white">
+                    <i data-lucide="map-pin" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                    <span>Location & Boundaries</span>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                    <div>
+                        <span class="text-[10px] text-slate-400 block font-bold">BARANGAY / DISTRICT</span>
+                        <span class="font-bold text-slate-800 dark:text-stone-200">@(string.IsNullOrWhiteSpace(Model.DistrictOrBarangay) ? "--" : Model.DistrictOrBarangay)</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-slate-400 block font-bold">MUNICIPALITY / CITY</span>
+                        <span class="font-bold text-slate-800 dark:text-stone-200">@(string.IsNullOrWhiteSpace(Model.Municipality) ? "--" : Model.Municipality)</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-slate-400 block font-bold">PROVINCE</span>
+                        <span class="font-bold text-slate-800 dark:text-stone-200">@(string.IsNullOrWhiteSpace(Model.ProvinceCity) ? "--" : Model.ProvinceCity)</span>
+                    </div>
+                    <div class="col-span-2 sm:col-span-3">
+                        <span class="text-[10px] text-slate-400 block font-bold">STREET / SPECIFIC LOCATION</span>
+                        <span class="text-slate-700 dark:text-stone-300">@(string.IsNullOrWhiteSpace(Model.StreetNo) ? "--" : Model.StreetNo)</span>
+                    </div>
+                </div>
+
+                <!-- Boundaries Grid -->
+                <div class="pt-3 border-t border-slate-100 dark:border-stone-800/80 space-y-2">
+                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Property Boundaries</span>
+                    <div class="grid grid-cols-2 gap-3 p-3 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-[11px]">
+                        <div><strong class="text-slate-500">North:</strong> @(string.IsNullOrWhiteSpace(Model.BoundaryNorth) ? "--" : Model.BoundaryNorth)</div>
+                        <div><strong class="text-slate-500">East:</strong> @(string.IsNullOrWhiteSpace(Model.BoundaryEast) ? "--" : Model.BoundaryEast)</div>
+                        <div><strong class="text-slate-500">South:</strong> @(string.IsNullOrWhiteSpace(Model.BoundarySouth) ? "--" : Model.BoundarySouth)</div>
+                        <div><strong class="text-slate-500">West:</strong> @(string.IsNullOrWhiteSpace(Model.BoundaryWest) ? "--" : Model.BoundaryWest)</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. Cadastral & Title Information -->
+            <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-4">
+                <div class="flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-3 font-bold text-slate-900 dark:text-white">
+                    <i data-lucide="award" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                    <span>Cadastral & Title Registration</span>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                    <div>
+                        <span class="text-[10px] text-slate-400 block font-bold">TITLE TYPE</span>
+                        <span class="font-bold text-slate-800 dark:text-stone-200">@(string.IsNullOrWhiteSpace(Model.TitleType) ? "--" : Model.TitleType)</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-slate-400 block font-bold">TITLE NO.</span>
+                        <span class="font-mono text-slate-800 dark:text-stone-200">@(string.IsNullOrWhiteSpace(Model.TitleNo) ? "--" : Model.TitleNo)</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-slate-400 block font-bold">DATE REGISTERED</span>
+                        <span class="text-slate-700 dark:text-stone-300">@(Model.DateRegistered?.ToString("MMM dd, yyyy") ?? "--")</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-slate-400 block font-bold">CADASTRAL SURVEY NO.</span>
+                        <span class="font-mono text-slate-800 dark:text-stone-200">@(string.IsNullOrWhiteSpace(Model.SurveyNo) ? "--" : Model.SurveyNo)</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-slate-400 block font-bold">LOT NO.</span>
+                        <span class="font-mono text-slate-800 dark:text-stone-200">@(string.IsNullOrWhiteSpace(Model.LotNo) ? "--" : Model.LotNo)</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-slate-400 block font-bold">BLOCK NO.</span>
+                        <span class="font-mono text-slate-800 dark:text-stone-200">@(string.IsNullOrWhiteSpace(Model.BlockNo) ? "--" : Model.BlockNo)</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- RIGHT COLUMN -->
+        <div class="space-y-6">
+
+            <!-- 4. Classification & Assessment Breakdown -->
+            <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-4">
+                <div class="flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-3 font-bold text-slate-900 dark:text-white">
+                    <i data-lucide="calculator" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                    <span>Valuation & Tax Assessment Details</span>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                    <div>
+                        <span class="text-[10px] text-slate-400 block font-bold">CLASSIFICATION</span>
+                        <span class="font-bold text-slate-800 dark:text-stone-200">@Model.Classification</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-slate-400 block font-bold">SUB-CLASSIFICATION</span>
+                        <span class="text-slate-700 dark:text-stone-300">@(string.IsNullOrWhiteSpace(Model.SubClassification) ? "--" : Model.SubClassification)</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-slate-400 block font-bold">ACTUAL USE</span>
+                        <span class="text-slate-700 dark:text-stone-300">@(string.IsNullOrWhiteSpace(Model.ActualUse) ? Model.Classification.ToString() : Model.ActualUse)</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-slate-400 block font-bold">EFFECTIVITY YEAR</span>
+                        <span class="font-bold text-slate-800 dark:text-stone-200">@Model.EffectivityYear @(string.IsNullOrWhiteSpace(Model.EffectivityQuarter) ? "" : $"({Model.EffectivityQuarter})")</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-slate-400 block font-bold">TAXABILITY</span>
+                        <span class="font-bold @(Model.Taxability == "Exempt" ? "text-amber-600" : "text-emerald-600 dark:text-emerald-400")">@(string.IsNullOrWhiteSpace(Model.Taxability) ? "Taxable" : Model.Taxability)</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-slate-400 block font-bold">TAX PERIOD</span>
+                        <span class="text-slate-700 dark:text-stone-300">@Model.TaxPeriodFromYear - @Model.TaxPeriodToYear</span>
+                    </div>
+                </div>
+
+                <!-- Breakdown Table -->
+                <div class="pt-3 border-t border-slate-100 dark:border-stone-800/80">
+                    <div class="rounded-2xl border border-slate-200 dark:border-stone-800 overflow-hidden">
+                        <table class="w-full text-left text-[11px] font-mono">
+                            <thead class="bg-slate-100 dark:bg-stone-950 text-slate-600 dark:text-stone-400 font-bold border-b border-slate-200 dark:border-stone-800">
+                                <tr>
+                                    <th class="p-2.5">AREA</th>
+                                    <th class="p-2.5 text-right">UNIT VALUE</th>
+                                    <th class="p-2.5 text-right">MARKET VALUE</th>
+                                    <th class="p-2.5 text-center">LEVEL</th>
+                                    <th class="p-2.5 text-right">ASSESSED VALUE</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="p-2.5 font-bold text-slate-900 dark:text-white">@Model.AreaSqMeters.ToString("N2") sq.m.</td>
+                                    <td class="p-2.5 text-right text-slate-600 dark:text-stone-400">₱@Model.UnitValue.ToString("N2")</td>
+                                    <td class="p-2.5 text-right font-bold text-slate-900 dark:text-white">₱@Model.MarketValue.ToString("N2")</td>
+                                    <td class="p-2.5 text-center text-slate-700 dark:text-stone-300">@Model.AssessmentLevelPercent%</td>
+                                    <td class="p-2.5 text-right font-black text-emerald-700 dark:text-emerald-400">₱@Model.AssessedValue.ToString("N2")</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Tax Calculation Breakdown -->
+                <div class="p-3.5 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 space-y-1.5 text-xs">
+                    <div class="flex justify-between text-slate-600 dark:text-stone-400">
+                        <span>Basic Real Property Tax (2.0%):</span>
+                        <span class="font-bold text-slate-900 dark:text-white">₱@((Model.AssessedValue * (Model.BasicTaxRate / 100m)).ToString("N2"))</span>
+                    </div>
+                    <div class="flex justify-between text-slate-600 dark:text-stone-400 pb-1.5 border-b border-emerald-200 dark:border-emerald-800/60">
+                        <span>Special Education Fund - SEF (1.0%):</span>
+                        <span class="font-bold text-slate-900 dark:text-white">₱@((Model.AssessedValue * (Model.SefTaxRate / 100m)).ToString("N2"))</span>
+                    </div>
+                    <div class="flex justify-between text-amber-700 dark:text-amber-400 font-black text-sm pt-0.5">
+                        <span>Total Annual Real Property Tax:</span>
+                        <span>₱@Model.AnnualTaxDue.ToString("N2")</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. Property Specific Kind Specs (Building / Machinery) -->
+            @if (Model.Kind == PropertyAssessmentApp.Models.PropertyKind.Building)
+            {
+                <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-4">
+                    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-stone-800 pb-3 font-bold text-slate-900 dark:text-white">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="building" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                            <span>Building & Structural Specifications (CAST Reference)</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            @if (Model.IsCct)
+                            {
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+                                    CONDOMINIUM (CCT)
+                                </span>
+                            }
+                            @if (Model.IsAdministrator)
+                            {
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300 border border-sky-300 dark:border-sky-700">
+                                    ADMINISTRATOR MANAGED
+                                </span>
+                            }
+                        </div>
+                    </div>
+
+                    @if (Model.IsCct)
+                    {
+                        <div class="p-3 rounded-2xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/50 text-xs grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <div><span class="text-[10px] text-amber-700 dark:text-amber-400 font-bold block">CCT TITLE NO.</span><span class="font-mono font-bold">@(string.IsNullOrWhiteSpace(Model.CctTitleNo) ? "--" : Model.CctTitleNo)</span></div>
+                            <div><span class="text-[10px] text-amber-700 dark:text-amber-400 font-bold block">DATE REGISTERED</span><span>@(Model.CctDateRegistered?.ToString("MMM dd, yyyy") ?? "--")</span></div>
+                            <div><span class="text-[10px] text-amber-700 dark:text-amber-400 font-bold block">OWNER REFLECTED IN CCT</span><span>@(string.IsNullOrWhiteSpace(Model.OwnerNameReflectedInCct) ? "--" : Model.OwnerNameReflectedInCct)</span></div>
+                        </div>
+                    }
+
+                    @if (Model.IsAdministrator && !string.IsNullOrWhiteSpace(Model.AdministratorName))
+                    {
+                        <div class="p-3 rounded-2xl bg-sky-50/50 dark:bg-sky-950/20 border border-sky-200 dark:border-sky-800/50 text-xs grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <div><span class="text-[10px] text-sky-700 dark:text-sky-400 font-bold block">ADMINISTRATOR</span><span class="font-bold">@Model.AdministratorName</span></div>
+                            <div><span class="text-[10px] text-sky-700 dark:text-sky-400 font-bold block">ADMIN TIN</span><span class="font-mono">@(string.IsNullOrWhiteSpace(Model.AdministratorTin) ? "--" : Model.AdministratorTin)</span></div>
+                            <div><span class="text-[10px] text-sky-700 dark:text-sky-400 font-bold block">CONTACT NO.</span><span>@(string.IsNullOrWhiteSpace(Model.AdministratorContactNo) ? "--" : Model.AdministratorContactNo)</span></div>
+                        </div>
+                    }
+
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                        <div>
+                            <span class="text-[10px] text-slate-400 block font-bold">STRUCTURAL TYPE</span>
+                            <span class="font-bold text-slate-800 dark:text-stone-200">@(string.IsNullOrWhiteSpace(Model.StructuralType) ? "--" : Model.StructuralType)</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 block font-bold">STOREYS</span>
+                            <span class="text-slate-800 dark:text-stone-200 font-bold">@Model.NoOfStoreys</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 block font-bold">BUILDING AREA</span>
+                            <span class="text-slate-800 dark:text-stone-200 font-bold">@Model.TotalBuildingAreaSqm.ToString("N2") sq.m.</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 block font-bold">BUILDING PERMIT NO.</span>
+                            <span class="font-mono text-slate-700 dark:text-stone-300">@(string.IsNullOrWhiteSpace(Model.BuildingPermitNo) ? "--" : Model.BuildingPermitNo)</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 block font-bold">DATE CONSTRUCTED</span>
+                            <span class="text-slate-700 dark:text-stone-300">@(Model.DateConstructed?.ToString("MMM dd, yyyy") ?? "--")</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 block font-bold">DATE COMPLETED</span>
+                            <span class="text-slate-700 dark:text-stone-300">@(Model.DateCompleted?.ToString("MMM dd, yyyy") ?? "--")</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 block font-bold">DATE OCCUPIED</span>
+                            <span class="text-slate-700 dark:text-stone-300">@(Model.DateOccupied?.ToString("MMM dd, yyyy") ?? "--")</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 block font-bold">BUILDING AGE</span>
+                            <span class="text-slate-800 dark:text-stone-200 font-bold">@Model.BuildingAgeYears years</span>
+                        </div>
+                    </div>
+
+                    <!-- Valuation Components Breakdown (CAST) -->
+                    @if (Model.BaseRcnValue > 0 || Model.BuildingTotalAdditionsValue > 0 || Model.BuildingDepreciationPercent > 0)
+                    {
+                        <div class="p-3 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-xs grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            <div><span class="text-[10px] text-slate-400 font-bold block">BASE RCN</span><span class="font-mono font-bold">₱@Model.BaseRcnValue.ToString("N2")</span></div>
+                            <div><span class="text-[10px] text-slate-400 font-bold block">DEPRECIATION (@Model.BuildingDepreciationPercent%)</span><span class="font-mono text-rose-600 dark:text-rose-400">-₱@Model.BuildingDepreciationAccumulated.ToString("N2")</span></div>
+                            <div><span class="text-[10px] text-slate-400 font-bold block">ADDL IMPROVEMENTS</span><span class="font-mono text-sky-600 dark:text-sky-400">+₱@Model.BuildingTotalAdditionsValue.ToString("N2")</span></div>
+                            <div><span class="text-[10px] text-slate-400 font-bold block">DEPRECIATED CORE MV</span><span class="font-mono text-emerald-600 dark:text-emerald-400 font-black">₱@Model.BuildingDepreciatedMarketValue.ToString("N2")</span></div>
+                        </div>
+                    }
+
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs pt-1 border-t border-slate-100 dark:border-stone-800">
+                        <div>
+                            <span class="text-[10px] text-slate-400 block font-bold">FOUNDATION</span>
+                            <span class="text-slate-700 dark:text-stone-300">@(string.IsNullOrWhiteSpace(Model.StructuralFoundation) ? "--" : Model.StructuralFoundation)</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 block font-bold">ROOF MATERIAL</span>
+                            <span class="text-slate-700 dark:text-stone-300">@(string.IsNullOrWhiteSpace(Model.StructuralRoof) ? "--" : Model.StructuralRoof)</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 block font-bold">EXTERIOR WALLS</span>
+                            <span class="text-slate-700 dark:text-stone-300">@(string.IsNullOrWhiteSpace(Model.StructuralExteriorWalls) ? "--" : Model.StructuralExteriorWalls)</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 block font-bold">FLOORING</span>
+                            <span class="text-slate-700 dark:text-stone-300">@(string.IsNullOrWhiteSpace(Model.StructuralFlooring) ? "--" : Model.StructuralFlooring)</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 block font-bold">ELECTRICAL</span>
+                            <span class="text-slate-700 dark:text-stone-300">@(string.IsNullOrWhiteSpace(Model.ElectricalSystem) ? "--" : Model.ElectricalSystem)</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 block font-bold">PLUMBING & SEWER</span>
+                            <span class="text-slate-700 dark:text-stone-300">@(string.IsNullOrWhiteSpace(Model.PlumbingSewer) ? "--" : Model.PlumbingSewer)</span>
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(Model.LandTdNo))
+                    {
+                        <div class="p-3 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-[11px] space-y-1">
+                            <span class="text-[10px] text-slate-400 font-bold uppercase block">Reference Land Property</span>
+                            <div><strong>Land TD No:</strong> @Model.LandTdNo | <strong>Land PIN:</strong> @(string.IsNullOrWhiteSpace(Model.LandPin) ? "--" : Model.LandPin)</div>
+                            <div><strong>Land Owner:</strong> @(string.IsNullOrWhiteSpace(Model.LandOwnerName) ? "--" : Model.LandOwnerName)</div>
+                        </div>
+                    }
+
+                    @if (Model.BackTaxesYearFrom.HasValue || !string.IsNullOrWhiteSpace(Model.AssessmentBasis))
+                    {
+                        <div class="p-3 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-[11px] flex items-center justify-between">
+                            <div><strong>Basis of Assessment:</strong> @(string.IsNullOrWhiteSpace(Model.AssessmentBasis) ? "Sec. 217 RA 7160" : Model.AssessmentBasis)</div>
+                            @if (Model.BackTaxesYearFrom.HasValue)
+                            {
+                                <div><strong>Back Taxes Period:</strong> @Model.BackTaxesYearFrom - @Model.BackTaxesYearTo</div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+            else if (Model.Kind == PropertyAssessmentApp.Models.PropertyKind.Machinery)
+            {
+                <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-4">
+                    <div class="flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-3 font-bold text-slate-900 dark:text-white">
+                        <i data-lucide="cpu" class="w-4 h-4 text-purple-600 dark:text-purple-400"></i>
+                        <span>Machinery & Equipment Specifications</span>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                        <div class="col-span-2">
+                            <span class="text-[10px] text-slate-400 block font-bold">DESCRIPTION / BRAND</span>
+                            <span class="font-bold text-slate-800 dark:text-stone-200">@(string.IsNullOrWhiteSpace(Model.DescriptionBrand) ? "--" : Model.DescriptionBrand)</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 block font-bold">RATED CAPACITY</span>
+                            <span class="text-slate-700 dark:text-stone-300">@(string.IsNullOrWhiteSpace(Model.RatedCapacity) ? "--" : Model.RatedCapacity)</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 block font-bold">ACQUISITION DATE</span>
+                            <span class="text-slate-700 dark:text-stone-300">@(Model.DateAcquired?.ToString("MMM dd, yyyy") ?? "--")</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 block font-bold">ECONOMIC LIFE</span>
+                            <span class="text-slate-700 dark:text-stone-300">@Model.EconomicLifeYears Years</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 block font-bold">ORIGINAL COST</span>
+                            <span class="font-bold text-slate-800 dark:text-stone-200">₱@Model.OriginalCost.ToString("N2")</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 block font-bold">DEPRECIATION RATE</span>
+                            <span class="text-slate-700 dark:text-stone-300">@Model.DepreciationRatePercent%</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 block font-bold">DEPRECIATED VALUE</span>
+                            <span class="font-bold text-slate-800 dark:text-stone-200">₱@Model.DepreciatedValue.ToString("N2")</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 block font-bold">COUNTRY OF ORIGIN</span>
+                            <span class="text-slate-700 dark:text-stone-300">@(string.IsNullOrWhiteSpace(Model.CountryOfOrigin) ? "--" : Model.CountryOfOrigin)</span>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <!-- 6. Historical Reference & Previous TD -->
+            @if (!string.IsNullOrWhiteSpace(Model.PreviousTdNo) || !string.IsNullOrWhiteSpace(Model.PreviousOwner))
+            {
+                <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-4">
+                    <div class="flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-3 font-bold text-slate-900 dark:text-white">
+                        <i data-lucide="history" class="w-4 h-4 text-slate-500"></i>
+                        <span>Previous Record Reference</span>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                        <div>
+                            <span class="text-[10px] text-slate-400 block font-bold">PREVIOUS TD NO.</span>
+                            <span class="font-mono font-bold text-slate-800 dark:text-stone-200">@(string.IsNullOrWhiteSpace(Model.PreviousTdNo) ? "--" : Model.PreviousTdNo)</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 block font-bold">PREVIOUS OWNER</span>
+                            <span class="text-slate-700 dark:text-stone-300">@(string.IsNullOrWhiteSpace(Model.PreviousOwner) ? "--" : Model.PreviousOwner)</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 block font-bold">PREVIOUS ASSESSED VALUE</span>
+                            <span class="text-slate-700 dark:text-stone-300">₱@Model.PreviousAssessedValue.ToString("N2")</span>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <!-- 7. Signatories & System Audit Trail -->
+            <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-4">
+                <div class="flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-3 font-bold text-slate-900 dark:text-white">
+                    <i data-lucide="shield-check" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                    <span>Signatories & System Audit Trail</span>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div>
+                        <span class="text-[10px] text-slate-400 block font-bold">APPRAISED BY</span>
+                        <span class="font-bold text-slate-800 dark:text-stone-200">@(string.IsNullOrWhiteSpace(Model.AppraisedByName) ? "--" : Model.AppraisedByName)</span>
+                        <div class="text-[10px] text-slate-400">@(Model.DateAppraised?.ToString("MMM dd, yyyy") ?? "--")</div>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-slate-400 block font-bold">APPROVED BY (CITY ASSESSOR)</span>
+                        <span class="font-bold text-slate-800 dark:text-stone-200">@(string.IsNullOrWhiteSpace(Model.ApprovedByName) ? "--" : Model.ApprovedByName)</span>
+                        <div class="text-[10px] text-slate-400">@(Model.DateApproved?.ToString("MMM dd, yyyy") ?? "--")</div>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-slate-400 block font-bold">RECOMMENDING APPROVAL</span>
+                        <span class="text-slate-700 dark:text-stone-300">@(string.IsNullOrWhiteSpace(Model.RecommendingApprovalName) ? "--" : Model.RecommendingApprovalName)</span>
+                        <div class="text-[10px] text-slate-400">@(Model.DateRecommended?.ToString("MMM dd, yyyy") ?? "--")</div>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-slate-400 block font-bold">ENTRY IN ROLL CLERK</span>
+                        <span class="text-slate-700 dark:text-stone-300">@(string.IsNullOrWhiteSpace(Model.EntryInRollName) ? "--" : Model.EntryInRollName)</span>
+                        <div class="text-[10px] text-slate-400">@(Model.EntryInRollDate?.ToString("MMM dd, yyyy") ?? "--")</div>
+                    </div>
+                    <div class="sm:col-span-2 pt-2 border-t border-slate-100 dark:border-stone-800/80 flex items-center justify-between">
+                        <div>
+                            <span class="text-[10px] text-slate-400 block font-bold">ENCODED / MIGRATED BY</span>
+                            <span class="font-bold text-emerald-700 dark:text-emerald-400">@(string.IsNullOrWhiteSpace(Model.EncodedByName) ? "System Staff" : Model.EncodedByName)</span>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-[10px] text-slate-400 block font-bold">TIMESTAMP</span>
+                            <span class="text-slate-600 dark:text-stone-300">@(Model.DateEncoded?.ToString("MMM dd, yyyy hh:mm tt") ?? "--")</span>
+                        </div>
+                    </div>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(Model.Memoranda))
+                {
+                    <div class="pt-3 border-t border-slate-100 dark:border-stone-800/80 space-y-1">
+                        <span class="text-[10px] text-slate-400 font-bold uppercase block">Memoranda & Special Notes</span>
+                        <p class="p-3 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-700 dark:text-stone-300 whitespace-pre-line text-[11px] leading-relaxed">@Model.Memoranda</p>
+                    </div>
+                }
+            </div>
+
+        </div>
+
+    </div>
+
+</div>

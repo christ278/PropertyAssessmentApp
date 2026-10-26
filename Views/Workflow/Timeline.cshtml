@@ -1,0 +1,350 @@
+@model PropertyAssessmentApp.Services.TransactionTimelineDto
+@using PropertyAssessmentApp.Models
+
+@{
+    ViewData["Title"] = $"Transaction Timeline - {Model.TrackingNumber}";
+    bool isSuperAdmin = ViewBag.IsSuperAdminOrHead is bool s && s;
+}
+
+<div class="space-y-6 font-mono text-xs max-w-6xl mx-auto pb-12">
+    
+    <!-- Top Action Breadcrumb & Print Navigation -->
+    <div class="flex items-center justify-between gap-4 flex-wrap bg-white dark:bg-stone-900 p-4 rounded-3xl border border-slate-200 dark:border-stone-800 shadow-sm print:hidden">
+        <div class="flex items-center gap-2">
+            <a asp-action="Track" class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-slate-700 dark:text-stone-300 transition-all flex items-center gap-1 font-bold">
+                <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                <span class="hidden sm:inline">Intake Registry</span>
+            </a>
+            <div class="h-4 w-px bg-slate-200 dark:bg-stone-800"></div>
+            <div class="text-slate-500 dark:text-stone-400">
+                <span>Timeline:</span>
+                <strong class="text-slate-900 dark:text-white ml-1">@Model.TrackingNumber</strong>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <button onclick="window.print()" class="px-4 py-2 rounded-2xl bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-slate-700 dark:text-stone-300 font-bold flex items-center gap-1.5 transition-all shadow-xs">
+                <i data-lucide="printer" class="w-4 h-4 text-slate-500"></i>
+                <span>Print Routing Slip</span>
+            </button>
+            <a asp-action="Pool" class="px-4 py-2 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold flex items-center gap-1.5 shadow-md shadow-emerald-600/20 transition-all">
+                <i data-lucide="inbox" class="w-4 h-4"></i>
+                <span>Shared Pool</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Official Header / Document Summary Card -->
+    <div class="bg-white dark:bg-stone-900 p-6 sm:p-8 rounded-3xl border border-slate-200 dark:border-stone-800 shadow-sm space-y-6">
+        
+        <div class="flex flex-col md:flex-row md:items-start justify-between gap-4 border-b border-slate-100 dark:border-stone-800 pb-6">
+            <div class="space-y-2">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300">
+                    <i data-lucide="map-pin" class="w-3.5 h-3.5"></i>
+                    <span>@Model.DivisionName</span>
+                </div>
+                <h1 class="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-3">
+                    <span>@Model.TrackingNumber</span>
+                    @switch (Model.OverallStatus)
+                    {
+                        case "Released":
+                            <span class="px-3 py-1 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300">
+                                RELEASED
+                            </span>
+                            break;
+                        case "Deferred":
+                            <span class="px-3 py-1 rounded-full text-xs font-black bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">
+                                DEFERRED
+                            </span>
+                            break;
+                        case "For Approval":
+                            <span class="px-3 py-1 rounded-full text-xs font-black bg-purple-100 text-purple-800 dark:bg-purple-500/20 dark:text-purple-300">
+                                FOR APPROVAL
+                            </span>
+                            break;
+                        case "On Going":
+                            <span class="px-3 py-1 rounded-full text-xs font-black bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-300 animate-pulse">
+                                ON GOING
+                            </span>
+                            break;
+                        default: // "Pending"
+                            <span class="px-3 py-1 rounded-full text-xs font-black bg-slate-100 text-slate-700 dark:bg-stone-800 dark:text-stone-300">
+                                PENDING
+                            </span>
+                            break;
+                    }
+                </h1>
+                <p class="text-sm font-bold text-slate-500 dark:text-stone-400">
+                    @Model.DisplayType &bull; Filed by <strong class="text-slate-800 dark:text-stone-200">@Model.OwnerOrApplicant</strong>
+                </p>
+            </div>
+
+            <!-- Reference & O.R. Metadata Box -->
+            <div class="grid grid-cols-2 sm:grid-cols-2 gap-3 bg-slate-50 dark:bg-stone-950 p-4 rounded-2xl border border-slate-200 dark:border-stone-800 min-w-[280px]">
+                <div>
+                    <span class="text-[10px] text-slate-400 font-bold block">DATE FILED</span>
+                    <span class="text-xs font-bold text-slate-800 dark:text-stone-200">@Model.DateSubmitted.ToString("MMM dd, yyyy")</span>
+                    <span class="text-[10px] text-slate-400 block">@Model.DateSubmitted.ToString("hh:mm tt")</span>
+                </div>
+                <div>
+                    <span class="text-[10px] text-slate-400 font-bold block">ELAPSED TIME</span>
+                    <span class="text-xs font-bold text-emerald-700 dark:text-emerald-400">@Model.ElapsedTimeText</span>
+                </div>
+                <div>
+                    <span class="text-[10px] text-slate-400 font-bold block">OFFICIAL RECEIPT (O.R.)</span>
+                    @if (!string.IsNullOrEmpty(Model.ORNumber))
+                    {
+                        <span class="text-xs font-extrabold text-slate-900 dark:text-white font-mono flex items-center gap-1">
+                            <i data-lucide="receipt" class="w-3 h-3 text-emerald-600"></i>
+                            @Model.ORNumber
+                        </span>
+                        @if (Model.ORDateIssued.HasValue)
+                        {
+                            <span class="text-[10px] text-slate-400 block">Issued: @Model.ORDateIssued.Value.ToString("MMM dd, yyyy")</span>
+                        }
+                    }
+                    else
+                    {
+                        <span class="text-xs font-bold text-amber-600 dark:text-amber-400">Pending Receipt</span>
+                    }
+                </div>
+                <div>
+                    <span class="text-[10px] text-slate-400 font-bold block">TOTAL FEES</span>
+                    <span class="text-xs font-extrabold text-slate-900 dark:text-white">₱@Model.TotalAmount.ToString("N2")</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- LIVE CURRENT LOCATION & STATION BANNER -->
+        <div class="relative overflow-hidden p-5 sm:p-6 rounded-2xl bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white shadow-lg border border-blue-800/60">
+            <div class="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div class="space-y-1">
+                    <div class="inline-flex items-center gap-2 text-xs font-bold text-emerald-400 uppercase tracking-widest">
+                        <span class="relative flex h-2.5 w-2.5">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                        </span>
+                        <span>LIVE CURRENT LOCATION & STATION</span>
+                    </div>
+                    <div class="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2">
+                        <i data-lucide="navigation" class="w-6 h-6 text-emerald-400"></i>
+                        <span>@Model.CurrentStageName</span>
+                    </div>
+                    <p class="text-slate-300 text-xs">
+                        @Model.CurrentLocationDescription
+                    </p>
+                </div>
+
+                <div class="bg-white/10 backdrop-blur-md p-3.5 rounded-xl border border-white/20 sm:text-right shrink-0">
+                    <span class="text-[10px] text-slate-300 font-bold uppercase block">Current Station Role</span>
+                    <span class="text-sm font-extrabold text-white block">@Model.AssignedToRole</span>
+                    @if (Model.OverallStatus == "Released")
+                    {
+                        <span class="text-[11px] text-emerald-300 font-bold block mt-0.5">
+                            Status: Released & Closed
+                        </span>
+                    }
+                    else if (Model.OverallStatus == "For Approval")
+                    {
+                        <span class="text-[11px] text-purple-300 font-bold block mt-0.5">
+                            Status: For Approval Review
+                        </span>
+                    }
+                    else if (Model.IsClaimed && !string.IsNullOrEmpty(Model.AssignedUserName))
+                    {
+                        <span class="text-[11px] text-blue-300 font-bold block mt-0.5">
+                            On Going: @Model.AssignedUserName
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="text-[11px] text-amber-300 font-bold block mt-0.5">
+                            Pending &bull; Unclaimed in Pool
+                        </span>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- VISUAL MULTI-STEP PROGRESS STEPPER -->
+        <div class="space-y-3 pt-2">
+            <h2 class="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center gap-1.5">
+                <i data-lucide="git-merge" class="w-3.5 h-3.5 text-blue-600"></i>
+                <span>Workflow Progress Stepper</span>
+            </h2>
+
+            <div class="overflow-x-auto pb-4">
+                <div class="flex items-center min-w-[680px] justify-between relative px-2">
+                    <!-- Background Connector Line -->
+                    <div class="absolute left-6 right-6 top-5 h-1 bg-slate-200 dark:bg-stone-800 -z-0"></div>
+
+                    @foreach (var step in Model.WorkflowSteps)
+                    {
+                        bool isCurrent = step.State == "current";
+                        bool isDone = step.State == "completed";
+                        bool isDef = step.State == "deferred";
+
+                        var circleClass = isCurrent 
+                            ? "bg-blue-600 text-white ring-4 ring-blue-500/30 scale-110 shadow-md animate-pulse" 
+                            : isDone 
+                                ? "bg-emerald-600 text-white shadow-xs" 
+                                : isDef 
+                                    ? "bg-amber-600 text-white ring-4 ring-amber-500/30" 
+                                    : "bg-slate-100 dark:bg-stone-800 text-slate-400 dark:text-stone-500 border border-slate-300 dark:border-stone-700";
+
+                        var labelClass = isCurrent 
+                            ? "text-blue-700 dark:text-blue-400 font-black" 
+                            : isDone 
+                                ? "text-emerald-700 dark:text-emerald-400 font-bold" 
+                                : isDef 
+                                    ? "text-amber-700 dark:text-amber-400 font-black" 
+                                    : "text-slate-400 dark:text-stone-500 font-normal";
+
+                        <div class="flex flex-col items-center text-center space-y-1.5 z-10 max-w-[120px]">
+                            <div class="w-10 h-10 rounded-2xl flex items-center justify-center font-extrabold text-xs @circleClass transition-all">
+                                @if (isDone)
+                                {
+                                    <i data-lucide="check" class="w-5 h-5 stroke-[3]"></i>
+                                }
+                                else if (isCurrent)
+                                {
+                                    <i data-lucide="map-pin" class="w-5 h-5"></i>
+                                }
+                                else if (isDef)
+                                {
+                                    <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                                }
+                                else
+                                {
+                                    <span>@step.StepId</span>
+                                }
+                            </div>
+                            <div>
+                                <span class="text-[11px] block leading-tight @labelClass">@step.StepName</span>
+                                @if (isCurrent)
+                                {
+                                    <span class="inline-block mt-0.5 px-1.5 py-0.2 rounded bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300 text-[9px] uppercase font-black">
+                                        Current
+                                    </span>
+                                }
+                                @if (step.Timestamp.HasValue)
+                                {
+                                    <span class="text-[9px] text-slate-400 block mt-0.5">@step.Timestamp.Value.ToString("MMM dd")</span>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- CHRONOLOGICAL ROUTING AUDIT TRAIL / TIMELINE CARDS -->
+    <div class="bg-white dark:bg-stone-900 p-6 sm:p-8 rounded-3xl border border-slate-200 dark:border-stone-800 shadow-sm space-y-6">
+        
+        <div class="flex items-center justify-between gap-4 border-b border-slate-100 dark:border-stone-800 pb-4">
+            <div>
+                <h2 class="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+                    <i data-lucide="history" class="w-5 h-5 text-emerald-600"></i>
+                    <span>Routing Audit Trail & Activity Log</span>
+                </h2>
+                <p class="text-xs text-slate-500 dark:text-stone-400">
+                    Chronological record of every desk transfer, endorsement, and status update for this transaction.
+                </p>
+            </div>
+            <span class="px-3 py-1 rounded-full text-xs font-bold bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300">
+                @Model.TimelineEvents.Count Events Recorded
+            </span>
+        </div>
+
+        <div class="relative pl-6 sm:pl-8 space-y-8 before:absolute before:left-3 sm:before:left-4 before:top-3 before:bottom-3 before:w-0.5 before:bg-slate-200 dark:before:bg-stone-800">
+            @foreach (var ev in Model.TimelineEvents)
+            {
+                bool isFiling = ev.ActionTaken.Contains("Filing", StringComparison.OrdinalIgnoreCase);
+                bool isCheckout = ev.ActionTaken.Contains("Checked Out", StringComparison.OrdinalIgnoreCase) || ev.ActionTaken.Contains("Claim", StringComparison.OrdinalIgnoreCase);
+                bool isForwarded = ev.ActionTaken.Contains("Forward", StringComparison.OrdinalIgnoreCase);
+                bool isDeferred = ev.IsDeferred || ev.ActionTaken.Contains("Return", StringComparison.OrdinalIgnoreCase) || ev.ActionTaken.Contains("Defer", StringComparison.OrdinalIgnoreCase);
+
+                var dotColor = isFiling 
+                    ? "bg-emerald-500 ring-4 ring-emerald-500/20" 
+                    : isCheckout 
+                        ? "bg-blue-500 ring-4 ring-blue-500/20" 
+                        : isDeferred 
+                            ? "bg-amber-500 ring-4 ring-amber-500/20" 
+                            : "bg-indigo-500 ring-4 ring-indigo-500/20";
+
+                var iconName = isFiling ? "file-plus" : isCheckout ? "hand" : isDeferred ? "rotate-ccw" : "send";
+
+                <div class="relative group">
+                    <!-- Timeline Node Pin -->
+                    <div class="absolute -left-6 sm:-left-8 top-1.5 w-6 h-6 sm:w-8 sm:h-8 rounded-full @dotColor flex items-center justify-center text-white shadow-xs">
+                        <i data-lucide="@iconName" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i>
+                    </div>
+
+                    <!-- Event Card -->
+                    <div class="bg-slate-50 dark:bg-stone-950 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-stone-800 shadow-xs space-y-3 group-hover:border-blue-400 dark:group-hover:border-blue-500 transition-colors">
+                        
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/60 dark:border-stone-800/80 pb-2.5">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="px-2.5 py-0.5 rounded-lg text-xs font-black bg-white dark:bg-stone-900 text-slate-900 dark:text-white border border-slate-200 dark:border-stone-800">
+                                    @ev.ActionTaken
+                                </span>
+                                <span class="text-xs font-bold text-slate-700 dark:text-stone-300">
+                                    @ev.FromStageName &rarr; <strong class="text-blue-700 dark:text-blue-400">@ev.ToStageName</strong>
+                                </span>
+                            </div>
+                            <span class="text-[11px] font-bold text-slate-400 dark:text-stone-500">
+                                @ev.Timestamp.ToString("MMM dd, yyyy &bull; hh:mm tt")
+                            </span>
+                        </div>
+
+                        <!-- Routing Metadata -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                            <div>
+                                <span class="text-[10px] text-slate-400 block font-bold">OPERATOR / SENDER</span>
+                                <span class="font-extrabold text-slate-800 dark:text-stone-200">@ev.ForwardedByName</span>
+                                <span class="text-[10px] text-slate-500 block">@ev.ForwardedByRole</span>
+                            </div>
+                            <div>
+                                <span class="text-[10px] text-slate-400 block font-bold">TARGET DESTINATION</span>
+                                <span class="font-extrabold text-slate-800 dark:text-stone-200">@ev.AssignedToRole</span>
+                                @if (ev.IsClaimed && !string.IsNullOrEmpty(ev.AssignedUserName))
+                                {
+                                    <span class="text-[10px] text-blue-600 dark:text-blue-400 block">Claimed by: @ev.AssignedUserName</span>
+                                }
+                            </div>
+                            @if (!string.IsNullOrEmpty(ev.ORNumber))
+                            {
+                                <div>
+                                    <span class="text-[10px] text-slate-400 block font-bold">OFFICIAL RECEIPT</span>
+                                    <span class="font-extrabold text-emerald-700 dark:text-emerald-400 font-mono">@ev.ORNumber</span>
+                                </div>
+                            }
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(ev.Remarks))
+                        {
+                            <div class="p-3 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-600 dark:text-stone-300 text-xs italic">
+                                "@ev.Remarks"
+                            </div>
+                        }
+
+                    </div>
+                </div>
+            }
+        </div>
+
+    </div>
+
+</div>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.lucide) {
+                window.lucide.createIcons();
+            }
+        });
+    </script>
+}

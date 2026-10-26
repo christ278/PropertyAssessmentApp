@@ -1,0 +1,584 @@
+﻿@model PropertyAssessmentApp.Models.AssessmentPartitionItem
+@{
+    var classifications = ViewBag.LandClassifications as IEnumerable<PropertyAssessmentApp.Models.LandClassification> ?? Enumerable.Empty<PropertyAssessmentApp.Models.LandClassification>();
+    var subClassifications = ViewBag.LandSubClassifications as IEnumerable<PropertyAssessmentApp.Models.LandSubClassification> ?? Enumerable.Empty<PropertyAssessmentApp.Models.LandSubClassification>();
+    var actualUses = ViewBag.LandActualUses as IEnumerable<PropertyAssessmentApp.Models.LandActualUse> ?? Enumerable.Empty<PropertyAssessmentApp.Models.LandActualUse>();
+    var assessmentLevels = ViewBag.LandAssessmentLevels as IEnumerable<PropertyAssessmentApp.Models.LandAssessmentLevel> ?? Enumerable.Empty<PropertyAssessmentApp.Models.LandAssessmentLevel>();
+    var adjustments = ViewBag.LandAdjustments as IEnumerable<PropertyAssessmentApp.Models.LandAdjustmentFactor> ?? Enumerable.Empty<PropertyAssessmentApp.Models.LandAdjustmentFactor>();
+    var improvementTypes = ViewBag.LandImprovementTypes as IEnumerable<PropertyAssessmentApp.Models.LandImprovementType> ?? Enumerable.Empty<PropertyAssessmentApp.Models.LandImprovementType>();
+    var barangays = ViewBag.Barangays as IEnumerable<PropertyAssessmentApp.Models.Barangay> ?? Enumerable.Empty<PropertyAssessmentApp.Models.Barangay>();
+}
+
+<script>
+    if (typeof window.switchLandTab !== 'function') {
+        window.switchLandTab = function(tabId) {
+            document.querySelectorAll('.land-tab-content').forEach(function(el) {
+                el.classList.add('hidden');
+            });
+            document.querySelectorAll('.land-tab-btn').forEach(function(btn) {
+                btn.classList.remove('bg-emerald-600', 'text-white', 'shadow-sm');
+                btn.classList.add('bg-slate-100', 'dark:bg-stone-800', 'text-slate-600', 'dark:text-stone-400');
+            });
+            var target = document.getElementById(tabId);
+            if (target) {
+                target.classList.remove('hidden');
+            }
+            var activeBtn = document.getElementById('btn-' + tabId);
+            if (activeBtn) {
+                activeBtn.classList.remove('bg-slate-100', 'dark:bg-stone-800', 'text-slate-600', 'dark:text-stone-400');
+                activeBtn.classList.add('bg-emerald-600', 'text-white', 'shadow-sm');
+            }
+            if (window.lucide) {
+                lucide.createIcons();
+            }
+        };
+    }
+</script>
+
+<!-- Hidden Storage for Land Dynamic Breakdown Tables -->
+<input type="hidden" asp-for="LandAppraisalDetailsJson" id="landAppraisalDetailsJson" />
+<input type="hidden" asp-for="LandImprovementsJson" id="landImprovementsJson" />
+<input type="hidden" asp-for="LandAdjustmentsJson" id="landAdjustmentsJson" />
+<input type="hidden" asp-for="LandPropertyAssessmentsJson" id="landPropertyAssessmentsJson" />
+
+<!-- Land Tab Navigation (CAST Style) -->
+<div class="flex items-center gap-2 overflow-x-auto border-b border-slate-200 dark:border-stone-800 pb-3" id="land-tab-bar">
+    <button type="button" onclick="switchLandTab('land-tab-cadastral')" id="btn-land-tab-cadastral" class="land-tab-btn px-4 py-2.5 rounded-xl text-xs font-bold font-mono transition-all bg-emerald-600 text-white shadow-sm flex items-center gap-2 shrink-0">
+        <i data-lucide="map" class="w-4 h-4"></i> 1. Cadastral & Title Registration
+    </button>
+    <button type="button" onclick="switchLandTab('land-tab-location')" id="btn-land-tab-location" class="land-tab-btn px-4 py-2.5 rounded-xl text-xs font-bold font-mono transition-all bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-400 border border-slate-200 dark:border-stone-800 hover:bg-slate-200 dark:hover:bg-stone-700 flex items-center gap-2 shrink-0">
+        <i data-lucide="compass" class="w-4 h-4"></i> 2. Location & Boundaries
+    </button>
+    <button type="button" onclick="switchLandTab('land-tab-owner')" id="btn-land-tab-owner" class="land-tab-btn px-4 py-2.5 rounded-xl text-xs font-bold font-mono transition-all bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-400 border border-slate-200 dark:border-stone-800 hover:bg-slate-200 dark:hover:bg-stone-700 flex items-center gap-2 shrink-0">
+        <i data-lucide="users" class="w-4 h-4"></i> 3. Owner & Demographics
+    </button>
+    <button type="button" onclick="switchLandTab('land-tab-valuation')" id="btn-land-tab-valuation" class="land-tab-btn px-4 py-2.5 rounded-xl text-xs font-bold font-mono transition-all bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-400 border border-slate-200 dark:border-stone-800 hover:bg-slate-200 dark:hover:bg-stone-700 flex items-center gap-2 shrink-0">
+        <i data-lucide="calculator" class="w-4 h-4"></i> 4. Valuation & 4 Schedules (CAST)
+    </button>
+    <button type="button" onclick="switchLandTab('land-tab-effectivity')" id="btn-land-tab-effectivity" class="land-tab-btn px-4 py-2.5 rounded-xl text-xs font-bold font-mono transition-all bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-400 border border-slate-200 dark:border-stone-800 hover:bg-slate-200 dark:hover:bg-stone-700 flex items-center gap-2 shrink-0">
+        <i data-lucide="file-text" class="w-4 h-4"></i> 5. Effectivity, Back Taxes & Notes
+    </button>
+</div>
+
+<!-- ========================================== -->
+<!-- TAB 1: CADASTRAL & TITLE REGISTRATION      -->
+<!-- ========================================== -->
+<div id="land-tab-cadastral" class="land-tab-content space-y-6">
+    <div class="p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-stone-800 pb-3">
+            <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+                <i data-lucide="map" class="w-4 h-4"></i>
+                Cadastral Details & Title Registration (CAST Reference)
+            </h4>
+            <div class="flex items-center gap-2">
+                <span class="text-[11px] font-mono font-bold text-slate-500">ARP NO:</span>
+                <input asp-for="ARPNo" id="inputLandArpNo" class="px-3 py-1 text-xs rounded-lg bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono font-bold text-emerald-600 dark:text-emerald-400" placeholder="187-00-0000-000-000" />
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+                <label asp-for="RegistrationStatus" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">REGISTRATION STATUS</label>
+                <select asp-for="RegistrationStatus" id="selectLandRegStatus" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold cursor-pointer">
+                    <option value="Titled">Titled Land</option>
+                    <option value="Untitled">Untitled / Tax Declaration Only</option>
+                </select>
+            </div>
+            <div>
+                <label asp-for="TitleType" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">TITLE TYPE</label>
+                <select asp-for="TitleType" id="selectLandTitleType" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold cursor-pointer">
+                    <option value="OCT">OCT (Original Certificate of Title)</option>
+                    <option value="TCT">TCT (Transfer Certificate of Title)</option>
+                    <option value="CLOA">CLOA (Certificate of Land Ownership Award)</option>
+                    <option value="Patent">Free Patent / Homestead Patent</option>
+                </select>
+            </div>
+            <div>
+                <label asp-for="TitleNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">OCT / TCT / CLOA NO.</label>
+                <input asp-for="TitleNo" id="inputLandTitleNo" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" placeholder="T-104928" />
+            </div>
+            <div>
+                <label asp-for="DateRegistered" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">DATE OF TITLE REGISTRATION</label>
+                <input asp-for="DateRegistered" id="inputLandDateRegistered" type="date" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" />
+            </div>
+            <div>
+                <label asp-for="CadastralSurveyNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">CADASTRAL SURVEY NO.</label>
+                <input asp-for="CadastralSurveyNo" id="inputLandCadSurveyNo" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" placeholder="Cad-12-00412" />
+            </div>
+            <div>
+                <label asp-for="SectionNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">SECTION NO.</label>
+                <input asp-for="SectionNo" id="inputLandSectionNo" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" placeholder="Section 02" />
+            </div>
+            <div>
+                <label asp-for="LotNumber" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">LOT NO.</label>
+                <input asp-for="LotNumber" id="inputLandLotNo" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" placeholder="Lot 10-A" />
+            </div>
+            <div>
+                <label asp-for="BlockNumber" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BLOCK NO.</label>
+                <input asp-for="BlockNumber" id="inputLandBlockNo" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" placeholder="Block 4" />
+            </div>
+            <div>
+                <label asp-for="ParcelNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">PARCEL NO.</label>
+                <input asp-for="ParcelNo" id="inputLandParcelNo" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" placeholder="Parcel 01" />
+            </div>
+            <div>
+                <label asp-for="SurveyNumber" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">SURVEY NO.</label>
+                <input asp-for="SurveyNumber" id="inputLandSurveyNo" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" placeholder="Psu-12345" />
+            </div>
+            <div class="md:col-span-2">
+                <label asp-for="PIN" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">PROPERTY INDEX NUMBER (PIN)</label>
+                <input asp-for="PIN" id="inputLandPin" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono font-bold" placeholder="126-00-0000-000" />
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- TAB 2: LOCATION & BOUNDARIES (CAST)        -->
+<!-- ========================================== -->
+<div id="land-tab-location" class="land-tab-content space-y-6 hidden">
+    <!-- Property Location -->
+    <div class="p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
+            <i data-lucide="map-pin" class="w-4 h-4"></i>
+            Property Location Details (General Santos City Standard)
+        </h4>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="md:col-span-2">
+                <label asp-for="StreetLocation" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BUILDING NO. / STREET / ROAD</label>
+                <input asp-for="StreetLocation" id="inputLandStreet" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white" placeholder="e.g. Pioneer Avenue, Corner Salazar St." />
+            </div>
+            <div>
+                <label asp-for="Purok" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">PUROK / SITIO</label>
+                <input asp-for="Purok" id="inputLandPurok" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white" placeholder="e.g. Purok Malakas" />
+            </div>
+            <div>
+                <label asp-for="DistrictOrBarangay" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BARANGAY <span class="text-rose-500">*</span></label>
+                <select asp-for="DistrictOrBarangay" id="selectLandBarangay" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold cursor-pointer">
+                    @if (barangays.Any())
+                    {
+                        foreach (var b in barangays)
+                        {
+                            <option value="@b.Name">@b.Name</option>
+                        }
+                    }
+                    else
+                    {
+                        <option value="Brgy. Central">Brgy. Central</option>
+                        <option value="Brgy. Dadiangas East">Brgy. Dadiangas East</option>
+                        <option value="Brgy. Dadiangas North">Brgy. Dadiangas North</option>
+                        <option value="Brgy. Dadiangas South">Brgy. Dadiangas South</option>
+                        <option value="Brgy. Dadiangas West">Brgy. Dadiangas West</option>
+                        <option value="Brgy. Lagao">Brgy. Lagao</option>
+                        <option value="Brgy. San Isidro">Brgy. San Isidro</option>
+                        <option value="Brgy. Calumpang">Brgy. Calumpang</option>
+                        <option value="Brgy. City Heights">Brgy. City Heights</option>
+                        <option value="Brgy. Labangal">Brgy. Labangal</option>
+                    }
+                </select>
+            </div>
+            <div class="md:col-span-2">
+                <label asp-for="CityMunicipality" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">CITY / MUNICIPALITY</label>
+                <input asp-for="CityMunicipality" id="inputLandCity" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold" readonly value="General Santos City" />
+            </div>
+            <div class="md:col-span-2">
+                <label asp-for="Province" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">PROVINCE</label>
+                <input asp-for="Province" id="inputLandProvince" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold" readonly value="South Cotabato" />
+            </div>
+        </div>
+    </div>
+
+    <!-- Boundaries & Boundary Remarks (CAST Reference) -->
+    <div class="p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
+            <i data-lucide="compass" class="w-4 h-4"></i>
+            Property Boundaries & Adjacent Lots (with Boundary Remarks)
+        </h4>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="space-y-4">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label asp-for="BoundaryNorth" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">NORTH BOUNDARY</label>
+                        <input asp-for="BoundaryNorth" id="inputLandBNorth" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="Lot 101" />
+                    </div>
+                    <div>
+                        <label asp-for="Nremarks" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">NORTH REMARKS</label>
+                        <input asp-for="Nremarks" id="inputLandNRemarks" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs" placeholder="e.g. Juan dela Cruz (Lot 101)" />
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label asp-for="BoundarySouth" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">SOUTH BOUNDARY</label>
+                        <input asp-for="BoundarySouth" id="inputLandBSouth" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="Lot 103" />
+                    </div>
+                    <div>
+                        <label asp-for="Sremarks" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">SOUTH REMARKS</label>
+                        <input asp-for="Sremarks" id="inputLandSRemarks" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs" placeholder="e.g. Existing Residential Lot" />
+                    </div>
+                </div>
+            </div>
+            <div class="space-y-4">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label asp-for="BoundaryEast" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">EAST BOUNDARY</label>
+                        <input asp-for="BoundaryEast" id="inputLandBEast" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="Road Lot" />
+                    </div>
+                    <div>
+                        <label asp-for="Eremarks" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">EAST REMARKS</label>
+                        <input asp-for="Eremarks" id="inputLandERemarks" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs" placeholder="e.g. 10m Wide Concrete Road" />
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label asp-for="BoundaryWest" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">WEST BOUNDARY</label>
+                        <input asp-for="BoundaryWest" id="inputLandBWest" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="Creek / Lot 104" />
+                    </div>
+                    <div>
+                        <label asp-for="Wremarks" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">WEST REMARKS</label>
+                        <input asp-for="Wremarks" id="inputLandWRemarks" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs" placeholder="e.g. Natural Drainage Creek" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- TAB 3: OWNER & DEMOGRAPHICS (CAST)         -->
+<!-- ========================================== -->
+<div id="land-tab-owner" class="land-tab-content space-y-6 hidden">
+    <div class="p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <div class="border-b border-slate-200 dark:border-stone-800 pb-2 flex flex-wrap items-center justify-between gap-2">
+            <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+                <i data-lucide="users" class="w-4 h-4"></i> Owner & Declarant Demographics
+            </h4>
+            <!-- Flagging: Is Administrator / Beneficial User -->
+            <label class="inline-flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 dark:text-stone-300 bg-white dark:bg-stone-900 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-stone-800 shadow-sm hover:border-emerald-500 transition-colors">
+                <input type="checkbox" asp-for="IsAdministrator" id="isLandAdminSwitch" class="rounded border-slate-300 text-emerald-600 shadow-sm focus:ring-emerald-500 w-4 h-4" />
+                <span>IS ADMINISTRATOR / BENEFICIAL USER</span>
+            </label>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="md:col-span-2">
+                <label asp-for="NewOwnerName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">OWNER / DECLARANT NAME</label>
+                <input asp-for="NewOwnerName" id="inputLandOwnerName" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-bold font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="Full name of owner / declarant" />
+            </div>
+            <div>
+                <label asp-for="OwnerTIN" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">TAX IDENTIFICATION NO. (TIN)</label>
+                <input asp-for="OwnerTIN" id="inputLandOwnerTin" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="000-000-000-000" />
+            </div>
+            <div>
+                <label asp-for="OwnerContactNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">CONTACT NUMBER</label>
+                <input asp-for="OwnerContactNo" id="inputLandOwnerPhone" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="09XX-XXX-XXXX" />
+            </div>
+            <div class="md:col-span-2">
+                <label asp-for="OwnerAddress" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">OWNER RESIDENTIAL ADDRESS</label>
+                <input asp-for="OwnerAddress" id="inputLandOwnerAddress" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="Street, Barangay, City, Province" />
+            </div>
+            <div>
+                <label asp-for="OwnerEmail" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">EMAIL ADDRESS</label>
+                <input asp-for="OwnerEmail" id="inputLandOwnerEmail" type="email" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="owner@example.com" />
+            </div>
+            <div>
+                <label asp-for="OwnerGender" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">SEX / GENDER</label>
+                <select asp-for="OwnerGender" id="selectLandOwnerGender" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-xs font-bold text-slate-900 dark:text-white">
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Corporate">Corporate / Entity</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Administrator Section (Toggled) -->
+        <div id="divLandAdminSection" class="hidden pt-4 border-t border-slate-200 dark:border-stone-800 space-y-3">
+            <h5 class="text-xs font-bold text-amber-700 dark:text-amber-400 flex items-center gap-1.5 uppercase">
+                <i data-lucide="shield-alert" class="w-4 h-4"></i> Administrator / Beneficial Possessor Details
+            </h5>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="md:col-span-2">
+                    <label asp-for="AdministratorName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">ADMINISTRATOR NAME</label>
+                    <input asp-for="AdministratorName" id="inputLandAdminName" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-bold font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="Full name of administrator / possessor" />
+                </div>
+                <div>
+                    <label asp-for="AdministratorTin" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">ADMINISTRATOR TIN</label>
+                    <input asp-for="AdministratorTin" id="inputLandAdminTin" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="000-000-000-000" />
+                </div>
+                <div>
+                    <label asp-for="AdministratorContactNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">CONTACT NUMBER</label>
+                    <input asp-for="AdministratorContactNo" id="inputLandAdminPhone" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="09XX-XXX-XXXX" />
+                </div>
+                <div class="md:col-span-3">
+                    <label asp-for="AdministratorAddress" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">ADMINISTRATOR ADDRESS</label>
+                    <input asp-for="AdministratorAddress" id="inputLandAdminAddress" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="Address of administrator" />
+                </div>
+                <div>
+                    <label asp-for="AdministratorEmail" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">ADMINISTRATOR EMAIL</label>
+                    <input asp-for="AdministratorEmail" id="inputLandAdminEmail" type="email" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="admin@example.com" />
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- TAB 4: VALUATION & 4 SCHEDULES (CAST)      -->
+<!-- ========================================== -->
+<div id="land-tab-valuation" class="land-tab-content space-y-6 hidden">
+    <!-- TABLE 1: LAND APPRAISAL / CLASSIFICATION SCHEDULE -->
+    <div class="p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-stone-800 pb-3">
+            <div>
+                <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+                    <i data-lucide="layers" class="w-4 h-4"></i>
+                    Table 1: Land Appraisal & Classification Schedule (SMV)
+                </h4>
+                <p class="text-[11px] text-slate-500 dark:text-stone-400">Classify parcel segments according to schedule of unit values (SMV) to determine Base Market Value.</p>
+            </div>
+            <button type="button" onclick="addLandClassificationRow()" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-sm transition-all">
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add Classification Row
+            </button>
+        </div>
+
+        <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-stone-800 bg-white dark:bg-stone-900">
+            <table class="w-full text-xs text-left" id="landClassificationTable">
+                <thead class="bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-stone-700">
+                    <tr>
+                        <th class="p-3">Classification</th>
+                        <th class="p-3">Sub-Classification (SMV)</th>
+                        <th class="p-3">Actual Use</th>
+                        <th class="p-3 text-right">Area (sq.m.)</th>
+                        <th class="p-3 text-right">Unit Value (₱/sq.m.)</th>
+                        <th class="p-3 text-right">Base Market Value (₱)</th>
+                        <th class="p-3 text-center w-16">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="landClassificationTableBody" class="divide-y divide-slate-100 dark:divide-stone-800 font-medium">
+                    <!-- Dynamic rows inserted via JavaScript -->
+                </tbody>
+                <tfoot class="bg-slate-50 dark:bg-stone-950 font-bold text-slate-800 dark:text-stone-200 border-t border-slate-200 dark:border-stone-800">
+                    <tr>
+                        <td colspan="3" class="p-3 text-right">TOTAL LAND AREA:</td>
+                        <td class="p-3 text-right font-mono text-emerald-600 dark:text-emerald-400" id="displayTotalLandArea">0.00 sq.m.</td>
+                        <td class="p-3 text-right">TOTAL BASE MARKET VALUE:</td>
+                        <td class="p-3 text-right font-mono text-emerald-600 dark:text-emerald-400" id="displayTotalBaseMarketValue">₱0.00</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+
+    <!-- TABLE 2: OTHER IMPROVEMENTS / PLANTS & TREES -->
+    <div class="p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-stone-800 pb-3">
+            <div>
+                <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+                    <i data-lucide="sprout" class="w-4 h-4"></i>
+                    Table 2: Other Improvements / Plants & Trees Appraisal
+                </h4>
+                <p class="text-[11px] text-slate-500 dark:text-stone-400">Record fruit-bearing trees, plantations, fences, and improvements on the land.</p>
+            </div>
+            <button type="button" onclick="addLandImprovementRow()" class="px-3 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-sm transition-all">
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add Improvement Row
+            </button>
+        </div>
+
+        <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-stone-800 bg-white dark:bg-stone-900">
+            <table class="w-full text-xs text-left" id="landImprovementTable">
+                <thead class="bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-stone-700">
+                    <tr>
+                        <th class="p-3">Improvement Type</th>
+                        <th class="p-3 text-center">Fruit Bearing</th>
+                        <th class="p-3 text-right">Quantity</th>
+                        <th class="p-3 text-right">Age (Years)</th>
+                        <th class="p-3 text-right">Unit Value (₱)</th>
+                        <th class="p-3 text-right">Base Market Value (₱)</th>
+                        <th class="p-3 text-center w-16">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="landImprovementTableBody" class="divide-y divide-slate-100 dark:divide-stone-800 font-medium">
+                    <!-- Dynamic rows inserted via JavaScript -->
+                </tbody>
+                <tfoot class="bg-slate-50 dark:bg-stone-950 font-bold text-slate-800 dark:text-stone-200 border-t border-slate-200 dark:border-stone-800">
+                    <tr>
+                        <td colspan="5" class="p-3 text-right">TOTAL OTHER IMPROVEMENTS:</td>
+                        <td class="p-3 text-right font-mono text-teal-600 dark:text-teal-400" id="displayTotalImprovementsValue">₱0.00</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+
+    <!-- TABLE 3: BASE MARKET VALUE ADJUSTMENTS -->
+    <div class="p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-stone-800 pb-3">
+            <div>
+                <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+                    <i data-lucide="sliders" class="w-4 h-4"></i>
+                    Table 3: Base Market Value Adjustments (Corner, Elevation, Topography)
+                </h4>
+                <p class="text-[11px] text-slate-500 dark:text-stone-400">Apply percentage adjustments based on corner lot influence, topography, or road access.</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <button type="button" onclick="syncAdjustmentsFromClassifications()" class="px-3 py-1.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 hover:bg-slate-100 dark:hover:bg-stone-800 text-slate-700 dark:text-stone-200 font-bold text-xs inline-flex items-center gap-1.5 shadow-xs transition-all">
+                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Sync from Schedules
+                </button>
+                <button type="button" onclick="addLandAdjustmentRow()" class="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-sm transition-all">
+                    <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add Adjustment Row
+                </button>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-stone-800 bg-white dark:bg-stone-900">
+            <table class="w-full text-xs text-left" id="landAdjustmentTable">
+                <thead class="bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-stone-700">
+                    <tr>
+                        <th class="p-3">Classification</th>
+                        <th class="p-3 text-right">Base Market Value (₱)</th>
+                        <th class="p-3">Adjustment Factor</th>
+                        <th class="p-3 text-right">% Adjustment</th>
+                        <th class="p-3 text-right">Value Adjustment (₱)</th>
+                        <th class="p-3 text-right">Adjusted Market Value (₱)</th>
+                        <th class="p-3 text-center w-16">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="landAdjustmentTableBody" class="divide-y divide-slate-100 dark:divide-stone-800 font-medium">
+                    <!-- Dynamic rows inserted via JavaScript -->
+                </tbody>
+                <tfoot class="bg-slate-50 dark:bg-stone-950 font-bold text-slate-800 dark:text-stone-200 border-t border-slate-200 dark:border-stone-800">
+                    <tr>
+                        <td class="p-3 font-bold">TOTAL:</td>
+                        <td colspan="2"></td>
+                        <td class="p-3 text-right font-mono text-sky-600 dark:text-sky-400" id="displayTotalPercentAdjustment">0.00%</td>
+                        <td></td>
+                        <td class="p-3 text-right font-mono text-emerald-600 dark:text-emerald-400" id="displayTotalAdjustedMarketValue">₱0.00</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+
+    <!-- TABLE 4: PROPERTY ASSESSMENT ROLL -->
+    <div class="p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-stone-800 pb-3">
+            <div>
+                <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+                    <i data-lucide="calculator" class="w-4 h-4"></i>
+                    Table 4: Property Assessment Roll & Tax Due Calculation
+                </h4>
+                <p class="text-[11px] text-slate-500 dark:text-stone-400">Computes final Assessed Value by applying statutory Assessment Levels (%) to adjusted market values.</p>
+            </div>
+            <button type="button" onclick="autoGeneratePropertyAssessmentRoll()" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-sm transition-all">
+                <i data-lucide="zap" class="w-3.5 h-3.5"></i> Auto-Generate Assessment Roll
+            </button>
+        </div>
+
+        <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-stone-800 bg-white dark:bg-stone-900">
+            <table class="w-full text-xs text-left" id="landPropertyAssessmentTable">
+                <thead class="bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-stone-700">
+                    <tr>
+                        <th class="p-3">Kinds</th>
+                        <th class="p-3">Actual Use</th>
+                        <th class="p-3 text-right">Market Value (₱)</th>
+                        <th class="p-3 text-right">Assessment Level (%)</th>
+                        <th class="p-3 text-right">Assessed Value (₱)</th>
+                        <th class="p-3 text-center w-16">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="landPropertyAssessmentTableBody" class="divide-y divide-slate-100 dark:divide-stone-800 font-medium">
+                    <!-- Dynamic rows inserted via JavaScript -->
+                </tbody>
+                <tfoot class="bg-slate-50 dark:bg-stone-950 font-bold text-slate-800 dark:text-stone-200 border-t border-slate-200 dark:border-stone-800">
+                    <tr>
+                        <td colspan="2" class="p-3 text-right">TOTAL MARKET VALUE:</td>
+                        <td class="p-3 text-right font-mono text-emerald-600 dark:text-emerald-400" id="displayTotalAssessmentMarketValue">₱0.00</td>
+                        <td class="p-3 text-right">TOTAL ASSESSED VALUE:</td>
+                        <td class="p-3 text-right font-mono text-emerald-600 dark:text-emerald-400 font-black" id="displayTotalAssessedValue">₱0.00</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <!-- Valuation Summary KPI Dashboard -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 pt-3">
+            <div class="p-3 bg-white dark:bg-stone-900 rounded-xl border border-slate-200 dark:border-stone-800">
+                <span class="text-[10px] font-bold uppercase text-slate-400 block mb-1">Total Market Value</span>
+                <span class="text-sm font-black font-mono text-slate-900 dark:text-white" id="kpiLandMarketValue">₱0.00</span>
+            </div>
+            <div class="p-3 bg-white dark:bg-stone-900 rounded-xl border border-slate-200 dark:border-stone-800">
+                <span class="text-[10px] font-bold uppercase text-slate-400 block mb-1">Total Assessed Value</span>
+                <span class="text-sm font-black font-mono text-emerald-600 dark:text-emerald-400" id="kpiLandAssessedValue">₱0.00</span>
+            </div>
+            <div class="p-3 bg-white dark:bg-stone-900 rounded-xl border border-slate-200 dark:border-stone-800">
+                <span class="text-[10px] font-bold uppercase text-slate-400 block mb-1">Basic RPT (2.0%)</span>
+                <span class="text-sm font-black font-mono text-sky-600 dark:text-sky-400" id="kpiLandBasicRpt">₱0.00</span>
+            </div>
+            <div class="p-3 bg-white dark:bg-stone-900 rounded-xl border border-slate-200 dark:border-stone-800">
+                <span class="text-[10px] font-bold uppercase text-slate-400 block mb-1">Total Annual Tax Due</span>
+                <span class="text-sm font-black font-mono text-amber-600 dark:text-amber-400" id="kpiLandAnnualTax">₱0.00</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- TAB 5: EFFECTIVITY, BACK TAXES & NOTES     -->
+<!-- ========================================== -->
+<div id="land-tab-effectivity" class="land-tab-content space-y-6 hidden">
+    <!-- Effectivity & Assessment Basis -->
+    <div class="p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
+            <i data-lucide="calendar" class="w-4 h-4"></i>
+            Effectivity, Taxability & Assessment Basis (CAST Standard)
+        </h4>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+                <label asp-for="EffectivityQuarter" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">EFFECTIVITY QUARTER</label>
+                <select asp-for="EffectivityQuarter" id="selectLandEffQuarter" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold cursor-pointer text-xs">
+                    <option value="1st Quarter">1st Quarter</option>
+                    <option value="2nd Quarter">2nd Quarter</option>
+                    <option value="3rd Quarter">3rd Quarter</option>
+                    <option value="4th Quarter">4th Quarter</option>
+                </select>
+            </div>
+            <div>
+                <label asp-for="EffectivityYear" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">EFFECTIVITY YEAR</label>
+                <input asp-for="EffectivityYear" id="inputLandEffYear" type="number" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono font-bold text-xs" value="@(Model.EffectivityYear ?? DateTime.Now.Year)" />
+            </div>
+            <div>
+                <label asp-for="Taxability" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">TAXABILITY STATUS</label>
+                <select asp-for="Taxability" id="selectLandTaxability" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold cursor-pointer text-xs">
+                    <option value="Taxable">Taxable (Standard)</option>
+                    <option value="Exempt">Exempt from Real Property Tax</option>
+                </select>
+            </div>
+            <div>
+                <label asp-for="AssessmentBasis" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BASIS OF ASSESSMENT</label>
+                <input asp-for="AssessmentBasis" id="inputLandAssessmentBasis" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold text-xs" value="Sec. 217 RA 7160" />
+            </div>
+            <div>
+                <label asp-for="BackTaxesYearFrom" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BACK TAXES FROM YEAR</label>
+                <input asp-for="BackTaxesYearFrom" id="inputLandBackTaxesFrom" type="number" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="YYYY (Optional)" />
+            </div>
+            <div>
+                <label asp-for="BackTaxesYearTo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BACK TAXES TO YEAR</label>
+                <input asp-for="BackTaxesYearTo" id="inputLandBackTaxesTo" type="number" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="YYYY (Optional)" />
+            </div>
+        </div>
+    </div>
+
+    <!-- Memoranda & Notes -->
+    <div class="p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
+            <i data-lucide="clipboard-list" class="w-4 h-4"></i>
+            Memoranda & Assessment Notes
+        </h4>
+        <div>
+            <textarea asp-for="Memoranda" id="textareaLandMemoranda" rows="4" class="w-full px-4 py-3 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs focus:outline-none focus:border-emerald-600" placeholder="Enter notes, registration references, partition directives, or sworn statement details..."></textarea>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,117 @@
+@model PropertyAssessmentApp.Models.UserAccount
+
+@{
+    ViewData["Title"] = $"User Profile - {Model.FullName}";
+}
+
+<div class="space-y-8 font-mono text-xs">
+    
+    <!-- Action Header Bar -->
+    <div class="flex items-center justify-between">
+        <a asp-action="Index" class="px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 hover:bg-slate-50 dark:hover:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold border border-slate-200 dark:border-stone-800 shadow-sm flex items-center gap-2">
+            <i data-lucide="arrow-left" class="w-4 h-4"></i>
+            Back to Directory
+        </a>
+        <div class="flex items-center gap-3">
+            <a asp-action="Edit" asp-route-id="@Model.Id" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-till-950 font-bold flex items-center gap-2 shadow-sm">
+                <i data-lucide="edit" class="w-4 h-4"></i>
+                Edit Profile / Reset Password
+            </a>
+        </div>
+    </div>
+
+    <!-- User Profile Card -->
+    <div class="p-8 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-6">
+        
+        <div class="border-b border-slate-200 dark:border-stone-800 pb-4 flex items-center justify-between">
+            <div>
+                <span class="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold uppercase tracking-wider">System User Credentials</span>
+                <h2 class="text-2xl font-black text-slate-900 dark:text-white font-mono">@Model.FullName</h2>
+                <span class="text-slate-500 dark:text-stone-400 text-xs">Username: <strong class="text-emerald-700 dark:text-emerald-400">@@@Model.Username</strong></span>
+            </div>
+            @if (Model.IsActive)
+            {
+                <span class="px-3 py-1 rounded-xl bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/40 text-xs font-bold uppercase">Active User</span>
+            }
+            else
+            {
+                <span class="px-3 py-1 rounded-xl bg-rose-100 dark:bg-rose-500/20 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-500/40 text-xs font-bold uppercase">Inactive (Soft Deleted)</span>
+            }
+        </div>
+
+        <!-- Password Hash Security Section -->
+        <div class="p-4 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/80 dark:border-emerald-800/40 space-y-2">
+            <div class="flex items-center justify-between">
+                <span class="text-[10px] text-emerald-800 dark:text-emerald-300 font-bold uppercase flex items-center gap-1.5">
+                    <i data-lucide="lock" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                    Password Security Algorithm:
+                </span>
+                <span class="px-2 py-0.5 rounded text-[10px] bg-emerald-200 dark:bg-emerald-500/20 text-emerald-900 dark:text-emerald-300 font-bold uppercase font-mono">
+                    PBKDF2 + HMAC-SHA256 Salted Hash
+                </span>
+            </div>
+            <div class="text-[11px] font-mono text-slate-600 dark:text-stone-400 truncate max-w-full" title="@Model.PasswordHash">
+                Hash Digest: <span class="font-bold text-slate-900 dark:text-white select-all">@Model.PasswordHash</span>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
+            <div>
+                <span class="text-slate-500 dark:text-stone-400 block text-[10px] font-bold uppercase">User Position:</span>
+                <span class="text-slate-900 dark:text-white font-bold font-mono text-sm">@Model.Role</span>
+            </div>
+            <div>
+                <span class="text-slate-500 dark:text-stone-400 block text-[10px] font-bold uppercase">Division:</span>
+                <span class="text-slate-900 dark:text-white font-bold font-mono text-sm">@Model.DivisionName</span>
+            </div>
+            <div>
+                <span class="text-slate-500 dark:text-stone-400 block text-[10px] font-bold uppercase">User Role (Workflow Step):</span>
+                <span class="text-emerald-700 dark:text-emerald-400 font-bold font-mono text-sm">
+                    @(string.IsNullOrEmpty(Model.WorkflowRoleName) ? (Model.WorkflowRoleId.HasValue ? $"Step {Model.WorkflowRoleId}" : "Unassigned") : $"Step {Model.WorkflowRoleId}: {Model.WorkflowRoleName}")
+                </span>
+            </div>
+        </div>
+
+        <div class="space-y-4 pt-2">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <span class="text-slate-500 dark:text-stone-400 block text-[10px] font-bold uppercase">Contact Phone:</span>
+                    <span class="text-slate-900 dark:text-stone-100 font-bold">@(string.IsNullOrEmpty(Model.ContactNo) ? "N/A" : Model.ContactNo)</span>
+                </div>
+                <div>
+                    <span class="text-slate-500 dark:text-stone-400 block text-[10px] font-bold uppercase">Email Address:</span>
+                    <span class="text-slate-900 dark:text-stone-100 font-bold">@Model.Email</span>
+                </div>
+            </div>
+
+            <div class="p-4 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
+                <span class="text-[10px] text-slate-500 dark:text-stone-400 block uppercase font-bold">Department / Division Assignment:</span>
+                <strong class="text-slate-900 dark:text-white text-sm">@Model.Department</strong>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 pt-4 border-t border-slate-200 dark:border-stone-800 text-slate-500 dark:text-stone-400 text-[10px]">
+                <div>Account Created: <strong class="text-slate-700 dark:text-stone-300">@Model.CreatedDate.ToString("MMMM dd, yyyy - hh:mm tt")</strong></div>
+                <div>Last Login Session: <strong class="text-slate-700 dark:text-stone-300">@(Model.LastLoginDate.HasValue ? Model.LastLoginDate.Value.ToString("MMMM dd, yyyy - hh:mm tt") : "Never Logged In")</strong></div>
+            </div>
+        </div>
+
+        <!-- Soft Delete / Inactivate Toggle Form -->
+        <div class="pt-4 border-t border-slate-200 dark:border-stone-800 flex justify-end">
+            <form asp-action="ToggleStatus" asp-route-id="@Model.Id" method="post">
+                <input type="hidden" name="setStatus" value="@(Model.IsActive ? "false" : "true")" />
+                @if (Model.IsActive)
+                {
+                    <button type="submit" onclick="return confirm('Inactivate user account @Model.Username? (Account will be soft-deleted)')" class="px-5 py-2.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-700 dark:text-rose-300 font-bold">
+                        Inactivate Account (Soft Delete)
+                    </button>
+                }
+                else
+                {
+                    <button type="submit" onclick="return confirm('Re-activate user account @Model.Username?')" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold">
+                        Re-Activate User Access
+                    </button>
+                }
+            </form>
+        </div>
+    </div>
+</div>

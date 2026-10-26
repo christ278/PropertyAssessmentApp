@@ -1,0 +1,64 @@
+@model PropertyAssessmentApp.Models.UserRoleSetting
+@using PropertyAssessmentApp.Models
+
+@{
+    ViewData["Title"] = "Add New User Role";
+}
+
+<div class="space-y-8 font-mono text-xs">
+    
+    <!-- Page Header -->
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+            <div class="inline-flex items-center gap-2 text-xs font-mono text-emerald-700 dark:text-emerald-400 font-bold mb-1">
+                <i data-lucide="shield-plus" class="w-4 h-4"></i>
+                <span>User Role Setting</span>
+            </div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Create User Role</h1>
+            <p class="text-slate-500 dark:text-stone-400 text-sm">Define LGU Assessor staff role title, description, and division assignment.</p>
+        </div>
+        <a asp-action="Index" class="w-full sm:w-auto text-center px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 hover:bg-slate-50 dark:hover:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold text-xs font-mono border border-slate-200 dark:border-stone-800 shadow-sm">
+            Cancel
+        </a>
+    </div>
+
+    <!-- Form Container -->
+    <div class="p-4 sm:p-6 lg:p-8 rounded-2xl sm:rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm">
+        <form asp-action="Create" method="post" class="space-y-6">
+            <div asp-validation-summary="ModelOnly" class="p-4 rounded-xl bg-rose-50 dark:bg-rose-500/20 text-rose-800 border border-rose-200"></div>
+
+            <div>
+                <label asp-for="RoleName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">
+                    ROLE NAME / TITLE <span class="text-rose-600 font-bold">*</span>
+                </label>
+                <input asp-for="RoleName" class="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold focus:outline-none focus:border-emerald-600" placeholder="e.g. Replotting Specialist, Senior Tax Mapper" />
+                <span asp-validation-for="RoleName" class="text-rose-600 text-[10px]"></span>
+            </div>
+
+            <div>
+                <label asp-for="Division" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">DIVISION ASSIGNMENT</label>
+                <select asp-for="Division" asp-items="Html.GetEnumSelectList<DivisionType>()" class="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold focus:outline-none focus:border-emerald-600">
+                    <option value="">-- All Divisions / Global Scope --</option>
+                </select>
+            </div>
+
+            <div>
+                <label asp-for="Description" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">ROLE DESCRIPTION & RESPONSIBILITIES</label>
+                <textarea asp-for="Description" rows="3" class="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600" placeholder="Specify workflow responsibilities and permission scope..."></textarea>
+            </div>
+
+            <label class="flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 cursor-pointer">
+                <input type="checkbox" asp-for="IsActive" class="w-4 h-4 rounded text-emerald-600" />
+                <span class="font-bold text-slate-800 dark:text-stone-200">Active Role Status</span>
+            </label>
+
+            <div class="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 sm:gap-4 pt-4 border-t border-slate-200 dark:border-stone-800">
+                <a asp-action="Index" class="w-full sm:w-auto text-center px-6 py-3 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold">Cancel</a>
+                <button type="submit" class="w-full sm:w-auto px-8 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold flex items-center justify-center gap-2 shadow-lg">
+                    <i data-lucide="check" class="w-4 h-4"></i>
+                    Create User Role
+                </button>
+            </div>
+        </form>
+    </div>
+</div>

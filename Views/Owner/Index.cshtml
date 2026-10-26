@@ -1,0 +1,191 @@
+@model IEnumerable<PropertyAssessmentApp.Models.Owner>
+@using PropertyAssessmentApp.Models
+
+@{
+    ViewData["Title"] = "Real Property Owner Directory";
+    var search = ViewBag.Search as string ?? "";
+    var currentType = ViewBag.Type as OwnerType?;
+}
+
+<div class="space-y-8">
+    
+    <!-- Page Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <div class="inline-flex items-center gap-2 text-xs font-mono text-emerald-700 dark:text-emerald-400 font-bold mb-1">
+                <i data-lucide="users" class="w-4 h-4"></i>
+                <span>Taxpayer & Owner Registry</span>
+            </div>
+            <h1 class="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Real Property Owner Masterlist</h1>
+            <p class="text-slate-500 dark:text-stone-400 text-sm">Register land owners, corporate entities, TIN records, and taxpayer profiles.</p>
+        </div>
+
+        <a asp-action="Create" class="px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-till-950 font-bold text-xs font-mono flex items-center gap-2 shadow-md shadow-emerald-600/20 transition-all">
+            <i data-lucide="user-plus" class="w-4 h-4"></i>
+            Register New Owner
+        </a>
+    </div>
+
+    <!-- Summary Metrics Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="p-5 rounded-2xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 space-y-1 shadow-sm sinsilyo-card-light">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-mono text-slate-500 dark:text-stone-400 font-bold uppercase">Total Registered Owners</span>
+                <i data-lucide="users" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+            </div>
+            <div class="text-2xl font-black font-mono text-slate-900 dark:text-white">@ViewBag.TotalCount</div>
+            <span class="text-[10px] font-mono text-emerald-700 dark:text-emerald-400 font-bold">Active Taxpayer Database</span>
+        </div>
+
+        <div class="p-5 rounded-2xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 space-y-1 shadow-sm sinsilyo-card-light">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-mono text-slate-500 dark:text-stone-400 font-bold uppercase">Individual Taxpayers</span>
+                <i data-lucide="user" class="w-4 h-4 text-amber-600 dark:text-amber-400"></i>
+            </div>
+            <div class="text-2xl font-black font-mono text-slate-800 dark:text-stone-200">@ViewBag.IndividualCount</div>
+            <span class="text-[10px] font-mono text-slate-400 dark:text-stone-500">Private Land Owners</span>
+        </div>
+
+        <div class="p-5 rounded-2xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 space-y-1 shadow-sm sinsilyo-card-light border-l-4 border-l-emerald-600">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-mono text-emerald-700 dark:text-emerald-400 font-bold uppercase">Corporate & Government</span>
+                <i data-lucide="building-2" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+            </div>
+            <div class="text-2xl font-black font-mono text-emerald-700 dark:text-emerald-400">@ViewBag.CorporateCount</div>
+            <span class="text-[10px] font-mono text-slate-500 dark:text-stone-500">Commercial Entities</span>
+        </div>
+    </div>
+
+    <!-- Search & Filter Controls -->
+    <form method="get" asp-action="Index" class="flex flex-wrap items-center justify-between gap-4 bg-white dark:bg-stone-900 p-4 rounded-2xl border border-slate-200 dark:border-stone-800 shadow-sm font-mono text-xs">
+        <div class="flex items-center gap-2 flex-1 min-w-[240px]">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 dark:text-stone-400"></i>
+            <input type="text" name="search" value="@search" placeholder="Search owner name, TIN, RPTIN, or Barangay..." class="w-full bg-slate-50 dark:bg-stone-950 px-4 py-2 rounded-xl border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600">
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3">
+            <div class="flex items-center gap-2 bg-slate-50 dark:bg-stone-800 px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-700 shadow-xs shrink-0">
+                <span class="limit-label text-[10px] text-slate-500 dark:text-emerald-400 font-extrabold uppercase">Limit:</span>
+                <select class="table-limit-select bg-transparent font-extrabold text-slate-900 dark:text-white focus:outline-none cursor-pointer">
+                    <option value="5" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">5</option>
+                    <option value="10" selected class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">10</option>
+                    <option value="25" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">25</option>
+                    <option value="50" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">50</option>
+                    <option value="100" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">100</option>
+                </select>
+            </div>
+
+            <select name="type" asp-items="Html.GetEnumSelectList<OwnerType>()" class="bg-slate-50 dark:bg-stone-950 text-slate-900 dark:text-white px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800">
+                <option value="">All Owner Types</option>
+            </select>
+
+            <button type="submit" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-till-950 font-bold">Filter</button>
+            <a asp-action="Index" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-300 hover:text-slate-900 dark:hover:text-white"><i data-lucide="rotate-ccw" class="w-4 h-4"></i></a>
+        </div>
+    </form>
+
+    <!-- Owner Table Directory -->
+    <div class="bg-white dark:bg-stone-900 rounded-3xl border border-slate-200 dark:border-stone-800 shadow-sm paginated-table-card">
+        <div class="overflow-x-auto min-h-[260px] pb-4 rounded-3xl">
+            <table class="w-full text-left text-xs font-mono">
+                <thead class="bg-slate-100 dark:bg-stone-950 text-slate-600 dark:text-stone-400 border-b border-slate-200 dark:border-stone-800 font-bold">
+                    <tr>
+                        <th class="px-3 sm:px-4 py-3.5">OWNER NAME</th>
+                        <th class="hidden md:table-cell px-4 py-3.5">TYPE</th>
+                        <th class="hidden sm:table-cell px-4 py-3.5">TIN & RPTIN NO.</th>
+                        <th class="hidden lg:table-cell px-4 py-3.5">CONTACT & EMAIL</th>
+                        <th class="hidden md:table-cell px-4 py-3.5">BARANGAY / ADDRESS</th>
+                        <th class="px-2 sm:px-4 py-3.5 text-center">STATUS</th>
+                        <th class="px-2 sm:px-4 py-3.5 text-center">ACTION</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-stone-800/60">
+                    @if (!Model.Any())
+                    {
+                        <tr>
+                            <td colspan="7" class="text-center py-8 text-slate-400 dark:text-stone-500">
+                                <i data-lucide="users" class="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-stone-600"></i>
+                                No property owners found matching the filter criteria.
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var item in Model)
+                        {
+                            <tr class="hover:bg-slate-50/80 dark:hover:bg-stone-800/50 transition-all">
+                                <td class="px-3 sm:px-4 py-3.5">
+                                    <a asp-action="Details" asp-route-id="@item.Id" class="font-bold text-slate-900 dark:text-white hover:text-emerald-700 dark:hover:text-emerald-400 font-mono">
+                                        @item.DisplayName
+                                    </a>
+                                    <div class="sm:hidden mt-1 space-y-0.5">
+                                        <div class="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold">TIN: @(string.IsNullOrEmpty(item.TaxIdentNo) ? "N/A" : item.TaxIdentNo)</div>
+                                        <div class="text-[10px] text-slate-500 dark:text-stone-400">@item.BarangayName &bull; <span class="uppercase">@item.OwnerType</span></div>
+                                    </div>
+                                </td>
+                                <td class="hidden md:table-cell px-4 py-3.5">
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-mono uppercase font-bold bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 border border-slate-200 dark:border-stone-700">
+                                        @item.OwnerType
+                                    </span>
+                                </td>
+                                <td class="hidden sm:table-cell px-4 py-3.5">
+                                    <div class="font-bold text-slate-800 dark:text-stone-200">TIN: @item.TaxIdentNo</div>
+                                    <span class="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold block">@item.RptinNumber</span>
+                                </td>
+                                <td class="hidden lg:table-cell px-4 py-3.5 text-slate-700 dark:text-stone-300">
+                                    <div>📞 @(string.IsNullOrEmpty(item.ContactNo) ? "N/A" : item.ContactNo)</div>
+                                    <div class="text-[10px] text-slate-400 dark:text-stone-500">✉️ @(string.IsNullOrEmpty(item.Email) ? "N/A" : item.Email)</div>
+                                </td>
+                                <td class="hidden md:table-cell px-4 py-3.5 text-slate-700 dark:text-stone-300">
+                                    <div class="font-bold text-slate-800 dark:text-stone-200">@item.BarangayName</div>
+                                    <span class="text-[10px] text-slate-500 dark:text-stone-500 block truncate max-w-[160px]">@item.Address</span>
+                                </td>
+                                <td class="px-2 sm:px-4 py-3.5 text-center">
+                                    @if (item.IsActive)
+                                    {
+                                        <span class="px-2.5 py-1 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/40 text-[10px] font-bold uppercase">Active</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-stone-800 text-slate-500 dark:text-stone-400 text-[10px] font-bold uppercase">Inactive</span>
+                                    }
+                                </td>
+                                <td class="px-2 sm:px-4 py-3.5 text-center relative">
+                                    <div class="relative inline-block text-left">
+                                        <button type="button" onclick="toggleKebabMenu(event, 'kebab-owner-@item.Id')" class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-slate-700 dark:text-stone-300 border border-slate-200 dark:border-stone-700 transition-colors focus:outline-none" title="More Actions">
+                                            <i data-lucide="more-vertical" class="w-4 h-4"></i>
+                                        </button>
+
+                                        <div id="kebab-owner-@item.Id" class="kebab-dropdown hidden absolute right-0 mt-2 w-44 rounded-2xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-xl z-50 overflow-hidden divide-y divide-slate-100 dark:divide-stone-800/80 text-xs font-mono text-left">
+                                            <div class="py-1">
+                                                <a asp-action="Details" asp-route-id="@item.Id" class="flex items-center gap-2.5 px-3.5 py-2 text-slate-700 dark:text-stone-300 hover:bg-emerald-50 dark:hover:bg-stone-800 font-bold">
+                                                    <i data-lucide="user-check" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
+                                                    View Profile
+                                                </a>
+                                                <a asp-action="Edit" asp-route-id="@item.Id" class="flex items-center gap-2.5 px-3.5 py-2 text-slate-700 dark:text-stone-300 hover:bg-emerald-50 dark:hover:bg-stone-800 font-bold">
+                                                    <i data-lucide="edit-3" class="w-3.5 h-3.5 text-teal-600 dark:text-teal-400"></i>
+                                                    Edit Profile
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination Controls -->
+        <div class="table-pagination-footer p-4 sm:p-6 pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-200 dark:border-stone-800 text-xs font-mono">
+            <div class="text-slate-500 dark:text-stone-400 text-center sm:text-left">
+                Showing <span class="font-bold text-slate-900 dark:text-white table-showing-start">1</span> to 
+                <span class="font-bold text-slate-900 dark:text-white table-showing-end">10</span> of 
+                <span class="font-bold text-slate-900 dark:text-white table-total-count">@Model.Count()</span> entries
+            </div>
+            <div class="flex items-center gap-1.5 flex-wrap justify-center table-pagination-buttons">
+            </div>
+        </div>
+    </div>
+</div>

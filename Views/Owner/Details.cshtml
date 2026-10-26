@@ -1,0 +1,100 @@
+@model PropertyAssessmentApp.Models.Owner
+
+@{
+    ViewData["Title"] = $"Owner Profile - {Model.DisplayName}";
+}
+
+<div class="space-y-8 font-mono text-xs">
+    
+    <!-- Action Header Bar -->
+    <div class="flex items-center justify-between">
+        <a asp-action="Index" class="px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 hover:bg-slate-50 dark:hover:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold border border-slate-200 dark:border-stone-800 shadow-sm flex items-center gap-2">
+            <i data-lucide="arrow-left" class="w-4 h-4"></i>
+            Back to Directory
+        </a>
+        <a asp-action="Edit" asp-route-id="@Model.Id" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-till-950 font-bold flex items-center gap-2 shadow-sm">
+            <i data-lucide="edit" class="w-4 h-4"></i>
+            Edit Profile
+        </a>
+    </div>
+
+    <!-- Owner Profile Card -->
+    <div class="p-8 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-6">
+        
+        <div class="border-b border-slate-200 dark:border-stone-800 pb-4 flex items-center justify-between">
+            <div>
+                <span class="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold uppercase tracking-wider">Property Taxpayer Profile</span>
+                <h2 class="text-2xl font-black text-slate-900 dark:text-white font-mono">@Model.DisplayName</h2>
+                <span class="text-slate-500 dark:text-stone-400 text-xs">Type: @Model.OwnerType</span>
+            </div>
+            @if (Model.IsActive)
+            {
+                <span class="px-3 py-1 rounded-xl bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/40 text-xs font-bold uppercase">Active Taxpayer</span>
+            }
+            else
+            {
+                <span class="px-3 py-1 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-500 dark:text-stone-400 text-xs font-bold uppercase">Inactive</span>
+            }
+        </div>
+
+        <div class="p-4 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-2">
+            <span class="text-[10px] text-slate-500 dark:text-stone-400 font-bold uppercase block">Owner System Primary Key (Guid):</span>
+            <span class="text-sm font-bold text-slate-900 dark:text-white font-mono select-all">@Model.Id</span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
+            <div>
+                <span class="text-slate-500 dark:text-stone-400 block text-[10px] font-bold uppercase">Tax Identification No. (TIN):</span>
+                <span class="text-slate-900 dark:text-white font-bold font-mono text-base">@Model.TaxIdentNo</span>
+            </div>
+            <div>
+                <span class="text-slate-500 dark:text-stone-400 block text-[10px] font-bold uppercase">RPTIN Number:</span>
+                <span class="text-emerald-700 dark:text-emerald-400 font-bold font-mono text-base">@Model.RptinNumber</span>
+            </div>
+        </div>
+
+        <div class="space-y-4 pt-2">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <span class="text-slate-500 dark:text-stone-400 block text-[10px] font-bold uppercase">Contact Phone:</span>
+                    <span class="text-slate-900 dark:text-stone-100 font-bold">@(string.IsNullOrEmpty(Model.ContactNo) ? "N/A" : Model.ContactNo)</span>
+                </div>
+                <div>
+                    <span class="text-slate-500 dark:text-stone-400 block text-[10px] font-bold uppercase">Email Address:</span>
+                    <span class="text-slate-900 dark:text-stone-100 font-bold">@(string.IsNullOrEmpty(Model.Email) ? "N/A" : Model.Email)</span>
+                </div>
+            </div>
+
+            <!-- Geographic Address Details -->
+            <div class="p-4 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-3">
+                <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                    <i data-lucide="map-pin" class="w-4 h-4"></i>
+                    Geographic Administrative Location
+                </h4>
+                <div class="grid grid-cols-3 gap-3 text-slate-800 dark:text-stone-200">
+                    <div>
+                        <span class="text-[10px] text-slate-500 dark:text-stone-400 block">Province:</span>
+                        <strong class="text-slate-900 dark:text-white">@Model.ProvinceName</strong>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-slate-500 dark:text-stone-400 block">City / Municipality:</span>
+                        <strong class="text-slate-900 dark:text-white">@Model.CityMunicipalityName</strong>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-slate-500 dark:text-stone-400 block">Barangay:</span>
+                        <strong class="text-slate-900 dark:text-white">@Model.BarangayName</strong>
+                    </div>
+                </div>
+                <div class="pt-2 border-t border-slate-200 dark:border-stone-800">
+                    <span class="text-[10px] text-slate-500 dark:text-stone-400 block">Complete Registered Address:</span>
+                    <span class="text-slate-900 dark:text-white font-bold text-sm">@Model.FullAddress</span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 pt-4 border-t border-slate-200 dark:border-stone-800 text-slate-500 dark:text-stone-400 text-[10px]">
+                <div>Registered Date: <strong class="text-slate-700 dark:text-stone-300">@Model.CreatedDate.ToString("MMMM dd, yyyy")</strong></div>
+                <div>Last Updated: <strong class="text-slate-700 dark:text-stone-300">@Model.UpdatedDate.ToString("MMMM dd, yyyy")</strong></div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,185 @@
+@model PropertyAssessmentApp.Models.LandHoldingRequest
+@using PropertyAssessmentApp.Models
+
+@{
+    ViewData["Title"] = $"Land Holding Request Details - {Model.TrackingNumber}";
+}
+
+<div class="space-y-8 font-mono text-xs">
+    
+    <!-- Page Header & Action Bar -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <div class="inline-flex items-center gap-2 text-xs font-mono text-emerald-700 dark:text-emerald-400 font-bold mb-1">
+                <i data-lucide="award" class="w-4 h-4"></i>
+                <span>Land Holding Request & Certification Details</span>
+            </div>
+            <h1 class="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">@Model.TrackingNumber</h1>
+            <p class="text-slate-500 dark:text-stone-400 text-sm">Submitted on @Model.RequestDate.ToString("MMMM dd, yyyy - hh:mm tt")</p>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <a asp-action="Index" class="px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 hover:bg-slate-50 dark:hover:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold text-xs font-mono border border-slate-200 dark:border-stone-800 shadow-sm">
+                Back to Directory
+            </a>
+            <a asp-action="Edit" asp-route-id="@Model.Id" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs font-mono flex items-center gap-2 shadow-md shadow-emerald-600/20">
+                <i data-lucide="edit-3" class="w-4 h-4"></i>
+                Edit Request
+            </a>
+        </div>
+    </div>
+
+    <!-- Details Card Container -->
+    <div class="p-8 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-8">
+        
+        <!-- Status & Reference Overview -->
+        <div class="flex flex-wrap items-center justify-between p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 gap-4">
+            <div>
+                <span class="text-[10px] text-slate-400 dark:text-stone-500 uppercase font-bold block">Processing Status</span>
+                @switch (Model.Status)
+                {
+                    case LandHoldingRequestStatus.Approved:
+                        <span class="inline-block mt-1 px-3 py-1 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/40 text-xs font-bold uppercase">Issued / Approved</span>
+                        break;
+                    case LandHoldingRequestStatus.Pending:
+                        <span class="inline-block mt-1 px-3 py-1 rounded-lg bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40 text-xs font-bold uppercase">Pending Verification</span>
+                        break;
+                    default:
+                        <span class="inline-block mt-1 px-3 py-1 rounded-lg bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-400 text-xs font-bold uppercase">@Model.Status</span>
+                        break;
+                }
+            </div>
+
+            <div>
+                <span class="text-[10px] text-slate-400 dark:text-stone-500 uppercase font-bold block">Total Billed Fees</span>
+                <div class="text-2xl font-black font-mono text-emerald-700 dark:text-emerald-400">₱@Model.TotalFeesAmount.ToString("N2")</div>
+            </div>
+        </div>
+
+        <!-- Property & Owner Info -->
+        <div class="space-y-4">
+            <h3 class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+                <i data-lucide="building" class="w-4 h-4"></i>
+                Property & Owner Information
+            </h3>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
+                <div>
+                    <span class="text-slate-400 dark:text-stone-500 block">TD NUMBER:</span>
+                    <span class="font-bold text-slate-900 dark:text-white font-mono text-sm">@(string.IsNullOrEmpty(Model.TaxDeclarationNumber) ? "N/A" : Model.TaxDeclarationNumber)</span>
+                </div>
+                <div>
+                    <span class="text-slate-400 dark:text-stone-500 block">PIN / PROPERTY INDEX NO:</span>
+                    <span class="font-bold text-slate-900 dark:text-white font-mono text-sm">@(string.IsNullOrEmpty(Model.PropertyIndexNumber) ? "N/A" : Model.PropertyIndexNumber)</span>
+                </div>
+                <div>
+                    <span class="text-slate-400 dark:text-stone-500 block">OWNER NAME:</span>
+                    <span class="font-bold text-slate-900 dark:text-white text-sm">@Model.OwnerName</span>
+                </div>
+                <div>
+                    <span class="text-slate-400 dark:text-stone-500 block">SPOUSE NAME:</span>
+                    <span class="font-bold text-slate-900 dark:text-white">@(string.IsNullOrEmpty(Model.SpouseName) ? "N/A" : Model.SpouseName)</span>
+                </div>
+                <div>
+                    <span class="text-slate-400 dark:text-stone-500 block">CONTACT NO:</span>
+                    <span class="font-bold text-slate-900 dark:text-white">@(string.IsNullOrEmpty(Model.ContactNo) ? "N/A" : Model.ContactNo)</span>
+                </div>
+                <div class="md:col-span-3">
+                    <span class="text-slate-400 dark:text-stone-500 block">LOCATION OF PROPERTY:</span>
+                    <span class="font-semibold text-slate-800 dark:text-stone-200">@(string.IsNullOrEmpty(Model.PropertyLocation) ? "N/A" : Model.PropertyLocation)</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Requirements & Requested Certificates -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Requirements Submitted -->
+            <div class="p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-3">
+                <h4 class="font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2">
+                    <i data-lucide="check-square" class="w-4 h-4 text-emerald-600"></i>
+                    Requirements Submitted
+                </h4>
+                <ul class="space-y-2">
+                    <li class="flex items-center gap-2">
+                        <i data-lucide="@(Model.ReqIdOfOwner ? "check-circle-2" : "circle")" class="w-4 h-4 @(Model.ReqIdOfOwner ? "text-emerald-600" : "text-slate-300")"></i>
+                        <span>ID OF OWNER</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                        <i data-lucide="@(Model.ReqIdOfRepresentative ? "check-circle-2" : "circle")" class="w-4 h-4 @(Model.ReqIdOfRepresentative ? "text-emerald-600" : "text-slate-300")"></i>
+                        <span>ID OF REPRESENTATIVE</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                        <i data-lucide="@(Model.ReqAuthorizationLetter ? "check-circle-2" : "circle")" class="w-4 h-4 @(Model.ReqAuthorizationLetter ? "text-emerald-600" : "text-slate-300")"></i>
+                        <span>AUTHORIZATION LETTER / SPA</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                        <i data-lucide="@(Model.ReqDeedOfConveyance ? "check-circle-2" : "circle")" class="w-4 h-4 @(Model.ReqDeedOfConveyance ? "text-emerald-600" : "text-slate-300")"></i>
+                        <span>DEED OF CONVEYANCE</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                        <i data-lucide="@(Model.ReqCertIndigency ? "check-circle-2" : "circle")" class="w-4 h-4 @(Model.ReqCertIndigency ? "text-emerald-600" : "text-slate-300")"></i>
+                        <span>CERTIFICATE OF INDIGENCY</span>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Requested Certificates -->
+            <div class="p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-3">
+                <h4 class="font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2">
+                    <i data-lucide="file-check" class="w-4 h-4 text-emerald-600"></i>
+                    Request Certificate Option/s
+                </h4>
+                <ul class="space-y-2">
+                    <li class="flex items-center gap-2">
+                        <i data-lucide="@(Model.CertTotalLandholdings ? "check-circle-2" : "circle")" class="w-4 h-4 @(Model.CertTotalLandholdings ? "text-emerald-600" : "text-slate-300")"></i>
+                        <span>CERTIFICATE OF TOTAL LANDHOLDINGS</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                        <i data-lucide="@(Model.CertTypeTaxDeclaration ? "check-circle-2" : "circle")" class="w-4 h-4 @(Model.CertTypeTaxDeclaration ? "text-emerald-600" : "text-slate-300")"></i>
+                        <span>CERTIFICATION TYPE OF TAX DECLARATION</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                        <i data-lucide="@(Model.CertAggregateAgriLandholdings ? "check-circle-2" : "circle")" class="w-4 h-4 @(Model.CertAggregateAgriLandholdings ? "text-emerald-600" : "text-slate-300")"></i>
+                        <span>CERTIFICATE OF AGGREGATE AGRICULTURAL LANDHOLDINGS</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                        <i data-lucide="@(Model.CertNoImprovementFromDeath ? "check-circle-2" : "circle")" class="w-4 h-4 @(Model.CertNoImprovementFromDeath ? "text-emerald-600" : "text-slate-300")"></i>
+                        <span>CERTIFICATION W/ NO IMPROVEMENT (FROM TIME OF DEATH)</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                        <i data-lucide="@(Model.CertNoLandholdings ? "check-circle-2" : "circle")" class="w-4 h-4 @(Model.CertNoLandholdings ? "text-emerald-600" : "text-slate-300")"></i>
+                        <span>CERTIFICATE OF NO LANDHOLDINGS</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                        <i data-lucide="@(Model.CertPropertyHistory ? "check-circle-2" : "circle")" class="w-4 h-4 @(Model.CertPropertyHistory ? "text-emerald-600" : "text-slate-300")"></i>
+                        <span>PROPERTY HISTORY</span>
+                    </li>
+                    @if (!string.IsNullOrEmpty(Model.CertOthersSpecify))
+                    {
+                        <li class="pt-2 text-slate-700 dark:text-stone-300">
+                            <strong>OTHERS:</strong> @Model.CertOthersSpecify
+                        </li>
+                    }
+                </ul>
+            </div>
+        </div>
+
+        <!-- Attachment Download -->
+        @if (!string.IsNullOrEmpty(Model.AttachmentFileName))
+        {
+            <div class="p-6 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <i data-lucide="paperclip" class="w-5 h-5 text-emerald-600"></i>
+                    <div>
+                        <span class="font-bold text-slate-900 dark:text-white block">@Model.AttachmentFileName</span>
+                        <span class="text-[10px] text-slate-500 dark:text-stone-400 block">File Size: @Model.AttachmentFileSize</span>
+                    </div>
+                </div>
+                <a asp-action="DownloadAttachment" asp-route-id="@Model.Id" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center gap-2 shadow-sm">
+                    <i data-lucide="download" class="w-4 h-4"></i>
+                    Download Attachment
+                </a>
+            </div>
+        }
+    </div>
+</div>

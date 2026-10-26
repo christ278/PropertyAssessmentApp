@@ -1,0 +1,23 @@
+﻿## Build & Compiled binaries
+[Bb]in/
+[Oo]bj/
+out/
+
+## Visual Studio & Rider / IDE files
+.vs/
+*.user
+*.userosscache
+*.suo
+*.userprefs
+*.sln.docstates
+.vscode/
+
+## Logs and temporary scripts
+*.log
+*.tmp
+temp_check.js
+update_edit_partition_js.ps1
+
+## OS generated files
+.DS_Store
+Thumbs.db

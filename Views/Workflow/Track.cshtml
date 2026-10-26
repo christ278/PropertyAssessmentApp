@@ -1,0 +1,438 @@
+@model IEnumerable<PropertyAssessmentApp.Services.WorkflowQueueItemDto>
+@using PropertyAssessmentApp.Models
+@using PropertyAssessmentApp.Services
+
+@{
+    ViewData["Title"] = "Transaction Tracker & Intake Registry";
+    var divisionId = ViewBag.DivisionId as int?;
+    var search = ViewBag.Search as string ?? "";
+    var statusFilter = ViewBag.StatusFilter as string ?? "";
+    bool canChangeDivision = ViewBag.CanChangeDivision is bool b && b;
+    bool isSuperAdminOrHead = ViewBag.IsSuperAdminOrHead is bool s && s;
+    string userWorkflowRole = ViewBag.UserWorkflowRoleName as string ?? "";
+    string currentUserRole = ViewBag.CurrentUserRole as string ?? "Assessment Clerk";
+
+    int totalFiled = ViewBag.TotalFiled is int tf ? tf : 0;
+    int totalPending = ViewBag.TotalPending is int tp ? tp : 0;
+    int totalOnGoing = ViewBag.TotalOnGoing is int tog ? tog : 0;
+    int totalForApproval = ViewBag.TotalForApproval is int tfa ? tfa : 0;
+    int totalDeferred = ViewBag.TotalDeferred is int td ? td : 0;
+    int totalReleased = ViewBag.TotalReleased is int tr ? tr : 0;
+
+    string activeDivisionLabel = divisionId switch
+    {
+        1 => "Division 1: Appraisal and Assessment",
+        2 => "Division 2: Tax Mapping",
+        3 => "Division 3: Records",
+        _ => "All Divisions"
+    };
+}
+
+<div class="space-y-6 font-mono text-xs">
+    
+    <!-- Top Hub Header -->
+    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white dark:bg-stone-900 p-6 rounded-3xl border border-slate-200 dark:border-stone-800 shadow-sm">
+        <div class="space-y-1.5">
+            <div class="inline-flex items-center gap-2 text-xs font-mono text-blue-700 dark:text-blue-400 font-bold">
+                <i data-lucide="navigation" class="w-4 h-4"></i>
+                <span>Receiving Intake & Document Tracking Registry</span>
+            </div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-3">
+                <span>Transaction Tracker & Timeline</span>
+                <span class="px-3 py-1 rounded-full text-xs font-black bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300">
+                    @totalFiled Total Registered
+                </span>
+            </h1>
+            <p class="text-slate-500 dark:text-stone-400 text-xs">
+                Real-time tracking for receiving staff. Check the live station, current processor, and step-by-step progress of any filed transaction.
+            </p>
+        </div>
+
+        <!-- Division Filter & Hub Navigation -->
+        <div class="flex items-center gap-3 flex-wrap">
+            @if (canChangeDivision)
+            {
+                <div class="flex items-center gap-2 bg-slate-50 dark:bg-stone-950 p-2 rounded-2xl border border-slate-200 dark:border-stone-800 shadow-xs">
+                    <label for="trackDivSelector" class="text-[11px] font-extrabold text-slate-500 dark:text-stone-400 uppercase flex items-center gap-1 pl-1">
+                        <i data-lucide="shield" class="w-3.5 h-3.5 text-purple-600"></i>
+                        <span>Division:</span>
+                    </label>
+                    <select id="trackDivSelector" onchange="onTrackDivisionChange(this.value)" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white font-extrabold text-xs px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800 focus:outline-none focus:border-blue-600 cursor-pointer">
+                        <option value="" selected="@(!divisionId.HasValue ? "selected" : null)">All Divisions</option>
+                        <option value="1" selected="@(divisionId == 1 ? "selected" : null)">Division 1: Appraisal and Assessment</option>
+                        <option value="2" selected="@(divisionId == 2 ? "selected" : null)">Division 2: Tax Mapping</option>
+                        <option value="3" selected="@(divisionId == 3 ? "selected" : null)">Division 3: Records</option>
+                    </select>
+                </div>
+            }
+            else
+            {
+                <div class="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 shadow-xs">
+                    <i data-lucide="lock" class="w-4 h-4 text-amber-500"></i>
+                    <div>
+                        <div class="font-extrabold text-slate-900 dark:text-white text-xs">@activeDivisionLabel</div>
+                        <div class="text-[10px] text-slate-400 dark:text-stone-500 font-bold">
+                            Station: <strong>@(string.IsNullOrEmpty(userWorkflowRole) ? currentUserRole : userWorkflowRole)</strong>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <a asp-action="Pool" asp-route-divisionId="@(canChangeDivision ? divisionId : null)" class="px-4 py-2.5 rounded-2xl font-bold bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 flex items-center gap-2 shadow-xs transition-all">
+                <i data-lucide="inbox" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                <span>Shared Pool</span>
+            </a>
+
+            <a asp-action="MyTransactions" asp-route-divisionId="@(canChangeDivision ? divisionId : null)" class="px-4 py-2.5 rounded-2xl font-bold bg-blue-50 hover:bg-blue-100 dark:bg-blue-500/10 dark:hover:bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60 flex items-center gap-2 shadow-xs transition-all">
+                <i data-lucide="user-check" class="w-4 h-4 text-blue-600"></i>
+                <span>My Workspace</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Status KPI Summary Cards (Pending, On Going, For Approval, Deferred, Released) -->
+    <div class="grid grid-cols-2 sm:grid-cols-5 gap-3.5">
+        <!-- 1. Pending (In Pool) -->
+        <a asp-action="Track" asp-route-divisionId="@divisionId" asp-route-status="pending" class="bg-white dark:bg-stone-900 p-4 rounded-3xl border border-slate-200 dark:border-stone-800 shadow-sm flex items-center gap-3 hover:border-slate-400 transition-all @(statusFilter == "pending" ? "ring-2 ring-slate-400" : "")">
+            <div class="p-2.5 rounded-2xl bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-300">
+                <i data-lucide="clock" class="w-5 h-5"></i>
+            </div>
+            <div>
+                <span class="text-[10px] text-slate-400 font-bold uppercase block">Pending</span>
+                <span class="text-lg font-black text-slate-900 dark:text-white">@totalPending</span>
+            </div>
+        </a>
+
+        <!-- 2. On Going (Claimed & Processing) -->
+        <a asp-action="Track" asp-route-divisionId="@divisionId" asp-route-status="ongoing" class="bg-white dark:bg-stone-900 p-4 rounded-3xl border border-slate-200 dark:border-stone-800 shadow-sm flex items-center gap-3 hover:border-blue-400 transition-all @(statusFilter == "ongoing" || statusFilter == "on going" ? "ring-2 ring-blue-500" : "")">
+            <div class="p-2.5 rounded-2xl bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                <i data-lucide="play" class="w-5 h-5"></i>
+            </div>
+            <div>
+                <span class="text-[10px] text-slate-400 font-bold uppercase block">On Going</span>
+                <span class="text-lg font-black text-slate-900 dark:text-white">@totalOnGoing</span>
+            </div>
+        </a>
+
+        <!-- 3. For Approval (Approval Step) -->
+        <a asp-action="Track" asp-route-divisionId="@divisionId" asp-route-status="for approval" class="bg-white dark:bg-stone-900 p-4 rounded-3xl border border-slate-200 dark:border-stone-800 shadow-sm flex items-center gap-3 hover:border-purple-400 transition-all @(statusFilter == "for approval" ? "ring-2 ring-purple-500" : "")">
+            <div class="p-2.5 rounded-2xl bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                <i data-lucide="shield-alert" class="w-5 h-5"></i>
+            </div>
+            <div>
+                <span class="text-[10px] text-slate-400 font-bold uppercase block">For Approval</span>
+                <span class="text-lg font-black text-slate-900 dark:text-white">@totalForApproval</span>
+            </div>
+        </a>
+
+        <!-- 4. Deferred (Returned for Revision) -->
+        <a asp-action="Track" asp-route-divisionId="@divisionId" asp-route-status="deferred" class="bg-white dark:bg-stone-900 p-4 rounded-3xl border border-slate-200 dark:border-stone-800 shadow-sm flex items-center gap-3 hover:border-amber-400 transition-all @(statusFilter == "deferred" ? "ring-2 ring-amber-500" : "")">
+            <div class="p-2.5 rounded-2xl bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                <i data-lucide="rotate-ccw" class="w-5 h-5"></i>
+            </div>
+            <div>
+                <span class="text-[10px] text-slate-400 font-bold uppercase block">Deferred</span>
+                <span class="text-lg font-black text-slate-900 dark:text-white">@totalDeferred</span>
+            </div>
+        </a>
+
+        <!-- 5. Released (Completed & Issued) -->
+        <a asp-action="Track" asp-route-divisionId="@divisionId" asp-route-status="released" class="bg-white dark:bg-stone-900 p-4 rounded-3xl border border-slate-200 dark:border-stone-800 shadow-sm flex items-center gap-3 hover:border-emerald-400 transition-all @(statusFilter == "released" ? "ring-2 ring-emerald-500" : "")">
+            <div class="p-2.5 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                <i data-lucide="check-circle" class="w-5 h-5"></i>
+            </div>
+            <div>
+                <span class="text-[10px] text-slate-400 font-bold uppercase block">Released</span>
+                <span class="text-lg font-black text-slate-900 dark:text-white">@totalReleased</span>
+            </div>
+        </a>
+    </div>
+
+    <!-- Search & Filter Bar -->
+    <form method="get" asp-action="Track" class="bg-white dark:bg-stone-900 p-4 rounded-3xl border border-slate-200 dark:border-stone-800 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3 font-mono text-xs">
+        @if (!canChangeDivision)
+        {
+            <input type="hidden" name="divisionId" value="@divisionId" />
+        }
+
+        <div class="relative w-full sm:flex-1">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-3"></i>
+            <input type="text" name="search" value="@search" placeholder="Enter Tracking No (e.g. TMR-2026-3777) or Owner Name..." class="w-full pl-9 pr-3 py-2.5 rounded-2xl bg-slate-50 dark:bg-stone-950 text-slate-900 dark:text-white border border-slate-200 dark:border-stone-800 focus:outline-none focus:border-blue-600 text-xs font-bold" />
+        </div>
+
+        <!-- Status Filter Dropdown -->
+        <div class="w-full sm:w-auto">
+            <select name="status" onchange="this.form.submit()" class="w-full sm:w-auto px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-stone-950 text-slate-900 dark:text-white border border-slate-200 dark:border-stone-800 font-bold focus:outline-none focus:border-blue-600 cursor-pointer">
+                <option value="" selected="@(string.IsNullOrEmpty(statusFilter) ? "selected" : null)">All Statuses (@totalFiled)</option>
+                <option value="pending" selected="@(statusFilter == "pending" ? "selected" : null)">Pending (@totalPending)</option>
+                <option value="ongoing" selected="@(statusFilter == "ongoing" || statusFilter == "on going" ? "selected" : null)">On Going (@totalOnGoing)</option>
+                <option value="for approval" selected="@(statusFilter == "for approval" ? "selected" : null)">For Approval (@totalForApproval)</option>
+                <option value="deferred" selected="@(statusFilter == "deferred" ? "selected" : null)">Deferred (@totalDeferred)</option>
+                <option value="released" selected="@(statusFilter == "released" ? "selected" : null)">Released (@totalReleased)</option>
+            </select>
+        </div>
+
+        <div class="flex items-center gap-2 w-full sm:w-auto">
+            <button type="submit" class="px-5 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold flex items-center gap-1.5 shadow-md shadow-blue-600/20 transition-all">
+                <i data-lucide="navigation" class="w-4 h-4"></i>
+                <span>Track</span>
+            </button>
+            @if (!string.IsNullOrEmpty(search) || !string.IsNullOrEmpty(statusFilter))
+            {
+                <a asp-action="Track" asp-route-divisionId="@(canChangeDivision ? divisionId : null)" class="p-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-slate-600 dark:text-stone-300 transition-all" title="Reset Filters">
+                    <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                </a>
+            }
+        </div>
+    </form>
+
+    <!-- Intake & Tracking Registry Table -->
+    <div class="bg-white dark:bg-stone-900 rounded-3xl border border-slate-200 dark:border-stone-800 shadow-sm paginated-table-card">
+        <div class="overflow-x-auto min-h-[320px] pb-4 rounded-3xl">
+            <table class="w-full text-left text-xs font-mono">
+                <thead class="bg-slate-100 dark:bg-stone-950 text-slate-600 dark:text-stone-400 border-b border-slate-200 dark:border-stone-800 font-bold">
+                    <tr>
+                        <th class="px-4 py-3.5">TRACKING & TYPE</th>
+                        <th class="px-4 py-3.5">OWNER / APPLICANT</th>
+                        <th class="px-4 py-3.5">STATUS</th>
+                        <th class="px-4 py-3.5">CURRENT LOCATION & STATION</th>
+                        <th class="hidden md:table-cell px-4 py-3.5">HANDLER / PROCESSOR</th>
+                        <th class="hidden lg:table-cell px-4 py-3.5">LAST ACTIVITY</th>
+                        <th class="px-4 py-3.5 text-center">ACTION</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-stone-800/60">
+                    @if (!Model.Any())
+                    {
+                        <tr>
+                            <td colspan="7" class="px-6 py-12 text-center text-slate-400 dark:text-stone-500 font-medium space-y-2">
+                                <i data-lucide="search-x" class="w-8 h-8 mx-auto text-slate-300 dark:text-stone-600"></i>
+                                <p class="text-sm">No transactions found matching your criteria.</p>
+                                <p class="text-[11px] font-normal">Try searching by tracking number, applicant name, or property index.</p>
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var item in Model)
+                        {
+                            var divBadgeClass = item.Division switch
+                            {
+                                DivisionType.Division1_TaxAssessmentAndLandHolding => "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300",
+                                DivisionType.Division2_GIS_TaxMapping => "bg-teal-100 text-teal-800 dark:bg-teal-500/20 dark:text-teal-300",
+                                DivisionType.Division3_RecordsAndCertification => "bg-purple-100 text-purple-800 dark:bg-purple-500/20 dark:text-purple-300",
+                                _ => "bg-slate-100 text-slate-800 dark:bg-stone-800 dark:text-stone-300"
+                            };
+
+                            var divShort = item.Division switch
+                            {
+                                DivisionType.Division1_TaxAssessmentAndLandHolding => "DIV 1",
+                                DivisionType.Division2_GIS_TaxMapping => "DIV 2",
+                                DivisionType.Division3_RecordsAndCertification => "DIV 3",
+                                _ => "ALL"
+                            };
+
+                            <tr class="hover:bg-slate-50/80 dark:hover:bg-stone-800/40 transition-colors">
+                                <!-- Tracking & Request Type -->
+                                <td class="px-4 py-3.5 space-y-1">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <span class="px-2 py-0.5 rounded-lg text-[10px] font-bold @divBadgeClass">
+                                            @divShort
+                                        </span>
+                                        <button type="button" onclick="openTimelineModal('@item.RequestId', '@item.TrackingNumber')" class="font-extrabold text-blue-600 dark:text-blue-400 hover:underline text-xs flex items-center gap-1">
+                                            <span>@item.TrackingNumber</span>
+                                            <i data-lucide="external-link" class="w-3 h-3"></i>
+                                        </button>
+                                    </div>
+                                    <div class="text-[11px] text-slate-500 dark:text-stone-400 font-bold">
+                                        @item.DisplayType
+                                    </div>
+                                    <div class="text-[10px] text-slate-400 dark:text-stone-500">
+                                        Filed: @item.DateSubmitted.ToString("MMM dd, yyyy hh:mm tt")
+                                    </div>
+                                </td>
+
+                                <!-- Owner / Applicant -->
+                                <td class="px-4 py-3.5">
+                                    <div class="font-bold text-slate-900 dark:text-white text-xs">
+                                        @item.OwnerOrApplicant
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(item.ORNumber))
+                                    {
+                                        <div class="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-1 mt-0.5">
+                                            <i data-lucide="receipt" class="w-3 h-3 text-emerald-600"></i>
+                                            <span>OR: @item.ORNumber</span>
+                                        </div>
+                                    }
+                                </td>
+
+                                <!-- STATUS (Pending, On Going, For Approval, Deferred, Released) -->
+                                <td class="px-4 py-3.5">
+                                    @switch (item.StatusText)
+                                    {
+                                        case "Released":
+                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-black bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/60 shadow-2xs">
+                                                <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
+                                                <span>Released</span>
+                                            </span>
+                                            break;
+                                        case "Deferred":
+                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-black bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300 border border-amber-300 dark:border-amber-700/60 shadow-2xs">
+                                                <i data-lucide="rotate-ccw" class="w-3.5 h-3.5 text-amber-600 dark:text-amber-400"></i>
+                                                <span>Deferred</span>
+                                            </span>
+                                            break;
+                                        case "For Approval":
+                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-black bg-purple-100 text-purple-800 dark:bg-purple-500/20 dark:text-purple-300 border border-purple-300 dark:border-purple-700/60 shadow-2xs">
+                                                <i data-lucide="shield-alert" class="w-3.5 h-3.5 text-purple-600 dark:text-purple-400"></i>
+                                                <span>For Approval</span>
+                                            </span>
+                                            break;
+                                        case "On Going":
+                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-black bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-300 border border-blue-300 dark:border-blue-700/60 shadow-2xs">
+                                                <i data-lucide="play" class="w-3.5 h-3.5 text-blue-600 dark:text-blue-400"></i>
+                                                <span>On Going</span>
+                                            </span>
+                                            break;
+                                        default: // "Pending"
+                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-bold bg-slate-100 text-slate-700 dark:bg-stone-800 dark:text-stone-300 border border-slate-300 dark:border-stone-700 shadow-2xs">
+                                                <i data-lucide="clock" class="w-3.5 h-3.5 text-slate-500"></i>
+                                                <span>Pending</span>
+                                            </span>
+                                            break;
+                                    }
+                                </td>
+
+                                <!-- LIVE CURRENT LOCATION & STATION -->
+                                <td class="px-4 py-3.5 space-y-1">
+                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                        <span class="relative flex h-2 w-2">
+                                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                                            <span class="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                                        </span>
+                                        <span class="px-2.5 py-1 rounded-xl text-xs font-black bg-blue-50 dark:bg-blue-500/10 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60 inline-flex items-center gap-1">
+                                            <i data-lucide="map-pin" class="w-3.5 h-3.5 text-blue-600"></i>
+                                            <span>@item.CurrentStageName</span>
+                                        </span>
+                                    </div>
+                                    <div class="text-[10px] text-slate-500 dark:text-stone-400 font-medium">
+                                        Station: @item.AssignedToRole
+                                    </div>
+                                </td>
+
+                                <!-- HANDLER / PROCESSOR -->
+                                <td class="hidden md:table-cell px-4 py-3.5 space-y-1">
+                                    @if (item.StatusText == "Released")
+                                    {
+                                        <span class="px-2.5 py-1 rounded-xl text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300">
+                                            Released & Closed
+                                        </span>
+                                    }
+                                    else if (item.IsClaimed && !string.IsNullOrEmpty(item.AssignedUserName))
+                                    {
+                                        <div class="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1">
+                                            <i data-lucide="user-check" class="w-3.5 h-3.5 text-blue-600"></i>
+                                            <span>@item.AssignedUserName</span>
+                                        </div>
+                                        <span class="text-[10px] text-blue-600 dark:text-blue-400 font-bold block">
+                                            Claimed & In Progress
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <div class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 border border-slate-200 dark:border-stone-700">
+                                            <i data-lucide="inbox" class="w-3 h-3"></i>
+                                            <span>Unclaimed in Pool</span>
+                                        </div>
+                                        <span class="text-[10px] text-slate-400 block">
+                                            Awaiting Staff Checkout
+                                        </span>
+                                    }
+                                </td>
+
+                                <!-- LAST ACTIVITY -->
+                                <td class="hidden lg:table-cell px-4 py-3.5">
+                                    @if (!string.IsNullOrEmpty(item.LastForwardedBy))
+                                    {
+                                        <div class="text-[10px] text-slate-700 dark:text-stone-300 font-bold">
+                                            From: @item.LastForwardedBy
+                                        </div>
+                                        <div class="text-[10px] text-slate-400 dark:text-stone-500">
+                                            @item.LastForwardedDate?.ToString("MMM dd, yyyy hh:mm tt")
+                                        </div>
+                                    }
+                                    @if (!string.IsNullOrEmpty(item.LastRemarks))
+                                    {
+                                        <div class="text-[10px] text-slate-500 dark:text-stone-400 italic line-clamp-1 mt-0.5">
+                                            "@item.LastRemarks"
+                                        </div>
+                                    }
+                                </td>
+
+                                <!-- ACTIONS -->
+                                <td class="px-4 py-3.5 text-center">
+                                    <div class="flex items-center justify-center gap-1.5 flex-wrap">
+                                        <!-- Open Timeline Modal Button -->
+                                        <button type="button" onclick="openTimelineModal('@item.RequestId', '@item.TrackingNumber')" class="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[11px] flex items-center gap-1 shadow-xs transition-all" title="View interactive step progress timeline">
+                                            <i data-lucide="git-branch" class="w-3.5 h-3.5"></i>
+                                            <span>Timeline</span>
+                                        </button>
+
+                                        <!-- Full Page Timeline Link -->
+                                        <a asp-action="Timeline" asp-route-id="@item.RequestId" class="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-slate-700 dark:text-stone-300 border border-slate-200 dark:border-stone-700" title="Open full-page timeline and routing slip">
+                                            <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination Controls -->
+        <div class="table-pagination-footer p-4 sm:p-6 pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-200 dark:border-stone-800 text-xs font-mono">
+            <div class="text-slate-500 dark:text-stone-400 text-center sm:text-left">
+                Showing <span class="font-bold text-slate-900 dark:text-white table-showing-start">1</span> to 
+                <span class="font-bold text-slate-900 dark:text-white table-showing-end">10</span> of 
+                <span class="font-bold text-slate-900 dark:text-white table-total-count">@Model.Count()</span> entries
+            </div>
+            <div class="flex items-center gap-1.5 flex-wrap justify-center table-pagination-buttons">
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function onTrackDivisionChange(val) {
+            var url = new URL(window.location.href);
+            if (val) {
+                url.searchParams.set('divisionId', val);
+            } else {
+                url.searchParams.delete('divisionId');
+            }
+            window.location.href = url.toString();
+        }
+
+        // Real-Time auto-refresh when transactions are forwarded, claimed, or released
+        window.addEventListener('workflow:transactionForwarded', function(e) {
+            var currentDiv = '@(ViewBag.DivisionId ?? 0)';
+            if (!currentDiv || currentDiv === '0' || currentDiv == e.detail.divisionId) {
+                setTimeout(function() {
+                    window.location.reload();
+                }, 1500);
+            }
+        });
+
+        window.addEventListener('workflow:transactionClaimed', function(e) {
+            var currentDiv = '@(ViewBag.DivisionId ?? 0)';
+            if (!currentDiv || currentDiv === '0' || currentDiv == e.detail.divisionId) {
+                setTimeout(function() {
+                    window.location.reload();
+                }, 1200);
+            }
+        });
+    </script>
+}

@@ -1,0 +1,229 @@
+@model PropertyAssessmentApp.Models.RequestForInspection
+@using PropertyAssessmentApp.Models
+
+@{
+    ViewData["Title"] = $"RFI Details - {Model.TrackingNumber}";
+}
+
+<div class="space-y-6 font-mono text-xs">
+    
+    <!-- Top Action Bar -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <div class="inline-flex items-center gap-2 text-xs font-mono text-emerald-700 dark:text-emerald-400 font-bold mb-1">
+                <i data-lucide="clipboard-check" class="w-4 h-4"></i>
+                <span>Inspection Request Dossier</span>
+            </div>
+            <div class="flex items-center gap-3">
+                <h1 class="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">@Model.TrackingNumber</h1>
+                <span class="px-3 py-1 rounded-full text-xs font-bold 
+                    @(Model.Status == RequestForInspectionStatus.Releasing || Model.Status == RequestForInspectionStatus.Approval ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300" :
+                      Model.Status == RequestForInspectionStatus.Deferred ? "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300" :
+                      "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300")">
+                    Stage: @Model.Status
+                </span>
+            </div>
+            <p class="text-slate-500 dark:text-stone-400 text-sm">Filed on @Model.RequestDate.ToString("MMMM dd, yyyy hh:mm tt")</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <a asp-action="Edit" asp-route-id="@Model.Id" class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold transition-all flex items-center gap-1.5">
+                <i data-lucide="edit" class="w-4 h-4"></i>
+                <span>Edit Request</span>
+            </a>
+            <a asp-action="Index" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold hover:bg-slate-200 transition-all">
+                Back to List
+            </a>
+        </div>
+    </div>
+
+    <!-- Alert Messages -->
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 font-bold">
+            @TempData["SuccessMessage"]
+        </div>
+    }
+
+    <!-- 10-Stage CAST Workflow Progression Bar -->
+    <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-4">
+        <h3 class="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2">
+            <i data-lucide="git-commit" class="w-4 h-4 text-emerald-600"></i>
+            CAST 10-Stage Field Inspection Workflow Pipeline
+        </h3>
+
+        <div class="grid grid-cols-2 sm:grid-cols-5 md:grid-cols-10 gap-2 text-center text-[10px]">
+            @foreach (RequestForInspectionStatus stage in Enum.GetValues(typeof(RequestForInspectionStatus)))
+            {
+                if (stage == RequestForInspectionStatus.Deferred) continue;
+                bool isPast = (int)Model.Status >= (int)stage;
+                bool isCurrent = Model.Status == stage;
+
+                <div class="p-2.5 rounded-xl border transition-all @(isCurrent ? "bg-emerald-600 text-white font-extrabold border-emerald-600 shadow-sm" : isPast ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 border-emerald-300" : "bg-slate-50 dark:bg-stone-950 text-slate-400 border-slate-200 dark:border-stone-800")">
+                    <span class="block font-bold">@((int)stage).</span>
+                    <span class="truncate block">@stage</span>
+                </div>
+            }
+        </div>
+
+        <!-- Advance Stage Form -->
+        <div class="pt-4 border-t border-slate-100 dark:border-stone-800/80">
+            <form asp-action="UpdateStatus" method="post" class="flex flex-wrap items-center gap-3">
+                <input type="hidden" name="id" value="@Model.Id" />
+                <span class="font-bold text-slate-700 dark:text-stone-300">Advance Workflow Stage:</span>
+                <select name="newStatus" class="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-xs font-mono font-bold">
+                    @foreach (RequestForInspectionStatus s in Enum.GetValues(typeof(RequestForInspectionStatus)))
+                    {
+                        <option value="@s" selected="@(Model.Status == s ? "selected" : null)">@((int)s). @s</option>
+                    }
+                </select>
+                <input type="text" name="staff" placeholder="Assigned Staff" value="@Model.AssignedStaff" class="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-xs font-mono" />
+                <input type="text" name="remarks" placeholder="Technical Remarks / Routing Notes" class="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-xs font-mono flex-1 min-w-[200px]" />
+                <button type="submit" class="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition-all flex items-center gap-1">
+                    <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                    Update Stage
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Request Details Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        <!-- Property Information -->
+        <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-4">
+            <h3 class="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2 border-b border-slate-100 dark:border-stone-800 pb-2">
+                <i data-lucide="home" class="w-4 h-4 text-emerald-600"></i>
+                Property Information
+            </h3>
+            
+            <dl class="grid grid-cols-2 gap-3">
+                <div>
+                    <dt class="text-[10px] text-slate-400 font-bold uppercase">TDN / ARP No.</dt>
+                    <dd class="text-sm font-black text-slate-900 dark:text-white">@Model.TaxDeclarationNumber</dd>
+                </div>
+                <div>
+                    <dt class="text-[10px] text-slate-400 font-bold uppercase">PIN</dt>
+                    <dd class="text-sm font-black text-slate-900 dark:text-white">@Model.PropertyIndexNumber</dd>
+                </div>
+                <div class="col-span-2">
+                    <dt class="text-[10px] text-slate-400 font-bold uppercase">Declared Owner</dt>
+                    <dd class="text-sm font-bold text-slate-900 dark:text-white">@Model.OwnerName</dd>
+                </div>
+                <div>
+                    <dt class="text-[10px] text-slate-400 font-bold uppercase">Property Kind</dt>
+                    <dd class="text-xs font-semibold text-slate-700 dark:text-stone-300">@Model.Kind</dd>
+                </div>
+                <div>
+                    <dt class="text-[10px] text-slate-400 font-bold uppercase">Lot / Survey No.</dt>
+                    <dd class="text-xs font-semibold text-slate-700 dark:text-stone-300">@Model.LotNo</dd>
+                </div>
+                <div class="col-span-2">
+                    <dt class="text-[10px] text-slate-400 font-bold uppercase">Location Address</dt>
+                    <dd class="text-xs font-semibold text-slate-700 dark:text-stone-300">@Model.PropertyLocation</dd>
+                </div>
+            </dl>
+        </div>
+
+        <!-- Inspection Reasons & Contact -->
+        <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-4">
+            <h3 class="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2 border-b border-slate-100 dark:border-stone-800 pb-2">
+                <i data-lucide="info" class="w-4 h-4 text-emerald-600"></i>
+                Purpose & Contact Details
+            </h3>
+
+            <div>
+                <dt class="text-[10px] text-slate-400 font-bold uppercase mb-1">Inspection Reasons</dt>
+                <div class="flex flex-wrap gap-2">
+                    @if (Model.IsDepreciation) { <span class="px-2.5 py-1 rounded-lg bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 font-bold text-[10px]">Depreciation</span> }
+                    @if (Model.IsReassessment) { <span class="px-2.5 py-1 rounded-lg bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 font-bold text-[10px]">Reassessment</span> }
+                    @if (Model.IsCancelled) { <span class="px-2.5 py-1 rounded-lg bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 font-bold text-[10px]">Cancellation</span> }
+                    @if (Model.IsOther) { <span class="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 dark:bg-stone-800 dark:text-stone-200 font-bold text-[10px]">Other</span> }
+                </div>
+                @if (!string.IsNullOrWhiteSpace(Model.OtherPurposeDetails))
+                {
+                    <p class="text-xs text-slate-600 dark:text-stone-300 mt-2 bg-slate-50 dark:bg-stone-950 p-2.5 rounded-xl border border-slate-200 dark:border-stone-800">
+                        @Model.OtherPurposeDetails
+                    </p>
+                }
+            </div>
+
+            <dl class="grid grid-cols-2 gap-3 pt-2">
+                <div>
+                    <dt class="text-[10px] text-slate-400 font-bold uppercase">Contact Person</dt>
+                    <dd class="text-xs font-semibold text-slate-700 dark:text-stone-300">@(Model.ContactPerson ?? "N/A")</dd>
+                </div>
+                <div>
+                    <dt class="text-[10px] text-slate-400 font-bold uppercase">Contact Number</dt>
+                    <dd class="text-xs font-semibold text-slate-700 dark:text-stone-300">@(Model.ContactNumber ?? "N/A")</dd>
+                </div>
+                <div>
+                    <dt class="text-[10px] text-slate-400 font-bold uppercase">Email Address</dt>
+                    <dd class="text-xs font-semibold text-slate-700 dark:text-stone-300">@(Model.EmailAddress ?? "N/A")</dd>
+                </div>
+                <div>
+                    <dt class="text-[10px] text-slate-400 font-bold uppercase">Representative</dt>
+                    <dd class="text-xs font-semibold text-slate-700 dark:text-stone-300">@(Model.Representative ?? "N/A")</dd>
+                </div>
+            </dl>
+        </div>
+    </div>
+
+    <!-- Attachment & Billing Section -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        <!-- Attachment Card -->
+        <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-4">
+            <h3 class="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2 border-b border-slate-100 dark:border-stone-800 pb-2">
+                <i data-lucide="paperclip" class="w-4 h-4 text-emerald-600"></i>
+                Uploaded Inspection Attachments
+            </h3>
+
+            @if (!string.IsNullOrEmpty(Model.AttachmentFileName))
+            {
+                <div class="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="file-check" class="w-8 h-8 text-emerald-600"></i>
+                        <div>
+                            <span class="font-bold text-slate-900 dark:text-white block">@Model.AttachmentFileName</span>
+                            <span class="text-[10px] text-slate-400">Size: @(Model.AttachmentFileSize ?? "Unknown") | Location: ~/UploadFile/Inspection</span>
+                        </div>
+                    </div>
+                    <a asp-action="DownloadAttachment" asp-route-id="@Model.Id" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 transition-all">
+                        <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                        <span>Download</span>
+                    </a>
+                </div>
+            }
+            else
+            {
+                <div class="p-6 text-center text-slate-400 dark:text-stone-500 bg-slate-50 dark:bg-stone-950 rounded-2xl border border-dashed border-slate-200 dark:border-stone-800">
+                    No attachment uploaded for this inspection request.
+                </div>
+            }
+        </div>
+
+        <!-- Fee & Receipt Card -->
+        <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-4">
+            <h3 class="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2 border-b border-slate-100 dark:border-stone-800 pb-2">
+                <i data-lucide="receipt" class="w-4 h-4 text-emerald-600"></i>
+                Billing & Official Receipt Details
+            </h3>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <span class="text-[10px] text-slate-400 font-bold uppercase block">Official Receipt No.</span>
+                    <span class="text-base font-black text-slate-900 dark:text-white">@(Model.ORNumber ?? "PENDING")</span>
+                </div>
+                <div>
+                    <span class="text-[10px] text-slate-400 font-bold uppercase block">Total Fees Amount</span>
+                    <span class="text-xl font-black text-emerald-600">₱@Model.TotalFeesAmount.ToString("N2")</span>
+                </div>
+            </div>
+
+            @if (Model.ORDateIssued.HasValue)
+            {
+                <p class="text-[11px] text-slate-500">O.R. Date Issued: @Model.ORDateIssued.Value.ToString("yyyy-MM-dd")</p>
+            }
+        </div>
+    </div>
+</div>

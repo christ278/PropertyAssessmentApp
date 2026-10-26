@@ -1,0 +1,553 @@
+@model PropertyAssessmentApp.Models.TaxDeclaration
+
+<!-- BUILDING SPECIFIC FORM (SHARED BETWEEN CREATE AND EDIT) -->
+<div id="buildingform" class="space-y-6 hidden">
+    <!-- Hidden Storage for Dynamic Tables -->
+    <input type="hidden" asp-for="BuildingFloorBreakdownJson" id="buildingFloorBreakdownJson" />
+    <input type="hidden" asp-for="BaseRcnValue" id="baseRcnValue" />
+    <input type="hidden" asp-for="BuildingAdditionalItemsJson" id="buildingAdditionalItemsJson" />
+    <input type="hidden" asp-for="BuildingTotalAdditionsValue" id="buildingTotalAdditionsValue" />
+    <input type="hidden" asp-for="BuildingDepreciationAccumulated" id="buildingDepreciationAccumulated" />
+    <input type="hidden" asp-for="BuildingDepreciatedMarketValue" id="buildingDepreciatedMarketValue" />
+
+    <!-- 1. CCT (CONDOMINIUM CERTIFICATE OF TITLE) & ADMINISTRATOR (CAST) -->
+    <div class="p-5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-stone-800 pb-3">
+            <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+                <i data-lucide="file-badge" class="w-4 h-4"></i>
+                Condominium Title (CCT) & Administration
+            </h4>
+            <div class="flex items-center gap-6">
+                <label class="inline-flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 dark:text-stone-300">
+                    <input type="checkbox" asp-for="IsCct" id="isCctSwitch" class="rounded border-slate-300 text-emerald-600 shadow-sm focus:ring-emerald-500 w-4 h-4" />
+                    <span>CONDOMINIUM UNIT (CCT)</span>
+                </label>
+                <label class="inline-flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 dark:text-stone-300">
+                    <input type="checkbox" asp-for="IsAdministrator" id="isAdminSwitch" class="rounded border-slate-300 text-emerald-600 shadow-sm focus:ring-emerald-500 w-4 h-4" />
+                    <span>HAS ADMINISTRATOR</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- CCT Details Panel -->
+        <div id="cctDetailsRow" class="grid grid-cols-1 md:grid-cols-3 gap-4 hidden bg-white dark:bg-stone-900 p-4 rounded-xl border border-emerald-100 dark:border-emerald-900/40">
+            <div>
+                <label asp-for="CctTitleNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">CCT TITLE NO.</label>
+                <input asp-for="CctTitleNo" class="w-full px-4 py-2 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" placeholder="e.g. CCT-12345" />
+            </div>
+            <div>
+                <label asp-for="CctDateRegistered" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">DATE REGISTERED</label>
+                <input asp-for="CctDateRegistered" type="date" class="w-full px-4 py-2 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white" />
+            </div>
+            <div>
+                <label asp-for="OwnerNameReflectedInCct" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">OWNER REFLECTED IN CCT</label>
+                <input asp-for="OwnerNameReflectedInCct" class="w-full px-4 py-2 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white" placeholder="Name as shown on CCT" />
+            </div>
+        </div>
+
+        <!-- Administrator Details Panel -->
+        <div id="adminDetailsRow" class="grid grid-cols-1 md:grid-cols-4 gap-4 hidden bg-white dark:bg-stone-900 p-4 rounded-xl border border-sky-100 dark:border-sky-900/40">
+            <div>
+                <label asp-for="AdministratorName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">ADMINISTRATOR NAME</label>
+                <input asp-for="AdministratorName" class="w-full px-4 py-2 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white" placeholder="Full name of administrator" />
+            </div>
+            <div>
+                <label asp-for="AdministratorTin" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">ADMINISTRATOR TIN</label>
+                <input asp-for="AdministratorTin" class="w-full px-4 py-2 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" placeholder="000-000-000-000" />
+            </div>
+            <div>
+                <label asp-for="AdministratorContactNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">CONTACT NO.</label>
+                <input asp-for="AdministratorContactNo" class="w-full px-4 py-2 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white" placeholder="09XXXXXXXXX" />
+            </div>
+            <div>
+                <label asp-for="AdministratorAddress" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">MAILING ADDRESS</label>
+                <input asp-for="AdministratorAddress" class="w-full px-4 py-2 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white" placeholder="Complete address" />
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. BUILDING USE, STRUCTURAL TYPE & CONSTRUCTION TIMELINE -->
+    <div class="p-5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+            <i data-lucide="building" class="w-4 h-4"></i>
+            Building Classification & Construction Timeline
+        </h4>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label asp-for="BuildingUseType" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BUILDING USE TYPE</label>
+                <select asp-for="BuildingUseType" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold">
+                    <option value="Residential Condominium">Residential Condominium</option>
+                    <option value="Townhouse">Townhouse</option>
+                    <option value="Commercial Condominium">Commercial Condominium</option>
+                    <option value="Single Detached House">Single Detached House</option>
+                    <option value="Two Family Dwelling">Two Family Dwelling</option>
+                    <option value="Apartment / Rowhouse">Apartment / Rowhouse</option>
+                    <option value="Boarding / Lodging House">Boarding / Lodging House</option>
+                    <option value="Warehouse / Factory">Warehouse / Factory</option>
+                    <option value="Commercial Mall / Store">Commercial Mall / Store</option>
+                    <option value="Office / Bank Building">Office / Bank Building</option>
+                    <option value="School / Institutional">School / Institutional</option>
+                    <option value="Hospital / Clinic">Hospital / Clinic</option>
+                </select>
+            </div>
+            <div>
+                <label asp-for="StructuralType" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">STRUCTURAL TYPE (BUCC CLASS)</label>
+                <select asp-for="StructuralType" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold">
+                    <option value="Type I">Type I (Reinforced Concrete Frame)</option>
+                    <option value="Type II">Type II (Reinforced Concrete & Hollow Blocks)</option>
+                    <option value="Type III">Type III (Structural Steel & Concrete)</option>
+                    <option value="Type IV">Type IV (Timber & Wood Frame)</option>
+                    <option value="Type V">Type V (Light Materials / Mixed)</option>
+                </select>
+            </div>
+            <div>
+                <label asp-for="BuildingClassification" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BUILDING CLASSIFICATION</label>
+                <input asp-for="BuildingClassification" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white" />
+            </div>
+            <div>
+                <label asp-for="BuildingPermitNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BUILDING PERMIT NO.</label>
+                <input asp-for="BuildingPermitNo" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" placeholder="Permit No." />
+            </div>
+            <div>
+                <label asp-for="OccupancyPermitNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">OCCUPANCY PERMIT NO.</label>
+                <input asp-for="OccupancyPermitNo" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" placeholder="Occupancy No." />
+            </div>
+            <div>
+                <label asp-for="BuildingAgeYears" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BUILDING AGE (YEARS)</label>
+                <input asp-for="BuildingAgeYears" id="buildingAgeYearsInput" type="number" min="0" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-right" />
+            </div>
+            <div>
+                <label asp-for="DateConstructed" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">DATE CONSTRUCTED / STARTED</label>
+                <input asp-for="DateConstructed" type="date" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" />
+            </div>
+            <div>
+                <label asp-for="DateCompleted" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">DATE COMPLETED</label>
+                <input asp-for="DateCompleted" type="date" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" />
+            </div>
+            <div>
+                <label asp-for="DateOccupied" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">DATE OCCUPIED</label>
+                <input asp-for="DateOccupied" type="date" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" />
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. FLOOR-BY-FLOOR BREAKDOWN TABLE (CAST REFERENCE) -->
+    <div class="p-5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-stone-800 pb-3">
+            <div>
+                <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+                    <i data-lucide="layers" class="w-4 h-4"></i>
+                    Floor Levels & Base Construction Cost (BUCC) Breakdown
+                </h4>
+                <p class="text-[11px] text-slate-500 dark:text-stone-400">Add individual floor levels to automatically compute Total Floor Area (TFA) and Base Replacement Cost New (RCN).</p>
+            </div>
+            <button type="button" onclick="openAddFloorModal()" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-sm transition-all">
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add Floor Level
+            </button>
+        </div>
+
+        <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-stone-800 bg-white dark:bg-stone-900">
+            <table class="w-full text-xs text-left" id="tableBuildingFloors">
+                <thead class="bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-stone-700">
+                    <tr>
+                        <th class="p-3">Storey / Level</th>
+                        <th class="p-3">Description</th>
+                        <th class="p-3 text-right">Floor Area (sq.m.)</th>
+                        <th class="p-3 text-right">BUCC Rate (PHP/sq.m.)</th>
+                        <th class="p-3 text-right">Market Value (PHP)</th>
+                        <th class="p-3 text-center">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBuildingFloorsBody" class="divide-y divide-slate-100 dark:divide-stone-800 font-medium">
+                    <!-- Dynamic rows loaded via JS -->
+                </tbody>
+                <tfoot class="bg-slate-50 dark:bg-stone-950 font-bold text-slate-800 dark:text-stone-200 border-t border-slate-200 dark:border-stone-800">
+                    <tr>
+                        <td colspan="2" class="p-3 text-right">TOTAL FLOOR AREA (TFA):</td>
+                        <td class="p-3 text-right font-mono text-emerald-600 dark:text-emerald-400" id="displayTotalBldgArea">0.00 sq.m.</td>
+                        <td class="p-3 text-right">BASE RCN:</td>
+                        <td class="p-3 text-right font-mono text-emerald-600 dark:text-emerald-400" id="displayTotalBaseRcn">₱0.00</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <!-- Fallback / Overall inputs -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+            <div>
+                <label asp-for="NoOfStoreys" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">TOTAL STOREY COUNT</label>
+                <input asp-for="NoOfStoreys" id="noOfStoreysInput" type="number" min="1" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" />
+            </div>
+            <div>
+                <label asp-for="TotalBuildingAreaSqm" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">TOTAL BUILDING AREA (SQ.M.)</label>
+                <input asp-for="TotalBuildingAreaSqm" id="totalBuildingAreaInput" type="number" step="0.01" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-right font-bold" />
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. ADDITIONAL ITEMS & IMPROVEMENTS (CAST REFERENCE) -->
+    <div class="p-5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-stone-800 pb-3">
+            <div>
+                <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+                    <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                    Additional Items & Custom Improvements
+                </h4>
+                <p class="text-[11px] text-slate-500 dark:text-stone-400">Carports, Porches, Balconies, Garages, Terraces, Pavements, and Premium Finishes.</p>
+            </div>
+            <button type="button" onclick="openAddAdditionModal()" class="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-sm transition-all">
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add Improvement Item
+            </button>
+        </div>
+
+        <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-stone-800 bg-white dark:bg-stone-900">
+            <table class="w-full text-xs text-left" id="tableBuildingAdditions">
+                <thead class="bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-stone-700">
+                    <tr>
+                        <th class="p-3">Improvement Description</th>
+                        <th class="p-3 text-right">Qty / Area</th>
+                        <th class="p-3 text-right">Unit Rate / Cost</th>
+                        <th class="p-3 text-right">Multiplier / Adj (%)</th>
+                        <th class="p-3 text-right">Subtotal Value (PHP)</th>
+                        <th class="p-3 text-center">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBuildingAdditionsBody" class="divide-y divide-slate-100 dark:divide-stone-800 font-medium">
+                    <!-- Dynamic rows loaded via JS -->
+                </tbody>
+                <tfoot class="bg-slate-50 dark:bg-stone-950 font-bold text-slate-800 dark:text-stone-200 border-t border-slate-200 dark:border-stone-800">
+                    <tr>
+                        <td colspan="4" class="p-3 text-right">TOTAL ADDITIONAL IMPROVEMENTS:</td>
+                        <td class="p-3 text-right font-mono text-sky-600 dark:text-sky-400" id="displayTotalAdditions">₱0.00</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+
+    <!-- 5. DEPRECIATION SCHEDULE & VALUATION SUMMARY (CAST REFERENCE) -->
+    <div class="p-5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+            <i data-lucide="trending-down" class="w-4 h-4"></i>
+            Building Depreciation & Live Valuation Matrix
+        </h4>
+        
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div class="p-3 bg-white dark:bg-stone-900 rounded-xl border border-slate-200 dark:border-stone-800">
+                <span class="text-[10px] font-bold uppercase text-slate-400 block mb-1">Base RCN</span>
+                <span class="text-sm font-black font-mono text-slate-900 dark:text-white" id="kpiBaseRcn">₱0.00</span>
+            </div>
+            <div class="p-3 bg-white dark:bg-stone-900 rounded-xl border border-slate-200 dark:border-stone-800">
+                <span class="text-[10px] font-bold uppercase text-slate-400 block mb-1">Total Depreciation</span>
+                <span class="text-sm font-black font-mono text-rose-600 dark:text-rose-400" id="kpiDepreciation">₱0.00</span>
+            </div>
+            <div class="p-3 bg-white dark:bg-stone-900 rounded-xl border border-slate-200 dark:border-stone-800">
+                <span class="text-[10px] font-bold uppercase text-slate-400 block mb-1">Depreciated Core</span>
+                <span class="text-sm font-black font-mono text-emerald-600 dark:text-emerald-400" id="kpiDepreciatedCore">₱0.00</span>
+            </div>
+            <div class="p-3 bg-white dark:bg-stone-900 rounded-xl border border-slate-200 dark:border-stone-800">
+                <span class="text-[10px] font-bold uppercase text-slate-400 block mb-1">Addl Improvements</span>
+                <span class="text-sm font-black font-mono text-sky-600 dark:text-sky-400" id="kpiAdditions">₱0.00</span>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+            <div>
+                <label asp-for="BuildingDepreciationPercent" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">DEPRECIATION RATE (%)</label>
+                <input asp-for="BuildingDepreciationPercent" id="buildingDeprPercentInput" type="number" step="0.1" min="0" max="90" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-right font-bold" />
+            </div>
+            <div>
+                <label class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">ACCUMULATED DEPRECIATION (PHP)</label>
+                <input type="text" id="displayDepreciationAcc" readonly class="w-full px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-stone-800 border border-slate-200 dark:border-stone-800 text-slate-700 dark:text-stone-300 font-mono text-right font-bold" value="₱0.00" />
+            </div>
+            <div>
+                <label class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">FINAL BUILDING MARKET VALUE (PHP)</label>
+                <input type="text" id="displayFinalBldgMarketValue" readonly class="w-full px-4 py-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 font-mono text-right font-black" value="₱0.00" />
+            </div>
+        </div>
+    </div>
+
+    <!-- 6. 17 STRUCTURAL MATERIALS CHECKLIST (CAST REFERENCE) -->
+    <div class="p-5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <h4 class="text-xs font-bold uppercase text-slate-800 dark:text-stone-200 flex items-center gap-2">
+            <i data-lucide="check-square" class="w-4 h-4 text-emerald-600"></i>
+            17 Structural Materials & Parts Assessment
+        </h4>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+                <label asp-for="StructuralFoundation" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">1. FOUNDATION</label>
+                <select asp-for="StructuralFoundation" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs">
+                    <option value="Reinforced Concrete (RC)">Reinforced Concrete (RC)</option>
+                    <option value="Plain Concrete (PC)">Plain Concrete (PC)</option>
+                    <option value="Stone / Rubble Footing">Stone / Rubble Footing</option>
+                </select>
+            </div>
+            <div>
+                <label asp-for="StructuralColumns" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">2. COLUMNS</label>
+                <select asp-for="StructuralColumns" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs">
+                    <option value="Reinforced Concrete (RC)">Reinforced Concrete (RC)</option>
+                    <option value="Steel (S)">Steel (S)</option>
+                    <option value="Wood / Timber (W)">Wood / Timber (W)</option>
+                </select>
+            </div>
+            <div>
+                <label asp-for="StructuralBeams" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">3. BEAMS</label>
+                <select asp-for="StructuralBeams" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs">
+                    <option value="Reinforced Concrete (RC)">Reinforced Concrete (RC)</option>
+                    <option value="Steel (S)">Steel (S)</option>
+                    <option value="Wood / Timber (W)">Wood / Timber (W)</option>
+                </select>
+            </div>
+            <div>
+                <label asp-for="StructuralTrussRoof" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">4. ROOF FRAMING / TRUSS</label>
+                <select asp-for="StructuralTrussRoof" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs">
+                    <option value="Steel Truss (S)">Steel Truss (S)</option>
+                    <option value="Reinforced Concrete (RC)">Reinforced Concrete (RC)</option>
+                    <option value="Wood / Timber (W)">Wood / Timber (W)</option>
+                </select>
+            </div>
+            <div>
+                <label asp-for="StructuralRoof" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">5. ROOFING</label>
+                <select asp-for="StructuralRoof" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs">
+                    <option value="Long Span G.I. Sheet (LGI)">Long Span G.I. Sheet (LGI)</option>
+                    <option value="Corrugated G.I. Sheet (CGI)">Corrugated G.I. Sheet (CGI)</option>
+                    <option value="Concrete Slab (CS)">Concrete Slab (CS)</option>
+                    <option value="Ceramic / Clay Tiles (CT)">Ceramic / Clay Tiles (CT)</option>
+                    <option value="Solid Polycarbonate (SPC)">Solid Polycarbonate (SPC)</option>
+                    <option value="Aluminum (Al)">Aluminum (Al)</option>
+                </select>
+            </div>
+            <div>
+                <label asp-for="StructuralExteriorWalls" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">6. EXTERIOR WALLS</label>
+                <select asp-for="StructuralExteriorWalls" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs">
+                    <option value="Concrete Hollow Block (CHB)">Concrete Hollow Block (CHB)</option>
+                    <option value="Reinforced Concrete (RC)">Reinforced Concrete (RC)</option>
+                    <option value="Aluminum Composite (ALP)">Aluminum Composite (ALP)</option>
+                    <option value="Plain Concrete (PC)">Plain Concrete (PC)</option>
+                    <option value="Wood / Timber (W)">Wood / Timber (W)</option>
+                </select>
+            </div>
+            <div>
+                <label asp-for="StructuralFlooring" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">7. FLOORING</label>
+                <select asp-for="StructuralFlooring" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs">
+                    <option value="Reinforced Concrete Slab (RC)">Reinforced Concrete Slab (RC)</option>
+                    <option value="Plain Cement (PC)">Plain Cement (PC)</option>
+                    <option value="Wood Planks / T&G (W)">Wood Planks / T&G (W)</option>
+                </select>
+            </div>
+            <div>
+                <label asp-for="DoorMain" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">8. DOORS</label>
+                <select asp-for="DoorMain" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs">
+                    <option value="Wood Panel (WP)">Wood Panel (WP)</option>
+                    <option value="Glass / Aluminum (G/Al)">Glass / Aluminum (G/Al)</option>
+                    <option value="Steel Door (S)">Steel Door (S)</option>
+                    <option value="Flush Door (FD)">Flush Door (FD)</option>
+                </select>
+            </div>
+            <div>
+                <label asp-for="Ceiling" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">9. CEILING</label>
+                <select asp-for="Ceiling" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs">
+                    <option value="Hardiflex / Fiber Cement (Hx)">Hardiflex / Fiber Cement (Hx)</option>
+                    <option value="Gypsum Board / Duraflex (D)">Gypsum Board / Duraflex (D)</option>
+                    <option value="Plywood (Pw)">Plywood (Pw)</option>
+                    <option value="Aluminum Framing (AF)">Aluminum Framing (AF)</option>
+                </select>
+            </div>
+            <div>
+                <label asp-for="StructuralWindows" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">10. WINDOWS</label>
+                <select asp-for="StructuralWindows" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs">
+                    <option value="Aluminum Casement / Sliding (AC)">Aluminum Casement / Sliding (AC)</option>
+                    <option value="Steel Casement with Grills (SCG)">Steel Casement with Grills (SCG)</option>
+                    <option value="Glass Jalousie / Fixed (G)">Glass Jalousie / Fixed (G)</option>
+                    <option value="Wood Casement (WC)">Wood Casement (WC)</option>
+                </select>
+            </div>
+            <div>
+                <label asp-for="StructuralStairs" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">11. STAIRS</label>
+                <select asp-for="StructuralStairs" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs">
+                    <option value="Reinforced Concrete (RC)">Reinforced Concrete (RC)</option>
+                    <option value="Steel (S)">Steel (S)</option>
+                    <option value="Wood (W)">Wood (W)</option>
+                </select>
+            </div>
+            <div>
+                <label asp-for="StructuralPartitionWalls" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">12. PARTITION</label>
+                <select asp-for="StructuralPartitionWalls" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs">
+                    <option value="Drywall Hardiflex (Hx)">Drywall Hardiflex (Hx)</option>
+                    <option value="Concrete Hollow Block (CHB)">Concrete Hollow Block (CHB)</option>
+                    <option value="Plywood / Plyboard (Pw)">Plywood / Plyboard (Pw)</option>
+                    <option value="Aluminum Glass Panel (AIF)">Aluminum Glass Panel (AIF)</option>
+                </select>
+            </div>
+            <div>
+                <label asp-for="StructuralFloorFinish" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">13. FLOOR FINISH</label>
+                <select asp-for="StructuralFloorFinish" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs">
+                    <option value="Ceramic / Granite Tiles (T)">Ceramic / Granite Tiles (T)</option>
+                    <option value="Marble Slabs / Tiles (M)">Marble Slabs / Tiles (M)</option>
+                    <option value="Plain Cement Plaster (PC)">Plain Cement Plaster (PC)</option>
+                    <option value="Wood Vinyl / Parquet (W)">Wood Vinyl / Parquet (W)</option>
+                </select>
+            </div>
+            <div>
+                <label asp-for="StructuralFinishFront" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">14. WALL FINISH</label>
+                <select asp-for="StructuralFinishFront" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs">
+                    <option value="Cement Plaster Paint Finish (CP)">Cement Plaster Paint Finish (CP)</option>
+                    <option value="Decorative Tiles / Stones (T)">Decorative Tiles / Stones (T)</option>
+                    <option value="Washout Pebbles (WOP)">Washout Pebbles (WOP)</option>
+                </select>
+            </div>
+            <div>
+                <label asp-for="ElectricalSystem" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">15. ELECTRICAL CONDUIT</label>
+                <select asp-for="ElectricalSystem" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs">
+                    <option value="Poly Vinyl Carbonate Conduit (EPVC)">Poly Vinyl Carbonate Conduit (EPVC)</option>
+                    <option value="Metal Conduit / Molding (MM)">Metal Conduit / Molding (MM)</option>
+                    <option value="Concealed Knob & Tube">Concealed Knob & Tube</option>
+                </select>
+            </div>
+            <div>
+                <label asp-for="ToiletAndBathroom" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">16. TOILET & BATH</label>
+                <select asp-for="ToiletAndBathroom" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs">
+                    <option value="Ceramic Tiled with Fixtures (CT)">Ceramic Tiled with Fixtures (CT)</option>
+                    <option value="Marble with Premium Fixtures (M)">Marble with Premium Fixtures (M)</option>
+                    <option value="Plain Cement with Basic Fixtures (PC)">Plain Cement with Basic Fixtures (PC)</option>
+                </select>
+            </div>
+            <div>
+                <label asp-for="PlumbingSewer" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">17. PLUMBING & SERVICES</label>
+                <select asp-for="PlumbingSewer" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs">
+                    <option value="PVC Pipes to Septic Tank (PVCP)">PVC Pipes to Septic Tank (PVCP)</option>
+                    <option value="Galvanized Iron Pipes (GIP)">Galvanized Iron Pipes (GIP)</option>
+                    <option value="Cast Iron / Concrete Pipes (CP)">Cast Iron / Concrete Pipes (CP)</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- 7. BACK TAXES PERIOD & ASSESSMENT BASIS (CAST REFERENCE) -->
+    <div class="p-5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <h4 class="text-xs font-bold uppercase text-slate-800 dark:text-stone-200 flex items-center gap-2">
+            <i data-lucide="history" class="w-4 h-4 text-emerald-600"></i>
+            Back Taxes Period & Assessment Basis
+        </h4>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label asp-for="AssessmentBasis" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BASIS OF ASSESSMENT</label>
+                <input asp-for="AssessmentBasis" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold" placeholder="e.g. Sec. 217 RA 7160 / Ordinance No. X" />
+            </div>
+            <div>
+                <label asp-for="BackTaxesYearFrom" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BACK TAXES FROM YEAR</label>
+                <input asp-for="BackTaxesYearFrom" type="number" min="1950" max="2099" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" placeholder="e.g. 2021" />
+            </div>
+            <div>
+                <label asp-for="BackTaxesYearTo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BACK TAXES TO YEAR</label>
+                <input asp-for="BackTaxesYearTo" type="number" min="1950" max="2099" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" placeholder="e.g. 2025" />
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD FLOOR LEVEL (CAST) -->
+    <div id="addFloorModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden">
+        <div class="bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-200 dark:border-stone-800 pb-3">
+                <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <i data-lucide="layers" class="w-4 h-4 text-emerald-600"></i> Add Floor Level / Component
+                </h3>
+                <button type="button" onclick="closeAddFloorModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-stone-300">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 dark:text-stone-400 mb-1">STOREY / LEVEL</label>
+                    <select id="modalFloorLevel" class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-xs font-bold">
+                        <option value="1st Floor">1st Floor (Ground Level)</option>
+                        <option value="2nd Floor">2nd Floor</option>
+                        <option value="3rd Floor">3rd Floor</option>
+                        <option value="4th Floor">4th Floor</option>
+                        <option value="Mezzanine">Mezzanine Level</option>
+                        <option value="Basement">Basement Level</option>
+                        <option value="Roof Deck">Roof Deck / Penthouse</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 dark:text-stone-400 mb-1">DESCRIPTION / USE</label>
+                    <input type="text" id="modalFloorDesc" class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-xs" placeholder="e.g. Main Living & Dining, Bedrooms" value="Living & Dining Area" />
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 dark:text-stone-400 mb-1">AREA (SQ.M.)</label>
+                        <input type="number" id="modalFloorArea" step="0.01" min="0" class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-xs text-right font-mono font-bold" placeholder="0.00" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 dark:text-stone-400 mb-1">BUCC RATE (PHP/SQ.M.)</label>
+                        <input type="number" id="modalFloorUnitCost" step="0.01" min="0" class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-xs text-right font-mono font-bold" placeholder="0.00" value="8500" />
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-stone-800">
+                <button type="button" onclick="closeAddFloorModal()" class="px-4 py-2 rounded-xl border border-slate-300 dark:border-stone-700 text-xs font-bold text-slate-700 dark:text-stone-300 hover:bg-slate-100">Cancel</button>
+                <button type="button" onclick="saveFloorLevel()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm">Save Floor</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD ADDITIONAL IMPROVEMENT ITEM (CAST) -->
+    <div id="addAdditionModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden">
+        <div class="bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-200 dark:border-stone-800 pb-3">
+                <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <i data-lucide="plus-circle" class="w-4 h-4 text-sky-600"></i> Add Additional Improvement Item
+                </h3>
+                <button type="button" onclick="closeAddAdditionModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-stone-300">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 dark:text-stone-400 mb-1">STANDARD PRESET</label>
+                    <select id="modalAdditionPreset" class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-xs font-bold">
+                        <option value="custom">-- Custom Item / Improvement --</option>
+                        <option value="CARPORT" data-rate="30" data-type="Percent">Carport (30% of BUCC)</option>
+                        <option value="MEZZANINE" data-rate="60" data-type="Percent">Mezzanine (60% of BUCC)</option>
+                        <option value="PORCH" data-rate="40" data-type="Percent">Porch (40% of BUCC)</option>
+                        <option value="BALCONY" data-rate="45" data-type="Percent">Balcony (45% of BUCC)</option>
+                        <option value="GARAGE" data-rate="45" data-type="Percent">Garage (45% of BUCC)</option>
+                        <option value="TERRACE : COVERED" data-rate="40" data-type="Percent">Terrace : Covered (40% of BUCC)</option>
+                        <option value="TERRACE : OPEN" data-rate="20" data-type="Percent">Terrace : Open (20% of BUCC)</option>
+                        <option value="DECK ROOF : COVERED" data-rate="40" data-type="Percent">Deck Roof : Covered (40% of BUCC)</option>
+                        <option value="DECK ROOF : OPEN" data-rate="20" data-type="Percent">Deck Roof : Open (20% of BUCC)</option>
+                        <option value="BASEMENT : RESIDENTIAL" data-rate="70" data-type="Percent">Basement : Residential (70% of BUCC)</option>
+                        <option value="PAVEMENT : CONCRETE 10 CM" data-rate="150" data-type="FixedCost">Concrete Pavement 10cm (₱150/sq.m.)</option>
+                        <option value="PAVEMENT : CONCRETE 15 CM" data-rate="225" data-type="FixedCost">Concrete Pavement 15cm (₱225/sq.m.)</option>
+                        <option value="FLOOR FINISH : GRANITE TILES" data-rate="1000" data-type="FixedCost">Granite Tiles Finish (₱1,000/sq.m.)</option>
+                        <option value="FLOOR FINISH : CERAMIC TILES" data-rate="600" data-type="FixedCost">Ceramic Tiles Finish (₱600/sq.m.)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 dark:text-stone-400 mb-1">ITEM DESCRIPTION</label>
+                    <input type="text" id="modalAdditionDesc" class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-xs" placeholder="e.g. Carport, Open Terrace, Fence" />
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 dark:text-stone-400 mb-1">QUANTITY / AREA</label>
+                        <input type="number" id="modalAdditionQty" step="0.01" min="0" class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-xs text-right font-mono font-bold" placeholder="1.00" value="1" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 dark:text-stone-400 mb-1" id="modalAdditionRateLabel">UNIT RATE / COST (PHP)</label>
+                        <input type="number" id="modalAdditionRate" step="0.01" min="0" class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-xs text-right font-mono font-bold" placeholder="0.00" />
+                    </div>
+                </div>
+                <div id="modalMultiplierRow" class="hidden">
+                    <label class="block text-xs font-bold text-slate-600 dark:text-stone-400 mb-1">PERCENT MULTIPLIER (%)</label>
+                    <input type="number" id="modalAdditionMultiplier" step="0.1" min="0" max="100" class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-xs text-right font-mono font-bold" placeholder="0" />
+                </div>
+            </div>
+            <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-stone-800">
+                <button type="button" onclick="closeAddAdditionModal()" class="px-4 py-2 rounded-xl border border-slate-300 dark:border-stone-700 text-xs font-bold text-slate-700 dark:text-stone-300 hover:bg-slate-100">Cancel</button>
+                <button type="button" onclick="saveAdditionItem()" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold shadow-sm">Save Improvement</button>
+            </div>
+        </div>
+    </div>
+</div>

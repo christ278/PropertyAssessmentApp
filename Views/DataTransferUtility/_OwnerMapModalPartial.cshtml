@@ -1,0 +1,128 @@
+@model PropertyAssessmentApp.Models.Owner
+@{
+    var existingOwners = ViewBag.ExistingOwners as IEnumerable<PropertyAssessmentApp.Models.Owner> ?? new List<PropertyAssessmentApp.Models.Owner>();
+}
+
+<div class="bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 rounded-3xl p-6 w-full max-w-2xl shadow-2xl space-y-5 font-mono text-xs max-h-[90vh] overflow-y-auto">
+    <!-- Modal Header -->
+    <div class="flex items-center justify-between border-b border-slate-200 dark:border-stone-800 pb-3">
+        <div class="flex items-center gap-2">
+            <i data-lucide="user-check" class="w-5 h-5 text-emerald-600 dark:text-emerald-400"></i>
+            <div>
+                <h3 class="text-base font-extrabold text-slate-900 dark:text-white">Owner Matching & Record Migration</h3>
+                <span class="text-[10px] text-slate-400">Attach an existing owner or register a new taxpayer profile.</span>
+            </div>
+        </div>
+        <button type="button" onclick="closeOwnerModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-stone-200">
+            <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+    </div>
+
+    <!-- Tab Buttons -->
+    <div class="flex items-center gap-2 p-1 rounded-2xl bg-slate-100 dark:bg-stone-800">
+        <button type="button" id="tabBtnRegister" onclick="switchOwnerTab('register')" 
+                class="flex-1 py-2 px-3 rounded-xl font-bold text-center transition-all bg-white dark:bg-stone-900 text-slate-900 dark:text-white shadow-xs">
+            Register New Owner
+        </button>
+        <button type="button" id="tabBtnSelect" onclick="switchOwnerTab('select')" 
+                class="flex-1 py-2 px-3 rounded-xl font-bold text-center transition-all text-slate-500 hover:text-slate-900 dark:text-stone-400 dark:hover:text-white">
+            Select Existing Owner (@existingOwners.Count())
+        </button>
+    </div>
+
+    <!-- TAB 1: REGISTER NEW OWNER FORM -->
+    <div id="tabPanelRegister" class="space-y-4">
+        <div class="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 text-emerald-800 dark:text-emerald-300 text-[11px]">
+            <strong>Parsed Legacy Name:</strong> The taxpayer name from PATAS has been pre-split into First, Middle, and Last name below. Verify and adjust if necessary.
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+                <label class="block text-slate-600 dark:text-stone-400 font-bold mb-1">Owner Type</label>
+                <select id="newOwnerType" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-700 bg-slate-50 dark:bg-stone-800 text-slate-900 dark:text-white font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    <option value="0">Individual</option>
+                    <option value="1">Corporate</option>
+                    <option value="2">Government</option>
+                    <option value="3">Estate</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-slate-600 dark:text-stone-400 font-bold mb-1">TIN</label>
+                <input type="text" id="newTaxIdentNo" value="@Model.TaxIdentNo" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-700 bg-slate-50 dark:bg-stone-800 text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            </div>
+            <div>
+                <label class="block text-slate-600 dark:text-stone-400 font-bold mb-1">RPTIN</label>
+                <input type="text" id="newRptin" value="@Model.RptinNumber" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-700 bg-slate-50 dark:bg-stone-800 text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+                <label class="block text-slate-600 dark:text-stone-400 font-bold mb-1">First Name</label>
+                <input type="text" id="newFirstName" value="@Model.FirstName" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-700 bg-slate-50 dark:bg-stone-800 text-slate-900 dark:text-white font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            </div>
+            <div>
+                <label class="block text-slate-600 dark:text-stone-400 font-bold mb-1">Middle Name</label>
+                <input type="text" id="newMiddleName" value="@Model.MiddleName" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-700 bg-slate-50 dark:bg-stone-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            </div>
+            <div>
+                <label class="block text-slate-600 dark:text-stone-400 font-bold mb-1">Last Name</label>
+                <input type="text" id="newLastName" value="@Model.LastName" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-700 bg-slate-50 dark:bg-stone-800 text-slate-900 dark:text-white font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+                <label class="block text-slate-600 dark:text-stone-400 font-bold mb-1">Contact Phone</label>
+                <input type="text" id="newContactNo" value="@Model.ContactNo" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-700 bg-slate-50 dark:bg-stone-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            </div>
+            <div>
+                <label class="block text-slate-600 dark:text-stone-400 font-bold mb-1">Email</label>
+                <input type="email" id="newEmail" value="@Model.Email" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-700 bg-slate-50 dark:bg-stone-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            </div>
+        </div>
+
+        <div>
+            <label class="block text-slate-600 dark:text-stone-400 font-bold mb-1">Mailing Address</label>
+            <textarea id="newAddress" rows="2" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-700 bg-slate-50 dark:bg-stone-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500">@Model.Address</textarea>
+        </div>
+
+        <div class="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:gap-3 pt-3 border-t border-slate-200 dark:border-stone-800">
+            <button type="button" onclick="closeOwnerModal()" class="w-full sm:w-auto text-center px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold">
+                Cancel
+            </button>
+            <button type="button" id="btnConfirmSave" onclick="submitTransferWithNewOwner()" class="w-full sm:w-auto px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center justify-center gap-2 shadow-sm">
+                <i data-lucide="check" class="w-4 h-4"></i>
+                <span>Save and Migrate Record</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- TAB 2: SELECT EXISTING OWNER -->
+    <div id="tabPanelSelect" class="space-y-4 hidden">
+        <div>
+            <input type="text" id="existingOwnerSearch" 
+                   onkeyup="filterExistingOwners(this.value)" 
+                   placeholder="Search existing owner by name, TIN, or RPTIN..." 
+                   class="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-stone-700 bg-slate-50 dark:bg-stone-800 text-slate-900 dark:text-white text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
+        </div>
+
+        <div id="existingOwnersList" class="space-y-2 max-h-72 overflow-y-auto divide-y divide-slate-100 dark:divide-stone-800">
+            @foreach (var owner in existingOwners)
+            {
+                <div class="existing-owner-item pt-2 pb-2 flex items-center justify-between gap-3 hover:bg-slate-50 dark:hover:bg-stone-800/40 p-2 rounded-xl transition-colors">
+                    <div>
+                        <div class="font-bold text-slate-900 dark:text-white owner-name-text">@owner.DisplayName</div>
+                        <div class="text-[10px] text-slate-500 font-mono">TIN: @owner.TaxIdentNo • RPTIN: @owner.RptinNumber</div>
+                        <div class="text-[10px] text-slate-400">@owner.FullAddress</div>
+                    </div>
+                    <button type="button" 
+                            onclick="submitTransferWithExistingOwner('@owner.Id')"
+                            class="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-600 font-bold border border-emerald-200 dark:border-emerald-500/30 transition-all text-xs shrink-0">
+                        Select & Link
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
+</div>

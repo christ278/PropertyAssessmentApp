@@ -1,0 +1,490 @@
+@model PropertyAssessmentApp.Models.LandHoldingRequest
+@using PropertyAssessmentApp.Models
+
+@{
+    ViewData["Title"] = "New Land Holding Certificate Request";
+    var properties = ViewBag.Properties as IEnumerable<TaxDeclaration> ?? new List<TaxDeclaration>();
+    var orderPayments = ViewBag.OrderPayments as IEnumerable<OrderPayment> ?? new List<OrderPayment>();
+}
+
+<div class="space-y-8 font-mono text-xs">
+    
+    <!-- Page Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <div class="inline-flex items-center gap-2 text-xs font-mono text-emerald-700 dark:text-emerald-400 font-bold mb-1">
+                <i data-lucide="award" class="w-4 h-4"></i>
+                <span>Land Holdings & Certification Services</span>
+            </div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">File Land Holding Certificate Request</h1>
+            <p class="text-slate-500 dark:text-stone-400 text-xs sm:text-sm">Encode property landholdings verification, total landholdings, agricultural holdings, and tax clearance certifications.</p>
+        </div>
+        <a asp-action="Index" class="w-full sm:w-auto text-center px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 hover:bg-slate-50 dark:hover:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold text-xs font-mono border border-slate-200 dark:border-stone-800 shadow-sm">
+            Cancel
+        </a>
+    </div>
+
+    <!-- Form Container -->
+    <div class="p-4 sm:p-6 lg:p-8 rounded-2xl sm:rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm">
+        <form asp-action="Create" method="post" enctype="multipart/form-data" id="landHoldingForm" class="space-y-8">
+            <input type="hidden" asp-for="Id" />
+            <input type="hidden" asp-for="RequestedDocumentsJson" id="RequestedDocumentsJson" />
+            <input type="hidden" asp-for="TotalFeesAmount" id="TotalFeesAmount" />
+            <div asp-validation-summary="All" class="p-4 rounded-xl bg-rose-50 dark:bg-rose-500/20 border border-rose-200 dark:border-rose-500/40 text-rose-800 dark:text-rose-300 font-sans font-bold"></div>
+
+            <!-- Step 1: Real Property Search & Owner Selection -->
+            <div class="space-y-4 p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
+                <div class="border-b border-slate-200 dark:border-stone-800 pb-3 flex items-center justify-between">
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2">
+                            <i data-lucide="search" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                            1. Select Registered Property (Auto-Fill Fields)
+                        </h3>
+                        <p class="text-slate-500 dark:text-stone-400 text-[11px] mt-0.5">Search property by TD No., Owner, or PIN from Assessment Records to auto-populate form details.</p>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">
+                        SEARCH & SELECT PROPERTY <span class="text-rose-600 dark:text-rose-500 font-bold">*</span>
+                    </label>
+                    <select id="propertySelect" asp-for="TaxDeclarationId" class="w-full">
+                        <option value="">-- Choose Property from Assessment Records --</option>
+                        @foreach (var p in properties)
+                        {
+                            <option value="@p.Id">@p.TaxDeclarationNumber - @p.OwnerName (@p.PropertyIndexNumber)</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                    <div>
+                        <label asp-for="TaxDeclarationNumber" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">
+                            TDN NO. <span class="text-rose-600 dark:text-rose-500 font-bold">*</span>
+                        </label>
+                        <input asp-for="TaxDeclarationNumber" id="tdNoInput" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono font-bold focus:outline-none focus:border-emerald-600" placeholder="TD-2026-GS-0001" />
+                        <span asp-validation-for="TaxDeclarationNumber" class="text-rose-500 font-bold text-[11px] mt-1 block"></span>
+                    </div>
+                    <div>
+                        <label asp-for="PropertyIndexNumber" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">PIN / PROPERTY INDEX NO.</label>
+                        <input asp-for="PropertyIndexNumber" id="pinInput" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono font-bold focus:outline-none focus:border-emerald-600" placeholder="162-02-001-04-012" />
+                    </div>
+                    <div>
+                        <label asp-for="OwnerName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">
+                            OWNER NAME <span class="text-rose-600 dark:text-rose-500 font-bold">*</span>
+                        </label>
+                        <input asp-for="OwnerName" id="ownerNameInput" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold focus:outline-none focus:border-emerald-600" placeholder="Owner / Taxpayer Name" />
+                        <span asp-validation-for="OwnerName" class="text-rose-500 font-bold text-[11px] mt-1 block"></span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label asp-for="SpouseName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">SPOUSE NAME</label>
+                        <input asp-for="SpouseName" id="spouseNameInput" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold focus:outline-none focus:border-emerald-600" placeholder="Spouse Full Name" />
+                    </div>
+                    <div>
+                        <label asp-for="ContactNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">CONTACT NO.</label>
+                        <input asp-for="ContactNo" id="contactNoInput" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold focus:outline-none focus:border-emerald-600" placeholder="0917-000-0000" />
+                    </div>
+                </div>
+
+                <div>
+                    <label asp-for="PropertyLocation" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">LOCATION OF PROPERTY</label>
+                    <input asp-for="PropertyLocation" id="locationInput" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-semibold focus:outline-none focus:border-emerald-600" placeholder="Street, Barangay, City, Province" />
+                </div>
+            </div>
+
+            <!-- Step 2: General Information & Official Receipt Details -->
+            <div class="space-y-4">
+                <div class="border-b border-slate-200 dark:border-stone-800 pb-2">
+                    <h3 class="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2">
+                        <i data-lucide="receipt" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                        2. General Information & Official Receipt Details
+                    </h3>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                        <label asp-for="RequesterName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">REQUESTER NAME</label>
+                        <input asp-for="RequesterName" class="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold focus:outline-none focus:border-emerald-600" placeholder="Name of Applicant / Requester" />
+                    </div>
+                    <div>
+                        <label asp-for="ORNumber" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">
+                            O.R. NO. <span class="text-[10px] text-slate-400 font-normal">(Optional on filing)</span>
+                        </label>
+                        <input asp-for="ORNumber" class="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono font-bold focus:outline-none focus:border-emerald-600" placeholder="OR-2026-XXXX" />
+                        <span asp-validation-for="ORNumber" class="text-rose-500 font-bold text-[11px] mt-1 block"></span>
+                    </div>
+                    <div>
+                        <label asp-for="ORDateIssued" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">DATE ISSUED</label>
+                        <input asp-for="ORDateIssued" type="date" class="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono font-bold focus:outline-none focus:border-emerald-600" />
+                    </div>
+                    <div>
+                        <label class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">ATTACHMENTS (PDF/IMG)</label>
+                        <input type="file" name="fileUpload" class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-mono file:font-bold file:bg-emerald-600 file:text-white" />
+                    </div>
+                </div>
+
+                <div>
+                    <label asp-for="Purposes" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">
+                        PURPOSE/S <span class="text-rose-600 dark:text-rose-500 font-bold">*</span>
+                    </label>
+                    <input asp-for="Purposes" class="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-semibold focus:outline-none focus:border-emerald-600" placeholder="e.g. BIR Requirement, Bank Loan Application, Capital Gains Tax, Transfer of Ownership" />
+                    <span asp-validation-for="Purposes" class="text-rose-500 font-bold text-[11px] mt-1 block"></span>
+                </div>
+            </div>
+
+            <!-- Step 3: Requirements Submitted -->
+            <div class="space-y-4 p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
+                <div class="border-b border-slate-200 dark:border-stone-800 pb-2">
+                    <h3 class="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2">
+                        <i data-lucide="check-square" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                        3. Requirements Submitted
+                    </h3>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <label class="flex items-center gap-3 p-3.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 cursor-pointer hover:border-emerald-600 transition-colors">
+                        <input type="checkbox" asp-for="ReqIdOfOwner" class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 dark:border-stone-700 dark:bg-stone-950" />
+                        <span class="font-bold text-slate-800 dark:text-stone-200 uppercase">ID OF OWNER</span>
+                    </label>
+
+                    <label class="flex items-center gap-3 p-3.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 cursor-pointer hover:border-emerald-600 transition-colors">
+                        <input type="checkbox" asp-for="ReqIdOfRepresentative" class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 dark:border-stone-700 dark:bg-stone-950" />
+                        <span class="font-bold text-slate-800 dark:text-stone-200 uppercase">ID OF REPRESENTATIVE</span>
+                    </label>
+
+                    <label class="flex items-center gap-3 p-3.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 cursor-pointer hover:border-emerald-600 transition-colors">
+                        <input type="checkbox" asp-for="ReqAuthorizationLetter" class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 dark:border-stone-700 dark:bg-stone-950" />
+                        <span class="font-bold text-slate-800 dark:text-stone-200 uppercase">AUTHORIZATION LETTER / SPA</span>
+                    </label>
+
+                    <label class="flex items-center gap-3 p-3.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 cursor-pointer hover:border-emerald-600 transition-colors">
+                        <input type="checkbox" asp-for="ReqDeedOfConveyance" class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 dark:border-stone-700 dark:bg-stone-950" />
+                        <span class="font-bold text-slate-800 dark:text-stone-200 uppercase">DEED OF CONVEYANCE</span>
+                    </label>
+
+                    <label class="flex items-center gap-3 p-3.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 cursor-pointer hover:border-emerald-600 transition-colors">
+                        <input type="checkbox" asp-for="ReqCertIndigency" class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 dark:border-stone-700 dark:bg-stone-950" />
+                        <span class="font-bold text-slate-800 dark:text-stone-200 uppercase">CERTIFICATE OF INDIGENCY</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Step 4: Request Certificate Option/s -->
+            <div class="space-y-4 p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
+                <div class="border-b border-slate-200 dark:border-stone-800 pb-2">
+                    <h3 class="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2">
+                        <i data-lucide="file-check" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                        4. * Request Certificate Option/s
+                    </h3>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-3">
+                    <label class="flex items-center gap-3 p-3.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 cursor-pointer hover:border-emerald-600 transition-colors">
+                        <input type="checkbox" asp-for="CertTotalLandholdings" class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 dark:border-stone-700 dark:bg-stone-950" />
+                        <span class="font-bold text-slate-800 dark:text-stone-200 uppercase">CERTIFICATE OF TOTAL LANDHOLDINGS</span>
+                    </label>
+
+                    <label class="flex items-center gap-3 p-3.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 cursor-pointer hover:border-emerald-600 transition-colors">
+                        <input type="checkbox" asp-for="CertTypeTaxDeclaration" class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 dark:border-stone-700 dark:bg-stone-950" />
+                        <span class="font-bold text-slate-800 dark:text-stone-200 uppercase">CERTIFICATION TYPE OF TAX DECLARATION</span>
+                    </label>
+
+                    <label class="flex items-center gap-3 p-3.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 cursor-pointer hover:border-emerald-600 transition-colors">
+                        <input type="checkbox" asp-for="CertAggregateAgriLandholdings" class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 dark:border-stone-700 dark:bg-stone-950" />
+                        <span class="font-bold text-slate-800 dark:text-stone-200 uppercase">CERTIFICATE OF AGGREGATE AGRICULTURAL LANDHOLDINGS</span>
+                    </label>
+
+                    <label class="flex items-center gap-3 p-3.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 cursor-pointer hover:border-emerald-600 transition-colors">
+                        <input type="checkbox" asp-for="CertNoImprovementFromDeath" class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 dark:border-stone-700 dark:bg-stone-950" />
+                        <span class="font-bold text-slate-800 dark:text-stone-200 uppercase">CERTIFICATION W/ NO IMPROVEMENT (FROM TIME OF DEATH)</span>
+                    </label>
+
+                    <label class="flex items-center gap-3 p-3.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 cursor-pointer hover:border-emerald-600 transition-colors">
+                        <input type="checkbox" asp-for="CertNoLandholdings" class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 dark:border-stone-700 dark:bg-stone-950" />
+                        <span class="font-bold text-slate-800 dark:text-stone-200 uppercase">CERTIFICATE OF NO LANDHOLDINGS</span>
+                    </label>
+
+                    <label class="flex items-center gap-3 p-3.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 cursor-pointer hover:border-emerald-600 transition-colors">
+                        <input type="checkbox" asp-for="CertPropertyHistory" class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 dark:border-stone-700 dark:bg-stone-950" />
+                        <span class="font-bold text-slate-800 dark:text-stone-200 uppercase">PROPERTY HISTORY</span>
+                    </label>
+                </div>
+
+                <div class="pt-2">
+                    <label asp-for="CertOthersSpecify" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold uppercase">OTHERS (SPECIFY)</label>
+                    <input asp-for="CertOthersSpecify" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-semibold focus:outline-none focus:border-emerald-600" placeholder="Specify other landholding requests..." />
+                </div>
+            </div>
+
+            <!-- Step 5: Document To Be Requested Table (Order of Payment Rates) -->
+            <div class="space-y-4 p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
+                <div class="border-b border-slate-200 dark:border-stone-800 pb-2 flex items-center justify-between">
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2">
+                            <i data-lucide="calculator" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                            5. Document To Be Requested Table (Order of Payment Rates)
+                        </h3>
+                        <p class="text-slate-500 dark:text-stone-400 text-[11px] mt-0.5">Select particulars and number of copies to compute exact billing amount.</p>
+                    </div>
+
+                    <button type="button" id="btnAddRow" class="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center gap-1.5 text-xs font-mono shadow-sm">
+                        <i data-lucide="plus" class="w-4 h-4"></i>
+                        Add Document Row
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[500px] text-left text-xs font-mono" id="feesTable">
+                        <thead class="bg-slate-200/60 dark:bg-stone-900 text-slate-700 dark:text-stone-300 font-bold border-b border-slate-300 dark:border-stone-800">
+                            <tr>
+                                <th class="px-3 py-2.5 w-12 text-center">ACTION</th>
+                                <th class="px-3 py-2.5">PARTICULARS</th>
+                                <th class="px-3 py-2.5 w-32 text-right">FEES (₱)</th>
+                                <th class="px-3 py-2.5 w-32 text-center">NO. OF PIECES</th>
+                                <th class="px-3 py-2.5 w-36 text-right">TOTAL (₱)</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-200 dark:divide-stone-800" id="feesTableBody">
+                            <!-- Dynamic rows appended via Javascript -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="flex items-center justify-between pt-4 border-t border-slate-200 dark:border-stone-800">
+                    <span class="text-sm font-extrabold text-slate-900 dark:text-white uppercase font-mono">Overall Total Amount:</span>
+                    <div class="text-xl font-black font-mono text-emerald-700 dark:text-emerald-400 bg-white dark:bg-stone-900 px-6 py-2 rounded-xl border border-slate-200 dark:border-stone-800 shadow-sm">
+                        ₱ <span id="lblOverallTotal">0.00</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Submit Button Footer -->
+            <div class="flex flex-col-reverse sm:flex-row sm:items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-stone-800">
+                <a asp-action="Index" class="w-full sm:w-auto text-center px-6 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-slate-700 dark:text-stone-300 font-bold transition-all">
+                    Cancel
+                </a>
+                <button type="submit" class="w-full sm:w-auto text-center px-8 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 transition-all">
+                    <i data-lucide="check" class="w-4 h-4"></i>
+                    Submit Land Holding Request
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        const availableParticulars = [
+            @foreach (var op in orderPayments)
+            {
+                @: { code: "@op.Code", name: "@op.Particular", fee: @op.UnitCost },
+            }
+        ];
+
+        let TomSelectProperty = null;
+
+        document.addEventListener('DOMContentLoaded', function () {
+            // Initialize TomSelect for Property Search
+            if (document.getElementById('propertySelect')) {
+                TomSelectProperty = new TomSelect('#propertySelect', {
+                    create: false,
+                    placeholder: 'Search property by TDN, Owner Name, or PIN...',
+                    onChange: function(val) {
+                        if (val) {
+                            fetchPropertyDetails(val);
+                        }
+                    }
+                });
+            }
+
+            // Add initial fee row
+            addRow();
+
+            document.getElementById('btnAddRow').addEventListener('click', function () {
+                addRow();
+            });
+
+            // Form Submit Client-side Validation
+            var form = document.getElementById('landHoldingForm');
+            if (form) {
+                form.addEventListener('submit', function (e) {
+                    var isValid = true;
+                    var firstInvalid = null;
+
+                    document.querySelectorAll('.border-rose-500').forEach(function(el) {
+                        el.classList.remove('border-rose-500', 'ring-2', 'ring-rose-500/30');
+                    });
+
+                    var reqFields = [
+                        { el: document.getElementById('tdNoInput'), name: 'Tax Declaration Number (TDN)' },
+                        { el: document.getElementById('ownerNameInput'), name: 'Owner / Taxpayer Name' },
+                        { el: document.querySelector('input[name="ORNumber"]'), name: 'Official Receipt (O.R.) Number' },
+                        { el: document.querySelector('input[name="Purposes"]'), name: 'Purpose/s' }
+                    ];
+
+                    reqFields.forEach(function (f) {
+                        if (f.el && (!f.el.value || !f.el.value.trim())) {
+                            isValid = false;
+                            f.el.classList.add('border-rose-500', 'ring-2', 'ring-rose-500/30');
+                            if (!firstInvalid) firstInvalid = f.el;
+                        }
+                    });
+
+                    // Validate Fee Rows
+                    var feesAmount = parseFloat(document.getElementById('TotalFeesAmount').value) || 0;
+                    var docJson = document.getElementById('RequestedDocumentsJson').value;
+                    var hasDocItems = false;
+                    try {
+                        var parsed = JSON.parse(docJson || '[]');
+                        hasDocItems = parsed && parsed.length > 0;
+                    } catch (ex) {
+                        hasDocItems = false;
+                    }
+
+                    var feesTable = document.getElementById('feesTable');
+                    if (!hasDocItems || feesAmount <= 0) {
+                        isValid = false;
+                        if (feesTable) feesTable.classList.add('border-rose-500', 'ring-2', 'ring-rose-500/30');
+                        if (!firstInvalid) firstInvalid = document.getElementById('btnAddRow');
+                    } else if (feesTable) {
+                        feesTable.classList.remove('border-rose-500', 'ring-2', 'ring-rose-500/30');
+                    }
+
+                    if (!isValid) {
+                        e.preventDefault();
+                        if (firstInvalid) {
+                            firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            firstInvalid.focus();
+                        }
+                        toastr.warning('Please fill in all required fields marked with * and select at least one document fee.', 'Validation Notice');
+                        return false;
+                    }
+                });
+            }
+
+            document.addEventListener('input', function(e) {
+                if (e.target && e.target.classList.contains('border-rose-500')) {
+                    e.target.classList.remove('border-rose-500', 'ring-2', 'ring-rose-500/30');
+                }
+            });
+        });
+
+        function fetchPropertyDetails(propertyId) {
+            fetch(`/LandHoldingRequest/GetPropertyDetails/${propertyId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data) {
+                        if (data.taxDeclarationNumber) document.getElementById('tdNoInput').value = data.taxDeclarationNumber;
+                        if (data.propertyIndexNumber) document.getElementById('pinInput').value = data.propertyIndexNumber;
+                        if (data.ownerName) document.getElementById('ownerNameInput').value = data.ownerName;
+                        if (data.spouseName) document.getElementById('spouseNameInput').value = data.spouseName;
+                        if (data.contactNo) document.getElementById('contactNoInput').value = data.contactNo;
+                        if (data.propertyLocation) document.getElementById('locationInput').value = data.propertyLocation;
+                    }
+                })
+                .catch(err => console.error('Error fetching property details:', err));
+        }
+
+        function addRow() {
+            const tbody = document.getElementById('feesTableBody');
+            const rowId = 'row_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+
+            let optionsHtml = '<option value="">-- Select Particular --</option>';
+            availableParticulars.forEach(p => {
+                optionsHtml += `<option value="${p.code}" data-fee="${p.fee}">${p.name} (₱${p.fee.toFixed(2)})</option>`;
+            });
+
+            const tr = document.createElement('tr');
+            tr.id = rowId;
+            tr.className = 'hover:bg-slate-100/50 dark:hover:bg-stone-900/50 transition-colors';
+            tr.innerHTML = `
+                <td class="px-3 py-2 text-center">
+                    <button type="button" onclick="removeRow('${rowId}')" class="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/20 transition-colors" title="Delete Row">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
+                </td>
+                <td class="px-3 py-2">
+                    <select class="particular-select w-full bg-white dark:bg-stone-900 px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600" onchange="onParticularChange('${rowId}')">
+                        ${optionsHtml}
+                    </select>
+                </td>
+                <td class="px-3 py-2">
+                    <input type="number" step="0.01" class="fee-input w-full bg-slate-100 dark:bg-stone-950 px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800 text-right font-bold text-slate-900 dark:text-white" value="0.00" readonly />
+                </td>
+                <td class="px-3 py-2">
+                    <input type="number" min="1" class="qty-input w-full bg-white dark:bg-stone-900 px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800 text-center font-bold text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600" value="1" oninput="calculateTotals()" />
+                </td>
+                <td class="px-3 py-2">
+                    <input type="number" step="0.01" class="row-total w-full bg-slate-100 dark:bg-stone-950 px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800 text-right font-black text-emerald-700 dark:text-emerald-400" value="0.00" readonly />
+                </td>
+            `;
+
+            tbody.appendChild(tr);
+            if (window.lucide) lucide.createIcons();
+            calculateTotals();
+        }
+
+        function removeRow(rowId) {
+            const row = document.getElementById(rowId);
+            if (row) {
+                row.remove();
+                calculateTotals();
+            }
+        }
+
+        function onParticularChange(rowId) {
+            const row = document.getElementById(rowId);
+            if (!row) return;
+
+            const select = row.querySelector('.particular-select');
+            const feeInput = row.querySelector('.fee-input');
+            const selectedOpt = select.options[select.selectedIndex];
+            const fee = parseFloat(selectedOpt.getAttribute('data-fee') || 0);
+
+            feeInput.value = fee.toFixed(2);
+            calculateTotals();
+        }
+
+        function calculateTotals() {
+            let overallTotal = 0;
+            const items = [];
+
+            const rows = document.querySelectorAll('#feesTableBody tr');
+            rows.forEach(r => {
+                const select = r.querySelector('.particular-select');
+                const feeInput = r.querySelector('.fee-input');
+                const qtyInput = r.querySelector('.qty-input');
+                const totalInput = r.querySelector('.row-total');
+
+                if (select && feeInput && qtyInput && totalInput) {
+                    const code = select.value;
+                    const text = select.options[select.selectedIndex]?.text || '';
+                    const fee = parseFloat(feeInput.value || 0);
+                    const qty = parseInt(qtyInput.value || 0);
+                    const rowTotal = fee * qty;
+
+                    totalInput.value = rowTotal.toFixed(2);
+                    overallTotal += rowTotal;
+
+                    if (code) {
+                        items.push({
+                            code: code,
+                            particularsName: text.split(' (₱')[0],
+                            unitCost: fee,
+                            quantity: qty,
+                            totalCost: rowTotal
+                        });
+                    }
+                }
+            });
+
+            document.getElementById('lblOverallTotal').innerText = overallTotal.toFixed(2);
+            document.getElementById('TotalFeesAmount').value = overallTotal.toFixed(2);
+            document.getElementById('RequestedDocumentsJson').value = JSON.stringify(items);
+        }
+    </script>
+}

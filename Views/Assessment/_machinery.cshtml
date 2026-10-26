@@ -1,0 +1,124 @@
+@model PropertyAssessmentApp.Models.TaxDeclaration
+
+<!-- MACHINERY SPECIFIC FORM -->
+<div id="machinery" class="space-y-6 hidden">
+    <!-- Property Registration Details for Machinery -->
+    <div class="p-5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400">Machinery Registration Details</h4>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="flex items-center gap-2 pt-6">
+                <input asp-for="IsLocallyManufactured" type="checkbox" class="w-4 h-4 text-emerald-600 rounded" />
+                <label asp-for="IsLocallyManufactured" class="text-slate-800 dark:text-stone-200 font-bold">For Locally Manufactured</label>
+            </div>
+            <div>
+                <label asp-for="MachineryRegNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">REGISTRATION NO.</label>
+                <input asp-for="MachineryRegNo" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" />
+            </div>
+            <div>
+                <label asp-for="DateRegistered" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">DATE REGISTERED</label>
+                <input asp-for="DateRegistered" type="date" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" />
+            </div>
+            <div>
+                <label asp-for="ImportationPermitNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">IMPORTATION PERMIT NO.</label>
+                <input asp-for="ImportationPermitNo" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" />
+            </div>
+            <div>
+                <label asp-for="ImportationDateIssued" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">PERMIT DATE ISSUED</label>
+                <input asp-for="ImportationDateIssued" type="date" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" />
+            </div>
+            <div>
+                <label asp-for="CountryOfOrigin" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">COUNTRY OF ORIGIN</label>
+                <input asp-for="CountryOfOrigin" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white" />
+            </div>
+            <div>
+                <label asp-for="SupplierSeller" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">SUPPLIER / SELLER</label>
+                <input asp-for="SupplierSeller" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white" />
+            </div>
+            <div>
+                <label asp-for="AcquisitionCost" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">ACQUISITION COST (PHP)</label>
+                <input asp-for="AcquisitionCost" type="number" step="0.01" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-right" />
+            </div>
+            <div>
+                <label asp-for="OrNoAndDate" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">O.R. NO. AND DATE</label>
+                <input asp-for="OrNoAndDate" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" />
+            </div>
+            <div class="md:col-span-3">
+                <label asp-for="SupplierAddress" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">ADDRESS OF SUPPLIER / SELLER</label>
+                <input asp-for="SupplierAddress" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white" />
+            </div>
+        </div>
+    </div>
+
+    <!-- Machinery Appraisal Details -->
+    <div class="p-5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400">Machinery Appraisal Details</h4>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label asp-for="DescriptionBrand" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">DESCRIPTION & BRAND</label>
+                <input asp-for="DescriptionBrand" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white" placeholder="Caterpillar 500KW Generator Set" />
+            </div>
+            <div>
+                <label asp-for="RatedCapacity" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">RATED CAPACITY</label>
+                <input asp-for="RatedCapacity" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white" placeholder="500 KVA / 400 KW" />
+            </div>
+            <div>
+                <label asp-for="ConditionWhenAcquired" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">CONDITION WHEN ACQUIRED</label>
+                <select asp-for="ConditionWhenAcquired" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold">
+                    <option value="New">New</option>
+                    <option value="Second Hand / Used">Second Hand / Used</option>
+                </select>
+            </div>
+            <div>
+                <label asp-for="DateAcquired" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">DATE ACQUIRED</label>
+                <input asp-for="DateAcquired" type="date" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" />
+            </div>
+            <div>
+                <label asp-for="EconomicLifeYears" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">ECONOMIC LIFE (YEARS)</label>
+                <input asp-for="EconomicLifeYears" type="number" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" />
+            </div>
+            <div>
+                <label asp-for="YearInstalled" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">YEAR INSTALLED</label>
+                <input asp-for="YearInstalled" type="number" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" />
+            </div>
+            <div>
+                <label asp-for="YearOfOperation" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">YEAR OF OPERATION</label>
+                <input asp-for="YearOfOperation" type="number" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" />
+            </div>
+            <div>
+                <label asp-for="OriginalCost" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">ORIGINAL COST (PHP)</label>
+                <input asp-for="OriginalCost" type="number" step="0.01" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-right" />
+            </div>
+            <div>
+                <label asp-for="InstallationCost" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">INSTALLATION & OTHER COST</label>
+                <input asp-for="InstallationCost" type="number" step="0.01" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-right" />
+            </div>
+            <div>
+                <label asp-for="DepreciationRatePercent" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">DEPRECIATION RATE (%)</label>
+                <input asp-for="DepreciationRatePercent" type="number" step="0.1" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-right" />
+            </div>
+            <div>
+                <label asp-for="DepreciatedValue" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">DEPRECIATED VALUE (PHP)</label>
+                <input asp-for="DepreciatedValue" type="number" step="0.01" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-right" />
+            </div>
+        </div>
+    </div>
+
+    <!-- Building Reference Panel (For Machinery) -->
+    <div class="p-5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <h4 class="text-xs font-bold uppercase text-slate-800 dark:text-stone-200">Building Reference (Where Machinery is Housed)</h4>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label asp-for="BuildingReferenceName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">BUILDING OWNER NAME</label>
+                <input asp-for="BuildingReferenceName" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white" />
+            </div>
+            <div>
+                <label asp-for="BuildingTdNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">BUILDING TD NO.</label>
+                <input asp-for="BuildingTdNo" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" />
+            </div>
+            <div>
+                <label asp-for="BuildingPin" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">BUILDING PIN</label>
+                <input asp-for="BuildingPin" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" />
+            </div>
+        </div>
+    </div>
+</div>

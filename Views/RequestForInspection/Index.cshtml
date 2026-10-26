@@ -1,0 +1,232 @@
+@model IEnumerable<PropertyAssessmentApp.Models.RequestForInspection>
+@using PropertyAssessmentApp.Models
+
+@{
+    ViewData["Title"] = "Request for Inspection (RFI)";
+    var currentStatus = ViewBag.Status as RequestForInspectionStatus?;
+    var currentSearch = ViewBag.Search as string;
+    var totalCount = ViewBag.TotalCount as int? ?? 0;
+    var pendingCount = ViewBag.PendingCount as int? ?? 0;
+    var approvedCount = ViewBag.ApprovedCount as int? ?? 0;
+}
+
+<div class="space-y-6 font-mono text-xs">
+    
+    <!-- Header Section -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <div class="inline-flex items-center gap-2 text-xs font-mono text-emerald-700 dark:text-emerald-400 font-bold mb-1">
+                <i data-lucide="clipboard-check" class="w-4 h-4"></i>
+                <span>Field Appraisal & Property Verification</span>
+            </div>
+            <h1 class="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Request for Inspection (RFI)</h1>
+            <p class="text-slate-500 dark:text-stone-400 text-sm">Track 10-stage property field inspection, depreciation reviews, reassessments, and site verification workflows.</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <a asp-action="Create" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs font-mono shadow-sm shadow-emerald-600/20 transition-all">
+                <i data-lucide="plus" class="w-4 h-4"></i>
+                <span>File Inspection Request</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Alert Messages -->
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <i data-lucide="check-circle" class="w-5 h-5 text-emerald-600"></i>
+                <span class="font-bold">@TempData["SuccessMessage"]</span>
+            </div>
+            <button type="button" onclick="this.parentElement.remove()" class="text-emerald-600 hover:text-emerald-800">&times;</button>
+        </div>
+    }
+
+    <!-- Stat Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="p-5 rounded-2xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm flex items-center justify-between">
+            <div>
+                <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Inspection Requests</p>
+                <h3 class="text-2xl font-black text-slate-900 dark:text-white mt-1">@totalCount</h3>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-300">
+                <i data-lucide="clipboard-list" class="w-5 h-5"></i>
+            </div>
+        </div>
+
+        <div class="p-5 rounded-2xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm flex items-center justify-between">
+            <div>
+                <p class="text-[11px] font-bold text-amber-500 uppercase tracking-wider">In Progress / Field Review</p>
+                <h3 class="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1">@pendingCount</h3>
+            </div>
+            <div class="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-600">
+                <i data-lucide="clock" class="w-5 h-5"></i>
+            </div>
+        </div>
+
+        <div class="p-5 rounded-2xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm flex items-center justify-between">
+            <div>
+                <p class="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">Approved & Released</p>
+                <h3 class="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">@approvedCount</h3>
+            </div>
+            <div class="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600">
+                <i data-lucide="check-check" class="w-5 h-5"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter & Table Card -->
+    <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-4">
+        
+        <!-- Filter Form -->
+        <form method="get" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+                <input type="text" name="search" value="@currentSearch" placeholder="Search Tracking No, Owner, TDN, PIN..." class="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs focus:outline-none focus:border-emerald-600" />
+            </div>
+            <div>
+                <select name="status" class="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs focus:outline-none focus:border-emerald-600">
+                    <option value="">-- All Workflow Stages --</option>
+                    @foreach (RequestForInspectionStatus s in Enum.GetValues(typeof(RequestForInspectionStatus)))
+                    {
+                        <option value="@s" selected="@(currentStatus == s ? "selected" : null)">@s</option>
+                    }
+                </select>
+            </div>
+            <div class="flex items-center gap-2 bg-slate-50 dark:bg-stone-800 px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-700 shadow-xs shrink-0">
+                <span class="limit-label text-[10px] text-slate-500 dark:text-emerald-400 font-extrabold uppercase">Limit:</span>
+                <select class="table-limit-select bg-transparent font-extrabold text-slate-900 dark:text-white focus:outline-none cursor-pointer">
+                    <option value="5" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">5</option>
+                    <option value="10" selected class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">10</option>
+                    <option value="25" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">25</option>
+                    <option value="50" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">50</option>
+                    <option value="100" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">100</option>
+                </select>
+            </div>
+            <div class="flex gap-2">
+                <button type="submit" class="px-5 py-2.5 rounded-xl bg-slate-900 dark:bg-stone-800 text-white font-bold hover:bg-slate-800 transition-all flex items-center gap-1.5">
+                    <i data-lucide="search" class="w-3.5 h-3.5"></i>
+                    <span>Filter</span>
+                </button>
+                <a asp-action="Index" class="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold hover:bg-slate-200 transition-all">
+                    Reset
+                </a>
+            </div>
+        </form>
+
+        <!-- Requests Table -->
+        <div class="border border-slate-200 dark:border-stone-800 rounded-2xl overflow-hidden paginated-table-card">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs font-mono">
+                    <thead class="bg-slate-100 dark:bg-stone-950 text-slate-600 dark:text-stone-400 border-b border-slate-200 dark:border-stone-800 uppercase tracking-wider">
+                        <tr>
+                            <th class="px-3 sm:px-4 py-3">Tracking No.</th>
+                            <th class="hidden sm:table-cell px-4 py-3">Property Reference</th>
+                            <th class="px-3 sm:px-4 py-3">Declared Owner</th>
+                            <th class="hidden md:table-cell px-4 py-3">Inspection Reason</th>
+                            <th class="hidden lg:table-cell px-4 py-3 text-right">Fee (₱)</th>
+                            <th class="px-2 sm:px-4 py-3">Workflow Stage</th>
+                            <th class="hidden xl:table-cell px-4 py-3">Attachment</th>
+                            <th class="px-2 sm:px-4 py-3 text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-stone-800">
+                        @if (!Model.Any())
+                        {
+                            <tr>
+                                <td colspan="8" class="px-4 py-8 text-center text-slate-400 dark:text-stone-500">
+                                    <div class="flex flex-col items-center gap-2">
+                                        <i data-lucide="inbox" class="w-8 h-8 stroke-1"></i>
+                                        <span>No Inspection Requests found. Click "File Inspection Request" to create one.</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var item in Model)
+                            {
+                                <tr class="hover:bg-slate-50/60 dark:hover:bg-stone-800/40 transition-colors">
+                                    <td class="px-3 sm:px-4 py-3 font-bold text-emerald-700 dark:text-emerald-400">
+                                        <a asp-action="Details" asp-route-id="@item.Id" class="hover:underline flex items-center gap-1.5">
+                                            <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+                                            @item.TrackingNumber
+                                        </a>
+                                        <span class="block text-[10px] text-slate-400 font-normal">@item.RequestDate.ToString("yyyy-MM-dd HH:mm")</span>
+                                        <div class="sm:hidden mt-1 text-[10px] text-slate-600 dark:text-stone-400">
+                                            TDN: @item.TaxDeclarationNumber
+                                        </div>
+                                    </td>
+                                    <td class="hidden sm:table-cell px-4 py-3">
+                                        <span class="font-bold text-slate-900 dark:text-white">@item.TaxDeclarationNumber</span>
+                                        <span class="block text-[10px] text-slate-400">PIN: @item.PropertyIndexNumber</span>
+                                    </td>
+                                    <td class="px-3 sm:px-4 py-3">
+                                        <span class="font-semibold text-slate-800 dark:text-stone-200">@item.OwnerName</span>
+                                        @if (!string.IsNullOrWhiteSpace(item.ContactPerson))
+                                        {
+                                            <span class="block text-[10px] text-slate-400">Rep: @item.ContactPerson</span>
+                                        }
+                                        <div class="lg:hidden mt-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                                            ₱@item.TotalFeesAmount.ToString("N2")
+                                        </div>
+                                    </td>
+                                    <td class="hidden md:table-cell px-4 py-3">
+                                        @if (item.IsDepreciation) { <span class="inline-block px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 text-[10px] mr-1">Depreciation</span> }
+                                        @if (item.IsReassessment) { <span class="inline-block px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-300 text-[10px] mr-1">Reassessment</span> }
+                                        @if (item.IsCancelled) { <span class="inline-block px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-900/40 text-rose-800 dark:text-rose-300 text-[10px] mr-1">Cancellation</span> }
+                                        @if (item.IsOther) { <span class="inline-block px-1.5 py-0.5 rounded bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 text-[10px]">Other</span> }
+                                    </td>
+                                    <td class="hidden lg:table-cell px-4 py-3 text-right font-bold text-slate-900 dark:text-white">
+                                        ₱@item.TotalFeesAmount.ToString("N2")
+                                    </td>
+                                    <td class="px-2 sm:px-4 py-3">
+                                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold 
+                                            @(item.Status == RequestForInspectionStatus.Releasing || item.Status == RequestForInspectionStatus.Approval ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300" :
+                                              item.Status == RequestForInspectionStatus.Deferred ? "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300" :
+                                              "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300")">
+                                            @item.Status
+                                        </span>
+                                    </td>
+                                    <td class="hidden xl:table-cell px-4 py-3">
+                                        @if (!string.IsNullOrEmpty(item.AttachmentFileName))
+                                        {
+                                            <a asp-action="DownloadAttachment" asp-route-id="@item.Id" class="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700 font-bold text-[11px]">
+                                                <i data-lucide="paperclip" class="w-3.5 h-3.5"></i>
+                                                <span class="truncate max-w-[120px]">@item.AttachmentFileName</span>
+                                            </a>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-slate-400">None</span>
+                                        }
+                                    </td>
+                                    <td class="px-2 sm:px-4 py-3 text-center">
+                                        <div class="flex items-center justify-center gap-2">
+                                            <a asp-action="Details" asp-route-id="@item.Id" class="p-1.5 rounded-lg bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 hover:bg-slate-200" title="Details / Workflow">
+                                                <i data-lucide="eye" class="w-4 h-4"></i>
+                                            </a>
+                                            <a asp-action="Edit" asp-route-id="@item.Id" class="p-1.5 rounded-lg bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 hover:bg-slate-200" title="Edit">
+                                                <i data-lucide="edit" class="w-4 h-4"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination Controls -->
+            <div class="table-pagination-footer p-4 sm:p-6 pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-200 dark:border-stone-800 text-xs font-mono">
+                <div class="text-slate-500 dark:text-stone-400 text-center sm:text-left">
+                    Showing <span class="font-bold text-slate-900 dark:text-white table-showing-start">1</span> to 
+                    <span class="font-bold text-slate-900 dark:text-white table-showing-end">10</span> of 
+                    <span class="font-bold text-slate-900 dark:text-white table-total-count">@Model.Count()</span> entries
+                </div>
+                <div class="flex items-center gap-1.5 flex-wrap justify-center table-pagination-buttons">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

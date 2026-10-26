@@ -1,0 +1,156 @@
+@model PropertyAssessmentApp.Models.TaxDeclaration
+
+@{
+    ViewData["Title"] = $"Tax Declaration {Model.TaxDeclarationNumber}";
+}
+
+<div class="space-y-8">
+    
+    <!-- Action Header Bar -->
+    <div class="flex items-center justify-between no-print">
+        <a asp-action="Index" class="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs font-mono border border-slate-200 shadow-sm flex items-center gap-2">
+            <i data-lucide="arrow-left" class="w-4 h-4"></i>
+            Back to Assessment Records
+        </a>
+        <div class="flex items-center gap-3">
+            <button onclick="window.print()" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs font-mono flex items-center gap-2 shadow-md shadow-emerald-600/20">
+                <i data-lucide="printer" class="w-4 h-4"></i>
+                Print Official TD Certificate
+            </button>
+            <a asp-action="Edit" asp-route-id="@Model.Id" class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs font-mono border border-slate-200">
+                Re-assess
+            </a>
+        </div>
+    </div>
+
+    <!-- Official Printable Tax Declaration Document Card -->
+    <div id="printableTaxDeclaration" class="p-8 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-6 font-mono text-xs">
+        
+        <!-- Document Header -->
+        <div class="text-center border-b border-slate-200 pb-6 space-y-1">
+            <span class="text-[10px] text-slate-400 tracking-widest uppercase font-bold">Republic of the Philippines &bull; Local Government Unit</span>
+            <h2 class="text-2xl font-black text-slate-900 uppercase tracking-tight">Office of the City Assessor</h2>
+            <h3 class="text-base font-bold text-emerald-700 uppercase">TAX DECLARATION OF REAL PROPERTY</h3>
+            <span class="text-[10px] text-slate-500 block">Pursuant to Section 222 of Republic Act No. 7160</span>
+        </div>
+
+        <!-- Reference Numbers Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-200">
+            <div>
+                <span class="text-[10px] text-slate-500 uppercase font-bold block mb-1">TAX DECLARATION NO. (TD)</span>
+                <span class="text-lg font-black text-slate-900 font-mono">@Model.TaxDeclarationNumber</span>
+            </div>
+            <div>
+                <span class="text-[10px] text-slate-500 uppercase font-bold block mb-1">TRANSACTION CODE</span>
+                <span class="text-base font-black text-slate-900 font-mono">@Model.TransactionCodeDisplay</span>
+            </div>
+            <div>
+                <span class="text-[10px] text-slate-500 uppercase font-bold block mb-1">PROPERTY INDEX NO. (PIN)</span>
+                <span class="text-lg font-black text-slate-900 font-mono">@Model.PropertyIndexNumber</span>
+            </div>
+        </div>
+
+        <!-- Property Owner & Location Metadata -->
+        <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <span class="text-slate-500 block text-[10px] font-bold">Property Owner Name:</span>
+                    <span class="text-slate-900 font-bold text-sm">@Model.OwnerName</span>
+                </div>
+                <div>
+                    <span class="text-slate-500 block text-[10px] font-bold">Barangay / District:</span>
+                    <span class="text-slate-900 font-bold text-sm">@Model.DistrictOrBarangay</span>
+                </div>
+                <div class="col-span-2">
+                    <span class="text-slate-500 block text-[10px] font-bold">Owner Mailing Address:</span>
+                    <span class="text-slate-700">@Model.OwnerAddress</span>
+                </div>
+                <div>
+                    <span class="text-slate-500 block text-[10px] font-bold">Property Kind:</span>
+                    <span class="px-2 py-0.5 rounded bg-slate-200 text-slate-800 font-bold">@Model.Kind</span>
+                </div>
+                <div>
+                    <span class="text-slate-500 block text-[10px] font-bold">Classification:</span>
+                    <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold">@Model.Classification</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Valuation Breakdown Table -->
+        <div class="space-y-2">
+            <h4 class="font-bold text-slate-700 text-xs uppercase">Valuation Breakdown</h4>
+            <div class="rounded-2xl border border-slate-200 overflow-x-auto bg-slate-50">
+                <table class="w-full text-left text-xs font-mono">
+                    <thead class="bg-slate-100 text-slate-600 border-b border-slate-200 font-bold">
+                        <tr>
+                            <th class="p-3">AREA (SQ.M.)</th>
+                            <th class="hidden md:table-cell p-3">BASE UNIT VALUE</th>
+                            <th class="hidden sm:table-cell p-3">MARKET VALUE (FMV)</th>
+                            <th class="hidden sm:table-cell p-3 text-center">ASS. LEVEL</th>
+                            <th class="p-3 text-right">ASSESSED VALUE</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="p-3 text-slate-900 font-bold">
+                                @Model.AreaSqMeters.ToString("N2") sq.m.
+                                <div class="sm:hidden text-[10px] text-slate-500 font-normal mt-0.5">
+                                    FMV: ₱@Model.MarketValue.ToString("N0") &bull; @Model.AssessmentLevelPercent%
+                                </div>
+                            </td>
+                            <td class="hidden md:table-cell p-3 text-slate-700">₱@Model.UnitValue.ToString("N2") / sq.m.</td>
+                            <td class="hidden sm:table-cell p-3 text-slate-900 font-bold">₱@Model.MarketValue.ToString("N2")</td>
+                            <td class="hidden sm:table-cell p-3 text-center"><span class="px-2 py-0.5 rounded bg-slate-200 text-slate-800 font-bold">@Model.AssessmentLevelPercent%</span></td>
+                            <td class="p-3 text-right font-black text-emerald-700 text-sm">₱@Model.AssessedValue.ToString("N2")</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tax Liability & Certification -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="p-5 rounded-2xl bg-emerald-50/60 border border-emerald-200 space-y-2">
+                <span class="text-emerald-800 font-bold uppercase text-[10px] block">Annual Real Property Tax Due</span>
+                <div class="flex justify-between text-slate-600">
+                    <span>Basic RPT (2.0%):</span>
+                    <span class="text-slate-900 font-bold">₱@((Model.AssessedValue * (Model.BasicTaxRate/100m)).ToString("N2"))</span>
+                </div>
+                <div class="flex justify-between text-slate-600 pb-2 border-b border-emerald-200">
+                    <span>Special Education Fund - SEF (1.0%):</span>
+                    <span class="text-slate-900 font-bold">₱@((Model.AssessedValue * (Model.SefTaxRate/100m)).ToString("N2"))</span>
+                </div>
+                <div class="flex justify-between text-amber-700 font-black text-lg pt-1">
+                    <span>Total Tax Liability:</span>
+                    <span>₱@Model.AnnualTaxDue.ToString("N2")</span>
+                </div>
+            </div>
+
+            <div class="p-5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col justify-between text-center">
+                <span class="text-[10px] text-slate-500 uppercase font-bold">Assessor Verification</span>
+                <div class="text-emerald-700 font-black text-lg uppercase my-2">@Model.Status</div>
+                <span class="text-[10px] text-slate-500">Date Assessed: @Model.DateAssessed.ToString("MMMM dd, yyyy")</span>
+            </div>
+        </div>
+
+        <!-- Official Signatures -->
+        <div class="grid grid-cols-2 gap-8 pt-8 border-t border-slate-200 text-slate-500">
+            <div class="border-t border-slate-300 pt-2 text-center">
+                <span class="block font-bold text-slate-900 uppercase text-xs">Field Appraisal Inspector</span>
+                <span class="text-[10px] text-slate-500">Field Assessment Division</span>
+            </div>
+            <div class="border-t border-slate-300 pt-2 text-center">
+                <span class="block font-bold text-slate-900 uppercase text-xs">Hon. City Assessor</span>
+                <span class="text-[10px] text-slate-500">Office of the City Assessor</span>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(Model.EncodedByName))
+        {
+            <div class="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between text-[10px] text-slate-400 font-mono">
+                <span>Encoded / Migrated by: <strong class="text-slate-600">@Model.EncodedByName</strong></span>
+                <span>Date: @(Model.DateEncoded?.ToString("MMM dd, yyyy hh:mm tt") ?? "--")</span>
+            </div>
+        }
+    </div>
+</div>

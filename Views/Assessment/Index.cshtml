@@ -1,0 +1,258 @@
+@model IEnumerable<PropertyAssessmentApp.Models.TaxDeclaration>
+@using PropertyAssessmentApp.Models
+@inject PropertyAssessmentApp.Services.IPermissionService PermissionService
+
+@{
+    ViewData["Title"] = "Real Property Assessment Records";
+    var search = ViewBag.Search as string ?? "";
+    bool canAccess = PermissionService.CanAccess(User, "Assessment");
+}
+
+<div class="space-y-8">
+    
+    <!-- Page Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <div class="inline-flex items-center gap-2 text-xs font-mono text-emerald-700 dark:text-emerald-400 font-bold mb-1">
+                <i data-lucide="layers" class="w-4 h-4"></i>
+                <span>Master Assessment Registry</span>
+            </div>
+            <h1 class="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Property Assessment Records</h1>
+            <p class="text-slate-500 dark:text-stone-400 text-sm">Real Property Tax Declarations, FAAS Appraisals & District Assessment Records.</p>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <a asp-action="Calculator" class="px-4 py-3 rounded-xl bg-white dark:bg-stone-900 hover:bg-slate-50 dark:hover:bg-stone-800 border border-slate-200 dark:border-stone-800 text-slate-700 dark:text-stone-200 font-bold text-xs font-mono flex items-center gap-2 shadow-sm transition-all">
+                <i data-lucide="calculator" class="w-4 h-4 text-amber-600 dark:text-amber-400"></i>
+                Valuation Simulator
+            </a>
+            @if (canAccess)
+            {
+                <a asp-action="Create" class="px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-till-950 font-bold text-xs font-mono flex items-center gap-2 shadow-md shadow-emerald-600/20 transition-all">
+                    <i data-lucide="plus" class="w-4 h-4"></i>
+                    Encode New FAAS
+                </a>
+            }
+        </div>
+    </div>
+
+    <!-- Summary Metrics Cards (Light / Dark Adaptive) -->
+    <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div class="p-5 rounded-2xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 space-y-1 shadow-sm sinsilyo-card-light">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-mono text-slate-500 dark:text-stone-400 font-bold uppercase">Active Declarations</span>
+                <i data-lucide="file-check" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+            </div>
+            <div class="text-2xl font-black font-mono text-slate-900 dark:text-white">@ViewBag.TotalProperties</div>
+            <span class="text-[10px] font-mono text-emerald-700 dark:text-emerald-400 font-bold">100% Taxable Verified</span>
+        </div>
+
+        <div class="p-5 rounded-2xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 space-y-1 shadow-sm sinsilyo-card-light">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-mono text-slate-500 dark:text-stone-400 font-bold uppercase">Total Market Value</span>
+                <i data-lucide="building" class="w-4 h-4 text-amber-600 dark:text-amber-400"></i>
+            </div>
+            <div class="text-xl font-black font-mono text-slate-800 dark:text-stone-200">₱@(((decimal)ViewBag.TotalMarketValue).ToString("N0"))</div>
+            <span class="text-[10px] font-mono text-slate-400 dark:text-stone-500">Aggregate Base FMV</span>
+        </div>
+
+        <div class="p-5 rounded-2xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 space-y-1 shadow-sm sinsilyo-card-light border-l-4 border-l-emerald-600">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-mono text-emerald-700 dark:text-emerald-400 font-bold uppercase">Total Assessed Value</span>
+                <i data-lucide="scale" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+            </div>
+            <div class="text-xl font-black font-mono text-emerald-700 dark:text-emerald-400">₱@(((decimal)ViewBag.TotalAssessedValue).ToString("N0"))</div>
+            <span class="text-[10px] font-mono text-slate-500 dark:text-stone-500">Assessment Base Benchmark</span>
+        </div>
+
+        <div class="p-5 rounded-2xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 space-y-1 shadow-sm sinsilyo-card-light border-l-4 border-l-amber-500">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-mono text-amber-700 dark:text-gold-400 font-bold uppercase">Est. Annual RPT Due</span>
+                <i data-lucide="banknote" class="w-4 h-4 text-amber-600 dark:text-gold-400"></i>
+            </div>
+            <div class="text-xl font-black font-mono text-amber-700 dark:text-gold-400">₱@(((decimal)ViewBag.TotalRevenue).ToString("N0"))</div>
+            <span class="text-[10px] font-mono text-slate-500 dark:text-stone-500">Basic RPT + SEF Levies</span>
+        </div>
+    </div>
+
+    <!-- Search & Filter Controls (Adaptive) -->
+    <form method="get" asp-action="Index" class="flex flex-wrap items-center justify-between gap-4 bg-white dark:bg-stone-900 p-4 rounded-2xl border border-slate-200 dark:border-stone-800 shadow-sm font-mono text-xs">
+        <div class="flex items-center gap-2 flex-1 min-w-[240px]">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 dark:text-stone-400"></i>
+            <input type="text" name="search" value="@search" placeholder="Search by TD No, PIN, Owner, or Barangay..." class="w-full bg-slate-50 dark:bg-stone-950 px-4 py-2 rounded-xl border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600">
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3">
+            <div class="flex items-center gap-2 bg-slate-50 dark:bg-stone-800 px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-700 shadow-xs shrink-0">
+                <span class="limit-label text-[10px] text-slate-500 dark:text-emerald-400 font-extrabold uppercase">Limit:</span>
+                <select class="table-limit-select bg-transparent font-extrabold text-slate-900 dark:text-white focus:outline-none cursor-pointer">
+                    <option value="5" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">5</option>
+                    <option value="10" selected class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">10</option>
+                    <option value="25" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">25</option>
+                    <option value="50" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">50</option>
+                    <option value="100" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">100</option>
+                </select>
+            </div>
+
+            <select name="classification" asp-items="Html.GetEnumSelectList<PropertyClassification>()" class="bg-slate-50 dark:bg-stone-950 text-slate-900 dark:text-white px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800">
+                <option value="">All Classifications</option>
+            </select>
+
+            <select name="status" asp-items="Html.GetEnumSelectList<AssessmentStatus>()" class="bg-slate-50 dark:bg-stone-950 text-slate-900 dark:text-white px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800">
+                <option value="">All Statuses</option>
+            </select>
+
+            <button type="submit" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-till-950 font-bold">Filter</button>
+            <a asp-action="Index" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-300 hover:text-slate-900 dark:hover:text-white"><i data-lucide="rotate-ccw" class="w-4 h-4"></i></a>
+        </div>
+    </form>
+
+    <!-- Assessment Records Monospaced Table (Adaptive & Paginated) -->
+    <div class="bg-white dark:bg-stone-900 rounded-3xl border border-slate-200 dark:border-stone-800 shadow-sm paginated-table-card">
+        <div class="overflow-x-auto min-h-[260px] pb-4 rounded-3xl">
+            <table class="w-full text-left text-xs font-mono">
+                <thead class="bg-slate-100 dark:bg-stone-950 text-slate-600 dark:text-stone-400 border-b border-slate-200 dark:border-stone-800 font-bold">
+                    <tr>
+                        <th class="px-3 sm:px-4 py-3.5">TD & PIN NUMBER</th>
+                        <th class="px-3 sm:px-4 py-3.5">PROPERTY OWNER</th>
+                        <th class="hidden md:table-cell px-4 py-3.5">BARANGAY</th>
+                        <th class="hidden lg:table-cell px-4 py-3.5">CLASSIFICATION</th>
+                        <th class="hidden xl:table-cell px-4 py-3.5 text-right">MARKET VALUE (FMV)</th>
+                        <th class="hidden xl:table-cell px-4 py-3.5 text-center">ASS. %</th>
+                        <th class="hidden sm:table-cell px-4 py-3.5 text-right">ASSESSED VALUE</th>
+                        <th class="hidden lg:table-cell px-4 py-3.5 text-right">ANNUAL RPT DUE</th>
+                        <th class="px-2 sm:px-4 py-3.5 text-center">STATUS</th>
+                        <th class="px-2 sm:px-4 py-3.5 text-center">ACTION</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-stone-800/60">
+                    @if (!Model.Any())
+                    {
+                        <tr>
+                            <td colspan="10" class="text-center py-8 text-slate-400 dark:text-stone-500">
+                                <i data-lucide="inbox" class="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-stone-600"></i>
+                                No real property records match the current filter criteria.
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var item in Model)
+                        {
+                            <tr class="hover:bg-slate-50/80 dark:hover:bg-stone-800/50 transition-all">
+                                <td class="px-3 sm:px-4 py-3.5">
+                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                        <a asp-action="Details" asp-route-id="@item.Id" class="font-bold text-slate-900 dark:text-white hover:text-emerald-700 dark:hover:text-emerald-400 font-mono">
+                                            @item.TaxDeclarationNumber
+                                        </a>
+                                        @if (!string.IsNullOrWhiteSpace(item.TransactionCode))
+                                        {
+                                            <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-300 border border-slate-200 dark:border-stone-700" title="@item.TransactionCodeDisplay">
+                                                @item.TransactionCode
+                                            </span>
+                                        }
+                                    </div>
+                                    <span class="block text-[10px] text-slate-400 dark:text-stone-500">@item.PropertyIndexNumber</span>
+                                </td>
+                                <td class="px-3 sm:px-4 py-3.5">
+                                    <div class="font-bold text-slate-800 dark:text-stone-200">@item.OwnerName</div>
+                                    <span class="text-[10px] text-slate-500 dark:text-stone-500 block truncate max-w-[180px]">@item.OwnerAddress</span>
+                                    <div class="sm:hidden mt-1 flex items-center gap-1.5 flex-wrap">
+                                        <span class="text-[10px] font-bold text-emerald-700 dark:text-emerald-400">AV: ₱@item.AssessedValue.ToString("N0")</span>
+                                        <span class="text-[9px] text-slate-400">&bull;</span>
+                                        <span class="text-[10px] text-slate-500 dark:text-stone-400 font-semibold">@item.DistrictOrBarangay</span>
+                                    </div>
+                                </td>
+                                <td class="hidden md:table-cell px-4 py-3.5 text-slate-700 dark:text-stone-300 font-semibold">
+                                    @item.DistrictOrBarangay
+                                </td>
+                                <td class="hidden lg:table-cell px-4 py-3.5">
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-mono uppercase font-bold bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 border border-slate-200 dark:border-stone-700">
+                                        @item.Kind &bull; @item.Classification
+                                    </span>
+                                </td>
+                                <td class="hidden xl:table-cell px-4 py-3.5 text-right font-bold text-slate-800 dark:text-stone-300">₱@item.MarketValue.ToString("N2")</td>
+                                <td class="hidden xl:table-cell px-4 py-3.5 text-center">
+                                    <span class="px-1.5 py-0.5 rounded text-[10px] bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-400 font-bold">@item.AssessmentLevelPercent%</span>
+                                </td>
+                                <td class="hidden sm:table-cell px-4 py-3.5 text-right font-bold text-emerald-700 dark:text-emerald-400">₱@item.AssessedValue.ToString("N2")</td>
+                                <td class="hidden lg:table-cell px-4 py-3.5 text-right font-bold text-amber-700 dark:text-gold-400">₱@item.AnnualTaxDue.ToString("N2")</td>
+                                <td class="px-2 sm:px-4 py-3.5 text-center">
+                                    @switch (item.Status)
+                                    {
+                                        case AssessmentStatus.Active:
+                                            <span class="px-2.5 py-1 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/40 text-[10px] font-bold uppercase">Active</span>
+                                            break;
+                                        case AssessmentStatus.Pending:
+                                            <span class="px-2.5 py-1 rounded-lg bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-500/40 text-[10px] font-bold uppercase">Pending Approval</span>
+                                            break;
+                                        case AssessmentStatus.UnderReassessment:
+                                            <span class="px-2.5 py-1 rounded-lg bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40 text-[10px] font-bold uppercase">Re-assessing</span>
+                                            break;
+                                        case AssessmentStatus.PendingAppeal:
+                                            <span class="px-2.5 py-1 rounded-lg bg-rose-100 dark:bg-rose-500/20 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-500/40 text-[10px] font-bold uppercase">Pending Appeal</span>
+                                            break;
+                                        default:
+                                            <span class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-400 text-[10px] font-bold">@item.Status</span>
+                                            break;
+                                    }
+                                </td>
+                                <td class="px-2 sm:px-4 py-3.5 text-center relative">
+                                    @if (canAccess)
+                                    {
+                                        <div class="flex items-center justify-center gap-1.5">
+                                            <a asp-action="ViewRecord" asp-route-id="@item.Id" class="p-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30 transition-colors" title="View Complete Data in One Page">
+                                                <i data-lucide="eye" class="w-4 h-4"></i>
+                                            </a>
+                                            <div class="relative inline-block text-left">
+                                                <button type="button" onclick="toggleKebabMenu(event, 'kebab-td-@item.Id')" class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-slate-700 dark:text-stone-300 border border-slate-200 dark:border-stone-700 transition-colors focus:outline-none" title="More Actions">
+                                                    <i data-lucide="more-vertical" class="w-4 h-4"></i>
+                                                </button>
+
+                                                <div id="kebab-td-@item.Id" class="kebab-dropdown hidden absolute right-0 mt-2 w-52 rounded-2xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-xl z-50 overflow-hidden divide-y divide-slate-100 dark:divide-stone-800/80 text-xs font-mono text-left">
+                                                    <div class="py-1">
+                                                        <a asp-action="ViewRecord" asp-route-id="@item.Id" class="flex items-center gap-2.5 px-3.5 py-2 text-slate-700 dark:text-stone-300 hover:bg-emerald-50 dark:hover:bg-stone-800 font-bold">
+                                                            <i data-lucide="eye" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
+                                                            View Complete Data
+                                                        </a>
+                                                        <a asp-action="Details" asp-route-id="@item.Id" class="flex items-center gap-2.5 px-3.5 py-2 text-slate-700 dark:text-stone-300 hover:bg-emerald-50 dark:hover:bg-stone-800 font-bold">
+                                                            <i data-lucide="printer" class="w-3.5 h-3.5 text-sky-600 dark:text-sky-400"></i>
+                                                            Print Tax Declaration
+                                                        </a>
+                                                        <a asp-action="Edit" asp-route-id="@item.Id" class="flex items-center gap-2.5 px-3.5 py-2 text-slate-700 dark:text-stone-300 hover:bg-emerald-50 dark:hover:bg-stone-800 font-bold">
+                                                            <i data-lucide="edit-3" class="w-3.5 h-3.5 text-teal-600 dark:text-teal-400"></i>
+                                                            Edit Assessment Record
+                                                        </a>
+                                                        <a asp-action="Calculator" class="flex items-center gap-2.5 px-3.5 py-2 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-stone-800 font-bold">
+                                                            <i data-lucide="calculator" class="w-3.5 h-3.5 text-amber-600"></i>
+                                                            Valuation Simulator
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-[10px] font-mono text-slate-400 italic">No access</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination Controls -->
+        <div class="table-pagination-footer p-4 sm:p-6 pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-200 dark:border-stone-800 text-xs font-mono">
+            <div class="text-slate-500 dark:text-stone-400 text-center sm:text-left">
+                Showing <span class="font-bold text-slate-900 dark:text-white table-showing-start">1</span> to 
+                <span class="font-bold text-slate-900 dark:text-white table-showing-end">10</span> of 
+                <span class="font-bold text-slate-900 dark:text-white table-total-count">@Model.Count()</span> entries
+            </div>
+            <div class="flex items-center gap-1.5 flex-wrap justify-center table-pagination-buttons">
+            </div>
+        </div>
+    </div>
+</div>

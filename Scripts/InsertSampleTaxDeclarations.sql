@@ -1,0 +1,712 @@
+﻿-- =========================================================================================
+-- City Assessor Real Property Tax & Assessment System
+-- Seed Script: Sample Tax Declarations (Land, Building, Machinery) & Default Registered Owner
+-- Target Database: FairTrackDB / MS SQL Server
+-- =========================================================================================
+
+SET NOCOUNT ON;
+BEGIN TRANSACTION;
+
+-- 1. IDENTIFIERS & UNIQUE KEYS
+DECLARE @OwnerId UNIQUEIDENTIFIER = '70000000-0000-0000-0000-000000000001';
+DECLARE @LandTdId UNIQUEIDENTIFIER = '80000000-0000-0000-0000-000000000001';
+DECLARE @LandDetailsId UNIQUEIDENTIFIER = '81000000-0000-0000-0000-000000000001';
+DECLARE @BldgTdId UNIQUEIDENTIFIER = '80000000-0000-0000-0000-000000000002';
+DECLARE @BldgDetailsId UNIQUEIDENTIFIER = '82000000-0000-0000-0000-000000000001';
+DECLARE @MachTdId UNIQUEIDENTIFIER = '80000000-0000-0000-0000-000000000003';
+DECLARE @MachDetailsId UNIQUEIDENTIFIER = '83000000-0000-0000-0000-000000000001';
+
+-- Clean existing sample data if re-run (idempotent execution)
+DELETE FROM TDNBuildingStructuralMaterials WHERE TDNBuildingId = @BldgDetailsId;
+DELETE FROM TDNBuildingAdditionalItems WHERE TDNBuildingId = @BldgDetailsId;
+DELETE FROM TDNBuildingFloors WHERE TDNBuildingId = @BldgDetailsId;
+DELETE FROM TDNBuildings WHERE Id = @BldgDetailsId OR TaxDeclarationId = @BldgTdId;
+
+DELETE FROM TDNLandPropertyAssessments WHERE TDNLandId = @LandDetailsId;
+DELETE FROM TDNLandBaseMarkets WHERE TDNLandId = @LandDetailsId;
+DELETE FROM TDNLandImprovements WHERE TDNLandId = @LandDetailsId;
+DELETE FROM TDNLandDetails WHERE TDNLandId = @LandDetailsId;
+DELETE FROM TDNLands WHERE Id = @LandDetailsId OR TaxDeclarationId = @LandTdId;
+
+DELETE FROM TDNMachineries WHERE Id = @MachDetailsId OR TaxDeclarationId = @MachTdId;
+
+DELETE FROM TaxDeclarations WHERE Id IN (@LandTdId, @BldgTdId, @MachTdId);
+DELETE FROM TaxpayerOwners WHERE Id = @OwnerId OR TaxIdentNo = '345-678-901-000';
+
+-- =========================================================================================
+-- 2. INSERT DEFAULT REGISTERED OWNER (TaxpayerOwners)
+-- =========================================================================================
+INSERT INTO TaxpayerOwners (
+    Id,
+    OwnerType,
+    FirstName,
+    MiddleName,
+    LastName,
+    CorporateName,
+    TaxIdentNo,
+    RptinNumber,
+    ContactNo,
+    Email,
+    ProvinceName,
+    CityMunicipalityName,
+    BarangayName,
+    Address,
+    IsActive,
+    CreatedDate,
+    UpdatedDate
+)
+VALUES (
+    @OwnerId,
+    0, -- Individual
+    'Roberto',
+    'Gomez',
+    'Alcantara',
+    NULL,
+    '345-678-901-000',
+    'RPTIN-2026-0088',
+    '0917-888-9999',
+    'roberto.alcantara@gmail.com',
+    'South Cotabato',
+    'General Santos City',
+    'Brgy. Lagao',
+    'Lot 12 Block 5, Pioneer Avenue',
+    1,
+    GETDATE(),
+    GETDATE()
+);
+
+-- =========================================================================================
+-- 3. INSERT SAMPLE 1: LAND TAX DECLARATION (Kind = 0 - Land)
+-- =========================================================================================
+INSERT INTO TaxDeclarations (
+    Id,
+    Kind,
+    TaxDeclarationNumber,
+    TransactionCode,
+    PropertyIndexNumber,
+    OwnerName,
+    OwnerTin,
+    OwnerPhone,
+    OwnerEmail,
+    OwnerAddress,
+    OwnerSex,
+    OwnerCivilStatus,
+    AdminPossessorName,
+    AdminPossessorSex,
+    AdminPossessorAddress,
+    AdminPossessorTin,
+    AdminPossessorPhone,
+    AdminPossessorEmail,
+    Memoranda,
+    FloorPlanSketchPath,
+    Status,
+    AppraisedByName,
+    DateAppraised,
+    AssessedByName,
+    DateAssessed,
+    RecommendingApprovalName,
+    DateRecommended,
+    ApprovedByName,
+    DateApproved,
+    EntryInRollName,
+    EntryInRollPosition,
+    EntryInRollDate,
+    EncodedByName,
+    DateEncoded
+)
+VALUES (
+    @LandTdId,
+    0, -- Land
+    'TD-2026-LAND-0088',
+    'DC',
+    '187-00-0012-005-0000',
+    'Roberto Gomez Alcantara',
+    '345-678-901-000',
+    '0917-888-9999',
+    'roberto.alcantara@gmail.com',
+    'Lot 12 Block 5, Pioneer Avenue, Brgy. Lagao, General Santos City',
+    'Male',
+    'Married',
+    NULL, NULL, NULL, NULL, NULL, NULL,
+    'Standard Land Real Property Appraisal encoded pursuant to Local Tax Ordinance.',
+    NULL,
+    0, -- Active
+    'Elena G. Reyes (Property Appraiser)',
+    GETDATE(),
+    'Marcus Aurelius Santos (Assessment Officer)',
+    GETDATE(),
+    'Engr. Roberto M. Dela Rosa (Assistant Assessor)',
+    GETDATE(),
+    'Atty. Clarissa V. Mendoza (City Assessor)',
+    GETDATE(),
+    'Patricia Ann Villanueva',
+    'Assessment Roll Clerk',
+    GETDATE(),
+    'Patricia Ann Villanueva',
+    GETDATE()
+);
+
+-- Normalized Child Record: TDNLands
+INSERT INTO TDNLands (
+    Id,
+    TaxDeclarationId,
+    RegistrationStatus,
+    TitleType,
+    TitleNo,
+    DateRegistered,
+    SurveyNo,
+    CadastralSurveyNo,
+    LotNo,
+    BlockNo,
+    SectionNo,
+    ParcelNo,
+    ARPNo,
+    StreetNo,
+    Purok,
+    Municipality,
+    DistrictOrBarangay,
+    ProvinceCity,
+    BoundaryNorth,
+    BoundaryEast,
+    BoundarySouth,
+    BoundaryWest,
+    Nremarks,
+    Eremarks,
+    Sremarks,
+    Wremarks,
+    Classification,
+    SubClassification,
+    ActualUse,
+    AreaSqMeters,
+    UnitValue,
+    MarketValue,
+    ImprovementType,
+    ImprovementQty,
+    ImprovementUnitOfMeasure,
+    ImprovementUnitValue,
+    ImprovementMarketValue,
+    AdjustmentFactor,
+    PercentAdjustment,
+    ValueAdjustment,
+    AdjustedMarketValue,
+    AssessmentLevelPercent,
+    AssessedValue,
+    BasicTaxRate,
+    SefTaxRate,
+    AnnualTaxDue,
+    EffectivityYear,
+    EffectivityQuarter,
+    Taxability,
+    TaxabilityBasis,
+    BackTaxesYearFrom,
+    BackTaxesYearTo,
+    PreviousTdNo,
+    PreviousPin,
+    PreviousOwner,
+    PreviousMarketValue,
+    PreviousAssessedValue,
+    LandAppraisalDetailsJson,
+    LandImprovementsJson,
+    LandAdjustmentsJson,
+    LandPropertyAssessmentsJson
+)
+VALUES (
+    @LandDetailsId,
+    @LandTdId,
+    'Titled',
+    'OCT',
+    'OCT-102938',
+    '2020-03-15',
+    'Csd-12-004321',
+    'Cad-1122',
+    '12',
+    '5',
+    '0012',
+    '005',
+    '187-00-0012-005-0000',
+    'Pioneer Avenue',
+    'Purok 3',
+    'General Santos City',
+    'Brgy. Lagao',
+    'South Cotabato',
+    'Lot 11',
+    'Pioneer Avenue (Road Lot)',
+    'Lot 13',
+    'Creek / Drainage Line',
+    'Boundary with Lot 11 verified',
+    'Road frontage along Pioneer Ave',
+    'Boundary with Lot 13 verified',
+    'Natural drainage easement',
+    0, -- Residential
+    'First Class Residential',
+    'Residential',
+    450.00,
+    3800.00,
+    1710000.00,
+    'Fence / Pavement',
+    0.00,
+    'sq.m.',
+    0.00,
+    0.00,
+    'Corner Lot Frontage (+10%)',
+    10.0000,
+    171000.00,
+    1881000.00,
+    20.0000,
+    376200.00,
+    2.0000,
+    1.0000,
+    11286.00,
+    2026,
+    '1st Quarter',
+    'Taxable',
+    'Sec. 217 RA 7160',
+    NULL,
+    NULL,
+    'TD-2015-LAND-9011',
+    '187-00-0012-005-0000',
+    'Elena Gomez Alcantara',
+    1200000.00,
+    240000.00,
+    '[{"OrderNo":1,"ClassificationId":1,"ClassificationName":"RESIDENTIAL","SubClassId":1,"SubClassName":"1st Class Residential","ActualUseName":"RESIDENTIAL","AreaSQM":450.00,"UnitValue":3800.00,"MarketValue":1710000.00}]',
+    '[{"OrderNo":1,"TypeId":1,"ProductClass":"CONCRETE PERIMETER FENCE","IsFruitBearing":false,"Quantity":60.00,"AgeYears":2,"UnitValue":500.00,"MarketValue":30000.00,"AssessmentLevel":40.00,"AssessedValue":12000.00}]',
+    '[{"OrderNo":1,"ClassificationName":"RESIDENTIAL","BaseMarketValue":1710000.00,"AdjustmentFactorId":1,"AdjustmentFactor":"Corner Lot Frontage (+10%)","PercentAdjustment":10.00,"ValueAdjustment":171000.00,"AdjustedMarketValue":1881000.00}]',
+    '[{"OrderNo":1,"Kinds":"LAND","ActualUseName":"RESIDENTIAL","MarketValue":1881000.00,"AssessmentLevelPercent":20.00,"AssessmentValue":376200.00}]'
+);
+
+-- Child breakdown schedules for Land
+INSERT INTO TDNLandDetails (Id, TDNLandId, OrderNo, ClassificationId, ClassificationName, SubClassId, SubClassName, ActualUseId, ActualUseName, AreaSQM, AreaHAS, UnitValue, MarketValue, IsTaxable)
+VALUES (NEWID(), @LandDetailsId, 1, 1, 'RESIDENTIAL', 1, '1st Class Residential', 1, 'RESIDENTIAL', 450.00, 0.0450, 3800.00, 1710000.00, 1);
+
+INSERT INTO TDNLandBaseMarkets (Id, TDNLandId, OrderNo, ClassificationId, ClassificationName, BaseMarketValue, AdjustmentFactorId, AdjustmentFactor, PercentAdjustment, ValueAdjustment, AdjustedMarketValue)
+VALUES (NEWID(), @LandDetailsId, 1, 1, 'RESIDENTIAL', 1710000.00, 1, 'Corner Lot Frontage (+10%)', 10.00, 171000.00, 1881000.00);
+
+INSERT INTO TDNLandImprovements (Id, TDNLandId, OrderNo, TypeId, ProductClass, AreaPlanted, IsFruitBearing, Quantity, AgeYears, UnitValue, MarketValue, AssessmentLevel, AssessedValue, IsTaxable)
+VALUES (NEWID(), @LandDetailsId, 1, 1, 'CONCRETE PERIMETER FENCE', NULL, 0, 60.00, 2, 500.00, 30000.00, 40.00, 12000.00, 1);
+
+INSERT INTO TDNLandPropertyAssessments (Id, TDNLandId, OrderNo, Kinds, ActualUseId, ActualUseName, MarketValue, AssessmentLevelPercent, AssessmentValue)
+VALUES (NEWID(), @LandDetailsId, 1, 'LAND', 1, 'RESIDENTIAL', 1881000.00, 20.00, 376200.00);
+
+-- =========================================================================================
+-- 4. INSERT SAMPLE 2: BUILDING & STRUCTURE TAX DECLARATION (Kind = 1 - Building)
+-- =========================================================================================
+INSERT INTO TaxDeclarations (
+    Id,
+    Kind,
+    TaxDeclarationNumber,
+    TransactionCode,
+    PropertyIndexNumber,
+    OwnerName,
+    OwnerTin,
+    OwnerPhone,
+    OwnerEmail,
+    OwnerAddress,
+    OwnerSex,
+    OwnerCivilStatus,
+    AdminPossessorName,
+    AdminPossessorSex,
+    AdminPossessorAddress,
+    AdminPossessorTin,
+    AdminPossessorPhone,
+    AdminPossessorEmail,
+    Memoranda,
+    FloorPlanSketchPath,
+    Status,
+    AppraisedByName,
+    DateAppraised,
+    AssessedByName,
+    DateAssessed,
+    RecommendingApprovalName,
+    DateRecommended,
+    ApprovedByName,
+    DateApproved,
+    EntryInRollName,
+    EntryInRollPosition,
+    EntryInRollDate,
+    EncodedByName,
+    DateEncoded
+)
+VALUES (
+    @BldgTdId,
+    1, -- Building
+    'TD-2026-BLDG-0088',
+    'DC',
+    '187-00-0012-005-1001',
+    'Roberto Gomez Alcantara',
+    '345-678-901-000',
+    '0917-888-9999',
+    'roberto.alcantara@gmail.com',
+    'Lot 12 Block 5, Pioneer Avenue, Brgy. Lagao, General Santos City',
+    'Male',
+    'Married',
+    NULL, NULL, NULL, NULL, NULL, NULL,
+    'Two-storey reinforced concrete residential structure constructed upon Lot 12 Block 5 covered by TD-2026-LAND-0088.',
+    '/uploads/sketches/sample_bldg_plan_0088.png',
+    0, -- Active
+    'Elena G. Reyes (Property Appraiser)',
+    GETDATE(),
+    'Marcus Aurelius Santos (Assessment Officer)',
+    GETDATE(),
+    'Engr. Roberto M. Dela Rosa (Assistant Assessor)',
+    GETDATE(),
+    'Atty. Clarissa V. Mendoza (City Assessor)',
+    GETDATE(),
+    'Patricia Ann Villanueva',
+    'Assessment Roll Clerk',
+    GETDATE(),
+    'Patricia Ann Villanueva',
+    GETDATE()
+);
+
+-- Normalized Child Record: TDNBuildings
+INSERT INTO TDNBuildings (
+    Id,
+    TaxDeclarationId,
+    StreetNo,
+    Municipality,
+    DistrictOrBarangay,
+    ProvinceCity,
+    LandOwnerName,
+    LandOwnerTin,
+    LandOwnerPhone,
+    LandOwnerEmail,
+    LandOwnerAddress,
+    LandOwnerSex,
+    LandTdNo,
+    LandPin,
+    LandTitleNo,
+    LandSurveyNo,
+    LandLotNo,
+    LandBlockNo,
+    LandAreaSqm,
+    IsCct,
+    CctTitleNo,
+    CctDateRegistered,
+    OwnerNameReflectedInCct,
+    IsAdministrator,
+    AdministratorName,
+    AdministratorAddress,
+    AdministratorContactNo,
+    AdministratorTin,
+    AdministratorGender,
+    AdministratorCivilStatus,
+    AdministratorEmail,
+    StructuralType,
+    BuildingClassification,
+    BuildingUseType,
+    OtherBuildingUseType,
+    NoOfStoreys,
+    FloorLevel,
+    BuildingPermitNo,
+    BuildingAgeYears,
+    DateConstructed,
+    DateCompleted,
+    OccupancyPermitNo,
+    DateOccupied,
+    TotalFloorArea,
+    BaseRcnValue,
+    ReplacementCostNew,
+    BuildingDepreciationPercent,
+    BuildingDepreciationAccumulated,
+    DepreciatedMarketValue,
+    TotalAdditionalItemsValue,
+    MarketValue,
+    AssessmentLevelPercent,
+    AssessedValue,
+    BasicTaxRate,
+    SefTaxRate,
+    AnnualTaxDue,
+    EffectivityYear,
+    EffectivityQuarter,
+    Taxability,
+    AssessmentBasis,
+    BackTaxesYearFrom,
+    BackTaxesYearTo,
+    FloorBreakdownJson,
+    AdditionalItemsJson
+)
+VALUES (
+    @BldgDetailsId,
+    @BldgTdId,
+    'Lot 12 Block 5, Pioneer Avenue',
+    'General Santos City',
+    'Brgy. Lagao',
+    'South Cotabato',
+    'Roberto Gomez Alcantara',
+    '345-678-901-000',
+    '0917-888-9999',
+    'roberto.alcantara@gmail.com',
+    'Lot 12 Block 5, Pioneer Avenue, Brgy. Lagao, General Santos City',
+    'Male',
+    'TD-2026-LAND-0088',
+    '187-00-0012-005-0000',
+    'OCT-102938',
+    'Csd-12-004321',
+    '12',
+    '5',
+    450.00,
+    0, -- IsCct
+    NULL, NULL, NULL,
+    0, -- IsAdministrator
+    NULL, NULL, NULL, NULL, 'Male', 'Single', NULL,
+    'I-A',
+    'Class A - Reinforced Concrete',
+    'Residential Single Detached',
+    NULL,
+    2,
+    '2-Storey',
+    'BP-2023-0199',
+    2,
+    '2023-04-10',
+    '2024-03-20',
+    'OP-2024-0088',
+    '2024-04-01',
+    240.00,
+    3600000.00,
+    3600000.00,
+    4.0000,
+    144000.00,
+    3456000.00,
+    220000.00,
+    3676000.00,
+    20.0000,
+    735200.00,
+    2.0000,
+    1.0000,
+    22056.00,
+    2026,
+    '1st Quarter',
+    'Taxable',
+    'Sec. 217 RA 7160',
+    NULL,
+    NULL,
+    '[{"floorNumber":"1st Floor (Ground Level)","buildingClassification":"Class A - Reinforced Concrete","rateMode":"Min","description":"Ground Floor Living & Dining","floorAreaSqm":130.00,"baseUnitCost":15000.00,"marketValue":1950000.00},{"floorNumber":"2nd Floor","buildingClassification":"Class A - Reinforced Concrete","rateMode":"Min","description":"Second Floor Bedrooms & Study","floorAreaSqm":110.00,"baseUnitCost":15000.00,"marketValue":1650000.00}]',
+    '[{"itemId":"GARAGE","description":"Attached Carport & Garage","quantity":25.00,"unitRate":4800.00,"multiplier":100,"totalValue":120000.00},{"itemId":"BALCONY","description":"Second Floor Covered Balcony & Terrace","quantity":20.00,"unitRate":5000.00,"multiplier":100,"totalValue":100000.00}]'
+);
+
+-- Insert Building Floors
+INSERT INTO TDNBuildingFloors (Id, TDNBuildingId, FloorOrder, FloorNumber, Description, FloorAreaSqm, BaseUnitCost, MarketValue)
+VALUES
+(NEWID(), @BldgDetailsId, 1, '1st Floor (Ground Level)', 'Ground Floor Living, Dining, Kitchen & Foyer', 130.00, 15000.00, 1950000.00),
+(NEWID(), @BldgDetailsId, 2, '2nd Floor', 'Second Floor Bedrooms, Bathrooms & Family Area', 110.00, 15000.00, 1650000.00);
+
+-- Insert Building Additional Items
+INSERT INTO TDNBuildingAdditionalItems (Id, TDNBuildingId, ItemDescription, Quantity, UnitRate, MultiplierPercent, RateType, TotalValue, IsCustom, ForAssessment, FloorNo)
+VALUES
+(NEWID(), @BldgDetailsId, 'Attached Carport & Concrete Garage', 25.00, 4800.00, 100.00, 'FixedCost', 120000.00, 0, 1, 'Ground Floor'),
+(NEWID(), @BldgDetailsId, 'Second Floor Covered Balcony & Terrace', 20.00, 5000.00, 100.00, 'FixedCost', 100000.00, 0, 1, 'Second Floor');
+
+-- Insert 17 Structural Materials (CAST Standard)
+INSERT INTO TDNBuildingStructuralMaterials (Id, TDNBuildingId, PartNumber, PartName, MaterialSelected, SpecificDescription)
+VALUES
+(NEWID(), @BldgDetailsId, 1, '1. Foundation', 'Reinforced Concrete (RC)', 'Standard reinforced concrete footing & tie beams'),
+(NEWID(), @BldgDetailsId, 2, '2. Columns', 'Reinforced Concrete (RC)', 'Reinforced concrete post & structural column system'),
+(NEWID(), @BldgDetailsId, 3, '3. Beams', 'Reinforced Concrete (RC)', 'Cast-in-place RC structural beams'),
+(NEWID(), @BldgDetailsId, 4, '4. Roof Framing / Truss', 'Steel Truss (S)', 'Engineered c-purlin and angle bar steel truss'),
+(NEWID(), @BldgDetailsId, 5, '5. Roofing', 'Long Span G.I. Sheet (LGI)', 'Rib-type pre-painted 0.50mm long-span roofing'),
+(NEWID(), @BldgDetailsId, 6, '6. Exterior Walls', 'Concrete Hollow Blocks (CHB)', '150mm CHB plastered both sides with latex paint'),
+(NEWID(), @BldgDetailsId, 7, '7. Flooring', 'Reinforced Concrete Slab', 'RC suspended slab with porcelain vitrified tiles'),
+(NEWID(), @BldgDetailsId, 8, '8. Main Door', 'Solid Hardwood (Panel)', 'Solid Narra/Yakal main double door with brass hardware'),
+(NEWID(), @BldgDetailsId, 9, '9. Ceiling', 'Gypsum Board on Metal Furring', 'Moisture-resistant gypsum ceiling with recessed lights'),
+(NEWID(), @BldgDetailsId, 10, '10. Windows', 'Glass on Aluminum Frame', 'Sliding 6mm tinted glass windows on powder-coated frame'),
+(NEWID(), @BldgDetailsId, 11, '11. Stairs', 'Reinforced Concrete with Railings', 'RC stairs with wrought iron balustrade & solid wood tread'),
+(NEWID(), @BldgDetailsId, 12, '12. Partition Walls', 'Drywall / CHB Mixed', '100mm CHB and insulated drywall bedroom partitions'),
+(NEWID(), @BldgDetailsId, 13, '13. Floor Finish', 'Ceramic / Granite Tiles', '60x60 polished granite floor tiles throughout'),
+(NEWID(), @BldgDetailsId, 14, '14. Front Exterior Finish', 'Textured Paint with Stone Cladding', 'Accent natural quartz stone wall cladding and stucco'),
+(NEWID(), @BldgDetailsId, 15, '15. Electrical System', 'Concealed Conduit & Panelboard', 'THHN copper wiring in PVC conduits with circuit breakers'),
+(NEWID(), @BldgDetailsId, 16, '16. Toilet & Bath', 'Fully Tiled with Fixtures', '3 T&B with HCG/American Standard ceramic water closets'),
+(NEWID(), @BldgDetailsId, 17, '17. Plumbing / Sewer', 'PVC Piping & Septic Tank', 'Heavy duty Neltex PVC drainage lines and 3-chamber septic tank');
+
+-- =========================================================================================
+-- 5. INSERT SAMPLE 3: MACHINERY & EQUIPMENT TAX DECLARATION (Kind = 2 - Machinery)
+-- =========================================================================================
+INSERT INTO TaxDeclarations (
+    Id,
+    Kind,
+    TaxDeclarationNumber,
+    TransactionCode,
+    PropertyIndexNumber,
+    OwnerName,
+    OwnerTin,
+    OwnerPhone,
+    OwnerEmail,
+    OwnerAddress,
+    OwnerSex,
+    OwnerCivilStatus,
+    AdminPossessorName,
+    AdminPossessorSex,
+    AdminPossessorAddress,
+    AdminPossessorTin,
+    AdminPossessorPhone,
+    AdminPossessorEmail,
+    Memoranda,
+    FloorPlanSketchPath,
+    Status,
+    AppraisedByName,
+    DateAppraised,
+    AssessedByName,
+    DateAssessed,
+    RecommendingApprovalName,
+    DateRecommended,
+    ApprovedByName,
+    DateApproved,
+    EntryInRollName,
+    EntryInRollPosition,
+    EntryInRollDate,
+    EncodedByName,
+    DateEncoded
+)
+VALUES (
+    @MachTdId,
+    2, -- Machinery
+    'TD-2026-MACH-0088',
+    'DC',
+    '187-00-0012-005-2001',
+    'Roberto Gomez Alcantara',
+    '345-678-901-000',
+    '0917-888-9999',
+    'roberto.alcantara@gmail.com',
+    'Lot 12 Block 5, Pioneer Avenue, Brgy. Lagao, General Santos City',
+    'Male',
+    'Married',
+    NULL, NULL, NULL, NULL, NULL, NULL,
+    'Heavy industrial standby diesel generator and automatic power transfer switch serving residential compound.',
+    NULL,
+    0, -- Active
+    'Elena G. Reyes (Property Appraiser)',
+    GETDATE(),
+    'Marcus Aurelius Santos (Assessment Officer)',
+    GETDATE(),
+    'Engr. Roberto M. Dela Rosa (Assistant Assessor)',
+    GETDATE(),
+    'Atty. Clarissa V. Mendoza (City Assessor)',
+    GETDATE(),
+    'Patricia Ann Villanueva',
+    'Assessment Roll Clerk',
+    GETDATE(),
+    'Patricia Ann Villanueva',
+    GETDATE()
+);
+
+-- Normalized Child Record: TDNMachineries
+INSERT INTO TDNMachineries (
+    Id,
+    TaxDeclarationId,
+    IsLocallyManufactured,
+    MachineryRegNo,
+    ImportationPermitNo,
+    ImportationDateIssued,
+    CountryOfOrigin,
+    SupplierSeller,
+    SupplierAddress,
+    AcquisitionCost,
+    OrNoAndDate,
+    DescriptionBrand,
+    RatedCapacity,
+    ConditionWhenAcquired,
+    DateAcquired,
+    EconomicLifeYears,
+    YearInstalled,
+    YearOfOperation,
+    OriginalCost,
+    InstallationCost,
+    TotalCost,
+    YearsUsed,
+    RemainingEconomicLife,
+    DepreciationRatePercent,
+    DepreciatedValue,
+    StreetNo,
+    Municipality,
+    DistrictOrBarangay,
+    ProvinceCity,
+    LandOwnerName,
+    LandTdNo,
+    LandPin,
+    BuildingReferenceName,
+    BuildingOwnerTin,
+    BuildingOwnerPhone,
+    BuildingOwnerAddress,
+    BuildingOwnerSex,
+    BuildingTdNo,
+    BuildingPin,
+    Classification,
+    ActualUse,
+    AssessmentLevelPercent,
+    AssessedValue,
+    BasicTaxRate,
+    SefTaxRate,
+    AnnualTaxDue,
+    EffectivityYear,
+    EffectivityQuarter,
+    Taxability,
+    TaxabilityBasis,
+    BackTaxesYearFrom,
+    BackTaxesYearTo,
+    PreviousTdNo,
+    PreviousPin,
+    PreviousOwner,
+    PreviousMarketValue,
+    PreviousAssessedValue
+)
+VALUES (
+    @MachDetailsId,
+    @MachTdId,
+    0, -- Imported
+    'GEN-2024-0088',
+    'BOC-IMP-2023-8871',
+    '2023-11-15',
+    'United States',
+    'Cummins Power Generation Phils. Corp.',
+    'Makati City, Metro Manila',
+    2250000.00,
+    'OR #876543 dtd. 2024-01-15',
+    'Cummins 350kVA Standby Diesel Generator Set with Soundproof Enclosure & ATS',
+    '350 kVA / 280 kW, 3-Phase 400V 60Hz',
+    'New',
+    '2024-01-15',
+    10,
+    2024,
+    2024,
+    2250000.00,
+    150000.00,
+    2400000.00,
+    2,
+    8,
+    20.0000,
+    1920000.00,
+    'Lot 12 Block 5, Pioneer Avenue',
+    'General Santos City',
+    'Brgy. Lagao',
+    'South Cotabato',
+    'Roberto Gomez Alcantara',
+    'TD-2026-LAND-0088',
+    '187-00-0012-005-0000',
+    'Two-Storey Residential Residence',
+    '345-678-901-000',
+    '0917-888-9999',
+    'Lot 12 Block 5, Pioneer Avenue, Brgy. Lagao, General Santos City',
+    'Male',
+    'TD-2026-BLDG-0088',
+    '187-00-0012-005-1001',
+    2, -- Industrial
+    'Industrial / Standby Power',
+    80.0000,
+    1536000.00,
+    2.0000,
+    1.0000,
+    46080.00,
+    2026,
+    '1st Quarter',
+    'Taxable',
+    'Sec. 217 RA 7160',
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    0.00,
+    0.00
+);
+
+COMMIT TRANSACTION;
+SELECT 'SUCCESS: Sample records for Default Owner, Land TDN, Building TDN, and Machinery TDN successfully inserted.' AS Result;

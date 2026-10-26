@@ -1,0 +1,1577 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - City Assessor Portal</title>
+    
+    <!-- Theme & Nav Layout Initialization script to avoid flicker -->
+    <script>
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+        if (localStorage.getItem('nav_layout') === 'horizontal') {
+            document.documentElement.classList.add('nav-layout-horizontal');
+        }
+    </script>
+
+    <!-- Tailwind CSS CDN with Dark Mode enabled -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        gold: { 400: '#facc15', 500: '#eab308', 600: '#ca8a04' },
+                        copper: { 400: '#fb923c', 500: '#ea580c' },
+                        emerald: { 50: '#ecfdf5', 100: '#d1fae5', 400: '#34d399', 500: '#10b981', 600: '#059669', 700: '#047857', 800: '#065f46' },
+                        till: { 800: '#1c1917', 900: '#0c0a09', 950: '#030202' }
+                    },
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts & Lucide Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Tom Select for Searchable Dropdowns -->
+    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+    <!-- Toastr Notifications CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" />
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="~/css/style.css" asp-append-version="true" />
+    
+    <style>
+        /* Responsive Off-Canvas Drawer on Mobile / Tablets (< lg) */
+        @@media (max-width: 1023px) {
+            #appSidebar {
+                transform: translateX(-100%);
+            }
+            #appSidebar.mobile-open {
+                transform: translateX(0) !important;
+            }
+            #mainContentWrapper {
+                margin-left: 0 !important;
+            }
+        }
+        @@media (min-width: 1024px) {
+            #appSidebar {
+                transform: translateX(0);
+            }
+        }
+
+        /* Dynamic Navigation Layout Styles */
+        html.nav-layout-horizontal #appSidebar {
+            display: none !important;
+        }
+        html.nav-layout-horizontal #mainContentWrapper {
+            margin-left: 0 !important;
+        }
+        html.nav-layout-horizontal .horizontal-nav-only {
+            display: flex !important;
+        }
+        html:not(.nav-layout-horizontal) .horizontal-nav-only {
+            display: none !important;
+        }
+        html.nav-layout-horizontal .sidebar-nav-only {
+            display: none !important;
+        }
+    </style>
+</head>
+@inject PropertyAssessmentApp.Services.IPermissionService PermissionService
+@{
+    var currentController = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
+    var currentAction = ViewContext.RouteData.Values["action"]?.ToString() ?? "";
+    bool isSettingsActive = currentController is "OrderPayment" or "UserAccount" or "UserRole" or "Workflow" or "FileLocation" or "DataTransferUtility";
+    bool isRequestsActive = currentController is "PropertyAssessmentRequest" or "RequestForInspection" or "LandHoldingRequest" or "TaxDeclarationRequest" or "TaxMapping";
+    var userPerms = PermissionService.GetUserPermissionSummary(User);
+
+    // Dynamic Module Permission Flags
+    bool canAssessmentRoll = PermissionService.CanAccess(User, "Assessment");
+    bool canOwner = PermissionService.CanAccess(User, "Owner");
+    bool canRpa = PermissionService.CanAccess(User, "PropertyAssessmentRequest");
+    bool canRfi = PermissionService.CanAccess(User, "RequestForInspection");
+    bool canFaasCreate = canAssessmentRoll;
+    bool showAssessmentGroup = canAssessmentRoll || canOwner || canRpa || canRfi;
+
+    bool canLandHolding = PermissionService.CanAccess(User, "LandHoldingRequest");
+    bool canTaxDeclaration = PermissionService.CanAccess(User, "TaxDeclarationRequest");
+    bool canTaxMapping = PermissionService.CanAccess(User, "TaxMapping");
+    bool showRequestsGroup = canLandHolding || canTaxDeclaration || canTaxMapping;
+
+    bool canPool = PermissionService.CanAccess(User, "Workflow", "Pool");
+    bool canMyTransactions = PermissionService.CanAccess(User, "Workflow", "MyTransactions") || canPool;
+    bool showWorkflowGroup = canPool || canMyTransactions;
+
+    bool canOrderPayment = PermissionService.CanAccess(User, "OrderPayment");
+    bool canUserAccount = PermissionService.CanAccess(User, "UserAccount");
+    bool canUserRole = PermissionService.CanAccess(User, "UserRole");
+    bool canRolePermissions = PermissionService.CanAccess(User, "UserRole", "Permissions");
+    bool canWorkflowSettings = PermissionService.CanAccess(User, "Workflow", "Settings");
+    bool canFileLocation = PermissionService.CanAccess(User, "FileLocation");
+    bool canDataTransfer = PermissionService.CanAccess(User, "DataTransferUtility");
+    bool showSettingsGroup = canOrderPayment || canUserAccount || canUserRole || canRolePermissions || canWorkflowSettings || canFileLocation || canDataTransfer;
+}
+<body class="bg-slate-50 dark:bg-till-950 text-slate-900 dark:text-stone-100 font-sans antialiased flex min-h-screen overflow-x-hidden selection:bg-emerald-500 selection:text-white transition-colors duration-200">
+
+    <!-- Ambient Glow Backgrounds -->
+    <div class="fixed top-0 left-1/4 w-[500px] h-[500px] bg-emerald-200/30 dark:bg-emerald-600/10 blur-[140px] pointer-events-none rounded-full"></div>
+    <div class="fixed bottom-10 right-10 w-[400px] h-[400px] bg-teal-200/20 dark:bg-teal-600/10 blur-[130px] pointer-events-none rounded-full"></div>
+
+    <!-- LEFT SIDEBAR NAVIGATION (Shown when in Sidebar mode) -->
+    <aside id="appSidebar" class="w-64 bg-white/95 dark:bg-till-900/90 backdrop-blur-xl border-r border-slate-200/90 dark:border-stone-800/80 shadow-2xl lg:shadow-sm flex flex-col justify-between fixed top-0 bottom-0 left-0 z-50 transition-transform duration-300">
+        
+        <!-- Logo & Brand Header -->
+        <div class="p-4 sm:p-6 border-b border-slate-200/80 dark:border-stone-800/80 flex items-center justify-between">
+            <a asp-controller="Assessment" asp-action="Index" class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 dark:from-emerald-400 dark:to-teal-600 flex items-center justify-center shadow-md shadow-emerald-500/20 text-white dark:text-till-950 font-bold text-xl ring-2 ring-emerald-500/20 dark:ring-emerald-400/30">
+                    🏛️
+                </div>
+                <div>
+                    <span class="text-lg font-extrabold tracking-tight text-slate-900 dark:bg-gradient-to-r dark:from-emerald-300 dark:via-teal-400 dark:to-emerald-500 dark:bg-clip-text dark:text-transparent">
+                        City Assessor
+                    </span>
+                    <span class="block text-[10px] uppercase font-mono tracking-widest text-emerald-700 dark:text-emerald-400 font-bold">FAIRTRACK</span>
+                </div>
+            </a>
+            <!-- Mobile Close Button -->
+            <button type="button" onclick="closeMobileSidebar()" class="lg:hidden p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-stone-200 hover:bg-slate-100 dark:hover:bg-stone-800 transition-all" title="Close Menu">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+
+        <!-- Navigation Links -->
+        <nav class="flex-1 p-4 space-y-1.5 overflow-y-auto">
+            @if (showWorkflowGroup)
+            {
+                <div class="px-3 pb-2 text-[10px] font-mono text-slate-400 dark:text-stone-500 font-bold uppercase tracking-wider">Transaction Workflows</div>
+
+                @if (canPool)
+                {
+                    <a asp-controller="Workflow" asp-action="Pool" class="nav-item flex items-center justify-between px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Workflow" && currentAction == "Pool" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                        <div class="flex items-center gap-3">
+                            <i data-lucide="inbox" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                            <span>Pool Transactions</span>
+                        </div>
+                        <span class="px-2 py-0.5 rounded-lg text-[9px] bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-bold uppercase">Pool</span>
+                    </a>
+                }
+
+                @if (canMyTransactions)
+                {
+                    <a asp-controller="Workflow" asp-action="MyTransactions" class="nav-item flex items-center justify-between px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Workflow" && currentAction == "MyTransactions" ? "bg-blue-50 text-blue-700 dark:bg-stone-800 dark:text-blue-400 font-bold" : "text-slate-700 dark:text-stone-300 hover:text-blue-700 dark:hover:text-blue-400")">
+                        <div class="flex items-center gap-3">
+                            <i data-lucide="user-check" class="w-4 h-4 text-blue-600 dark:text-blue-400"></i>
+                            <span>My Transactions</span>
+                        </div>
+                        <span class="px-2 py-0.5 rounded-lg text-[9px] bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300 font-bold uppercase">Active</span>
+                    </a>
+                }
+            }
+
+            @if (showAssessmentGroup)
+            {
+                <div class="px-3 pt-3 pb-2 text-[10px] font-mono text-slate-400 dark:text-stone-500 font-bold uppercase tracking-wider">Assessment Modules</div>
+                
+                @if (canAssessmentRoll)
+                {
+                    <a asp-controller="Assessment" asp-action="Index" class="nav-item flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Assessment" && currentAction != "Create" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                        <i data-lucide="layers" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                        <span>Assessment Records</span>
+                    </a>
+                }
+
+                @if (canOwner)
+                {
+                    <a asp-controller="Owner" asp-action="Index" class="nav-item flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Owner" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                        <i data-lucide="users" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                        <span>Owner Registration</span>
+                    </a>
+                }
+
+                @if (canRpa)
+                {
+                    <a asp-controller="PropertyAssessmentRequest" asp-action="Index" class="nav-item flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "PropertyAssessmentRequest" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                        <i data-lucide="clipboard-list" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                        <span>Property Assessment (RPA)</span>
+                    </a>
+                }
+
+                @if (canRfi)
+                {
+                    <a asp-controller="RequestForInspection" asp-action="Index" class="nav-item flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "RequestForInspection" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                        <i data-lucide="clipboard-check" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                        <span>Inspection Requests (RFI)</span>
+                    </a>
+                }
+
+                @if (canFaasCreate)
+                {
+                    <a asp-controller="Assessment" asp-action="Create" class="nav-item flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Assessment" && currentAction == "Create" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                        <i data-lucide="file-plus" class="w-4 h-4 text-teal-600 dark:text-teal-400"></i>
+                        <span>FAAS Encoding Wizard</span>
+                    </a>
+                }
+            }
+
+            @if (showRequestsGroup)
+            {
+                <div class="px-3 pt-4 pb-2 text-[10px] font-mono text-slate-400 dark:text-stone-500 font-bold uppercase tracking-wider">Requests & Services</div>
+
+                @if (canLandHolding)
+                {
+                    <a asp-controller="LandHoldingRequest" asp-action="Index" class="nav-item flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "LandHoldingRequest" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                        <i data-lucide="award" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                        <span>Land Holding Requests</span>
+                    </a>
+                }
+
+                @if (canTaxDeclaration)
+                {
+                    <a asp-controller="TaxDeclarationRequest" asp-action="Index" class="nav-item flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "TaxDeclarationRequest" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                        <i data-lucide="file-text" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                        <span>Tax Declaration Requests</span>
+                    </a>
+                }
+
+                @if (canTaxMapping)
+                {
+                    <a asp-controller="TaxMapping" asp-action="Index" class="nav-item flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "TaxMapping" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                        <i data-lucide="map-pin" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                        <span>Tax Mapping Requests</span>
+                    </a>
+                }
+            }
+
+            @if (showSettingsGroup)
+            {
+                <!-- Collapsible Settings & Admin Navigation Section in Sidebar -->
+                <div class="pt-4">
+                    <button type="button" onclick="toggleSidebarSettings()" class="w-full flex items-center justify-between px-3.5 py-2 rounded-xl text-[11px] font-mono uppercase tracking-wider font-bold transition-all @(isSettingsActive ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800/80 dark:text-emerald-400" : "text-slate-500 dark:text-stone-400 hover:bg-slate-100 dark:hover:bg-stone-800/40")">
+                        <span class="flex items-center gap-2">
+                            <i data-lucide="settings-2" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
+                            <span>File Maintenance & Admin</span>
+                        </span>
+                        <i data-lucide="chevron-down" id="sidebarSettingsChevron" class="w-3 h-3 transition-transform duration-200 @(isSettingsActive ? "rotate-180" : "")"></i>
+                    </button>
+
+                    <div id="sidebarSettingsMenu" class="@(isSettingsActive ? "" : "hidden") pl-2 space-y-1 mt-1.5 transition-all">
+                        @if (canOrderPayment)
+                        {
+                            <a asp-controller="OrderPayment" asp-action="Index" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold text-xs transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "OrderPayment" ? "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold" : "text-slate-600 dark:text-stone-400 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                                <i data-lucide="receipt" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
+                                <span>Order of Payment Fees</span>
+                            </a>
+                        }
+
+                        @if (canUserAccount)
+                        {
+                            <a asp-controller="UserAccount" asp-action="Index" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold text-xs transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "UserAccount" ? "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold" : "text-slate-600 dark:text-stone-400 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                                <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
+                                <span>User Accounts</span>
+                            </a>
+                        }
+
+                        @if (canUserRole)
+                        {
+                            <a asp-controller="UserRole" asp-action="Index" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold text-xs transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "UserRole" && currentAction != "Permissions" ? "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold" : "text-slate-600 dark:text-stone-400 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                                <i data-lucide="user-cog" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
+                                <span>User Roles</span>
+                            </a>
+                        }
+
+                        @if (canRolePermissions)
+                        {
+                            <a asp-controller="UserRole" asp-action="Permissions" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold text-xs transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "UserRole" && currentAction == "Permissions" ? "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold" : "text-slate-600 dark:text-stone-400 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                                <i data-lucide="shield-check" class="w-3.5 h-3.5 text-blue-600 dark:text-blue-400"></i>
+                                <span>Role Permissions</span>
+                            </a>
+                        }
+
+                        @if (canWorkflowSettings)
+                        {
+                            <a asp-controller="Workflow" asp-action="Settings" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold text-xs transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Workflow" ? "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold" : "text-slate-600 dark:text-stone-400 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                                <i data-lucide="git-pull-request" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
+                                <span>Workflow Pipeline</span>
+                            </a>
+                        }
+
+                        @if (canFileLocation)
+                        {
+                            <a asp-controller="FileLocation" asp-action="Index" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold text-xs transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "FileLocation" ? "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold" : "text-slate-600 dark:text-stone-400 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                                <i data-lucide="hard-drive" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
+                                <span>File Location Setup</span>
+                            </a>
+                        }
+
+                        @if (canDataTransfer)
+                        {
+                            <a asp-controller="DataTransferUtility" asp-action="Index" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold text-xs transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "DataTransferUtility" ? "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold" : "text-slate-600 dark:text-stone-400 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                                <i data-lucide="arrow-right-left" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
+                                <span>Data Transfer Utility</span>
+                            </a>
+                        }
+                    </div>
+                </div>
+            }
+        </nav>
+
+        <!-- Sidebar Footer Status -->
+        <div class="p-4 border-t border-slate-200/80 dark:border-stone-800/80 text-xs font-mono text-slate-500 dark:text-stone-400 space-y-1 bg-slate-50/50 dark:bg-transparent">
+            <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span class="font-bold text-slate-700 dark:text-stone-300">District 01 Connected</span>
+            </div>
+            <div class="text-[10px] text-slate-400 dark:text-stone-500">Database: DBCast (LAPTOP-JMBAQ8JB\HP)</div>
+        </div>
+    </aside>
+
+    <!-- Mobile Sidebar Backdrop Overlay -->
+    <div id="mobileSidebarBackdrop" onclick="closeMobileSidebar()" class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-40 hidden lg:hidden transition-opacity"></div>
+
+    <!-- MAIN CONTENT AREA -->
+    <div id="mainContentWrapper" class="flex-1 ml-0 lg:ml-64 flex flex-col min-h-screen transition-all duration-200 w-full overflow-x-hidden">
+        
+        <!-- Top Navigation Header -->
+        <header class="h-16 bg-white/80 dark:bg-till-900/60 backdrop-blur-md border-b border-slate-200 dark:border-stone-800/80 px-4 sm:px-8 flex items-center justify-between sticky top-0 z-40 shadow-2xs transition-colors duration-200">
+            
+            <!-- Left Header Area: Brand Logo (Horizontal Mode) & Status Info (Sidebar Mode) -->
+            <div class="flex items-center gap-3">
+                
+                <!-- Mobile Menu Hamburger Button (shown on mobile/tablet in sidebar mode) -->
+                <button type="button" onclick="toggleMobileSidebar()" class="sidebar-nav-only lg:hidden p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-stone-900 dark:hover:bg-stone-800 text-slate-700 dark:text-stone-300 border border-slate-200 dark:border-stone-800 transition-all shadow-xs" title="Open Navigation Menu">
+                    <i data-lucide="menu" class="w-5 h-5 text-emerald-600 dark:text-emerald-400"></i>
+                </button>
+
+                <!-- Brand Logo (Appears ONLY in Horizontal Nav Mode) -->
+                <div class="horizontal-nav-only items-center gap-3 mr-3">
+                    <a asp-controller="Assessment" asp-action="Index" class="flex items-center gap-2.5">
+                        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center text-white font-bold text-lg shadow-sm ring-2 ring-emerald-500/20">
+                            🏛️
+                        </div>
+                        <div class="hidden sm:block">
+                            <span class="text-base font-extrabold tracking-tight text-slate-900 dark:bg-gradient-to-r dark:from-emerald-300 dark:via-teal-400 dark:to-emerald-500 dark:bg-clip-text dark:text-transparent">
+                                City Assessor
+                            </span>
+                            <span class="block text-[9px] uppercase font-mono tracking-widest text-emerald-700 dark:text-emerald-400 font-bold">FAIRTRACK</span>
+                        </div>
+                    </a>
+                </div>
+
+                <!-- Info Badges (Shown in Sidebar Mode) -->
+                <div class="sidebar-nav-only flex items-center gap-3 text-xs font-mono text-slate-500 dark:text-stone-400">
+                    <span class="hidden sm:inline">Assessment Period: <strong class="text-slate-900 dark:text-white font-bold">@DateTime.Now.Year</strong></span>
+                    <span class="hidden sm:inline">•</span>
+                    <span class="hidden md:inline">LGU Status: <strong class="text-emerald-700 dark:text-emerald-400 font-bold">RA 7160 Compliant</strong></span>
+                </div>
+
+                <!-- Horizontal Navigation Items (Appears ONLY in Horizontal Nav Mode) -->
+                <nav class="horizontal-nav-only items-center gap-1.5 ml-2">
+                    @if (canPool)
+                    {
+                        <a asp-controller="Workflow" asp-action="Pool" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold text-xs font-mono transition-all @(currentController == "Workflow" && currentAction == "Pool" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold ring-1 ring-emerald-500/30" : "text-slate-700 dark:text-stone-300 hover:bg-slate-100 dark:hover:bg-stone-800/60 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                            <i data-lucide="inbox" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
+                            <span>Pool</span>
+                        </a>
+                    }
+
+                    @if (canMyTransactions)
+                    {
+                        <a asp-controller="Workflow" asp-action="MyTransactions" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold text-xs font-mono transition-all @(currentController == "Workflow" && currentAction == "MyTransactions" ? "bg-blue-50 text-blue-700 dark:bg-stone-800 dark:text-blue-400 font-bold ring-1 ring-blue-500/30" : "text-slate-700 dark:text-stone-300 hover:bg-slate-100 dark:hover:bg-stone-800/60 hover:text-blue-700 dark:hover:text-blue-400")">
+                            <i data-lucide="user-check" class="w-3.5 h-3.5 text-blue-600 dark:text-blue-400"></i>
+                            <span>My Trans</span>
+                        </a>
+                    }
+
+                    @if (canAssessmentRoll)
+                    {
+                        <a asp-controller="Assessment" asp-action="Index" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold text-xs font-mono transition-all @(currentController == "Assessment" && currentAction != "Create" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold ring-1 ring-emerald-500/30" : "text-slate-700 dark:text-stone-300 hover:bg-slate-100 dark:hover:bg-stone-800/60 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                            <i data-lucide="layers" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
+                            <span>Records</span>
+                        </a>
+                    }
+
+                    @if (canOwner)
+                    {
+                        <a asp-controller="Owner" asp-action="Index" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold text-xs font-mono transition-all @(currentController == "Owner" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold ring-1 ring-emerald-500/30" : "text-slate-700 dark:text-stone-300 hover:bg-slate-100 dark:hover:bg-stone-800/60 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                            <i data-lucide="users" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
+                            <span>Owners</span>
+                        </a>
+                    }
+
+                    @if (showRequestsGroup || canRpa || canRfi)
+                    {
+                        <!-- Horizontal Requests Dropdown Menu -->
+                        <div class="relative" id="horizontalRequestsDropdownContainer">
+                            <button id="horizontalRequestsDropdownBtn" type="button" onclick="toggleHorizontalRequestsDropdown(event)" 
+                                    class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all @(isRequestsActive ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 ring-1 ring-emerald-500/30" : "text-slate-700 dark:text-stone-300 hover:bg-slate-100 dark:hover:bg-stone-800/60")">
+                                <i data-lucide="folder-git-2" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
+                                <span>Requests</span>
+                                <i data-lucide="chevron-down" id="horizontalRequestsChevron" class="w-3 h-3 text-slate-400 transition-transform duration-200"></i>
+                            </button>
+                            
+                            <div id="horizontalRequestsDropdownMenu" class="hidden absolute left-0 mt-2 w-72 bg-white dark:bg-till-900 border border-slate-200/90 dark:border-stone-800 rounded-2xl shadow-2xl p-2 z-50 backdrop-blur-xl">
+                                <div class="px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-stone-500 border-b border-slate-100 dark:border-stone-800 mb-1">Assessor Requests & Field Inspections</div>
+                                
+                                @if (canRpa)
+                                {
+                                    <a asp-controller="PropertyAssessmentRequest" asp-action="Index" class="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 text-xs text-slate-700 dark:text-stone-300">
+                                        <i data-lucide="clipboard-list" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                                        <div>
+                                            <div class="font-bold">Property Assessment (RPA)</div>
+                                            <div class="text-[10px] text-slate-500 dark:text-stone-400">Real property assessment flow</div>
+                                        </div>
+                                    </a>
+                                }
+
+                                @if (canRfi)
+                                {
+                                    <a asp-controller="RequestForInspection" asp-action="Index" class="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 text-xs text-slate-700 dark:text-stone-300">
+                                        <i data-lucide="clipboard-check" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                                        <div>
+                                            <div class="font-bold">Inspection Requests (RFI)</div>
+                                            <div class="text-[10px] text-slate-500 dark:text-stone-400">Field ocular inspection tasks</div>
+                                        </div>
+                                    </a>
+                                }
+
+                                @if (canLandHolding)
+                                {
+                                    <a asp-controller="LandHoldingRequest" asp-action="Index" class="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 text-xs text-slate-700 dark:text-stone-300">
+                                        <i data-lucide="award" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                                        <div>
+                                            <div class="font-bold">Land Holding Requests</div>
+                                            <div class="text-[10px] text-slate-500 dark:text-stone-400">Certificates of aggregate holding</div>
+                                        </div>
+                                    </a>
+                                }
+
+                                @if (canTaxDeclaration)
+                                {
+                                    <a asp-controller="TaxDeclarationRequest" asp-action="Index" class="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 text-xs text-slate-700 dark:text-stone-300">
+                                        <i data-lucide="file-text" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                                        <div>
+                                            <div class="font-bold">Tax Declaration Requests</div>
+                                            <div class="text-[10px] text-slate-500 dark:text-stone-400">Certified true copy issuance</div>
+                                        </div>
+                                    </a>
+                                }
+
+                                @if (canTaxMapping)
+                                {
+                                    <a asp-controller="TaxMapping" asp-action="Index" class="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 text-xs text-slate-700 dark:text-stone-300">
+                                        <i data-lucide="map-pin" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                                        <div>
+                                            <div class="font-bold">Tax Mapping Requests</div>
+                                            <div class="text-[10px] text-slate-500 dark:text-stone-400">GIS parcel identification</div>
+                                        </div>
+                                    </a>
+                                }
+                            </div>
+                        </div>
+                    }
+                </nav>
+            </div>
+
+            <!-- Header Center/Right: Consolidated Quick Actions & Settings Dropdown, User Info -->
+            <div class="flex items-center gap-2.5">
+                
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <!-- User Profile Info Badge -->
+                    <div class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-xs font-mono text-slate-700 dark:text-stone-200 shadow-2xs">
+                        <i data-lucide="user-check" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                        <span class="font-bold hidden md:inline">@(User.FindFirst(System.Security.Claims.ClaimTypes.GivenName)?.Value ?? User.Identity.Name)</span>
+                        <span class="px-1.5 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold uppercase">
+                            @(User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "User")
+                        </span>
+                    </div>
+
+                    <!-- CONSOLIDATED GEAR / SETTINGS & QUICK ACTIONS NAVBAR DROPDOWN -->
+                    <div class="relative" id="settingsDropdownContainer">
+                        <button id="settingsDropdownBtn" type="button" onclick="toggleSettingsDropdown(event)" 
+                                class="flex items-center gap-1.5 p-2 sm:px-3 sm:py-2 rounded-xl text-xs font-mono font-bold transition-all shadow-sm border @(isSettingsActive ? "bg-emerald-600 text-white border-emerald-500 shadow-emerald-500/20" : "bg-slate-100 hover:bg-slate-200 dark:bg-stone-900 dark:hover:bg-stone-800 text-slate-700 dark:text-stone-300 border-slate-200 dark:border-stone-800")"
+                                title="Open Actions, System Controls & Settings Menu">
+                            <i data-lucide="settings" class="w-4 h-4 @(isSettingsActive ? "text-white" : "text-emerald-600 dark:text-emerald-400")"></i>
+                            <span class="hidden sm:inline">Settings</span>
+                            <i data-lucide="chevron-down" id="settingsChevron" class="w-3.5 h-3.5 transition-transform duration-200 @(isSettingsActive ? "text-white/80" : "text-slate-400")"></i>
+                        </button>
+
+                        <!-- Settings & Consolidated Actions Dropdown Panel -->
+                        <div id="settingsDropdownMenu" class="hidden absolute right-0 mt-2 w-80 sm:w-[480px] bg-white dark:bg-till-900 border border-slate-200/90 dark:border-stone-800 rounded-2xl shadow-2xl p-4 z-50 backdrop-blur-xl space-y-3 font-mono text-xs">
+                            
+                            <!-- Header & User Role -->
+                            <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-stone-800">
+                                <div class="flex items-center gap-2.5">
+                                    <div class="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                                        <i data-lucide="sliders" class="w-4 h-4"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-xs font-bold font-mono uppercase tracking-wider text-slate-900 dark:text-white">Quick Actions & Settings</h4>
+                                        <p class="text-[10px] text-slate-500 dark:text-stone-400">System actions, layout & file maintenance</p>
+                                    </div>
+                                </div>
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold uppercase">
+                                    @(User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "User")
+                                </span>
+                            </div>
+
+                            <!-- CONSOLIDATED ACTIONS ROW: NEW FAAS & LOGOUT -->
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                @if (canFaasCreate)
+                                {
+                                    <!-- ACTION 1: NEW FAAS ASSESSMENT -->
+                                    <a asp-controller="Assessment" asp-action="Create" class="flex items-center gap-2.5 p-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30 font-bold transition-all shadow-2xs">
+                                        <div class="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                                            <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                                        </div>
+                                        <div class="min-w-0">
+                                            <div class="text-xs font-bold truncate">New FAAS</div>
+                                            <div class="text-[10px] text-emerald-600 dark:text-emerald-400 font-normal truncate">Encode tax assessment</div>
+                                        </div>
+                                    </a>
+                                }
+
+                                <!-- ACTION 2: LOGOUT -->
+                                <a asp-controller="Account" asp-action="Logout" class="flex items-center gap-2.5 p-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30 font-bold transition-all shadow-2xs @(!canFaasCreate ? "sm:col-span-2" : "")">
+                                    <div class="w-7 h-7 rounded-lg bg-rose-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                                        <i data-lucide="log-out" class="w-4 h-4"></i>
+                                    </div>
+                                    <div class="min-w-0">
+                                        <div class="text-xs font-bold truncate">Logout Session</div>
+                                        <div class="text-[10px] text-rose-500 dark:text-rose-400 font-normal truncate">Sign out of system</div>
+                                    </div>
+                                </a>
+                            </div>
+
+                            <!-- CONSOLIDATED CONTROLS: SIDEBAR & DARK MODE -->
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <!-- ACTION 3: SIDEBAR / TOP NAV LAYOUT -->
+                                <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-stone-800/60 border border-slate-200/60 dark:border-stone-700/60 flex items-center justify-between">
+                                    <div class="flex items-center gap-2 min-w-0">
+                                        <i data-lucide="layout" class="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0"></i>
+                                        <div class="min-w-0">
+                                            <span class="text-xs font-bold text-slate-800 dark:text-stone-200 block truncate">Sidebar Style</span>
+                                            <span class="text-[10px] text-slate-500 dark:text-stone-400 block truncate" id="layoutToggleText">Sidebar</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center bg-slate-200/80 dark:bg-stone-900 p-0.5 rounded-lg border border-slate-300/60 dark:border-stone-700 shrink-0">
+                                        <button type="button" onclick="setNavLayout('sidebar')" id="navChoiceSidebar" class="px-2 py-1 rounded-md text-[10px] font-mono font-bold transition-all">
+                                            Sidebar
+                                        </button>
+                                        <button type="button" onclick="setNavLayout('horizontal')" id="navChoiceHorizontal" class="px-2 py-1 rounded-md text-[10px] font-mono font-bold transition-all">
+                                            Top Nav
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- ACTION 4: DARK MODE TOGGLE -->
+                                <button type="button" onclick="toggleTheme()" class="p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-stone-800/60 dark:hover:bg-stone-800 border border-slate-200/60 dark:border-stone-700/60 flex items-center justify-between transition-all text-left">
+                                    <div class="flex items-center gap-2 min-w-0">
+                                        <span id="themeToggleIconInside" class="shrink-0">
+                                            <i data-lucide="sun" class="w-4 h-4 text-amber-500 hidden dark:block"></i>
+                                            <i data-lucide="moon" class="w-4 h-4 text-indigo-600 block dark:hidden"></i>
+                                        </span>
+                                        <div class="min-w-0">
+                                            <span class="text-xs font-bold text-slate-800 dark:text-stone-200 block truncate">Dark Mode</span>
+                                            <span class="text-[10px] text-slate-500 dark:text-stone-400 block truncate" id="themeStatusText">Theme toggle</span>
+                                        </div>
+                                    </div>
+                                    <span id="themeBadge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 dark:bg-stone-700 text-slate-700 dark:text-stone-200 shrink-0">
+                                        Toggle
+                                    </span>
+                                </button>
+                            </div>
+
+                            @if (showSettingsGroup)
+                            {
+                                <div class="pt-2 border-t border-slate-100 dark:border-stone-800">
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                                        <!-- Section 1: Security & Roles -->
+                                        @if (canUserAccount || canUserRole || canRolePermissions)
+                                        {
+                                            <div class="space-y-1">
+                                                <div class="px-2 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-stone-500">Security & Roles</div>
+                                                @if (canUserAccount)
+                                                {
+                                                    <a asp-controller="UserAccount" asp-action="Index" class="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "UserAccount" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold ring-1 ring-emerald-500/20" : "text-slate-700 dark:text-stone-300")">
+                                                        <i data-lucide="shield-check" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                                                        <div>
+                                                            <div class="font-bold">User Accounts</div>
+                                                            <div class="text-[10px] text-slate-500 dark:text-stone-400">Staff logins & credentials</div>
+                                                        </div>
+                                                    </a>
+                                                }
+                                                @if (canUserRole)
+                                                {
+                                                    <a asp-controller="UserRole" asp-action="Index" class="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "UserRole" && currentAction != "Permissions" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold ring-1 ring-emerald-500/20" : "text-slate-700 dark:text-stone-300")">
+                                                        <i data-lucide="user-cog" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                                                        <div>
+                                                            <div class="font-bold">User Roles</div>
+                                                            <div class="text-[10px] text-slate-500 dark:text-stone-400">Role definitions & settings</div>
+                                                        </div>
+                                                    </a>
+                                                }
+                                                @if (canRolePermissions)
+                                                {
+                                                    <a asp-controller="UserRole" asp-action="Permissions" class="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "UserRole" && currentAction == "Permissions" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold ring-1 ring-emerald-500/20" : "text-slate-700 dark:text-stone-300")">
+                                                        <i data-lucide="shield-check" class="w-4 h-4 text-blue-600 dark:text-blue-400"></i>
+                                                        <div>
+                                                            <div class="font-bold">Role Permissions</div>
+                                                            <div class="text-[10px] text-slate-500 dark:text-stone-400">Dynamic form & module access</div>
+                                                        </div>
+                                                    </a>
+                                                }
+                                            </div>
+                                        }
+
+                                        <!-- Section 2: Configurations -->
+                                        @if (canWorkflowSettings || canFileLocation)
+                                        {
+                                            <div class="space-y-1">
+                                                <div class="px-2 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-stone-500">Configurations</div>
+                                                @if (canWorkflowSettings)
+                                                {
+                                                    <a asp-controller="Workflow" asp-action="Settings" class="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Workflow" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold ring-1 ring-emerald-500/20" : "text-slate-700 dark:text-stone-300")">
+                                                        <i data-lucide="git-pull-request" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                                                        <div>
+                                                            <div class="font-bold">Workflow Pipeline</div>
+                                                            <div class="text-[10px] text-slate-500 dark:text-stone-400">Transaction approval stages</div>
+                                                        </div>
+                                                    </a>
+                                                }
+                                                @if (canFileLocation)
+                                                {
+                                                    <a asp-controller="FileLocation" asp-action="Index" class="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "FileLocation" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold ring-1 ring-emerald-500/20" : "text-slate-700 dark:text-stone-300")">
+                                                        <i data-lucide="hard-drive" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                                                        <div>
+                                                            <div class="font-bold">File Location Setup</div>
+                                                            <div class="text-[10px] text-slate-500 dark:text-stone-400">Network storage & UNC paths</div>
+                                                        </div>
+                                                    </a>
+                                                }
+                                            </div>
+                                        }
+
+                                        <!-- Section 3: Fees & Utilities -->
+                                        @if (canOrderPayment || canDataTransfer)
+                                        {
+                                            <div class="sm:col-span-2 pt-2 border-t border-slate-100 dark:border-stone-800 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                @if (canOrderPayment)
+                                                {
+                                                    <a asp-controller="OrderPayment" asp-action="Index" class="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "OrderPayment" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold ring-1 ring-emerald-500/20" : "text-slate-700 dark:text-stone-300")">
+                                                        <i data-lucide="receipt" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                                                        <div>
+                                                            <div class="font-bold">Order of Payment Fees</div>
+                                                            <div class="text-[10px] text-slate-500 dark:text-stone-400">Itemized fee matrix & rates</div>
+                                                        </div>
+                                                    </a>
+                                                }
+                                                @if (canDataTransfer)
+                                                {
+                                                    <a asp-controller="DataTransferUtility" asp-action="Index" class="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "DataTransferUtility" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold ring-1 ring-emerald-500/20" : "text-slate-700 dark:text-stone-300")">
+                                                        <i data-lucide="arrow-right-left" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                                                        <div>
+                                                            <div class="font-bold">Data Transfer Utility</div>
+                                                            <div class="text-[10px] text-slate-500 dark:text-stone-400">Legacy migration & batch import</div>
+                                                        </div>
+                                                    </a>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <a asp-controller="Account" asp-action="Login" class="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-mono font-bold text-xs shadow-sm transition-all">
+                        <i data-lucide="log-in" class="w-3.5 h-3.5"></i>
+                        <span>Sign In</span>
+                    </a>
+                }
+            </div>
+        </header>
+
+        <!-- Main Body Render Content -->
+        <main class="flex-1 p-4 sm:p-8 w-full max-w-[1600px] mx-auto">
+            @if (TempData["SuccessMessage"] != null)
+            {
+                <div class="mb-6 p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-500/20 border border-emerald-200 dark:border-emerald-500/40 text-emerald-800 dark:text-emerald-300 text-xs font-mono flex items-center gap-2 shadow-sm">
+                    <i data-lucide="check-circle" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                    <span class="font-bold">@TempData["SuccessMessage"]</span>
+                </div>
+            }
+            @RenderBody()
+        </main>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- UNIVERSAL TRANSACTION TIMELINE & LIVE LOCATION MODAL                  -->
+    <!-- ===================================================================== -->
+    <div id="universalTimelineModal" class="fixed inset-0 z-50 hidden overflow-y-auto bg-slate-950/70 backdrop-blur-sm transition-opacity font-mono text-xs" onclick="handleTimelineModalBackdrop(event)">
+        <div class="min-h-full flex items-center justify-center p-3 sm:p-6">
+            <div class="relative w-full max-w-4xl bg-white dark:bg-stone-900 rounded-3xl border border-slate-200 dark:border-stone-800 shadow-2xl overflow-hidden my-8" onclick="event.stopPropagation()">
+                
+                <!-- Modal Header -->
+                <div class="px-6 py-5 border-b border-slate-200 dark:border-stone-800 flex items-center justify-between bg-slate-50/70 dark:bg-stone-950/70">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-2xl bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-400 flex items-center justify-center shrink-0 shadow-xs">
+                            <i data-lucide="route" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="font-black text-slate-900 dark:text-white text-base tracking-tight" id="modalTimelineTracking">Transaction Timeline</span>
+                                <span id="modalTimelineTypeBadge" class="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-700 dark:bg-stone-800 dark:text-stone-300">...</span>
+                                <span id="modalTimelineStatusBadge" class="px-2.5 py-0.5 rounded-lg text-[10px] font-bold"></span>
+                            </div>
+                            <p class="text-[11px] text-slate-500 dark:text-stone-400">Live transaction location, current handler & station audit trail</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <a id="modalTimelineFullPageLink" href="#" target="_blank" class="p-2 rounded-xl text-slate-500 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-stone-800 transition-all" title="Open Full-Screen Routing Slip & Timeline">
+                            <i data-lucide="external-link" class="w-4 h-4"></i>
+                        </a>
+                        <button type="button" onclick="closeTimelineModal()" class="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-stone-200 hover:bg-slate-100 dark:hover:bg-stone-800 transition-all" title="Close Modal">
+                            <i data-lucide="x" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Modal Body Dynamic Container -->
+                <div id="modalTimelineContent" class="p-6 max-h-[72vh] overflow-y-auto space-y-6">
+                    <!-- Loading State -->
+                    <div id="modalTimelineLoading" class="py-16 text-center space-y-3">
+                        <div class="inline-block animate-spin text-indigo-600 dark:text-indigo-400">
+                            <i data-lucide="loader-2" class="w-8 h-8"></i>
+                        </div>
+                        <p class="text-slate-600 dark:text-stone-300 font-bold">Locating transaction and loading live routing trail...</p>
+                    </div>
+
+                    <!-- Error State -->
+                    <div id="modalTimelineError" class="hidden py-12 text-center space-y-3">
+                        <div class="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400">
+                            <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+                        </div>
+                        <div class="text-slate-900 dark:text-white font-extrabold text-sm">Transaction Not Found</div>
+                        <p class="text-slate-500 dark:text-stone-400 max-w-md mx-auto text-xs err-msg">Could not resolve transaction history for this reference.</p>
+                    </div>
+
+                    <!-- Rendered Dynamic Content injected via JS -->
+                    <div id="modalTimelineBody" class="space-y-6 hidden">
+                    </div>
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="px-6 py-4 bg-slate-50/70 dark:bg-stone-950/70 border-t border-slate-200 dark:border-stone-800 flex items-center justify-between flex-wrap gap-3">
+                    <span id="modalTimelineElapsed" class="text-[11px] text-slate-500 dark:text-stone-400 font-bold flex items-center gap-1.5">
+                        <i data-lucide="clock" class="w-3.5 h-3.5 text-indigo-500"></i>
+                        <span>Elapsed Time: --</span>
+                    </span>
+                    <div class="flex items-center gap-2">
+                        <button type="button" onclick="printTimelineFromModal()" class="px-3.5 py-2 rounded-xl font-bold bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-slate-700 dark:text-stone-300 transition-all text-xs flex items-center gap-1.5 shadow-2xs">
+                            <i data-lucide="printer" class="w-3.5 h-3.5 text-slate-500"></i>
+                            <span>Print Slip</span>
+                        </button>
+                        <button type="button" onclick="closeTimelineModal()" class="px-4 py-2 rounded-xl font-bold bg-indigo-600 hover:bg-indigo-700 text-white transition-all text-xs shadow-md shadow-indigo-600/20">
+                            Close
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Toastr Notifications JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+    <!-- Microsoft SignalR Real-Time Hub Client -->
+    <script src="~/lib/signalr.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="~/js/table-pagination.js" asp-append-version="true"></script>
+    <script>
+        toastr.options = {
+            "closeButton": true,
+            "progressBar": true,
+            "positionClass": "toast-top-right",
+            "showDuration": "300",
+            "hideDuration": "800",
+            "timeOut": "6000",
+            "extendedTimeOut": "2000",
+            "showEasing": "swing",
+            "hideEasing": "linear",
+            "showMethod": "fadeIn",
+            "hideMethod": "fadeOut"
+        };
+
+        // Initialize Global Real-Time SignalR Hub Connection
+        if (typeof signalR !== 'undefined') {
+            const workflowHubConnection = new signalR.HubConnectionBuilder()
+                .withUrl("/hubs/workflow")
+                .withAutomaticReconnect([0, 2000, 5000, 10000, 30000])
+                .configureLogging(signalR.LogLevel.Warning)
+                .build();
+
+            workflowHubConnection.on("TransactionForwarded", function (data) {
+                console.log("⚡ SignalR: Transaction Forwarded in real-time:", data);
+
+                // Play gentle notification chime via Web Audio API
+                try {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (AudioCtx) {
+                        const ctx = new AudioCtx();
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.type = "sine";
+                        osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+                        osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15);
+                        gain.gain.setValueAtTime(0.12, ctx.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.start();
+                        osc.stop(ctx.currentTime + 0.3);
+                    }
+                } catch (e) { }
+
+                // Display rich Toastr pop-up alert
+                if (typeof toastr !== 'undefined') {
+                    toastr.info(
+                        `<div class="space-y-1 font-mono text-xs">` +
+                        `<div class="font-bold text-emerald-400">📄 ${data.trackingNumber} (${data.requestType})</div>` +
+                        `<div><strong>Target Station:</strong> ${data.targetStageName}</div>` +
+                        `<div><strong>Assigned To:</strong> ${data.targetRole}</div>` +
+                        `<div class="text-[10px] text-slate-300">From: ${data.forwardedByName} (${data.forwardedByRole})</div>` +
+                        `</div>`,
+                        "⚡ Transaction Received in Real-Time!",
+                        { timeOut: 7000, extendedTimeOut: 3000, enableHtml: true }
+                    );
+                }
+
+                // Dispatch global event for page-level handlers (Pool, MyTransactions, Queues)
+                window.dispatchEvent(new CustomEvent('workflow:transactionForwarded', { detail: data }));
+            });
+
+            workflowHubConnection.on("TransactionClaimed", function (data) {
+                window.dispatchEvent(new CustomEvent('workflow:transactionClaimed', { detail: data }));
+            });
+
+            workflowHubConnection.on("TransactionReleased", function (data) {
+                window.dispatchEvent(new CustomEvent('workflow:transactionReleased', { detail: data }));
+            });
+
+            workflowHubConnection.on("TransactionDeferred", function (data) {
+                window.dispatchEvent(new CustomEvent('workflow:transactionDeferred', { detail: data }));
+            });
+
+            workflowHubConnection.start()
+                .then(function () {
+                    console.log("⚡ SignalR connected to /hubs/workflow successfully.");
+                })
+                .catch(function (err) {
+                    console.warn("SignalR connection attempt failed:", err.toString());
+                });
+        }
+
+        window.UserPermissions = {
+            isAuthenticated: @(userPerms.IsAuthenticated ? "true" : "false"),
+            isRoleSet: @(userPerms.IsRoleSet ? "true" : "false"),
+            workflowRoleId: @(userPerms.WorkflowRoleId.HasValue ? userPerms.WorkflowRoleId.Value.ToString() : "null"),
+            roleName: '@(userPerms.RoleName ?? "")',
+            allowedControllers: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(userPerms.AllowedControllers.Select(c => c.ToLower()))),
+            allowedCreateControllers: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(userPerms.AllowedCreateControllers.Select(c => c.ToLower()))),
+            restrictedControllers: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(userPerms.RestrictedControllers.Select(c => c.ToLower())))
+        };
+
+        // Intercept navigation to prevent redirection to forms if role is not set or access is not assigned
+        document.addEventListener("click", function (e) {
+            var target = e.target.closest("a, button[data-href]");
+            if (!target) return;
+
+            var href = target.getAttribute("href") || target.getAttribute("data-href");
+            if (!href || href.startsWith("#") || href.startsWith("javascript:") || href.startsWith("mailto:") || href.startsWith("tel:")) return;
+
+            // Allow logout or login
+            if (href.indexOf("/Account/Logout") !== -1 || href.indexOf("/Account/Login") !== -1) return;
+
+            // External URLs
+            if (href.startsWith("http://") || href.startsWith("https://")) return;
+
+            if (!window.UserPermissions || !window.UserPermissions.isAuthenticated) {
+                return;
+            }
+
+            var cleanHref = href.split("?")[0].split("#")[0].trim();
+            var segments = cleanHref.split("/").filter(Boolean);
+            
+            var targetController = "Assessment";
+            var targetAction = "Index";
+
+            if (segments.length > 0) {
+                targetController = segments[0];
+                targetAction = segments.length > 1 ? segments[1] : "Index";
+            }
+
+            // Always allow general workflow transaction pool & public pages
+            if (targetController.toLowerCase() === "workflow" && targetAction.toLowerCase() !== "settings") {
+                return;
+            }
+            if (targetController.toLowerCase() === "home" || targetController.toLowerCase() === "account" || targetController.toLowerCase() === "location") {
+                return;
+            }
+
+            // Check if target controller is one of the restricted system modules
+            var isRestrictedModule = window.UserPermissions.restrictedControllers.indexOf(targetController.toLowerCase()) !== -1;
+
+            if (isRestrictedModule) {
+                // RULE 1: If role access is not set at all (no checks in system for this role)
+                if (!window.UserPermissions.isRoleSet) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toastr.error("User role access is not being set. Please contact your system administrator.", "Access Notice");
+                    return false;
+                }
+
+                // RULE 2: If the user role does not have access to this form/module
+                var isAllowed = window.UserPermissions.allowedControllers.indexOf(targetController.toLowerCase()) !== -1;
+
+                if (!isAllowed) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toastr.warning("Your user role does not have access assigned to this form.", "Access Restricted");
+                    return false;
+                }
+            }
+        }, true);
+    </script>
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <script>
+            $(document).ready(function () {
+                toastr.success('@TempData["SuccessMessage"]', 'System Notice');
+            });
+        </script>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <script>
+            $(document).ready(function () {
+                toastr.error('@TempData["ErrorMessage"]', 'Access Notice');
+            });
+        </script>
+    }
+    @await RenderSectionAsync("Scripts", required: false)
+    <script>
+        lucide.createIcons();
+
+        // ---------------------------------------------------------------------
+        // NAVIGATION LAYOUT TOGGLE (Sidebar <-> Horizontal Top Navbar)
+        // ---------------------------------------------------------------------
+        function getNavLayout() {
+            return localStorage.getItem('nav_layout') || 'sidebar';
+        }
+
+        function setNavLayout(layout) {
+            if (layout === 'horizontal') {
+                document.documentElement.classList.add('nav-layout-horizontal');
+                localStorage.setItem('nav_layout', 'horizontal');
+            } else {
+                document.documentElement.classList.remove('nav-layout-horizontal');
+                localStorage.setItem('nav_layout', 'sidebar');
+            }
+            updateNavLayoutUI();
+            lucide.createIcons();
+        }
+
+        function toggleNavLayout() {
+            var current = getNavLayout();
+            setNavLayout(current === 'horizontal' ? 'sidebar' : 'horizontal');
+        }
+
+        function updateNavLayoutUI() {
+            var isHorizontal = document.documentElement.classList.contains('nav-layout-horizontal');
+            var iconSidebar = document.getElementById('layoutIconSidebar');
+            var iconHorizontal = document.getElementById('layoutIconHorizontal');
+            var textElem = document.getElementById('layoutToggleText');
+            var choiceSidebar = document.getElementById('navChoiceSidebar');
+            var choiceHorizontal = document.getElementById('navChoiceHorizontal');
+
+            if (textElem) {
+                textElem.innerText = isHorizontal ? 'Top Nav' : 'Sidebar';
+            }
+            if (iconSidebar && iconHorizontal) {
+                if (isHorizontal) {
+                    iconSidebar.classList.add('hidden');
+                    iconHorizontal.classList.remove('hidden');
+                } else {
+                    iconSidebar.classList.remove('hidden');
+                    iconHorizontal.classList.add('hidden');
+                }
+            }
+            if (choiceSidebar && choiceHorizontal) {
+                if (isHorizontal) {
+                    choiceHorizontal.className = "px-2.5 py-1 rounded-md text-[10px] font-mono font-bold bg-emerald-600 text-white shadow-xs transition-all";
+                    choiceSidebar.className = "px-2.5 py-1 rounded-md text-[10px] font-mono font-bold text-slate-600 dark:text-stone-400 hover:text-slate-900 dark:hover:text-stone-200 transition-all";
+                } else {
+                    choiceSidebar.className = "px-2.5 py-1 rounded-md text-[10px] font-mono font-bold bg-emerald-600 text-white shadow-xs transition-all";
+                    choiceHorizontal.className = "px-2.5 py-1 rounded-md text-[10px] font-mono font-bold text-slate-600 dark:text-stone-400 hover:text-slate-900 dark:hover:text-stone-200 transition-all";
+                }
+            }
+        }
+
+        // Initialize UI State for Layout toggle on page load
+        updateNavLayoutUI();
+
+        // ---------------------------------------------------------------------
+        // SETTINGS & REQUESTS DROPDOWNS
+        // ---------------------------------------------------------------------
+        function toggleSettingsDropdown(event) {
+            event.stopPropagation();
+            var menu = document.getElementById('settingsDropdownMenu');
+            var chevron = document.getElementById('settingsChevron');
+            if (!menu) return;
+
+            var isHidden = menu.classList.contains('hidden');
+            // Close other dropdowns
+            closeAllDropdowns(menu);
+
+            if (isHidden) {
+                menu.classList.remove('hidden');
+                if (chevron) chevron.classList.add('rotate-180');
+            } else {
+                menu.classList.add('hidden');
+                if (chevron) chevron.classList.remove('rotate-180');
+            }
+        }
+
+        function toggleHorizontalRequestsDropdown(event) {
+            event.stopPropagation();
+            var menu = document.getElementById('horizontalRequestsDropdownMenu');
+            var chevron = document.getElementById('horizontalRequestsChevron');
+            if (!menu) return;
+
+            var isHidden = menu.classList.contains('hidden');
+            closeAllDropdowns(menu);
+
+            if (isHidden) {
+                menu.classList.remove('hidden');
+                if (chevron) chevron.classList.add('rotate-180');
+            } else {
+                menu.classList.add('hidden');
+                if (chevron) chevron.classList.remove('rotate-180');
+            }
+        }
+
+        function closeAllDropdowns(exceptMenu) {
+            document.querySelectorAll('.kebab-dropdown').forEach(m => {
+                if (m !== exceptMenu) m.classList.add('hidden');
+            });
+            var sMenu = document.getElementById('settingsDropdownMenu');
+            var sChevron = document.getElementById('settingsChevron');
+            if (sMenu && sMenu !== exceptMenu) {
+                sMenu.classList.add('hidden');
+                if (sChevron) sChevron.classList.remove('rotate-180');
+            }
+            var rMenu = document.getElementById('horizontalRequestsDropdownMenu');
+            var rChevron = document.getElementById('horizontalRequestsChevron');
+            if (rMenu && rMenu !== exceptMenu) {
+                rMenu.classList.add('hidden');
+                if (rChevron) rChevron.classList.remove('rotate-180');
+            }
+        }
+
+        // Sidebar Collapsible Settings Toggle
+        function toggleSidebarSettings() {
+            var menu = document.getElementById('sidebarSettingsMenu');
+            var chevron = document.getElementById('sidebarSettingsChevron');
+            if (!menu) return;
+            menu.classList.toggle('hidden');
+            if (chevron) chevron.classList.toggle('rotate-180');
+        }
+
+        function toggleKebabMenu(event, menuId) {
+            event.stopPropagation();
+            var menu = document.getElementById(menuId);
+            if (!menu) return;
+
+            closeAllDropdowns(menu);
+
+            var isOpening = menu.classList.contains('hidden');
+            menu.classList.toggle('hidden');
+
+            if (isOpening) {
+                var rect = menu.getBoundingClientRect();
+                var windowHeight = window.innerHeight || document.documentElement.clientHeight;
+
+                if (rect.bottom > windowHeight - 10) {
+                    menu.style.top = 'auto';
+                    menu.style.bottom = '100%';
+                    menu.style.marginTop = '0';
+                    menu.style.marginBottom = '0.5rem';
+                } else {
+                    menu.style.bottom = 'auto';
+                    menu.style.top = '100%';
+                    menu.style.marginTop = '0.5rem';
+                    menu.style.marginBottom = '0';
+                }
+            }
+        }
+
+        document.addEventListener('click', function (e) {
+            // Close kebab dropdowns
+            if (!e.target.closest('.kebab-dropdown') && !e.target.closest('button[onclick*="toggleKebabMenu"]')) {
+                document.querySelectorAll('.kebab-dropdown').forEach(function (m) {
+                    m.classList.add('hidden');
+                });
+            }
+
+            // Close settings dropdown if clicking outside
+            var sContainer = document.getElementById('settingsDropdownContainer');
+            if (sContainer && !sContainer.contains(e.target)) {
+                var sMenu = document.getElementById('settingsDropdownMenu');
+                var sChevron = document.getElementById('settingsChevron');
+                if (sMenu && !sMenu.classList.contains('hidden')) {
+                    sMenu.classList.add('hidden');
+                    if (sChevron) sChevron.classList.remove('rotate-180');
+                }
+            }
+
+            // Close horizontal requests dropdown if clicking outside
+            var rContainer = document.getElementById('horizontalRequestsDropdownContainer');
+            if (rContainer && !rContainer.contains(e.target)) {
+                var rMenu = document.getElementById('horizontalRequestsDropdownMenu');
+                var rChevron = document.getElementById('horizontalRequestsChevron');
+                if (rMenu && !rMenu.classList.contains('hidden')) {
+                    rMenu.classList.add('hidden');
+                    if (rChevron) rChevron.classList.remove('rotate-180');
+                }
+            }
+        });
+
+        // Mobile Sidebar Drawer Navigation
+        function toggleMobileSidebar() {
+            var sidebar = document.getElementById('appSidebar');
+            var backdrop = document.getElementById('mobileSidebarBackdrop');
+            if (!sidebar || !backdrop) return;
+            
+            var isOpen = sidebar.classList.contains('mobile-open');
+            if (isOpen) {
+                closeMobileSidebar();
+            } else {
+                sidebar.classList.add('mobile-open');
+                backdrop.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+            }
+        }
+
+        function closeMobileSidebar() {
+            var sidebar = document.getElementById('appSidebar');
+            var backdrop = document.getElementById('mobileSidebarBackdrop');
+            if (sidebar) sidebar.classList.remove('mobile-open');
+            if (backdrop) backdrop.classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === "Escape") {
+                closeAllDropdowns(null);
+                closeMobileSidebar();
+                closeTimelineModal();
+            }
+        });
+
+        // ---------------------------------------------------------------------
+        // UNIVERSAL TRANSACTION TIMELINE MODAL FUNCTIONS
+        // ---------------------------------------------------------------------
+        function openTimelineModal(requestId, trackingNumber) {
+            var modal = document.getElementById('universalTimelineModal');
+            var loading = document.getElementById('modalTimelineLoading');
+            var body = document.getElementById('modalTimelineBody');
+            var errorEl = document.getElementById('modalTimelineError');
+            var trackingEl = document.getElementById('modalTimelineTracking');
+            var typeBadge = document.getElementById('modalTimelineTypeBadge');
+            var statusBadge = document.getElementById('modalTimelineStatusBadge');
+            var fullPageLink = document.getElementById('modalTimelineFullPageLink');
+            var elapsedEl = document.getElementById('modalTimelineElapsed');
+
+            if (!modal) return;
+
+            modal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+            loading.classList.remove('hidden');
+            body.classList.add('hidden');
+            if (errorEl) errorEl.classList.add('hidden');
+
+            trackingEl.innerText = trackingNumber ? trackingNumber : 'Loading Transaction...';
+            typeBadge.innerText = 'Searching';
+            statusBadge.innerText = '';
+            statusBadge.className = 'hidden';
+
+            if (fullPageLink) {
+                fullPageLink.href = '/Workflow/Timeline?' + (trackingNumber ? 'trackingNumber=' + encodeURIComponent(trackingNumber) : 'id=' + encodeURIComponent(requestId || ''));
+            }
+
+            var params = new URLSearchParams();
+            if (requestId) params.append('id', requestId);
+            if (trackingNumber) params.append('trackingNumber', trackingNumber);
+
+            fetch('/Workflow/GetTransactionTimeline?' + params.toString())
+                .then(function (response) {
+                    if (!response.ok) throw new Error('Transaction record could not be found.');
+                    return response.json();
+                })
+                .then(function (res) {
+                    loading.classList.add('hidden');
+
+                    // CRUCIAL: Unpack timeline object from response
+                    var data = (res && (res.timeline || res.data)) ? (res.timeline || res.data) : res;
+
+                    if (!data || (!data.trackingNumber && !data.TrackingNumber)) {
+                        throw new Error('Transaction record details are unavailable.');
+                    }
+
+                    body.classList.remove('hidden');
+
+                    var trkNum = data.trackingNumber || data.TrackingNumber || 'Transaction';
+                    var reqType = data.displayType || data.DisplayType || data.requestType || data.RequestType || 'Request';
+                    var status = data.overallStatus || data.OverallStatus || 'Pending';
+
+                    trackingEl.innerText = trkNum;
+                    typeBadge.innerText = reqType;
+                    
+                    switch (status) {
+                        case 'Released':
+                            statusBadge.innerText = 'Released';
+                            statusBadge.className = 'px-2.5 py-0.5 rounded-lg text-[10px] font-black bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300';
+                            break;
+                        case 'Deferred':
+                            statusBadge.innerText = 'Deferred';
+                            statusBadge.className = 'px-2.5 py-0.5 rounded-lg text-[10px] font-black bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300';
+                            break;
+                        case 'For Approval':
+                            statusBadge.innerText = 'For Approval';
+                            statusBadge.className = 'px-2.5 py-0.5 rounded-lg text-[10px] font-black bg-purple-100 dark:bg-purple-500/20 text-purple-800 dark:text-purple-300';
+                            break;
+                        case 'On Going':
+                            statusBadge.innerText = 'On Going';
+                            statusBadge.className = 'px-2.5 py-0.5 rounded-lg text-[10px] font-black bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300';
+                            break;
+                        default: // 'Pending'
+                            statusBadge.innerText = 'Pending';
+                            statusBadge.className = 'px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300';
+                            break;
+                    }
+
+                    if (fullPageLink) {
+                        fullPageLink.href = '/Workflow/Timeline?trackingNumber=' + encodeURIComponent(trkNum);
+                    }
+                    if (elapsedEl) {
+                        var dateVal = data.dateSubmitted || data.DateSubmitted;
+                        var dateStr = dateVal ? new Date(dateVal).toLocaleString() : '';
+                        var elapsedStr = data.elapsedTimeText || data.ElapsedTimeText || 'N/A';
+                        elapsedEl.innerHTML = '<i data-lucide="clock" class="w-3.5 h-3.5 text-indigo-500"></i><span>Elapsed: <strong>' + elapsedStr + '</strong> (Filed ' + dateStr + ')</span>';
+                    }
+
+                    renderTimelineModalData(data);
+                    if (window.lucide) lucide.createIcons();
+                })
+                .catch(function (err) {
+                    loading.classList.add('hidden');
+                    if (errorEl) {
+                        errorEl.classList.remove('hidden');
+                        var msgSpan = errorEl.querySelector('.err-msg');
+                        if (msgSpan) msgSpan.innerText = err.message || 'Unable to locate transaction history.';
+                    }
+                    if (window.lucide) lucide.createIcons();
+                });
+        }
+
+        function closeTimelineModal() {
+            var modal = document.getElementById('universalTimelineModal');
+            if (modal) {
+                modal.classList.add('hidden');
+                document.body.style.overflow = '';
+            }
+        }
+
+        function handleTimelineModalBackdrop(event) {
+            if (event.target && event.target.id === 'universalTimelineModal') {
+                closeTimelineModal();
+            }
+        }
+
+        function printTimelineFromModal() {
+            var fullPageLink = document.getElementById('modalTimelineFullPageLink');
+            if (fullPageLink && fullPageLink.href && fullPageLink.href !== '#') {
+                window.open(fullPageLink.href + '&autoPrint=true', '_blank');
+            } else {
+                window.print();
+            }
+        }
+
+        function renderTimelineModalData(data) {
+            var body = document.getElementById('modalTimelineBody');
+            if (!body) return;
+
+            var html = '';
+
+            var overallStatus = data.overallStatus || data.OverallStatus || 'Pending';
+            var isClaimed = data.isClaimed || data.IsClaimed || false;
+            var assignedUserName = data.assignedUserName || data.AssignedUserName;
+            var assignedRole = data.assignedToRole || data.AssignedToRole || 'Processor';
+            var stageName = data.currentStageName || data.CurrentStageName || '';
+            var locationDesc = data.currentLocationDescription || data.CurrentLocationDescription || stageName || 'Current Station';
+            var divisionName = data.divisionName || data.DivisionName || '';
+            var owner = data.ownerOrApplicant || data.OwnerOrApplicant || 'N/A';
+            var orNumber = data.orNumber || data.ORNumber;
+            var orDateIssued = data.orDateIssued || data.ORDateIssued;
+            var dateSubmitted = data.dateSubmitted || data.DateSubmitted;
+            var steps = data.workflowSteps || data.WorkflowSteps || [];
+            var events = data.timelineEvents || data.TimelineEvents || [];
+
+            // 1. Live Current Location Card
+            var handlerStatusHtml = '';
+            if (overallStatus === 'Released') {
+                handlerStatusHtml = '<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-bold text-xs"><i data-lucide="check-check" class="w-4 h-4"></i><span>Released & Officially Issued</span></div>';
+            } else if (overallStatus === 'Deferred') {
+                handlerStatusHtml = '<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 font-bold text-xs"><i data-lucide="rotate-ccw" class="w-4 h-4"></i><span>Deferred &bull; Returned for Revision</span></div>';
+            } else if (overallStatus === 'For Approval') {
+                handlerStatusHtml = '<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-purple-100 dark:bg-purple-500/20 text-purple-800 dark:text-purple-300 font-bold text-xs"><i data-lucide="shield-alert" class="w-4 h-4"></i><span>For Approval &bull; Signatory Review</span></div>';
+            } else if (overallStatus === 'On Going' || (isClaimed && assignedUserName)) {
+                handlerStatusHtml = '<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300 font-bold text-xs"><i data-lucide="user-check" class="w-4 h-4"></i><span>Claimed by <strong>' + escapeHtml(assignedUserName || 'Staff') + '</strong> (' + escapeHtml(assignedRole) + ')</span></div>';
+            } else {
+                handlerStatusHtml = '<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold text-xs"><i data-lucide="clock" class="w-4 h-4"></i><span>Pending &bull; In <strong>' + escapeHtml(stageName) + '</strong> Pool</span></div>';
+            }
+
+            html += '<div class="p-5 rounded-2xl bg-gradient-to-r from-indigo-50/70 via-blue-50/50 to-slate-50 dark:from-indigo-950/30 dark:via-blue-950/20 dark:to-stone-900 border border-indigo-200/80 dark:border-indigo-800/60 shadow-xs space-y-3">' +
+                '<div class="flex items-center justify-between flex-wrap gap-2">' +
+                    '<div class="flex items-center gap-2">' +
+                        '<span class="relative flex h-3 w-3">' +
+                            '<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>' +
+                            '<span class="relative inline-flex rounded-full h-3 w-3 bg-indigo-600"></span>' +
+                        '</span>' +
+                        '<span class="text-[11px] font-black uppercase tracking-wider text-indigo-700 dark:text-indigo-400">Live Current Location & Station</span>' +
+                    '</div>' +
+                    '<span class="px-2.5 py-0.5 rounded-lg bg-indigo-100 dark:bg-indigo-500/20 text-indigo-800 dark:text-indigo-300 font-bold text-[10px]">' + escapeHtml(divisionName) + '</span>' +
+                '</div>' +
+                '<div class="flex flex-col md:flex-row md:items-center justify-between gap-3">' +
+                    '<div>' +
+                        '<h3 class="text-lg font-black text-slate-900 dark:text-white tracking-tight">' + escapeHtml(stageName) + '</h3>' +
+                        '<p class="text-slate-500 dark:text-stone-400 text-xs">Assigned Responsibility: <strong>' + escapeHtml(assignedRole) + '</strong></p>' +
+                        '<p class="text-slate-600 dark:text-stone-300 text-[11px] font-medium mt-0.5">' + escapeHtml(locationDesc) + '</p>' +
+                    '</div>' +
+                    '<div>' + handlerStatusHtml + '</div>' +
+                '</div>' +
+            '</div>';
+
+            // 2. Stepper Progress Bar
+            if (steps && steps.length > 0) {
+                html += '<div class="space-y-3">' +
+                    '<div class="flex items-center justify-between">' +
+                        '<h4 class="font-extrabold text-slate-900 dark:text-white text-xs uppercase tracking-wider flex items-center gap-1.5">' +
+                            '<i data-lucide="git-commit" class="w-4 h-4 text-indigo-600"></i>' +
+                            '<span>Sequential Processing Stepper</span>' +
+                        '</h4>' +
+                        '<span class="text-[10px] text-slate-400 dark:text-stone-500 font-bold">' + steps.length + ' Stages</span>' +
+                    '</div>' +
+                    '<div class="p-4 rounded-2xl bg-slate-50 dark:bg-stone-950/60 border border-slate-200 dark:border-stone-800 overflow-x-auto">' +
+                        '<div class="flex items-center min-w-max gap-4 px-2 py-3">';
+
+                for (var i = 0; i < steps.length; i++) {
+                    var s = steps[i];
+                    var sState = s.state || s.State || 'pending';
+                    var isCompleted = sState === 'completed' || sState === 1;
+                    var isCurrent = sState === 'current' || sState === 2;
+                    var isDef = sState === 'deferred';
+                    var isAppr = sState === 'approval' || s.isApproval || s.IsApproval;
+
+                    var circleClass = isCompleted 
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : (isAppr ? 'bg-purple-600 text-white ring-4 ring-purple-500/30'
+                        : (isDef ? 'bg-amber-600 text-white ring-4 ring-amber-500/30'
+                        : (isCurrent ? 'bg-indigo-600 text-white ring-4 ring-indigo-500/30 animate-pulse' : 'bg-slate-200 dark:bg-stone-800 text-slate-500 dark:text-stone-400')));
+
+                    var labelColor = isCompleted
+                        ? 'text-emerald-700 dark:text-emerald-400 font-bold'
+                        : (isAppr ? 'text-purple-700 dark:text-purple-400 font-black'
+                        : (isDef ? 'text-amber-700 dark:text-amber-400 font-black'
+                        : (isCurrent ? 'text-indigo-700 dark:text-indigo-400 font-black' : 'text-slate-400 dark:text-stone-500')));
+
+                    var iconContent = isCompleted
+                        ? '<i data-lucide="check" class="w-4 h-4"></i>'
+                        : (isAppr && isCurrent ? '<i data-lucide="shield-alert" class="w-4 h-4"></i>'
+                        : (isDef ? '<i data-lucide="rotate-ccw" class="w-4 h-4"></i>'
+                        : (isCurrent ? '<i data-lucide="map-pin" class="w-4 h-4"></i>' : (s.stepId || s.StepId || (i + 1)))));
+
+                    var sName = s.stepName || s.StepName || '';
+                    var sRole = s.assignedRole || s.AssignedRole || '';
+                    var isStepApproval = s.isApproval || s.IsApproval || false;
+
+                    html += '<div class="flex items-center gap-3">' +
+                        '<div class="flex flex-col items-center text-center w-28 space-y-1.5">' +
+                            '<div class="w-8 h-8 rounded-full ' + circleClass + ' flex items-center justify-center font-black text-xs shrink-0">' +
+                                iconContent +
+                            '</div>' +
+                            '<div class="text-[11px] font-bold ' + labelColor + ' line-clamp-2 leading-tight">' + escapeHtml(sName) + '</div>' +
+                            '<div class="text-[9px] text-slate-400 dark:text-stone-500 font-medium truncate max-w-[100px]">' + escapeHtml(sRole) + '</div>' +
+                            (isStepApproval ? '<span class="px-1.5 py-0.2 rounded text-[8px] font-black bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300">Approval Gate</span>' : '') +
+                        '</div>';
+
+                    if (i < steps.length - 1) {
+                        var lineClass = isCompleted ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-stone-800';
+                        html += '<div class="w-8 h-0.5 ' + lineClass + ' -mt-6"></div>';
+                    }
+
+                    html += '</div>';
+                }
+
+                html += '</div></div></div>';
+            }
+
+            // 3. Metadata Info Grid (Reference / PIN field removed as requested)
+            var orBadge = orNumber 
+                ? '<span class="font-extrabold text-emerald-700 dark:text-emerald-400">#' + escapeHtml(orNumber) + '</span>' + (orDateIssued ? ' (' + escapeHtml(String(orDateIssued).substring(0, 10)) + ')' : '')
+                : '<span class="text-amber-600 dark:text-amber-400 font-bold">Pending Receipt</span>';
+
+            html += '<div class="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 rounded-2xl bg-slate-50 dark:bg-stone-950/60 border border-slate-200 dark:border-stone-800 text-[11px]">' +
+                '<div>' +
+                    '<div class="text-slate-400 dark:text-stone-500 font-bold uppercase text-[9px]">Owner / Applicant</div>' +
+                    '<div class="font-extrabold text-slate-900 dark:text-white truncate" title="' + escapeHtml(owner) + '">' + escapeHtml(owner) + '</div>' +
+                '</div>' +
+                '<div>' +
+                    '<div class="text-slate-400 dark:text-stone-500 font-bold uppercase text-[9px]">Official Receipt (O.R.)</div>' +
+                    '<div>' + orBadge + '</div>' +
+                '</div>' +
+                '<div>' +
+                    '<div class="text-slate-400 dark:text-stone-500 font-bold uppercase text-[9px]">Date Intake / Filed</div>' +
+                    '<div class="font-bold text-slate-900 dark:text-white">' + (dateSubmitted ? new Date(dateSubmitted).toLocaleDateString() : 'N/A') + '</div>' +
+                '</div>' +
+            '</div>';
+
+            // 4. Chronological Routing Activity Log
+            html += '<div class="space-y-3">' +
+                '<h4 class="font-extrabold text-slate-900 dark:text-white text-xs uppercase tracking-wider flex items-center gap-1.5">' +
+                    '<i data-lucide="history" class="w-4 h-4 text-indigo-600"></i>' +
+                    '<span>Chronological Routing History</span>' +
+                '</h4>';
+
+            if (!events || events.length === 0) {
+                html += '<div class="p-6 text-center text-slate-400 dark:text-stone-500 bg-slate-50 dark:bg-stone-950/60 rounded-2xl border border-slate-200 dark:border-stone-800 italic">No routing activity logged yet. Transaction is in initial intake station.</div>';
+            } else {
+                html += '<div class="relative pl-6 space-y-4 border-l-2 border-indigo-200 dark:border-indigo-900/60 ml-3">';
+
+                for (var j = 0; j < events.length; j++) {
+                    var ev = events[j];
+                    var evTs = ev.timestamp || ev.Timestamp;
+                    var evDate = evTs ? new Date(evTs).toLocaleString() : '';
+                    var fromName = ev.fromStageName || ev.FromStageName || 'Start';
+                    var toName = ev.toStageName || ev.ToStageName || 'Next';
+                    var actTaken = ev.actionTaken || ev.ActionTaken || 'Forwarded';
+                    var fwdBy = ev.forwardedByName || ev.ForwardedByName || 'Staff';
+                    var targetRole = ev.assignedToRole || ev.AssignedToRole;
+                    var handlerUser = ev.assignedUserName || ev.AssignedUserName;
+                    var evOr = ev.orNumber || ev.ORNumber;
+                    var evOrDate = ev.orDateIssued || ev.ORDateIssued;
+                    var evRemarks = ev.remarks || ev.Remarks;
+
+                    html += '<div class="relative group">' +
+                        '<div class="absolute -left-[31px] top-1.5 w-4 h-4 rounded-full bg-white dark:bg-stone-900 border-2 border-indigo-600 flex items-center justify-center">' +
+                            '<div class="w-1.5 h-1.5 rounded-full bg-indigo-600"></div>' +
+                        '</div>' +
+                        '<div class="p-4 rounded-2xl bg-white dark:bg-stone-900/90 border border-slate-200 dark:border-stone-800 shadow-xs space-y-2">' +
+                            '<div class="flex items-center justify-between flex-wrap gap-2">' +
+                                '<div class="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 text-xs">' +
+                                    '<span>' + escapeHtml(fromName) + '</span>' +
+                                    '<i data-lucide="arrow-right" class="w-3.5 h-3.5 text-indigo-500"></i>' +
+                                    '<span class="text-indigo-600 dark:text-indigo-400 font-black">' + escapeHtml(toName) + '</span>' +
+                                '</div>' +
+                                '<span class="text-[10px] text-slate-400 dark:text-stone-500">' + evDate + '</span>' +
+                            '</div>' +
+                            '<div class="text-[11px] text-slate-600 dark:text-stone-300 flex items-center gap-2 flex-wrap">' +
+                                '<span>Action: <strong>' + escapeHtml(actTaken) + '</strong></span>' +
+                                '<span>•</span>' +
+                                '<span>By: <strong>' + escapeHtml(fwdBy) + '</strong></span>' +
+                                (targetRole ? '<span>•</span><span>Target: <strong>' + escapeHtml(targetRole) + '</strong></span>' : '') +
+                                (handlerUser ? '<span>•</span><span class="text-blue-600 dark:text-blue-400 font-bold">Claimed: ' + escapeHtml(handlerUser) + '</span>' : '') +
+                            '</div>';
+
+                    if (evOr) {
+                        html += '<div class="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-1">' +
+                            '<i data-lucide="receipt" class="w-3 h-3"></i>' +
+                            '<span>O.R. #' + escapeHtml(evOr) + ' (Issued: ' + escapeHtml(evOrDate ? String(evOrDate).substring(0, 10) : 'N/A') + ')</span>' +
+                        '</div>';
+                    }
+
+                    if (evRemarks) {
+                        html += '<div class="p-2.5 rounded-xl bg-slate-50 dark:bg-stone-950/70 border border-slate-200 dark:border-stone-800 text-[11px] text-slate-700 dark:text-stone-300 italic">' +
+                            '"' + escapeHtml(evRemarks) + '"' +
+                        '</div>';
+                    }
+
+                    html += '</div></div>';
+                }
+
+                html += '</div>';
+            }
+
+            html += '</div>';
+
+            body.innerHTML = html;
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return String(text)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function updateToggleBtnText() {
+            var isDark = document.documentElement.classList.contains('dark');
+            var textElem = document.getElementById('themeToggleText');
+            if (textElem) {
+                textElem.innerText = isDark ? 'Light' : 'Dark';
+            }
+            var statusElem = document.getElementById('themeStatusText');
+            if (statusElem) {
+                statusElem.innerText = isDark ? 'Dark Mode (Active)' : 'Light Mode (Active)';
+            }
+            var badgeElem = document.getElementById('themeBadge');
+            if (badgeElem) {
+                badgeElem.innerText = isDark ? 'Dark' : 'Light';
+            }
+            if (window.lucide) {
+                lucide.createIcons();
+            }
+        }
+
+        function toggleTheme() {
+            if (document.documentElement.classList.contains('dark')) {
+                document.documentElement.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+            } else {
+                document.documentElement.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
+            }
+            updateToggleBtnText();
+        }
+
+        updateToggleBtnText();
+    </script>
+</body>
+</html>

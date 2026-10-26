@@ -1,0 +1,1134 @@
+@model List<PropertyAssessmentApp.Models.WorkflowSequence>
+@using PropertyAssessmentApp.Models
+@{
+    ViewData["Title"] = "Transaction Workflow Manager";
+    var transactionTypes = ViewBag.TransactionTypes as List<SelectListItem> ?? new List<SelectListItem>();
+    var allStatuses = ViewBag.AllStatuses as List<TransactionStatus> ?? new List<TransactionStatus>();
+}
+
+@functions {
+    private static readonly Dictionary<string, string> StatusNameMap = new(StringComparer.OrdinalIgnoreCase)
+    {
+        { "checkAndReview", "Check and Review" },
+        { "Reploting", "Replotting" },
+        { "RecommendingAndApproved", "Recommending Approval" },
+        { "ValuationAndExamination", "Valuation & Examination" },
+        { "Verify", "Verification" },
+        { "Release", "Releasing" }
+    };
+
+    public static string FormatStatusName(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "";
+        if (StatusNameMap.TryGetValue(name, out var clean)) return clean;
+        return System.Text.RegularExpressions.Regex.Replace(name, "([a-z])([A-Z])", "$1 $2").Trim();
+    }
+}
+
+<style>
+    /* ========================================================= */
+    /* DIRECTED WORKFLOW GRAPH & SVG ARROW ENGINE (CAST SPEC)    */
+    /* ========================================================= */
+    :root {
+        --wf-primary: #006766;
+        --wf-primary-dark: #004d4d;
+        --wf-border: #cbd5e1;
+        --wf-card-bg: #ffffff;
+        --wf-accent-gold: #f59e0b;
+        --wf-accent-green: #10b981;
+        --wf-accent-blue: #2563eb;
+        --wf-arrow-color: #006766;
+    }
+
+    .orgchart-canvas-wrapper {
+        background: #f8fafc;
+        background-image: 
+            linear-gradient(to right, rgba(203, 213, 225, 0.45) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(203, 213, 225, 0.45) 1px, transparent 1px);
+        background-size: 24px 24px;
+        border: 1px solid #cbd5e1;
+        border-radius: 16px;
+        min-height: 600px;
+        position: relative;
+        overflow: auto;
+        padding: 3.5rem 2rem;
+    }
+
+    .dark .orgchart-canvas-wrapper {
+        background: #0c0a09;
+        background-image: 
+            linear-gradient(to right, rgba(41, 37, 36, 0.8) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(41, 37, 36, 0.8) 1px, transparent 1px);
+        border-color: #292524;
+    }
+
+    .orgchart-zoom-container {
+        transform-origin: top center;
+        transition: transform 0.2s ease-out;
+        width: 100%;
+        position: relative;
+        min-width: max-content;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    /* SVG Overlay for Directional Curved Bezier Arrows */
+    .wf-svg-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 1;
+    }
+
+    .wf-arrow-path {
+        fill: none;
+        stroke: var(--wf-arrow-color);
+        stroke-width: 2.5px;
+        stroke-linecap: round;
+        transition: stroke 0.2s ease, stroke-width 0.2s ease;
+    }
+
+    .dark .wf-arrow-path {
+        stroke: #14b8a6;
+    }
+
+    .wf-arrow-path.highlighted {
+        stroke: var(--wf-accent-blue) !important;
+        stroke-width: 3.5px !important;
+        filter: drop-shadow(0 2px 4px rgba(37, 99, 235, 0.4));
+    }
+
+    /* Graph Tier Rows */
+    .graph-levels-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 5rem;
+        position: relative;
+        z-index: 2;
+        width: 100%;
+    }
+
+    .graph-tier-row {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 3rem;
+        position: relative;
+        width: 100%;
+    }
+
+    .tier-badge-label {
+        position: absolute;
+        left: 0;
+        font-size: 0.7rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        color: #94a3b8;
+        letter-spacing: 0.5px;
+        background: #f1f5f9;
+        padding: 0.25rem 0.65rem;
+        border-radius: 6px;
+        border: 1px solid #e2e8f0;
+    }
+
+    .dark .tier-badge-label {
+        background: #1c1917;
+        color: #78716c;
+        border-color: #292524;
+    }
+
+    /* Org Graph Node Card matching User Uploaded Image */
+    .org-node-card {
+        background: #ffffff;
+        border: 1.5px solid #cbd5e1;
+        border-radius: 14px;
+        padding: 0.9rem 1.2rem;
+        width: 230px;
+        min-width: 230px;
+        max-width: 250px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        cursor: pointer;
+        position: relative;
+        z-index: 3;
+    }
+
+    .dark .org-node-card {
+        background: #1c1917;
+        border-color: #292524;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    }
+
+    .org-node-card:hover {
+        transform: translateY(-3px) scale(1.02);
+        box-shadow: 0 10px 24px rgba(0, 103, 102, 0.18);
+        border-color: var(--wf-primary);
+    }
+
+    .dark .org-node-card:hover {
+        border-color: #14b8a6;
+    }
+
+    .org-node-card.node-start {
+        border-top: 5px solid var(--wf-accent-blue);
+    }
+
+    .org-node-card.node-approval {
+        border: 2px solid var(--wf-accent-gold);
+        border-top: 5px solid var(--wf-accent-gold);
+        box-shadow: 0 6px 16px rgba(245, 158, 11, 0.16);
+    }
+
+    .org-node-card.node-terminal {
+        border-top: 5px solid var(--wf-accent-green);
+        background: #f0fdf4;
+    }
+
+    .dark .org-node-card.node-terminal {
+        background: #052e16;
+    }
+
+    /* Port Connectors (Anchor dots on card boundary) */
+    .node-port-top {
+        position: absolute;
+        top: -6px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 10px;
+        height: 10px;
+        background: var(--wf-primary);
+        border: 2px solid #ffffff;
+        border-radius: 50%;
+        z-index: 4;
+    }
+
+    .dark .node-port-top {
+        background: #14b8a6;
+        border-color: #1c1917;
+    }
+
+    .node-port-bottom {
+        position: absolute;
+        bottom: -6px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 10px;
+        height: 10px;
+        background: var(--wf-primary);
+        border: 2px solid #ffffff;
+        border-radius: 50%;
+        z-index: 4;
+    }
+
+    .dark .node-port-bottom {
+        background: #14b8a6;
+        border-color: #1c1917;
+    }
+
+    .node-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.45rem;
+    }
+
+    .node-step-tag {
+        font-size: 0.68rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #334155;
+        background: #f1f5f9;
+        padding: 0.2rem 0.5rem;
+        border-radius: 5px;
+    }
+
+    .dark .node-step-tag {
+        color: #e2e8f0;
+        background: #292524;
+    }
+
+    .node-div-tag {
+        font-size: 0.65rem;
+        font-weight: 800;
+        padding: 0.2rem 0.5rem;
+        border-radius: 5px;
+        text-transform: uppercase;
+        background: #e0f2fe;
+        color: #0369a1;
+    }
+
+    .dark .node-div-tag {
+        background: #082f49;
+        color: #38bdf8;
+    }
+
+    .node-title {
+        font-weight: 800;
+        font-size: 0.95rem;
+        color: #0f172a;
+        margin-bottom: 0.4rem;
+        line-height: 1.25;
+    }
+
+    .dark .node-title {
+        color: #ffffff;
+    }
+
+    .node-footer {
+        font-size: 0.72rem;
+        color: #64748b;
+        border-top: 1px dashed #cbd5e1;
+        padding-top: 0.4rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .dark .node-footer {
+        color: #a8a29e;
+        border-color: #292524;
+    }
+
+    /* Floating Canvas Controls */
+    .chart-controls {
+        position: absolute;
+        bottom: 1.5rem;
+        right: 1.5rem;
+        display: flex;
+        gap: 0.4rem;
+        background: #ffffff;
+        padding: 0.35rem;
+        border-radius: 12px;
+        border: 1px solid #cbd5e1;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+        z-index: 10;
+    }
+
+    .dark .chart-controls {
+        background: #1c1917;
+        border-color: #292524;
+    }
+
+    .btn-ctrl {
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+        color: #475569;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .dark .btn-ctrl {
+        background: #292524;
+        border-color: #44403c;
+        color: #e2e8f0;
+    }
+
+    .btn-ctrl:hover {
+        background: #f1f5f9;
+        color: var(--wf-primary);
+    }
+</style>
+
+<div class="space-y-8 font-mono text-xs">
+    
+    <!-- Page Header -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <div class="inline-flex items-center gap-2 text-xs font-mono text-emerald-700 dark:text-emerald-400 font-bold mb-1">
+                <i data-lucide="git-pull-request" class="w-4 h-4"></i>
+                <span>CAST Workflow Engine & Stage Transition Pipeline</span>
+            </div>
+            <h1 class="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Transaction Workflow Manager</h1>
+            <p class="text-slate-500 dark:text-stone-400 text-sm">Multi-step routing, converging & diverging directed graph flow with allowed target step transitions.</p>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <a asp-action="Index" class="px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 hover:bg-slate-50 dark:hover:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold text-xs font-mono border border-slate-200 dark:border-stone-800 shadow-sm flex items-center gap-2">
+                <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                Back to Workflow Hub
+            </a>
+        </div>
+    </div>
+
+    <!-- Main Navigation Tabs (Only 2 Tabs: Flow Graph & Matrix) -->
+    <div class="flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
+        <button type="button" onclick="switchMainTab('diagram')" id="tabBtnDiagram" class="px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 bg-emerald-600 text-white shadow-sm transition-all">
+            <i data-lucide="git-branch" class="w-4 h-4"></i>
+            Visual Flow Graph
+        </button>
+        <button type="button" onclick="switchMainTab('matrix')" id="tabBtnMatrix" class="px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-400 hover:bg-slate-200 dark:hover:bg-stone-700 transition-all">
+            <i data-lucide="layers" class="w-4 h-4"></i>
+            Step Configuration & Branching Matrix
+        </button>
+    </div>
+
+    <!-- Header Controls & Transaction Selector -->
+    <div class="p-5 sm:p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm">
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+            <!-- Select Transaction Workflow -->
+            <div class="md:col-span-4">
+                <label class="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-stone-400 mb-1.5 flex items-center gap-1.5">
+                    <i data-lucide="filter" class="w-3.5 h-3.5 text-emerald-600"></i>
+                    Select Transaction Workflow:
+                </label>
+                <select id="transactionTypeSelector" onchange="loadWorkflowSequence()" class="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold text-xs focus:outline-none focus:border-emerald-600 cursor-pointer shadow-xs">
+                    @foreach (var type in transactionTypes)
+                    {
+                        <option value="@type.Value" selected="@(type.Value == "1" ? "selected" : null)">@type.Text</option>
+                    }
+                </select>
+            </div>
+
+            <!-- Add Origin Step / Status -->
+            <div class="md:col-span-5">
+                <label class="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-stone-400 mb-1.5 flex items-center gap-1.5">
+                    <i data-lucide="plus-circle" class="w-3.5 h-3.5 text-emerald-600"></i>
+                    Add Origin Step / Status:
+                </label>
+                <div class="flex items-center gap-2">
+                    <select id="newSourceStatus" class="flex-1 px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold text-xs focus:outline-none focus:border-emerald-600 cursor-pointer shadow-xs">
+                        <option value="" disabled selected>-- Select a Status --</option>
+                        @foreach (var status in allStatuses.OrderBy(s => s.TransactionStatusId))
+                        {
+                            <option value="@status.TransactionStatusId">
+                                @FormatStatusName(status.Name) @(status.DivisionId > 0 ? $"(Division {status.DivisionId})" : "")
+                            </option>
+                        }
+                    </select>
+                    <button type="button" onclick="addSourceStep()" class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-slate-800 dark:text-stone-200 font-extrabold text-xs flex items-center gap-1.5 shrink-0 transition-all border border-slate-200 dark:border-stone-700">
+                        <i data-lucide="plus" class="w-4 h-4"></i>
+                        Add Step
+                    </button>
+                </div>
+            </div>
+
+            <!-- Save Workflow Button -->
+            <div class="md:col-span-3 text-right">
+                <button type="button" onclick="saveWorkflow()" id="btnSaveWorkflow" class="w-full px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 transition-all">
+                    <i data-lucide="save" class="w-4 h-4"></i>
+                    <span>Save Workflow Sequence</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- TAB 1: VISUAL FLOW GRAPH (MATCHING USER UPLOADED DIAGRAM CANVAS)          -->
+    <!-- ========================================================================= -->
+    <div id="tabContentDiagram" class="space-y-4">
+        <div class="p-4 sm:p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-200 dark:border-stone-800 pb-3">
+                <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                    <h3 id="flowDiagramTitle" class="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider">
+                        Request for Inspection Flow Tree
+                    </h3>
+                </div>
+                <div class="flex items-center gap-4 text-[11px] text-slate-500">
+                    <span>Total Steps: <strong id="statOrgStepCount" class="text-emerald-600 font-bold">0</strong></span>
+                    <span>Allowed Transitions: <strong id="statOrgTransCount" class="text-blue-600 font-bold">0</strong></span>
+                    <span>Approval Gates: <strong id="statOrgApprovalCount" class="text-amber-600 font-bold">0</strong></span>
+                </div>
+            </div>
+
+            <!-- Canvas Wrapper with Grid Background & SVG Bezier Arrow Engine -->
+            <div class="orgchart-canvas-wrapper" id="orgchartCanvasWrapper">
+                <div class="orgchart-zoom-container" id="orgChartZoomContainer">
+                    
+                    <!-- SVG Overlay for Directional Curved Bezier Connectors -->
+                    <svg class="wf-svg-overlay" id="wfArrowSvg">
+                        <defs>
+                            <marker id="wf-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                                <path d="M 0 1 L 10 5 L 0 9 z" fill="#006766" />
+                            </marker>
+                            <marker id="wf-arrow-highlight" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                                <path d="M 0 1 L 10 5 L 0 9 z" fill="#2563eb" />
+                            </marker>
+                        </defs>
+                        <g id="svgArrowGroup"></g>
+                    </svg>
+
+                    <!-- Tiered Node Rows -->
+                    <div class="graph-levels-container" id="graphLevelsContainer">
+                        <!-- Dynamic Nodes generated via JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Floating Canvas Controls -->
+                <div class="chart-controls">
+                    <button type="button" class="btn-ctrl" onclick="zoomOrgChart(0.1)" title="Zoom In">
+                        <i data-lucide="zoom-in" class="w-4 h-4"></i>
+                    </button>
+                    <button type="button" class="btn-ctrl" onclick="zoomOrgChart(-0.1)" title="Zoom Out">
+                        <i data-lucide="zoom-out" class="w-4 h-4"></i>
+                    </button>
+                    <button type="button" class="btn-ctrl" onclick="resetZoomOrgChart()" title="Reset Zoom">
+                        <i data-lucide="maximize" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- TAB 2: STEP CONFIGURATION MATRIX (Allowed Target Steps Editor)            -->
+    <!-- ========================================================================= -->
+    <div id="tabContentMatrix" class="hidden space-y-4">
+        <!-- Workflow Empty State -->
+        <div id="emptyWorkflowState" class="p-12 text-center rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 hidden">
+            <i data-lucide="git-pull-request" class="w-12 h-12 text-slate-300 dark:text-stone-600 mx-auto mb-3"></i>
+            <h4 class="font-extrabold text-slate-700 dark:text-stone-300 text-sm">No Workflow Paths Configured</h4>
+            <p class="text-slate-400 text-xs mt-1">Select an origin status above and click 'Add Step' to start building this transaction sequence.</p>
+        </div>
+
+        <!-- Workflow Step Cards Container (Rendered dynamically via JS) -->
+        <div id="workflowCardsContainer" class="space-y-4">
+            <!-- Dynamic Step Cards with Allowed Target Steps -->
+        </div>
+    </div>
+
+</div>
+
+@section Scripts {
+<script>
+    // Embedded database data
+    const rawSequences = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model ?? new List<WorkflowSequence>()));
+    const allStatuses = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(allStatuses ?? new List<TransactionStatus>()));
+
+    let activeWorkflowModel = [];
+    let currentZoom = 1.0;
+
+    // Formatting helper to transform legacy/camelCase/PascalCase status codes into clean human-readable labels
+    function formatStatusName(name) {
+        if (!name) return "";
+        const cleanMap = {
+            "checkAndReview": "Check and Review",
+            "CheckAndReview": "Check and Review",
+            "Reploting": "Replotting",
+            "reploting": "Replotting",
+            "RecommendingAndApproved": "Recommending Approval",
+            "recommendingAndApproved": "Recommending Approval",
+            "ValuationAndExamination": "Valuation & Examination",
+            "valuationAndExamination": "Valuation & Examination",
+            "Verify": "Verification",
+            "verify": "Verification",
+            "Release": "Releasing",
+            "release": "Releasing"
+        };
+        if (cleanMap[name]) return cleanMap[name];
+        
+        return name
+            .replace(/([a-z])([A-Z])/g, '$1 $2')
+            .replace(/_/g, ' ')
+            .trim();
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+        loadWorkflowSequence();
+
+        window.addEventListener("resize", function () {
+            if (!document.getElementById('tabContentDiagram').classList.contains('hidden')) {
+                drawWorkflowArrows();
+            }
+        });
+    });
+
+    function switchMainTab(tab) {
+        document.getElementById('tabContentMatrix').classList.add('hidden');
+        document.getElementById('tabContentDiagram').classList.add('hidden');
+
+        document.getElementById('tabBtnMatrix').className = "px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-400 hover:bg-slate-200 dark:hover:bg-stone-700 transition-all";
+        document.getElementById('tabBtnDiagram').className = "px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-400 hover:bg-slate-200 dark:hover:bg-stone-700 transition-all";
+
+        if (tab === 'diagram') {
+            document.getElementById('tabContentDiagram').classList.remove('hidden');
+            document.getElementById('tabBtnDiagram').className = "px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 bg-emerald-600 text-white shadow-sm transition-all";
+            setTimeout(() => {
+                renderOrgChart();
+            }, 60);
+        } else if (tab === 'matrix') {
+            document.getElementById('tabContentMatrix').classList.remove('hidden');
+            document.getElementById('tabBtnMatrix').className = "px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 bg-emerald-600 text-white shadow-sm transition-all";
+        }
+
+        if (window.lucide) window.lucide.createIcons();
+    }
+
+    function loadWorkflowSequence() {
+        const typeSelector = document.getElementById("transactionTypeSelector");
+        const typeId = parseInt(typeSelector.value, 10);
+        const typeText = typeSelector.options[typeSelector.selectedIndex].text;
+        
+        document.getElementById('flowDiagramTitle').innerText = typeText + " Flow Tree";
+
+        activeWorkflowModel = [];
+
+        const typeSequences = rawSequences.filter(s => s.TransactionTypeId === typeId);
+
+        const groups = {};
+        const isApprovalMap = {};
+        typeSequences.forEach(seq => {
+            if (!groups[seq.CurrentStatusId]) {
+                groups[seq.CurrentStatusId] = [];
+            }
+            if (seq.NextStatusId !== null && seq.NextStatusId !== undefined) {
+                if (!groups[seq.CurrentStatusId].includes(seq.NextStatusId)) {
+                    groups[seq.CurrentStatusId].push(seq.NextStatusId);
+                }
+            }
+            if (seq.IsApproval) {
+                isApprovalMap[seq.CurrentStatusId] = true;
+            }
+        });
+
+        for (const sourceId in groups) {
+            const statusDetail = allStatuses.find(s => s.TransactionStatusId === parseInt(sourceId, 10));
+            if (statusDetail) {
+                activeWorkflowModel.push({
+                    SourceStatusId: parseInt(sourceId, 10),
+                    SourceName: formatStatusName(statusDetail.Name),
+                    SourceDivisionId: statusDetail.DivisionId,
+                    NextStatusIds: groups[sourceId],
+                    IsApproval: !!isApprovalMap[sourceId]
+                });
+            }
+        }
+
+        activeWorkflowModel.sort((a, b) => a.SourceStatusId - b.SourceStatusId);
+
+        renderWorkflowCards();
+        renderOrgChart();
+    }
+
+    // =========================================================
+    // DIRECTED GRAPH & CONVERGENT ARROWS RENDERER (IMAGE SPEC)
+    // =========================================================
+    function renderOrgChart() {
+        const container = document.getElementById("graphLevelsContainer");
+        const svgGroup = document.getElementById("svgArrowGroup");
+        if (!container || !svgGroup) return;
+
+        container.innerHTML = "";
+        svgGroup.innerHTML = "";
+
+        const stepCount = activeWorkflowModel.length;
+        let transCount = 0;
+        let approvalCount = 0;
+
+        activeWorkflowModel.forEach(step => {
+            transCount += step.NextStatusIds.length;
+            if (step.IsApproval) approvalCount++;
+        });
+
+        document.getElementById('statOrgStepCount').innerText = stepCount;
+        document.getElementById('statOrgTransCount').innerText = transCount;
+        document.getElementById('statOrgApprovalCount').innerText = approvalCount;
+
+        if (activeWorkflowModel.length === 0) {
+            container.innerHTML = `
+                <div class="text-center py-12 text-slate-400">
+                    <p class="font-bold">No steps configured for this workflow.</p>
+                </div>`;
+            return;
+        }
+
+        const tiers = computeTopologicalTiers(activeWorkflowModel);
+
+        tiers.forEach((tierNodes, tierIdx) => {
+            let rowHtml = `<div class="graph-tier-row" id="tierRow_${tierIdx}">`;
+            rowHtml += `<span class="tier-badge-label">Stage ${tierIdx + 1}</span>`;
+
+            tierNodes.forEach(step => {
+                const isStart = tierIdx === 0;
+                const isApproval = step.IsApproval;
+                const isTerminal = step.NextStatusIds.length === 0;
+
+                let cardClass = 'org-node-card';
+                if (isStart) cardClass += ' node-start';
+                if (isApproval) cardClass += ' node-approval';
+                if (isTerminal) cardClass += ' node-terminal';
+
+                const divText = step.SourceDivisionId > 0 ? `Division ${step.SourceDivisionId}` : 'Global';
+
+                let footerText = '';
+                if (isApproval) {
+                    footerText = '<span class="text-amber-600 font-extrabold flex items-center gap-1"><i data-lucide="shield-alert" class="w-3.5 h-3.5"></i> Approval Step</span>';
+                } else if (isTerminal) {
+                    footerText = '<span class="text-emerald-600 font-extrabold flex items-center gap-1"><i data-lucide="check-circle" class="w-3.5 h-3.5"></i> Final Release</span>';
+                } else {
+                    footerText = `<span>Forwards: <strong>${step.NextStatusIds.length} target(s)</strong></span>`;
+                }
+
+                rowHtml += `
+                    <div class="${cardClass}" id="nodeCard_${step.SourceStatusId}" onclick="jumpToMatrixStep(${step.SourceStatusId})" onmouseenter="highlightNodeConnections(${step.SourceStatusId})" onmouseleave="clearNodeHighlight()">
+                        <div class="node-port-top"></div>
+                        <div class="node-header">
+                            <span class="node-step-tag">STEP ${step.SourceStatusId}</span>
+                            <span class="node-div-tag">${divText}</span>
+                        </div>
+                        <div class="node-title">${formatStatusName(step.SourceName)}</div>
+                        <div class="node-footer">
+                            ${footerText}
+                        </div>
+                        ${!isTerminal ? '<div class="node-port-bottom"></div>' : ''}
+                    </div>
+                `;
+            });
+
+            rowHtml += `</div>`;
+            container.innerHTML += rowHtml;
+        });
+
+        if (window.lucide) window.lucide.createIcons();
+
+        setTimeout(() => {
+            drawWorkflowArrows();
+        }, 120);
+    }
+
+    // Topological Tiering algorithm with cycle prevention
+    function computeTopologicalTiers(model) {
+        if (!model || model.length === 0) return [];
+
+        const totalNodes = model.length;
+        const inDegree = {};
+        const adj = {};
+        const nodeMap = {};
+
+        model.forEach(step => {
+            nodeMap[step.SourceStatusId] = step;
+            inDegree[step.SourceStatusId] = 0;
+            adj[step.SourceStatusId] = step.NextStatusIds ? [...step.NextStatusIds] : [];
+        });
+
+        model.forEach(step => {
+            step.NextStatusIds.forEach(targetId => {
+                if (inDegree[targetId] !== undefined && targetId !== step.SourceStatusId) {
+                    inDegree[targetId]++;
+                }
+            });
+        });
+
+        const ranks = {};
+        const queue = [];
+
+        // Prioritize Receiving as root
+        const receivingStep = model.find(s => s.SourceName.toLowerCase().includes('receiving') || s.SourceStatusId === 1 || s.SourceStatusId === 15 || s.SourceStatusId === 25);
+        if (receivingStep) {
+            ranks[receivingStep.SourceStatusId] = 0;
+            queue.push(receivingStep.SourceStatusId);
+
+            model.forEach(step => {
+                if (step.SourceStatusId !== receivingStep.SourceStatusId && inDegree[step.SourceStatusId] === 0) {
+                    if (ranks[step.SourceStatusId] === undefined) {
+                        ranks[step.SourceStatusId] = 0;
+                        queue.push(step.SourceStatusId);
+                    }
+                }
+            });
+        } else {
+            model.forEach(step => {
+                if (inDegree[step.SourceStatusId] === 0) {
+                    ranks[step.SourceStatusId] = 0;
+                    queue.push(step.SourceStatusId);
+                }
+            });
+        }
+
+        if (queue.length === 0 && model.length > 0) {
+            ranks[model[0].SourceStatusId] = 0;
+            queue.push(model[0].SourceStatusId);
+        }
+
+        const visitCount = {};
+        let iterations = 0;
+        const maxIterations = totalNodes * totalNodes * 2 + 100;
+
+        while (queue.length > 0 && iterations < maxIterations) {
+            iterations++;
+            const currId = queue.shift();
+            const currRank = ranks[currId] || 0;
+
+            const targets = adj[currId] || [];
+            targets.forEach(targetId => {
+                if (targetId === currId) return;
+                if (!nodeMap[targetId]) return;
+
+                const nextRank = currRank + 1;
+                if (nextRank < totalNodes) {
+                    visitCount[targetId] = (visitCount[targetId] || 0) + 1;
+                    if (visitCount[targetId] <= totalNodes && (ranks[targetId] === undefined || nextRank > ranks[targetId])) {
+                        ranks[targetId] = nextRank;
+                        queue.push(targetId);
+                    }
+                }
+            });
+        }
+
+        model.forEach(step => {
+            if (ranks[step.SourceStatusId] === undefined || isNaN(ranks[step.SourceStatusId])) {
+                ranks[step.SourceStatusId] = 0;
+            }
+        });
+
+        const rankValues = Object.values(ranks);
+        const maxTier = rankValues.length > 0 ? Math.max(...rankValues, 0) : 0;
+        const tiers = [];
+        for (let i = 0; i <= maxTier; i++) {
+            tiers.push([]);
+        }
+
+        model.forEach(step => {
+            const rank = Math.min(Math.max(ranks[step.SourceStatusId] || 0, 0), maxTier);
+            tiers[rank].push(step);
+        });
+
+        return tiers.filter(t => t && t.length > 0);
+    }
+
+    // Dynamic SVG Bezier Curved Arrow Drawer
+    function drawWorkflowArrows() {
+        const svgGroup = document.getElementById("svgArrowGroup");
+        const zoomContainer = document.getElementById("orgChartZoomContainer");
+        if (!svgGroup || !zoomContainer) return;
+
+        svgGroup.innerHTML = "";
+
+        if (activeWorkflowModel.length === 0) return;
+
+        const containerRect = zoomContainer.getBoundingClientRect();
+        if (!containerRect) return;
+
+        activeWorkflowModel.forEach(step => {
+            const sourceCard = document.getElementById(`nodeCard_${step.SourceStatusId}`);
+            if (!sourceCard) return;
+
+            const sourceRect = sourceCard.getBoundingClientRect();
+            const sourceWidth = sourceCard.offsetWidth || 230;
+            const sourceHeight = sourceCard.offsetHeight || 100;
+
+            // Start point: Center-Bottom anchor dot of source card
+            const x1 = (sourceRect.left - containerRect.left) / currentZoom + sourceWidth / 2;
+            const y1 = (sourceRect.top - containerRect.top) / currentZoom + sourceHeight;
+
+            step.NextStatusIds.forEach(targetId => {
+                const targetCard = document.getElementById(`nodeCard_${targetId}`);
+                if (!targetCard) return;
+
+                const targetRect = targetCard.getBoundingClientRect();
+                const targetWidth = targetCard.offsetWidth || 230;
+
+                // End point: Center-Top anchor dot of target card
+                const x2 = (targetRect.left - containerRect.left) / currentZoom + targetWidth / 2;
+                const y2 = (targetRect.top - containerRect.top) / currentZoom;
+
+                if (isNaN(x1) || isNaN(y1) || isNaN(x2) || isNaN(y2)) return;
+
+                // Cubic Bezier Spline
+                const controlDelta = Math.max(Math.abs(y2 - y1) * 0.5, 30);
+                const pathD = `M ${x1} ${y1} C ${x1} ${y1 + controlDelta}, ${x2} ${y2 - controlDelta}, ${x2} ${y2 - 6}`;
+
+                const pathEl = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                pathEl.setAttribute("d", pathD);
+                pathEl.setAttribute("class", "wf-arrow-path");
+                pathEl.setAttribute("id", `arrow_${step.SourceStatusId}_${targetId}`);
+                pathEl.setAttribute("data-source", step.SourceStatusId);
+                pathEl.setAttribute("data-target", targetId);
+                pathEl.setAttribute("marker-end", "url(#wf-arrow)");
+
+                svgGroup.appendChild(pathEl);
+            });
+        });
+    }
+
+    function highlightNodeConnections(statusId) {
+        document.querySelectorAll(`.wf-arrow-path[data-source='${statusId}'], .wf-arrow-path[data-target='${statusId}']`).forEach(p => {
+            p.classList.add('highlighted');
+            p.setAttribute("marker-end", "url(#wf-arrow-highlight)");
+        });
+    }
+
+    function clearNodeHighlight() {
+        document.querySelectorAll('.wf-arrow-path').forEach(p => {
+            p.classList.remove('highlighted');
+            p.setAttribute("marker-end", "url(#wf-arrow)");
+        });
+    }
+
+    function jumpToMatrixStep(sourceId) {
+        switchMainTab('matrix');
+        setTimeout(() => {
+            const card = document.getElementById(`stepCard_${sourceId}`);
+            if (card) {
+                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                card.classList.add('ring-2', 'ring-emerald-500');
+                setTimeout(() => {
+                    card.classList.remove('ring-2', 'ring-emerald-500');
+                }, 1500);
+            }
+        }, 100);
+    }
+
+    // Zoom Controls
+    function zoomOrgChart(delta) {
+        currentZoom = Math.min(Math.max(0.4, currentZoom + delta), 1.8);
+        document.getElementById('orgChartZoomContainer').style.transform = `scale(${currentZoom})`;
+        drawWorkflowArrows();
+    }
+
+    function resetZoomOrgChart() {
+        currentZoom = 1.0;
+        document.getElementById('orgChartZoomContainer').style.transform = 'scale(1)';
+        drawWorkflowArrows();
+    }
+
+    // =========================================================
+    // STEP CONFIGURATION MATRIX EDITOR (Allowed Target Steps)
+    // =========================================================
+    function renderWorkflowCards() {
+        const container = document.getElementById("workflowCardsContainer");
+        const emptyState = document.getElementById("emptyWorkflowState");
+
+        container.innerHTML = "";
+
+        if (activeWorkflowModel.length === 0) {
+            emptyState.classList.remove("hidden");
+            return;
+        }
+        emptyState.classList.add("hidden");
+
+        let html = '';
+
+        activeWorkflowModel.forEach((step, index) => {
+            // Badges for Allowed Target Steps (Transfer to)
+            let transitionBadgesHtml = '';
+            if (step.NextStatusIds.length === 0) {
+                transitionBadgesHtml = `
+                    <div class="px-3 py-2 rounded-xl bg-slate-50 dark:bg-stone-950 text-slate-400 dark:text-stone-500 text-[11px] font-bold border border-dashed border-slate-200 dark:border-stone-800 flex items-center gap-1.5">
+                        <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-500"></i>
+                        <span>Final Step / Releasing (No next transitions configured)</span>
+                    </div>`;
+            } else {
+                step.NextStatusIds.forEach(nextId => {
+                    const nextStatusDetail = allStatuses.find(s => s.TransactionStatusId === nextId);
+                    const rawName = nextStatusDetail ? nextStatusDetail.Name : `Status ${nextId}`;
+                    const name = formatStatusName(rawName);
+                    const divLabel = (nextStatusDetail && nextStatusDetail.DivisionId > 0) ? ` (Div ${nextStatusDetail.DivisionId})` : '';
+                    transitionBadgesHtml += `
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-extrabold text-xs shadow-xs">
+                            <span>${name}${divLabel}</span>
+                            <button type="button" onclick="removeTransition(${step.SourceStatusId}, ${nextId})" class="text-slate-400 hover:text-rose-600 transition-colors" title="Remove transition">
+                                <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                            </button>
+                        </span>
+                    `;
+                });
+            }
+
+            // Dropdown options for Choose Next Step
+            let dropdownOptionsHtml = '<option value="" disabled selected>-- Choose next step --</option>';
+            allStatuses.forEach(status => {
+                if (status.TransactionStatusId !== step.SourceStatusId && !step.NextStatusIds.includes(status.TransactionStatusId)) {
+                    const divLabel = status.DivisionId > 0 ? ` (Division ${status.DivisionId})` : '';
+                    const name = formatStatusName(status.Name);
+                    dropdownOptionsHtml += `<option value="${status.TransactionStatusId}">${name}${divLabel}</option>`;
+                }
+            });
+
+            html += `
+                <div class="p-5 sm:p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm" id="stepCard_${step.SourceStatusId}">
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-center">
+                        
+                        <!-- Col 1: Source Status Details -->
+                        <div class="lg:col-span-4 flex items-start gap-3">
+                            <span class="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 font-black text-xs shrink-0 border border-slate-200 dark:border-stone-700">
+                                Step ${index + 1}
+                            </span>
+                            <div class="space-y-1">
+                                <h4 class="font-extrabold text-sm text-slate-900 dark:text-white">${formatStatusName(step.SourceName)}</h4>
+                                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                                    ${step.SourceDivisionId > 0 ? 'Division ' + step.SourceDivisionId : 'Global Division'}
+                                </span>
+                                <label class="inline-flex items-center gap-2 cursor-pointer pt-1">
+                                    <input type="checkbox" id="chkApproval_${step.SourceStatusId}" ${step.IsApproval ? 'checked' : ''} onchange="toggleApprovalStep(${step.SourceStatusId}, this.checked)" class="w-4 h-4 rounded text-amber-600 cursor-pointer" />
+                                    <span class="text-[11px] font-bold text-slate-600 dark:text-stone-400">Mark as Approval Step</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Col 2: Allowed Target Steps (Transfer to) -->
+                        <div class="lg:col-span-4 border-t lg:border-t-0 lg:border-l border-slate-100 dark:border-stone-800/80 pt-3 lg:pt-0 lg:pl-5 space-y-1.5">
+                            <label class="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-stone-400">
+                                Allowed Target Steps (Transfer to)
+                            </label>
+                            <div class="flex flex-wrap gap-1.5 items-center">
+                                ${transitionBadgesHtml}
+                            </div>
+                        </div>
+
+                        <!-- Col 3: Choose Next Step Controls -->
+                        <div class="lg:col-span-4 border-t lg:border-t-0 lg:border-l border-slate-100 dark:border-stone-800/80 pt-3 lg:pt-0 lg:pl-5 space-y-1.5">
+                            <label class="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-stone-400">
+                                Choose Next Step
+                            </label>
+                            <div class="flex items-center gap-2">
+                                <select id="selectNext_${step.SourceStatusId}" class="flex-1 px-3 py-2 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 font-bold text-slate-900 dark:text-white text-xs focus:outline-none focus:border-emerald-600 shadow-xs cursor-pointer">
+                                    ${dropdownOptionsHtml}
+                                </select>
+                                <button type="button" onclick="addTransition(${step.SourceStatusId})" class="p-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-colors" title="Add transition to target step">
+                                    <i data-lucide="plus" class="w-4 h-4"></i>
+                                </button>
+                                <button type="button" onclick="removeSourceStep(${step.SourceStatusId})" class="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 dark:bg-rose-950/30 dark:hover:bg-rose-900/50 shadow-xs transition-colors" title="Delete this origin step">
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+        if (window.lucide) window.lucide.createIcons();
+    }
+
+    function toggleApprovalStep(sourceId, checked) {
+        const step = activeWorkflowModel.find(s => s.SourceStatusId === sourceId);
+        if (step) {
+            step.IsApproval = checked;
+            renderOrgChart();
+        }
+    }
+
+    function addTransition(sourceId) {
+        const select = document.getElementById(`selectNext_${sourceId}`);
+        const nextId = parseInt(select.value, 10);
+
+        if (isNaN(nextId)) return;
+
+        const step = activeWorkflowModel.find(s => s.SourceStatusId === sourceId);
+        if (step && !step.NextStatusIds.includes(nextId)) {
+            step.NextStatusIds.push(nextId);
+            renderWorkflowCards();
+            renderOrgChart();
+        }
+    }
+
+    function removeTransition(sourceId, nextId) {
+        const step = activeWorkflowModel.find(s => s.SourceStatusId === sourceId);
+        if (step) {
+            step.NextStatusIds = step.NextStatusIds.filter(id => id !== nextId);
+            renderWorkflowCards();
+            renderOrgChart();
+        }
+    }
+
+    function addSourceStep() {
+        const select = document.getElementById("newSourceStatus");
+        const sourceId = parseInt(select.value, 10);
+
+        if (isNaN(sourceId)) {
+            alert("Please select a status first.");
+            return;
+        }
+
+        if (activeWorkflowModel.some(s => s.SourceStatusId === sourceId)) {
+            alert("This step is already configured in the list.");
+            return;
+        }
+
+        const statusDetail = allStatuses.find(s => s.TransactionStatusId === sourceId);
+        if (statusDetail) {
+            activeWorkflowModel.push({
+                SourceStatusId: sourceId,
+                SourceName: formatStatusName(statusDetail.Name),
+                SourceDivisionId: statusDetail.DivisionId,
+                NextStatusIds: [],
+                IsApproval: false
+            });
+            activeWorkflowModel.sort((a, b) => a.SourceStatusId - b.SourceStatusId);
+            select.value = "";
+            renderWorkflowCards();
+            renderOrgChart();
+        }
+    }
+
+    function removeSourceStep(sourceId) {
+        if (!confirm("Are you sure you want to remove this workflow step?")) return;
+        activeWorkflowModel = activeWorkflowModel.filter(s => s.SourceStatusId !== sourceId);
+        renderWorkflowCards();
+        renderOrgChart();
+    }
+
+    function saveWorkflow() {
+        const typeSelector = document.getElementById("transactionTypeSelector");
+        const typeId = parseInt(typeSelector.value, 10);
+
+        if (activeWorkflowModel.length === 0) {
+            alert("Workflow is empty. Add at least one step.");
+            return;
+        }
+
+        const postData = [];
+
+        activeWorkflowModel.forEach(step => {
+            if (step.NextStatusIds.length === 0) {
+                postData.push({
+                    CurrentStatusId: step.SourceStatusId,
+                    NextStatusId: null,
+                    IsApproval: step.IsApproval || false
+                });
+            } else {
+                step.NextStatusIds.forEach(nextId => {
+                    postData.push({
+                        CurrentStatusId: step.SourceStatusId,
+                        NextStatusId: nextId,
+                        IsApproval: step.IsApproval || false
+                    });
+                });
+            }
+        });
+
+        const btn = document.getElementById("btnSaveWorkflow");
+        if (btn) btn.disabled = true;
+
+        fetch('/Workflow/UpdateWorkflowSettings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                transactionTypeId: typeId,
+                sequences: postData
+            })
+        })
+        .then(res => res.json())
+        .then(result => {
+            if (btn) btn.disabled = false;
+            if (result.success) {
+                alert(result.message || "Workflow sequence updated successfully!");
+                location.reload();
+            } else {
+                alert(result.message || "Error saving workflow sequence.");
+            }
+        })
+        .catch(err => {
+            if (btn) btn.disabled = false;
+            alert("Error communicating with server: " + err);
+        });
+    }
+</script>
+}

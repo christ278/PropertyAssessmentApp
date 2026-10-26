@@ -1,0 +1,525 @@
+@model PropertyAssessmentApp.Models.TaxDeclarationRequest
+@using PropertyAssessmentApp.Models
+
+@{
+    ViewData["Title"] = $"Edit Tax Declaration Request - {Model.TrackingNumber}";
+    var properties = ViewBag.Properties as IEnumerable<TaxDeclaration> ?? new List<TaxDeclaration>();
+    var orderPayments = ViewBag.OrderPayments as IEnumerable<OrderPayment> ?? new List<OrderPayment>();
+}
+
+<div class="space-y-8 font-mono text-xs">
+    
+    <!-- Page Header Bar -->
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-2xl sm:text-3xl font-black text-teal-800 dark:text-emerald-400 tracking-tight">Edit Tax Declaration Request</h1>
+            <p class="text-slate-500 dark:text-stone-400 text-sm">Update property request records and document certifications.</p>
+        </div>
+        <div class="w-full sm:w-auto text-center px-4 py-2 rounded-full bg-teal-800 text-white dark:bg-emerald-500 dark:text-till-950 font-mono font-bold text-xs shadow-sm">
+            Tracking No. @Model.TrackingNumber
+        </div>
+    </div>
+
+    <!-- Form Container Card -->
+    <div class="p-4 sm:p-6 lg:p-8 rounded-2xl sm:rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-6">
+        <form asp-action="Edit" asp-route-id="@Model.Id" method="post" enctype="multipart/form-data" id="taxDeclarationEditForm" class="space-y-6">
+            <input type="hidden" asp-for="Id" />
+            <input type="hidden" asp-for="TrackingNumber" />
+            <input type="hidden" asp-for="RequestDate" />
+            <input type="hidden" asp-for="TaxDeclarationId" id="TaxDeclarationId" />
+            <input type="hidden" asp-for="TaxDeclarationNumber" id="TaxDeclarationNumber" />
+            <input type="hidden" asp-for="RequestedDocumentsJson" id="RequestedDocumentsJson" />
+            <input type="hidden" asp-for="TotalFeesAmount" id="TotalFeesAmount" />
+            <div asp-validation-summary="ModelOnly" class="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800"></div>
+
+            <!-- 1. PROPERTY INFORMATION -->
+            <div class="p-6 rounded-2xl bg-white dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+                <div class="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-stone-800">
+                    <h3 class="text-xs font-black text-slate-800 dark:text-stone-200 uppercase tracking-wider border-l-4 border-l-teal-700 pl-3">
+                        PROPERTY INFORMATION
+                    </h3>
+                    <button type="button" id="btnSearchProperty" class="px-4 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all">
+                        <i data-lucide="search" class="w-3.5 h-3.5"></i>
+                        Change Property
+                    </button>
+                </div>
+
+                <div id="propertySelectContainer" class="hidden mb-3">
+                    <label class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">SELECT PROPERTY FROM ASSESSMENT RECORDS</label>
+                    <select id="propertySelect" class="w-full">
+                        <option value="">-- Choose Property by TDN, Owner Name, or PIN --</option>
+                        @foreach (var p in properties)
+                        {
+                            <option value="@p.Id" selected="@(Model.TaxDeclarationId == p.Id)">@p.TaxDeclarationNumber - @p.OwnerName (@p.PropertyIndexNumber)</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="border border-slate-200 dark:border-stone-800 rounded-xl overflow-x-auto">
+                    <table class="w-full text-left text-xs font-mono">
+                        <thead class="bg-slate-50 dark:bg-stone-900 text-slate-500 dark:text-stone-400 font-bold border-b border-slate-200 dark:border-stone-800">
+                            <tr>
+                                <th class="px-3 sm:px-4 py-3 uppercase">TD NO.</th>
+                                <th class="px-3 sm:px-4 py-3 uppercase">OWNER</th>
+                                <th class="hidden sm:table-cell px-4 py-3 uppercase">LOT NO.</th>
+                                <th class="hidden md:table-cell px-4 py-3 uppercase">LOCATION OF PROPERTY</th>
+                            </tr>
+                        </thead>
+                        <tbody id="selectedPropertyTbody">
+                            <tr>
+                                <td class="px-3 sm:px-4 py-3 font-bold text-slate-900 dark:text-white">
+                                    @(string.IsNullOrEmpty(Model.TaxDeclarationNumber) ? "N/A" : Model.TaxDeclarationNumber)
+                                </td>
+                                <td class="px-3 sm:px-4 py-3 font-bold text-slate-800 dark:text-stone-200">
+                                    @Model.OwnerName
+                                    <div class="sm:hidden text-[10px] text-slate-500 font-normal mt-0.5">
+                                        Lot: @(string.IsNullOrEmpty(Model.LotNo) ? "N/A" : Model.LotNo) &bull; @(string.IsNullOrEmpty(Model.PropertyLocation) ? "N/A" : Model.PropertyLocation)
+                                    </div>
+                                </td>
+                                <td class="hidden sm:table-cell px-4 py-3 font-semibold text-slate-700 dark:text-stone-300">@(string.IsNullOrEmpty(Model.LotNo) ? "N/A" : Model.LotNo)</td>
+                                <td class="hidden md:table-cell px-4 py-3 text-slate-700 dark:text-stone-300">@(string.IsNullOrEmpty(Model.PropertyLocation) ? "N/A" : Model.PropertyLocation)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 2. GENERAL INFORMATION -->
+            <div class="p-6 rounded-2xl bg-white dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+                <h3 class="text-xs font-black text-slate-800 dark:text-stone-200 uppercase tracking-wider border-l-4 border-l-teal-700 pl-3">
+                    GENERAL INFORMATION
+                </h3>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-700 dark:text-stone-300 mb-1 uppercase">
+                            <span class="text-rose-600 font-bold">*</span> OWNER NAME
+                        </label>
+                        <input asp-for="OwnerName" id="ownerNameInput" class="w-full px-4 py-2.5 rounded-xl bg-slate-50/80 dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold" />
+                        <span asp-validation-for="OwnerName" class="text-rose-500 font-bold text-[11px] mt-1 block"></span>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-700 dark:text-stone-300 mb-1 uppercase">
+                            CONTACT NO
+                        </label>
+                        <input asp-for="ContactNo" id="contactNoInput" class="w-full px-4 py-2.5 rounded-xl bg-slate-50/80 dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold" />
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-700 dark:text-stone-300 mb-1 uppercase">REQUESTER NAME</label>
+                        <input asp-for="RequesterName" class="w-full px-4 py-2.5 rounded-xl bg-slate-50/80 dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold" />
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-700 dark:text-stone-300 mb-1 uppercase">
+                            <span class="text-rose-600 font-bold">*</span> OR NO.
+                        </label>
+                        <input asp-for="ORNumber" class="w-full px-4 py-2.5 rounded-xl bg-slate-50/80 dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono font-bold" />
+                        <span asp-validation-for="ORNumber" class="text-rose-500 font-bold text-[11px] mt-1 block"></span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-700 dark:text-stone-300 mb-1 uppercase">
+                            <span class="text-rose-600 font-bold">*</span> DATE ISSUED
+                        </label>
+                        <input asp-for="ORDateIssued" type="date" class="w-full px-4 py-2.5 rounded-xl bg-slate-50/80 dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono font-bold" />
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-700 dark:text-stone-300 mb-1 uppercase">STATUS</label>
+                        <select asp-for="Status" class="w-full px-4 py-2.5 rounded-xl bg-slate-50/80 dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold" asp-items="Html.GetEnumSelectList<TaxDeclarationRequestStatus>()"></select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-700 dark:text-stone-300 mb-1 uppercase">
+                        <span class="text-rose-600 font-bold">*</span> PURPOSE/S
+                    </label>
+                    <input asp-for="Purposes" class="w-full px-4 py-2.5 rounded-xl bg-slate-50/80 dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold" />
+                    <span asp-validation-for="Purposes" class="text-rose-500 font-bold text-[11px] mt-1 block"></span>
+                </div>
+            </div>
+
+            <!-- 3. REQUIREMENTS SUBMITTED -->
+            <div class="p-6 rounded-2xl bg-white dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+                <h3 class="text-xs font-black text-slate-800 dark:text-stone-200 uppercase tracking-wider border-l-4 border-l-teal-700 pl-3">
+                    REQUIREMENTS SUBMITTED
+                </h3>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <label class="flex items-center gap-3 p-4 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50/50 dark:bg-stone-900/50 hover:border-teal-600 cursor-pointer transition-all">
+                        <input type="checkbox" asp-for="ReqIdOfOwner" class="w-5 h-5 rounded border-slate-300 text-teal-700 focus:ring-teal-600">
+                        <span class="font-bold text-slate-800 dark:text-stone-200 tracking-wide text-xs uppercase">ID OF OWNER</span>
+                    </label>
+
+                    <label class="flex items-center gap-3 p-4 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50/50 dark:bg-stone-900/50 hover:border-teal-600 cursor-pointer transition-all">
+                        <input type="checkbox" asp-for="ReqIdOfRepresentative" class="w-5 h-5 rounded border-slate-300 text-teal-700 focus:ring-teal-600">
+                        <span class="font-bold text-slate-800 dark:text-stone-200 tracking-wide text-xs uppercase">ID OF REPRESENTATIVE</span>
+                    </label>
+
+                    <label class="flex items-center gap-3 p-4 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50/50 dark:bg-stone-900/50 hover:border-teal-600 cursor-pointer transition-all">
+                        <input type="checkbox" asp-for="ReqAuthorizationLetter" class="w-5 h-5 rounded border-slate-300 text-teal-700 focus:ring-teal-600">
+                        <span class="font-bold text-slate-800 dark:text-stone-200 tracking-wide text-xs uppercase">AUTHORIZATION LETTER / SPA</span>
+                    </label>
+
+                    <label class="flex items-center gap-3 p-4 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50/50 dark:bg-stone-900/50 hover:border-teal-600 cursor-pointer transition-all">
+                        <input type="checkbox" asp-for="ReqDeedOfConveyance" class="w-5 h-5 rounded border-slate-300 text-teal-700 focus:ring-teal-600">
+                        <span class="font-bold text-slate-800 dark:text-stone-200 tracking-wide text-xs uppercase">DEED OF CONVEYANCE</span>
+                    </label>
+
+                    <label class="flex items-center gap-3 p-4 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50/50 dark:bg-stone-900/50 hover:border-teal-600 cursor-pointer transition-all md:col-span-2">
+                        <input type="checkbox" asp-for="ReqCertIndigency" class="w-5 h-5 rounded border-slate-300 text-teal-700 focus:ring-teal-600">
+                        <span class="font-bold text-slate-800 dark:text-stone-200 tracking-wide text-xs uppercase">CERTIFICATE OF INDIGENCY</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- 4. * REQUEST CERTIFICATE OPTION/S -->
+            <div class="p-6 rounded-2xl bg-white dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+                <h3 class="text-xs font-black text-slate-800 dark:text-stone-200 uppercase tracking-wider border-l-4 border-l-teal-700 pl-3">
+                    <span class="text-rose-600 font-bold">*</span> REQUEST CERTIFICATE OPTION/S
+                </h3>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Left Column -->
+                    <div class="space-y-3">
+                        <label class="flex items-center gap-3 p-4 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50/50 dark:bg-stone-900/50 hover:border-teal-600 cursor-pointer transition-all">
+                            <input type="checkbox" asp-for="CertTaxDeclaration" class="w-5 h-5 rounded border-slate-300 text-teal-700 focus:ring-teal-600">
+                            <span class="font-bold text-slate-800 dark:text-stone-200 tracking-wide text-xs uppercase">TAX DECLARATION</span>
+                        </label>
+
+                        <label class="flex items-center gap-3 p-4 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50/50 dark:bg-stone-900/50 hover:border-teal-600 cursor-pointer transition-all">
+                            <input type="checkbox" asp-for="CertTaxDecTimeOfDeath" class="w-5 h-5 rounded border-slate-300 text-teal-700 focus:ring-teal-600">
+                            <span class="font-bold text-slate-800 dark:text-stone-200 tracking-wide text-xs uppercase">TAX DECLARATION (FROM THE TIME OF DEATH)</span>
+                        </label>
+
+                        <label class="flex items-center gap-3 p-4 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50/50 dark:bg-stone-900/50 hover:border-teal-600 cursor-pointer transition-all">
+                            <input type="checkbox" asp-for="CertPropertyHistory" class="w-5 h-5 rounded border-slate-300 text-teal-700 focus:ring-teal-600">
+                            <span class="font-bold text-slate-800 dark:text-stone-200 tracking-wide text-xs uppercase">CERTIFICATE OF PROPERTY HISTORY</span>
+                        </label>
+
+                        <label class="flex items-center gap-3 p-4 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50/50 dark:bg-stone-900/50 hover:border-teal-600 cursor-pointer transition-all">
+                            <input type="checkbox" asp-for="CertNoImprovement" class="w-5 h-5 rounded border-slate-300 text-teal-700 focus:ring-teal-600">
+                            <span class="font-bold text-slate-800 dark:text-stone-200 tracking-wide text-xs uppercase">CERTIFICATE OF NO IMPROVEMENT</span>
+                        </label>
+
+                        <label class="flex items-center gap-3 p-4 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50/50 dark:bg-stone-900/50 hover:border-teal-600 cursor-pointer transition-all">
+                            <input type="checkbox" asp-for="CertSupportingDocuments" class="w-5 h-5 rounded border-slate-300 text-teal-700 focus:ring-teal-600">
+                            <span class="font-bold text-slate-800 dark:text-stone-200 tracking-wide text-xs uppercase">SUPPORTING DOCUMENTS</span>
+                        </label>
+                    </div>
+
+                    <!-- Right Column -->
+                    <div class="space-y-3">
+                        <label class="flex items-center gap-3 p-4 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50/50 dark:bg-stone-900/50 hover:border-teal-600 cursor-pointer transition-all">
+                            <input type="checkbox" asp-for="CertRecordsVerification" class="w-5 h-5 rounded border-slate-300 text-teal-700 focus:ring-teal-600">
+                            <span class="font-bold text-slate-800 dark:text-stone-200 tracking-wide text-xs uppercase">RECORDS VERIFICATION</span>
+                        </label>
+
+                        <label class="flex items-center gap-3 p-4 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50/50 dark:bg-stone-900/50 hover:border-teal-600 cursor-pointer transition-all">
+                            <input type="checkbox" asp-for="CertAnnotationBailBond" class="w-5 h-5 rounded border-slate-300 text-teal-700 focus:ring-teal-600">
+                            <span class="font-bold text-slate-800 dark:text-stone-200 tracking-wide text-xs uppercase">ANNOTATION OF BAIL BOND</span>
+                        </label>
+
+                        <label class="flex items-center gap-3 p-4 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50/50 dark:bg-stone-900/50 hover:border-teal-600 cursor-pointer transition-all">
+                            <input type="checkbox" asp-for="CertAnnotationMortgages" class="w-5 h-5 rounded border-slate-300 text-teal-700 focus:ring-teal-600">
+                            <span class="font-bold text-slate-800 dark:text-stone-200 tracking-wide text-xs uppercase">ANNOTATION OF MORTGAGES</span>
+                        </label>
+
+                        <label class="flex items-center gap-3 p-4 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50/50 dark:bg-stone-900/50 hover:border-teal-600 cursor-pointer transition-all">
+                            <input type="checkbox" asp-for="CertCancellationAnnotation" class="w-5 h-5 rounded border-slate-300 text-teal-700 focus:ring-teal-600">
+                            <span class="font-bold text-slate-800 dark:text-stone-200 tracking-wide text-xs uppercase">CANCELLATION OF ANNOTATION</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. DOCUMENT TO BE REQUESTED TABLE -->
+            <div class="p-6 rounded-2xl bg-white dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+                <div class="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-stone-800">
+                    <h3 class="text-xs font-black text-slate-800 dark:text-stone-200 uppercase tracking-wider border-l-4 border-l-teal-700 pl-3">
+                        DOCUMENT TO BE REQUESTED TABLE
+                    </h3>
+                    <button type="button" id="btnAddDocRow" class="w-7 h-7 rounded-full bg-teal-700 hover:bg-teal-800 text-white font-bold flex items-center justify-center shadow-sm transition-all" title="Add Row">
+                        +
+                    </button>
+                </div>
+
+                <div class="border border-slate-200 dark:border-stone-800 rounded-xl overflow-x-auto">
+                    <table class="w-full min-w-[550px] text-left text-xs font-mono" id="docRequestsTable">
+                        <thead class="bg-slate-50 dark:bg-stone-900 text-slate-500 dark:text-stone-400 font-bold border-b border-slate-200 dark:border-stone-800">
+                            <tr>
+                                <th class="px-4 py-3 uppercase">PARTICULARS</th>
+                                <th class="px-4 py-3 text-right uppercase">FEES</th>
+                                <th class="px-4 py-3 text-center w-28 uppercase">NO. OF PIECES</th>
+                                <th class="px-4 py-3 text-right uppercase">TOTAL</th>
+                                <th class="px-4 py-3 text-center w-14 uppercase">ACTION</th>
+                            </tr>
+                        </thead>
+                        <tbody id="docRequestsTbody" class="divide-y divide-slate-100 dark:divide-stone-800">
+                            <!-- Dynamic fee rows -->
+                        </tbody>
+                        <tfoot class="bg-slate-50/80 dark:bg-stone-900/80 border-t border-slate-200 dark:border-stone-800">
+                            <tr>
+                                <td colspan="3" class="px-4 py-3 text-right font-black uppercase text-slate-700 dark:text-stone-300">TOTAL:</td>
+                                <td class="px-4 py-3 text-right font-black text-teal-700 dark:text-emerald-400 text-sm" id="displayGrandTotal">₱0.00</td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pt-4 border-t border-slate-200 dark:border-stone-800">
+                <button type="button" onclick="if(confirm('Delete Request @Model.TrackingNumber?')) document.getElementById('deleteForm').submit();" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-rose-500/20 text-rose-700 font-bold text-center">
+                    Delete Request
+                </button>
+                <div class="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+                    <a asp-action="Index" class="w-full sm:w-auto text-center px-5 py-2.5 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold">Cancel</a>
+                    <button type="submit" class="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold uppercase tracking-wider shadow-md text-center">
+                        Update Request
+                    </button>
+                </div>
+            </div>
+        </form>
+        <form id="deleteForm" asp-action="Delete" asp-route-id="@Model.Id" method="post" class="hidden"></form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        var propTom;
+        var orderPaymentOptions = [
+            @foreach (var fee in orderPayments)
+            {
+                @:{ id: '@fee.Id', particular: '@fee.Particular.Replace("'", "\\'")', unitCost: @fee.UnitCost },
+            }
+        ];
+
+        function initPropertySearch() {
+            propTom = new TomSelect('#propertySelect', {
+                create: false,
+                placeholder: 'Search TDN No, Owner Name, or PIN...',
+                onChange: function(val) {
+                    if (val) selectProperty(val);
+                }
+            });
+
+            $('#btnSearchProperty').on('click', function() {
+                $('#propertySelectContainer').toggleClass('hidden');
+                if (propTom) propTom.focus();
+            });
+        }
+
+        function selectProperty(propertyId) {
+            $.get('/TaxDeclarationRequest/GetPropertyDetails', { id: propertyId }, function(data) {
+                if (data) {
+                    $('#TaxDeclarationId').val(propertyId);
+                    $('#ownerNameInput').val(data.ownerName || '');
+                    $('#contactNoInput').val(data.ownerPhone || '');
+
+                    var rowHtml = '<tr class="font-mono">' +
+                        '<td class="px-4 py-3 font-bold text-slate-900 dark:text-white">' + (data.taxDeclarationNumber || '') + '</td>' +
+                        '<td class="px-4 py-3 font-bold text-slate-800 dark:text-stone-200">' + (data.ownerName || '') + '</td>' +
+                        '<td class="px-4 py-3 font-semibold text-slate-700 dark:text-stone-300">' + (data.lotNo || '') + '</td>' +
+                        '<td class="px-4 py-3 text-slate-700 dark:text-stone-300">' + (data.propertyLocation || '') + '</td>' +
+                        '</tr>';
+
+                    $('#selectedPropertyTbody').html(rowHtml);
+                    toastr.success('Property updated: ' + data.taxDeclarationNumber);
+                }
+            });
+        }
+
+        function createDocRow(data) {
+            var $tr = $('<tr class="doc-row hover:bg-slate-50/80 dark:hover:bg-stone-800/50"></tr>');
+            var optionsHtml = '<option value="">-- Select Fee Particular --</option>';
+            orderPaymentOptions.forEach(function(opt) {
+                var selectedStr = (data && (data.feeId == opt.id || data.particular == opt.particular)) ? ' selected' : '';
+                optionsHtml += '<option value="' + opt.id + '" data-particular="' + opt.particular + '" data-unitcost="' + opt.unitCost + '"' + selectedStr + '>' + opt.particular + ' (₱' + opt.unitCost.toFixed(2) + ')</option>';
+            });
+
+            var qtyVal = (data && data.quantity) ? data.quantity : 1;
+
+            $tr.html(
+                '<td class="px-4 py-3"><select class="doc-fee-select w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-stone-800 bg-white dark:bg-stone-900 text-slate-900 dark:text-white font-bold">' + optionsHtml + '</select></td>' +
+                '<td class="px-4 py-3 text-right font-bold text-teal-700 dark:text-emerald-400 doc-unitcost">₱0.00</td>' +
+                '<td class="px-4 py-3 text-center"><input type="number" min="1" value="' + qtyVal + '" class="doc-qty w-20 px-2 py-1 rounded-lg border border-slate-200 dark:border-stone-800 bg-white dark:bg-stone-900 text-center font-bold text-slate-900 dark:text-white" /></td>' +
+                '<td class="px-4 py-3 text-right font-bold text-slate-900 dark:text-white doc-line-total">₱0.00</td>' +
+                '<td class="px-4 py-3 text-center"><button type="button" class="btn-remove-row p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 font-bold" title="Remove Row">✕</button></td>'
+            );
+
+            $('#docRequestsTbody').append($tr);
+
+            var selectElem = $tr.find('.doc-fee-select')[0];
+            var tom = new TomSelect(selectElem, {
+                create: false,
+                placeholder: 'Search fee particular...',
+                dropdownParent: 'body',
+                onChange: function() {
+                    updateRowDetails($tr);
+                    recalculateFees();
+                }
+            });
+            $tr.data('tomselect', tom);
+
+            updateRowDetails($tr);
+            recalculateFees();
+        }
+
+        function updateRowDetails($tr) {
+            var $selected = $tr.find('.doc-fee-select option:selected');
+            var unitCost = parseFloat($selected.data('unitcost')) || 0;
+            var qty = parseInt($tr.find('.doc-qty').val()) || 1;
+
+            $tr.find('.doc-unitcost').text('₱' + unitCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            var lineTotal = unitCost * qty;
+            $tr.find('.doc-line-total').text('₱' + lineTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+        }
+
+        function recalculateFees() {
+            var selectedItems = [];
+            var grandTotal = 0;
+
+            $('#docRequestsTbody tr.doc-row').each(function() {
+                var $tr = $(this);
+                var $selected = $tr.find('.doc-fee-select option:selected');
+                var feeId = $selected.val();
+                
+                if (feeId) {
+                    var particular = $selected.data('particular');
+                    var unitCost = parseFloat($selected.data('unitcost')) || 0;
+                    var qty = parseInt($tr.find('.doc-qty').val()) || 1;
+                    var lineTotal = unitCost * qty;
+
+                    grandTotal += lineTotal;
+
+                    selectedItems.push({
+                        feeId: feeId,
+                        particular: particular,
+                        unitCost: unitCost,
+                        quantity: qty,
+                        lineTotal: lineTotal
+                    });
+                }
+            });
+
+            $('#displayGrandTotal').text('₱' + grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            $('#TotalFeesAmount').val(grandTotal);
+            $('#RequestedDocumentsJson').val(JSON.stringify(selectedItems));
+        }
+
+        $(document).ready(function () {
+            initPropertySearch();
+
+            var existingJson = $('#RequestedDocumentsJson').val();
+            var loadedAny = false;
+            if (existingJson) {
+                try {
+                    var items = JSON.parse(existingJson);
+                    if (items && items.length > 0) {
+                        items.forEach(function(item) {
+                            createDocRow(item);
+                        });
+                        loadedAny = true;
+                    }
+                } catch(e) {}
+            }
+
+            if (!loadedAny) {
+                createDocRow();
+            }
+
+            $('#btnAddDocRow').on('click', function() {
+                createDocRow();
+            });
+
+            $(document).on('change keyup', '.doc-qty', function() {
+                var $tr = $(this).closest('tr');
+                updateRowDetails($tr);
+                recalculateFees();
+            });
+
+            $(document).on('click', '.btn-remove-row', function() {
+                var $tr = $(this).closest('tr');
+                var tom = $tr.data('tomselect');
+
+                if ($('#docRequestsTbody tr.doc-row').length > 1) {
+                    if (tom) tom.destroy();
+                    $tr.remove();
+                    recalculateFees();
+                } else {
+                    if (tom) tom.clear();
+                    updateRowDetails($tr);
+                    recalculateFees();
+                }
+            });
+
+            // Form Submit Client-side Validation
+            $('#taxDeclarationEditForm').on('submit', function (e) {
+                var isValid = true;
+                var $firstInvalid = null;
+
+                $('.border-rose-500').removeClass('border-rose-500 ring-2 ring-rose-500/30');
+
+                var reqFields = [
+                    { id: '#ownerNameInput', name: 'Owner / Taxpayer Name' },
+                    { id: 'input[name="ORNumber"]', name: 'Official Receipt (O.R.) Number' },
+                    { id: 'input[name="Purposes"]', name: 'Purpose/s' }
+                ];
+
+                reqFields.forEach(function (f) {
+                    var $el = $(f.id);
+                    if (!$el.val() || !$el.val().trim()) {
+                        isValid = false;
+                        $el.addClass('border-rose-500 ring-2 ring-rose-500/30');
+                        if (!$firstInvalid) $firstInvalid = $el;
+                    }
+                });
+
+                // Validate Fee Rows
+                var feesAmount = parseFloat($('#TotalFeesAmount').val()) || 0;
+                var docJson = $('#RequestedDocumentsJson').val();
+                var hasDocItems = false;
+                try {
+                    var parsed = JSON.parse(docJson || '[]');
+                    hasDocItems = parsed && parsed.length > 0;
+                } catch (ex) {
+                    hasDocItems = false;
+                }
+
+                if (!hasDocItems || feesAmount <= 0) {
+                    isValid = false;
+                    $('#docRequestsTable').addClass('border-rose-500 ring-2 ring-rose-500/30');
+                    if (!$firstInvalid) $firstInvalid = $('#btnAddDocRow');
+                } else {
+                    $('#docRequestsTable').removeClass('border-rose-500 ring-2 ring-rose-500/30');
+                }
+
+                if (!isValid) {
+                    e.preventDefault();
+                    if ($firstInvalid) {
+                        $('html, body').animate({
+                            scrollTop: $firstInvalid.offset().top - 120
+                        }, 300);
+                        $firstInvalid.focus();
+                    }
+                    toastr.warning('Please fill in all required fields marked with * and select at least one document fee particulars.', 'Validation Notice');
+                    return false;
+                }
+            });
+
+            $(document).on('input keyup change', '#ownerNameInput, input[name="ORNumber"], input[name="Purposes"], .doc-fee-select', function() {
+                $(this).removeClass('border-rose-500 ring-2 ring-rose-500/30');
+                $('#docRequestsTable').removeClass('border-rose-500 ring-2 ring-rose-500/30');
+            });
+        });
+    </script>
+}

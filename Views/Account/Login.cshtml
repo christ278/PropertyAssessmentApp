@@ -1,0 +1,142 @@
+@model PropertyAssessmentApp.Models.LoginViewModel
+
+@{
+    ViewData["Title"] = "System Login";
+    Layout = null;
+    var returnUrl = ViewBag.ReturnUrl as string;
+}
+
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - City Assessor Portal</title>
+    
+    <script>
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    </script>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        emerald: { 50: '#ecfdf5', 100: '#d1fae5', 400: '#34d399', 500: '#10b981', 600: '#059669', 700: '#047857', 800: '#065f46' },
+                        till: { 800: '#1c1917', 900: '#0c0a09', 950: '#030202' }
+                    },
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-slate-900 dark:bg-till-950 text-slate-100 font-sans antialiased min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+
+    <!-- Ambient Glowing Background Blobs -->
+    <div class="absolute -top-40 -left-40 w-[600px] h-[600px] bg-emerald-500/20 rounded-full blur-[150px] pointer-events-none"></div>
+    <div class="absolute -bottom-40 -right-40 w-[600px] h-[600px] bg-teal-500/15 rounded-full blur-[150px] pointer-events-none"></div>
+
+    <div class="w-full max-w-md space-y-6 relative z-10">
+        
+        <!-- Header Brand Logo -->
+        <div class="text-center space-y-3">
+            <div class="inline-flex w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 items-center justify-center shadow-lg shadow-emerald-500/30 text-3xl font-bold ring-4 ring-emerald-500/20">
+                🏛️
+            </div>
+            <div>
+                <h1 class="text-3xl font-extrabold tracking-tight text-white">City Assessor Portal</h1>
+                <p class="text-emerald-400 text-xs font-mono font-bold uppercase tracking-widest mt-1">FAIRTRACK</p>
+                <p class="text-slate-400 text-xs font-mono mt-0.5">Real Property Tax Assessment Management System</p>
+            </div>
+        </div>
+
+        <!-- Login Form Card -->
+        <div class="p-6 sm:p-8 rounded-2xl sm:rounded-3xl bg-slate-800/90 dark:bg-stone-900/90 border border-slate-700/80 dark:border-stone-800 shadow-2xl backdrop-blur-xl">
+            <h2 class="text-lg font-bold text-white mb-6 flex items-center gap-2">
+                <i data-lucide="lock" class="w-5 h-5 text-emerald-400"></i>
+                <span>Account Authentication</span>
+            </h2>
+
+            <!-- Quick Credentials Notice / Auto-Fill Pill -->
+            <div class="mb-6 p-4 rounded-2xl bg-emerald-950/60 border border-emerald-500/30 text-xs font-mono space-y-2">
+                <div class="flex items-center justify-between text-emerald-300 font-bold">
+                    <span class="flex items-center gap-1.5">
+                        <i data-lucide="shield-alert" class="w-4 h-4 text-emerald-400"></i>
+                        Default Admin Account Credentials:
+                    </span>
+                    <button type="button" onclick="fillAdminCredentials()" class="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-[10px] font-bold tracking-wider uppercase transition-all">
+                        Auto-Fill
+                    </button>
+                </div>
+                <div class="grid grid-cols-2 gap-2 text-slate-300 text-[11px]">
+                    <div>Username: <code class="text-emerald-400 font-bold">admin</code></div>
+                    <div>Password: <code class="text-emerald-400 font-bold">x</code></div>
+                </div>
+            </div>
+
+            <form asp-action="Login" asp-route-returnUrl="@returnUrl" method="post" class="space-y-5">
+                <div asp-validation-summary="ModelOnly" class="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-mono"></div>
+
+                <div>
+                    <label asp-for="Username" class="block text-slate-300 font-bold text-xs font-mono uppercase mb-2">Username</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                            <i data-lucide="user" class="w-4 h-4"></i>
+                        </div>
+                        <input asp-for="Username" id="inputUsername" class="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-900/80 border border-slate-700 text-white font-mono text-sm placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500" placeholder="e.g. admin" required autofocus />
+                    </div>
+                    <span asp-validation-for="Username" class="text-rose-400 text-xs font-mono mt-1 block"></span>
+                </div>
+
+                <div>
+                    <label asp-for="Password" class="block text-slate-300 font-bold text-xs font-mono uppercase mb-2">Password</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                            <i data-lucide="key-round" class="w-4 h-4"></i>
+                        </div>
+                        <input asp-for="Password" type="password" id="inputPassword" class="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-900/80 border border-slate-700 text-white font-mono text-sm placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500" placeholder="••••••••" required />
+                    </div>
+                    <span asp-validation-for="Password" class="text-rose-400 text-xs font-mono mt-1 block"></span>
+                </div>
+
+                <div class="flex items-center justify-between text-xs font-mono">
+                    <label class="flex items-center gap-2 cursor-pointer text-slate-300">
+                        <input asp-for="RememberMe" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-emerald-500 focus:ring-emerald-500" />
+                        <span>Remember credentials</span>
+                    </label>
+                </div>
+
+                <button type="submit" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-bold text-xs font-mono uppercase tracking-wider shadow-lg shadow-emerald-500/25 transition-all">
+                    Sign In to Portal
+                </button>
+            </form>
+        </div>
+
+        <div class="text-center text-slate-500 text-xs font-mono space-y-1">
+            <p>© @DateTime.Now.Year City Assessor's Office. All Rights Reserved.</p>
+            <p>RA 7160 Local Government Code Compliant</p>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        function fillAdminCredentials() {
+            document.getElementById('inputUsername').value = 'admin';
+            document.getElementById('inputPassword').value = 'x';
+        }
+    </script>
+</body>
+</html>

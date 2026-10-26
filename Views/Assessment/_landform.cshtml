@@ -1,0 +1,1137 @@
+@model PropertyAssessmentApp.Models.TaxDeclaration
+@{
+    var classifications = ViewBag.LandClassifications as IEnumerable<PropertyAssessmentApp.Models.LandClassification> ?? Enumerable.Empty<PropertyAssessmentApp.Models.LandClassification>();
+    var subClassifications = ViewBag.LandSubClassifications as IEnumerable<PropertyAssessmentApp.Models.LandSubClassification> ?? Enumerable.Empty<PropertyAssessmentApp.Models.LandSubClassification>();
+    var actualUses = ViewBag.LandActualUses as IEnumerable<PropertyAssessmentApp.Models.LandActualUse> ?? Enumerable.Empty<PropertyAssessmentApp.Models.LandActualUse>();
+    var assessmentLevels = ViewBag.LandAssessmentLevels as IEnumerable<PropertyAssessmentApp.Models.LandAssessmentLevel> ?? Enumerable.Empty<PropertyAssessmentApp.Models.LandAssessmentLevel>();
+    var adjustments = ViewBag.LandAdjustments as IEnumerable<PropertyAssessmentApp.Models.LandAdjustmentFactor> ?? Enumerable.Empty<PropertyAssessmentApp.Models.LandAdjustmentFactor>();
+    var improvementTypes = ViewBag.LandImprovementTypes as IEnumerable<PropertyAssessmentApp.Models.LandImprovementType> ?? Enumerable.Empty<PropertyAssessmentApp.Models.LandImprovementType>();
+    var barangays = ViewBag.Barangays as IEnumerable<PropertyAssessmentApp.Models.Barangay> ?? Enumerable.Empty<PropertyAssessmentApp.Models.Barangay>();
+}
+
+<!-- Hidden Storage for Land Dynamic Breakdown Tables -->
+<input type="hidden" asp-for="LandAppraisalDetailsJson" id="landAppraisalDetailsJson" />
+<input type="hidden" asp-for="LandImprovementsJson" id="landImprovementsJson" />
+<input type="hidden" asp-for="LandAdjustmentsJson" id="landAdjustmentsJson" />
+<input type="hidden" asp-for="LandPropertyAssessmentsJson" id="landPropertyAssessmentsJson" />
+
+<!-- LAND SPECIFIC FORM (CAST SYSTEM STANDARD) -->
+<div id="landform" class="space-y-6">
+
+    <!-- 1. CADASTRAL & REGISTRATION DETAILS (CAST) -->
+    <div class="p-5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-stone-800 pb-3">
+            <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+                <i data-lucide="map" class="w-4 h-4"></i>
+                1. Cadastral Details & Title Registration
+            </h4>
+            <div class="flex items-center gap-3">
+                <span class="text-[11px] font-mono font-bold text-slate-500">ARP NO:</span>
+                <input asp-for="ARPNo" class="px-3 py-1 text-xs rounded-lg bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono font-bold text-emerald-600 dark:text-emerald-400" placeholder="187-00-0000-000-000" />
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+                <label asp-for="RegistrationStatus" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">REGISTRATION STATUS</label>
+                <select asp-for="RegistrationStatus" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold cursor-pointer">
+                    <option value="Titled">Titled Land</option>
+                    <option value="Untitled">Untitled / Tax Declaration Only</option>
+                </select>
+            </div>
+            <div>
+                <label asp-for="TitleType" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">TITLE TYPE</label>
+                <select asp-for="TitleType" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold cursor-pointer">
+                    <option value="OCT">OCT (Original Certificate of Title)</option>
+                    <option value="TCT">TCT (Transfer Certificate of Title)</option>
+                    <option value="CLOA">CLOA (Certificate of Land Ownership Award)</option>
+                    <option value="Patent">Free Patent / Homestead Patent</option>
+                </select>
+            </div>
+            <div>
+                <label asp-for="TitleNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">OCT / TCT / CLOA NO.</label>
+                <input asp-for="TitleNo" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" placeholder="T-104928" />
+            </div>
+            <div>
+                <label asp-for="DateRegistered" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">DATE OF TITLE REGISTRATION</label>
+                <input asp-for="DateRegistered" type="date" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" />
+            </div>
+            <div>
+                <label asp-for="CadastralSurveyNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">CADASTRAL SURVEY NO.</label>
+                <input asp-for="CadastralSurveyNo" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" placeholder="Cad-12-00412" />
+            </div>
+            <div>
+                <label asp-for="SectionNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">SECTION NO.</label>
+                <input asp-for="SectionNo" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" placeholder="Section 02" />
+            </div>
+            <div>
+                <label asp-for="LotNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">LOT NO.</label>
+                <input asp-for="LotNo" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" placeholder="Lot 10-A" />
+            </div>
+            <div>
+                <label asp-for="BlockNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BLOCK NO.</label>
+                <input asp-for="BlockNo" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" placeholder="Block 4" />
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. PROPERTY LOCATION (CAST) -->
+    <div class="p-5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
+            <i data-lucide="map-pin" class="w-4 h-4"></i>
+            2. Property Location Details
+        </h4>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="md:col-span-2">
+                <label asp-for="StreetNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BUILDING NO. / STREET / ROAD</label>
+                <input asp-for="StreetNo" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white" placeholder="e.g. Pioneer Avenue, Corner Salazar St." />
+            </div>
+            <div>
+                <label asp-for="Purok" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">PUROK / SITIO</label>
+                <input asp-for="Purok" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white" placeholder="e.g. Purok Malakas" />
+            </div>
+            <div>
+                <label asp-for="DistrictOrBarangay" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BARANGAY <span class="text-rose-500">*</span></label>
+                <select asp-for="DistrictOrBarangay" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold cursor-pointer">
+                    @if (barangays.Any())
+                    {
+                        foreach (var b in barangays)
+                        {
+                            <option value="@b.Name">@b.Name</option>
+                        }
+                    }
+                    else
+                    {
+                        <option value="Brgy. Central">Brgy. Central</option>
+                        <option value="Brgy. Dadiangas East">Brgy. Dadiangas East</option>
+                        <option value="Brgy. Dadiangas North">Brgy. Dadiangas North</option>
+                        <option value="Brgy. Dadiangas South">Brgy. Dadiangas South</option>
+                        <option value="Brgy. Dadiangas West">Brgy. Dadiangas West</option>
+                        <option value="Brgy. Lagao">Brgy. Lagao</option>
+                        <option value="Brgy. San Isidro">Brgy. San Isidro</option>
+                        <option value="Brgy. Calumpang">Brgy. Calumpang</option>
+                        <option value="Brgy. City Heights">Brgy. City Heights</option>
+                        <option value="Brgy. Labangal">Brgy. Labangal</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label asp-for="Municipality" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">CITY / MUNICIPALITY</label>
+                <input asp-for="Municipality" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold" readonly value="General Santos City" />
+            </div>
+            <div>
+                <label asp-for="ProvinceCity" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">PROVINCE</label>
+                <input asp-for="ProvinceCity" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold" readonly value="South Cotabato" />
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. PROPERTY BOUNDARIES & REMARKS (CAST) -->
+    <div class="p-5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
+            <i data-lucide="compass" class="w-4 h-4"></i>
+            3. Property Boundaries & Remarks (CAST Standard)
+        </h4>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="space-y-3">
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label asp-for="BoundaryNorth" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">NORTH BOUNDARY</label>
+                        <input asp-for="BoundaryNorth" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="Lot 101" />
+                    </div>
+                    <div>
+                        <label asp-for="Nremarks" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">NORTH REMARKS</label>
+                        <input asp-for="Nremarks" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs" placeholder="e.g. Along City Road" />
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label asp-for="BoundarySouth" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">SOUTH BOUNDARY</label>
+                        <input asp-for="BoundarySouth" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="Lot 103" />
+                    </div>
+                    <div>
+                        <label asp-for="Sremarks" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">SOUTH REMARKS</label>
+                        <input asp-for="Sremarks" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs" placeholder="e.g. Existing Residential Lot" />
+                    </div>
+                </div>
+            </div>
+            <div class="space-y-3">
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label asp-for="BoundaryEast" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">EAST BOUNDARY</label>
+                        <input asp-for="BoundaryEast" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="Road Lot" />
+                    </div>
+                    <div>
+                        <label asp-for="Eremarks" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">EAST REMARKS</label>
+                        <input asp-for="Eremarks" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs" placeholder="e.g. 10m Wide Concrete Road" />
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label asp-for="BoundaryWest" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">WEST BOUNDARY</label>
+                        <input asp-for="BoundaryWest" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="Creek / Lot 104" />
+                    </div>
+                    <div>
+                        <label asp-for="Wremarks" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">WEST REMARKS</label>
+                        <input asp-for="Wremarks" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs" placeholder="e.g. Natural Drainage Creek" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. TABLE 1: LAND APPRAISAL / CLASSIFICATION BREAKDOWN (classificationTable IN CAST) -->
+    <div class="p-5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-stone-800 pb-3">
+            <div>
+                <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+                    <i data-lucide="layers" class="w-4 h-4"></i>
+                    4. Land Appraisal & Classification Schedule
+                </h4>
+                <p class="text-[11px] text-slate-500 dark:text-stone-400">Classify parcel segments according to schedule of unit values (SMV) to determine Base Market Value.</p>
+            </div>
+            <button type="button" onclick="addLandClassificationRow()" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-sm transition-all">
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add Classification Row
+            </button>
+        </div>
+
+        <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-stone-800 bg-white dark:bg-stone-900">
+            <table class="w-full text-xs text-left" id="landClassificationTable">
+                <thead class="bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-stone-700">
+                    <tr>
+                        <th class="p-3">Classification</th>
+                        <th class="p-3">Sub-Classification (SMV)</th>
+                        <th class="p-3">Actual Use</th>
+                        <th class="p-3 text-right">Area (sq.m.)</th>
+                        <th class="p-3 text-right">Unit Value (PHP/sq.m.)</th>
+                        <th class="p-3 text-right">Base Market Value (PHP)</th>
+                        <th class="p-3 text-center w-16">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="landClassificationTableBody" class="divide-y divide-slate-100 dark:divide-stone-800 font-medium">
+                    <!-- Dynamic rows inserted via JavaScript -->
+                </tbody>
+                <tfoot class="bg-slate-50 dark:bg-stone-950 font-bold text-slate-800 dark:text-stone-200 border-t border-slate-200 dark:border-stone-800">
+                    <tr>
+                        <td colspan="3" class="p-3 text-right">TOTAL LAND AREA:</td>
+                        <td class="p-3 text-right font-mono text-emerald-600 dark:text-emerald-400" id="displayTotalLandArea">0.00 sq.m.</td>
+                        <td class="p-3 text-right">TOTAL BASE MARKET VALUE:</td>
+                        <td class="p-3 text-right font-mono text-emerald-600 dark:text-emerald-400" id="displayTotalBaseMarketValue">₱0.00</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+
+    <!-- 5. TABLE 2: OTHER IMPROVEMENTS / PLANTS & TREES (otherImprovementTable IN CAST) -->
+    <div class="p-5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-stone-800 pb-3">
+            <div>
+                <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+                    <i data-lucide="sprout" class="w-4 h-4"></i>
+                    5. Other Improvements / Plants & Trees Appraisal
+                </h4>
+                <p class="text-[11px] text-slate-500 dark:text-stone-400">Record fruit-bearing trees, timber, plantations, fencing, and permanent lot improvements.</p>
+            </div>
+            <button type="button" onclick="addLandImprovementRow()" class="px-3 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-sm transition-all">
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add Improvement Row
+            </button>
+        </div>
+
+        <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-stone-800 bg-white dark:bg-stone-900">
+            <table class="w-full text-xs text-left" id="landImprovementTable">
+                <thead class="bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-stone-700">
+                    <tr>
+                        <th class="p-3">Product Class / Improvement</th>
+                        <th class="p-3 text-center">Fruit Bearing</th>
+                        <th class="p-3 text-right">Quantity</th>
+                        <th class="p-3 text-right">Age (Years)</th>
+                        <th class="p-3 text-right">Unit Value (PHP)</th>
+                        <th class="p-3 text-right">Base Market Value (PHP)</th>
+                        <th class="p-3 text-center w-16">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="landImprovementTableBody" class="divide-y divide-slate-100 dark:divide-stone-800 font-medium">
+                    <!-- Dynamic rows inserted via JavaScript -->
+                </tbody>
+                <tfoot class="bg-slate-50 dark:bg-stone-950 font-bold text-slate-800 dark:text-stone-200 border-t border-slate-200 dark:border-stone-800">
+                    <tr>
+                        <td colspan="5" class="p-3 text-right">TOTAL OTHER IMPROVEMENTS:</td>
+                        <td class="p-3 text-right font-mono text-teal-600 dark:text-teal-400" id="displayTotalImprovementsValue">₱0.00</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+
+    <!-- 6. TABLE 3: BASE MARKET VALUE & ADJUSTMENTS (baseMarketTable IN CAST) -->
+    <div class="p-5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-stone-800 pb-3">
+            <div>
+                <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+                    <i data-lucide="sliders" class="w-4 h-4"></i>
+                    6. Base Market Value Adjustments (Corner, Elevation & Road Type)
+                </h4>
+                <p class="text-[11px] text-slate-500 dark:text-stone-400">Apply positive or negative percentage adjustments based on corner lot influence, topography, or road access.</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <button type="button" onclick="syncAdjustmentsFromClassifications()" class="px-3 py-1.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 hover:bg-slate-100 dark:hover:bg-stone-800 text-slate-700 dark:text-stone-200 font-bold text-xs inline-flex items-center gap-1.5 shadow-xs transition-all">
+                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Sync from Appraisal
+                </button>
+                <button type="button" onclick="addLandAdjustmentRow()" class="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-sm transition-all">
+                    <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add Adjustment
+                </button>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-stone-800 bg-white dark:bg-stone-900">
+            <table class="w-full text-xs text-left" id="landAdjustmentTable">
+                <thead class="bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-stone-700">
+                    <tr>
+                        <th class="p-3">Classification</th>
+                        <th class="p-3 text-right">Base Market Value (PHP)</th>
+                        <th class="p-3">Adjustment Factor</th>
+                        <th class="p-3 text-right">% Adjustment</th>
+                        <th class="p-3 text-right">Value Adjustment (PHP)</th>
+                        <th class="p-3 text-right">Adjusted Market Value (PHP)</th>
+                        <th class="p-3 text-center w-16">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="landAdjustmentTableBody" class="divide-y divide-slate-100 dark:divide-stone-800 font-medium">
+                    <!-- Dynamic rows inserted via JavaScript -->
+                </tbody>
+                <tfoot class="bg-slate-50 dark:bg-stone-950 font-bold text-slate-800 dark:text-stone-200 border-t border-slate-200 dark:border-stone-800">
+                    <tr>
+                        <td class="p-3 font-bold">TOTAL:</td>
+                        <td colspan="2"></td>
+                        <td class="p-3 text-right font-mono text-sky-600 dark:text-sky-400" id="displayTotalPercentAdjustment">0.00%</td>
+                        <td></td>
+                        <td class="p-3 text-right font-mono text-emerald-600 dark:text-emerald-400" id="displayTotalAdjustedMarketValue">₱0.00</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+
+    <!-- 7. TABLE 4: PROPERTY ASSESSMENT ROLL & TAX DUE COMPUTATION (PropertyAssessmentTable IN CAST) -->
+    <div class="p-5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-stone-800 pb-3">
+            <div>
+                <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+                    <i data-lucide="calculator" class="w-4 h-4"></i>
+                    7. Property Assessment Roll & Valuation Summary
+                </h4>
+                <p class="text-[11px] text-slate-500 dark:text-stone-400">Computes final Assessed Value by applying statutory Assessment Levels (%) to adjusted market values.</p>
+            </div>
+            <button type="button" onclick="autoGeneratePropertyAssessmentRoll()" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-sm transition-all">
+                <i data-lucide="zap" class="w-3.5 h-3.5"></i> Auto-Generate Roll Lines
+            </button>
+        </div>
+
+        <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-stone-800 bg-white dark:bg-stone-900">
+            <table class="w-full text-xs text-left" id="landPropertyAssessmentTable">
+                <thead class="bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-stone-700">
+                    <tr>
+                        <th class="p-3">Kinds</th>
+                        <th class="p-3">Actual Use</th>
+                        <th class="p-3 text-right">Market Value (PHP)</th>
+                        <th class="p-3 text-right">Assessment Level (%)</th>
+                        <th class="p-3 text-right">Assessed Value (PHP)</th>
+                        <th class="p-3 text-center w-16">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="landPropertyAssessmentTableBody" class="divide-y divide-slate-100 dark:divide-stone-800 font-medium">
+                    <!-- Dynamic rows inserted via JavaScript -->
+                </tbody>
+                <tfoot class="bg-slate-50 dark:bg-stone-950 font-bold text-slate-800 dark:text-stone-200 border-t border-slate-200 dark:border-stone-800">
+                    <tr>
+                        <td colspan="2" class="p-3 text-right">TOTAL MARKET VALUE:</td>
+                        <td class="p-3 text-right font-mono text-emerald-600 dark:text-emerald-400" id="displayTotalAssessmentMarketValue">₱0.00</td>
+                        <td class="p-3 text-right">TOTAL ASSESSED VALUE:</td>
+                        <td class="p-3 text-right font-mono text-emerald-600 dark:text-emerald-400 font-black" id="displayTotalAssessedValue">₱0.00</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <!-- Valuation Summary KPI Dashboard -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 pt-3">
+            <div class="p-3 bg-white dark:bg-stone-900 rounded-xl border border-slate-200 dark:border-stone-800">
+                <span class="text-[10px] font-bold uppercase text-slate-400 block mb-1">Total Market Value</span>
+                <span class="text-sm font-black font-mono text-slate-900 dark:text-white" id="kpiLandMarketValue">₱0.00</span>
+            </div>
+            <div class="p-3 bg-white dark:bg-stone-900 rounded-xl border border-slate-200 dark:border-stone-800">
+                <span class="text-[10px] font-bold uppercase text-slate-400 block mb-1">Total Assessed Value</span>
+                <span class="text-sm font-black font-mono text-emerald-600 dark:text-emerald-400" id="kpiLandAssessedValue">₱0.00</span>
+            </div>
+            <div class="p-3 bg-white dark:bg-stone-900 rounded-xl border border-slate-200 dark:border-stone-800">
+                <span class="text-[10px] font-bold uppercase text-slate-400 block mb-1">Basic RPT (2.0%)</span>
+                <span class="text-sm font-black font-mono text-sky-600 dark:text-sky-400" id="kpiLandBasicRpt">₱0.00</span>
+            </div>
+            <div class="p-3 bg-white dark:bg-stone-900 rounded-xl border border-slate-200 dark:border-stone-800">
+                <span class="text-[10px] font-bold uppercase text-slate-400 block mb-1">Total Annual Tax Due</span>
+                <span class="text-sm font-black font-mono text-amber-600 dark:text-amber-400" id="kpiLandAnnualTax">₱0.00</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 8. EFFECTIVITY, TAXABILITY & TAX DETAILS -->
+    <div class="p-5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
+            <i data-lucide="calendar" class="w-4 h-4"></i>
+            8. Assessment Effectivity & Taxability Status
+        </h4>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+                <label asp-for="Taxability" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">TAXABILITY STATUS</label>
+                <select asp-for="Taxability" id="landTaxabilitySelect" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold cursor-pointer">
+                    <option value="Taxable">Taxable</option>
+                    <option value="Exempt">Exempt</option>
+                </select>
+            </div>
+            <div>
+                <label asp-for="EffectivityQuarter" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">EFFECTIVITY QUARTER</label>
+                <select asp-for="EffectivityQuarter" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold cursor-pointer">
+                    <option value="1st Quarter">1st Quarter</option>
+                    <option value="2nd Quarter">2nd Quarter</option>
+                    <option value="3rd Quarter">3rd Quarter</option>
+                    <option value="4th Quarter">4th Quarter</option>
+                </select>
+            </div>
+            <div>
+                <label asp-for="EffectivityYear" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">EFFECTIVITY YEAR</label>
+                <input asp-for="EffectivityYear" type="number" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono font-bold" />
+            </div>
+            <div>
+                <label asp-for="TaxabilityBasis" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">LEGAL BASIS OF ASSESSMENT</label>
+                <input asp-for="TaxabilityBasis" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white" value="RA 7160 / City Tax Ordinance" />
+            </div>
+        </div>
+    </div>
+
+    <!-- 9. RECORD OF SUPERSEDED ASSESSMENT & MEMORANDA (CAST STANDARD) -->
+    <div class="p-5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
+            <i data-lucide="archive" class="w-4 h-4"></i>
+            9. Memoranda & Record of Superseded Assessment
+        </h4>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+                <label asp-for="PreviousTdNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">PREVIOUS TD NO.</label>
+                <input asp-for="PreviousTdNo" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" placeholder="TD-2022-00123" />
+            </div>
+            <div>
+                <label asp-for="PreviousPin" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">PREVIOUS PIN</label>
+                <input asp-for="PreviousPin" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" placeholder="101-01-002-01-012" />
+            </div>
+            <div>
+                <label asp-for="PreviousOwner" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">PREVIOUS OWNER</label>
+                <input asp-for="PreviousOwner" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white" placeholder="Previous Declarant Name" />
+            </div>
+            <div>
+                <label asp-for="PreviousAssessedValue" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">PREVIOUS ASSESSED VALUE</label>
+                <input asp-for="PreviousAssessedValue" type="number" step="0.01" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-right" placeholder="0.00" />
+            </div>
+            <div class="md:col-span-4">
+                <label asp-for="Memoranda" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">MEMORANDA NOTES (RECORD ENTRY)</label>
+                <textarea asp-for="Memoranda" rows="3" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs leading-relaxed uppercase" placeholder="ENTER MEMORANDA, TRANSFER DETAILS, CAR NO., TAX CLEARANCE, OR CONDITIONS..."></textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- 10. SIGNATORIES (CAST SYSTEM STANDARD) -->
+    <div class="p-5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
+            <i data-lucide="user-check" class="w-4 h-4"></i>
+            10. Assessment Signatories & Approvals (CAST Standard)
+        </h4>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="p-4 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 space-y-2">
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Appraised / Prepared By</span>
+                <input asp-for="AppraisedByName" class="w-full px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold text-xs" />
+                <input asp-for="DateAppraised" type="date" class="w-full px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-500 text-xs font-mono" />
+            </div>
+            <div class="p-4 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 space-y-2">
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Checked & Reviewed By</span>
+                <input asp-for="AssessedByName" class="w-full px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold text-xs" />
+                <input asp-for="DateAssessed" type="date" class="w-full px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-500 text-xs font-mono" />
+            </div>
+            <div class="p-4 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 space-y-2">
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Recommending Approval</span>
+                <input asp-for="RecommendingApprovalName" class="w-full px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold text-xs" />
+                <input asp-for="DateRecommended" type="date" class="w-full px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-500 text-xs font-mono" />
+            </div>
+            <div class="p-4 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 space-y-2">
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Approved by City Assessor</span>
+                <input asp-for="ApprovedByName" class="w-full px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold text-xs" />
+                <input asp-for="DateApproved" type="date" class="w-full px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-500 text-xs font-mono" />
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- CLIENT JAVASCRIPT CALCULATION & MULTI-LINE BREAKDOWN ENGINE (CAST STANDARD) -->
+<script>
+    // 1. Data Arrays Injected from Server Prerequisites
+    window.landClassifications = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(classifications));
+    window.landSubClassifications = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(subClassifications));
+    window.landActualUses = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(actualUses));
+    window.landAssessmentLevels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(assessmentLevels));
+    window.landAdjustments = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(adjustments));
+    window.landImprovementTypes = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(improvementTypes));
+
+    document.addEventListener('DOMContentLoaded', function () {
+        initLandFormDynamicTables();
+    });
+
+    function initLandFormDynamicTables() {
+        // Load initial classification lines
+        const classJson = document.getElementById('landAppraisalDetailsJson')?.value;
+        if (classJson && classJson.trim() !== '[]' && classJson.trim() !== '') {
+            try {
+                const items = JSON.parse(classJson);
+                items.forEach(item => addLandClassificationRow(item));
+            } catch (e) {
+                addLandClassificationRow();
+            }
+        } else {
+            addLandClassificationRow();
+        }
+
+        // Load initial improvement lines
+        const impJson = document.getElementById('landImprovementsJson')?.value;
+        if (impJson && impJson.trim() !== '[]' && impJson.trim() !== '') {
+            try {
+                const items = JSON.parse(impJson);
+                items.forEach(item => addLandImprovementRow(item));
+            } catch (e) {
+                // leave empty or add default
+            }
+        }
+
+        // Load initial adjustment lines
+        const adjJson = document.getElementById('landAdjustmentsJson')?.value;
+        if (adjJson && adjJson.trim() !== '[]' && adjJson.trim() !== '') {
+            try {
+                const items = JSON.parse(adjJson);
+                items.forEach(item => addLandAdjustmentRow(item));
+            } catch (e) {
+                // leave empty
+            }
+        }
+
+        // Load initial property assessment roll lines
+        const rollJson = document.getElementById('landPropertyAssessmentsJson')?.value;
+        if (rollJson && rollJson.trim() !== '[]' && rollJson.trim() !== '') {
+            try {
+                const items = JSON.parse(rollJson);
+                items.forEach(item => addLandPropertyAssessmentRow(item));
+            } catch (e) {
+                // leave empty
+            }
+        }
+
+        recomputeAllLandValuation();
+
+        // Attach serialize on form submit
+        const form = document.getElementById('tdnForm') || document.querySelector('form');
+        if (form) {
+            form.addEventListener('submit', function () {
+                serializeAllLandTables();
+            });
+        }
+    }
+
+    // -------------------------------------------------------------
+    // Table 1: Land Appraisal / Classification Rows
+    // -------------------------------------------------------------
+    function addLandClassificationRow(data = null) {
+        const tbody = document.getElementById('landClassificationTableBody');
+        if (!tbody) return;
+
+        const row = document.createElement('tr');
+        row.className = 'hover:bg-slate-50 dark:hover:bg-stone-800/40 transition-colors land-class-row';
+
+        const selClassId = data ? data.ClassificationId || data.classificationId : 1;
+        const selSubClassId = data ? data.SubClassId || data.subClassId : 1;
+        const selActualUse = data ? (data.ActualUseName || data.actualUseName || 'RESIDENTIAL') : 'RESIDENTIAL';
+        const area = data ? (data.AreaSQM || data.areaSQM || 150) : 150;
+        const unitVal = data ? (data.UnitValue || data.unitValue || 520) : 520;
+        const marketVal = data ? (data.MarketValue || data.marketValue || (area * unitVal)) : (area * unitVal);
+
+        row.innerHTML = `
+            <td class="p-2.5">
+                <select class="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-bold class-dropdown text-xs cursor-pointer">
+                    ${window.landClassifications.map(c => `<option value="${c.Id}" ${c.Id == selClassId ? 'selected' : ''}>${c.ClassificationName}</option>`).join('')}
+                </select>
+            </td>
+            <td class="p-2.5">
+                <select class="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-medium subclass-dropdown text-xs cursor-pointer">
+                    <!-- Populated dynamically on class change -->
+                </select>
+            </td>
+            <td class="p-2.5">
+                <select class="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-medium actualuse-dropdown text-xs cursor-pointer">
+                    ${window.landActualUses.map(a => `<option value="${a.ActualUseName}" ${a.ActualUseName == selActualUse ? 'selected' : ''}>${a.ActualUseName}</option>`).join('')}
+                </select>
+            </td>
+            <td class="p-2.5 text-right">
+                <input type="number" step="0.01" class="w-24 px-2 py-1.5 rounded-lg bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-right text-xs area-input" value="${area}" />
+            </td>
+            <td class="p-2.5 text-right">
+                <input type="number" step="0.01" class="w-24 px-2 py-1.5 rounded-lg bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-right text-xs unitval-input font-bold" value="${unitVal}" />
+            </td>
+            <td class="p-2.5 text-right font-mono font-bold text-slate-900 dark:text-white mv-cell">
+                ₱${marketVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </td>
+            <td class="p-2.5 text-center">
+                <button type="button" onclick="removeLandRow(this)" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors" title="Delete Row">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+            </td>
+        `;
+
+        tbody.appendChild(row);
+
+        // Setup subclass dropdown cascade
+        const classSelect = row.querySelector('.class-dropdown');
+        const subClassSelect = row.querySelector('.subclass-dropdown');
+        const unitValInput = row.querySelector('.unitval-input');
+        const areaInput = row.querySelector('.area-input');
+
+        function updateSubClasses(selectedSubId = null) {
+            const classId = classSelect.value;
+            const subs = window.landSubClassifications.filter(s => s.ClassificationId == classId);
+            if (subs.length > 0) {
+                subClassSelect.innerHTML = subs.map(s => `<option value="${s.Id}" data-unitval="${s.UnitValue}" ${(selectedSubId && s.Id == selectedSubId) ? 'selected' : ''}>${s.SubClass} (₱${s.UnitValue.toLocaleString()})</option>`).join('');
+                if (!selectedSubId) {
+                    unitValInput.value = subs[0].UnitValue;
+                }
+            } else {
+                subClassSelect.innerHTML = `<option value="">Standard Base</option>`;
+            }
+        }
+
+        classSelect.addEventListener('change', function () {
+            updateSubClasses();
+            recomputeLandClassRow(row);
+        });
+
+        subClassSelect.addEventListener('change', function () {
+            const opt = this.options[this.selectedIndex];
+            if (opt && opt.getAttribute('data-unitval')) {
+                unitValInput.value = opt.getAttribute('data-unitval');
+            }
+            recomputeLandClassRow(row);
+        });
+
+        areaInput.addEventListener('input', () => recomputeLandClassRow(row));
+        unitValInput.addEventListener('input', () => recomputeLandClassRow(row));
+
+        updateSubClasses(selSubClassId);
+        recomputeLandClassRow(row);
+        lucide.createIcons();
+    }
+
+    function recomputeLandClassRow(row) {
+        const area = parseFloat(row.querySelector('.area-input').value) || 0;
+        const unitVal = parseFloat(row.querySelector('.unitval-input').value) || 0;
+        const mv = Math.round((area * unitVal) * 100) / 100;
+        row.querySelector('.mv-cell').textContent = `₱${mv.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        row.setAttribute('data-mv', mv);
+        row.setAttribute('data-area', area);
+        recomputeAllLandValuation();
+    }
+
+    // -------------------------------------------------------------
+    // Table 2: Other Improvements / Plants & Trees Rows
+    // -------------------------------------------------------------
+    function addLandImprovementRow(data = null) {
+        const tbody = document.getElementById('landImprovementTableBody');
+        if (!tbody) return;
+
+        const row = document.createElement('tr');
+        row.className = 'hover:bg-slate-50 dark:hover:bg-stone-800/40 transition-colors land-imp-row';
+
+        const selTypeId = data ? (data.TypeId || data.typeId) : 1;
+        const isFruit = data ? (data.IsFruitBearing !== false && data.isFruitBearing !== false) : true;
+        const qty = data ? (data.Quantity || data.quantity || 10) : 10;
+        const age = data ? (data.AgeYears || data.ageYears || 5) : 5;
+        const unitVal = data ? (data.UnitValue || data.unitValue || 120) : 120;
+        const marketVal = data ? (data.MarketValue || data.marketValue || (qty * unitVal)) : (qty * unitVal);
+
+        row.innerHTML = `
+            <td class="p-2.5">
+                <select class="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-bold imp-type-dropdown text-xs cursor-pointer">
+                    ${window.landImprovementTypes.map(i => `<option value="${i.Id}" data-baseval="${i.BaseValue}" data-kind="${i.Kind}" ${i.Id == selTypeId ? 'selected' : ''}>${i.TypeDescription} (${i.Kind})</option>`).join('')}
+                </select>
+            </td>
+            <td class="p-2.5 text-center">
+                <input type="checkbox" class="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4 imp-fruit-cb" ${isFruit ? 'checked' : ''} />
+            </td>
+            <td class="p-2.5 text-right">
+                <input type="number" step="0.01" class="w-20 px-2 py-1.5 rounded-lg bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-right text-xs imp-qty-input" value="${qty}" />
+            </td>
+            <td class="p-2.5 text-right">
+                <input type="number" class="w-16 px-2 py-1.5 rounded-lg bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-right text-xs imp-age-input" value="${age}" />
+            </td>
+            <td class="p-2.5 text-right">
+                <input type="number" step="0.01" class="w-24 px-2 py-1.5 rounded-lg bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-right text-xs imp-unitval-input font-bold" value="${unitVal}" />
+            </td>
+            <td class="p-2.5 text-right font-mono font-bold text-slate-900 dark:text-white imp-mv-cell">
+                ₱${marketVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </td>
+            <td class="p-2.5 text-center">
+                <button type="button" onclick="removeLandRow(this)" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors" title="Delete Row">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+            </td>
+        `;
+
+        tbody.appendChild(row);
+
+        const typeSelect = row.querySelector('.imp-type-dropdown');
+        const unitValInput = row.querySelector('.imp-unitval-input');
+        const qtyInput = row.querySelector('.imp-qty-input');
+
+        typeSelect.addEventListener('change', function () {
+            const opt = this.options[this.selectedIndex];
+            if (opt && opt.getAttribute('data-baseval')) {
+                unitValInput.value = opt.getAttribute('data-baseval');
+            }
+            recomputeLandImpRow(row);
+        });
+
+        qtyInput.addEventListener('input', () => recomputeLandImpRow(row));
+        unitValInput.addEventListener('input', () => recomputeLandImpRow(row));
+
+        recomputeLandImpRow(row);
+        lucide.createIcons();
+    }
+
+    function recomputeLandImpRow(row) {
+        const qty = parseFloat(row.querySelector('.imp-qty-input').value) || 0;
+        const unitVal = parseFloat(row.querySelector('.imp-unitval-input').value) || 0;
+        const mv = Math.round((qty * unitVal) * 100) / 100;
+        row.querySelector('.imp-mv-cell').textContent = `₱${mv.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        row.setAttribute('data-mv', mv);
+        recomputeAllLandValuation();
+    }
+
+    // -------------------------------------------------------------
+    // Table 3: Base Market Value & Adjustments Rows
+    // -------------------------------------------------------------
+    function addLandAdjustmentRow(data = null) {
+        const tbody = document.getElementById('landAdjustmentTableBody');
+        if (!tbody) return;
+
+        const row = document.createElement('tr');
+        row.className = 'hover:bg-slate-50 dark:hover:bg-stone-800/40 transition-colors land-adj-row';
+
+        const selClass = data ? (data.ClassificationName || data.classificationName || 'RESIDENTIAL') : 'RESIDENTIAL';
+        const baseMv = data ? (data.BaseMarketValue || data.baseMarketValue || 78000) : 78000;
+        const selAdjId = data ? (data.AdjustmentFactorId || data.adjustmentFactorId) : 1;
+        const pct = data ? (data.PercentAdjustment || data.percentAdjustment || 10) : 10;
+        const valAdj = data ? (data.ValueAdjustment || data.valueAdjustment || (baseMv * (pct / 100))) : (baseMv * (pct / 100));
+        const adjMv = data ? (data.AdjustedMarketValue || data.adjustedMarketValue || (baseMv + valAdj)) : (baseMv + valAdj);
+
+        row.innerHTML = `
+            <td class="p-2.5">
+                <input type="text" class="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-bold adj-class-input text-xs" value="${selClass}" />
+            </td>
+            <td class="p-2.5 text-right">
+                <input type="number" step="0.01" class="w-28 px-2 py-1.5 rounded-lg bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-right text-xs adj-basemv-input font-bold" value="${baseMv}" />
+            </td>
+            <td class="p-2.5">
+                <select class="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-medium adj-factor-dropdown text-xs cursor-pointer">
+                    ${window.landAdjustments.map(j => `<option value="${j.Id}" data-pct="${j.AdjustmentPercent}" ${j.Id == selAdjId ? 'selected' : ''}>${j.Description} (${j.AdjustmentPercent >= 0 ? '+' : ''}${j.AdjustmentPercent}%)</option>`).join('')}
+                </select>
+            </td>
+            <td class="p-2.5 text-right">
+                <input type="number" step="0.01" class="w-20 px-2 py-1.5 rounded-lg bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-right text-xs adj-pct-input font-bold" value="${pct}" />
+            </td>
+            <td class="p-2.5 text-right font-mono font-bold text-slate-600 dark:text-stone-300 adj-val-cell">
+                ₱${valAdj.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </td>
+            <td class="p-2.5 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400 adj-final-cell">
+                ₱${adjMv.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </td>
+            <td class="p-2.5 text-center">
+                <button type="button" onclick="removeLandRow(this)" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors" title="Delete Row">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+            </td>
+        `;
+
+        tbody.appendChild(row);
+
+        const factorSelect = row.querySelector('.adj-factor-dropdown');
+        const pctInput = row.querySelector('.adj-pct-input');
+        const baseMvInput = row.querySelector('.adj-basemv-input');
+
+        factorSelect.addEventListener('change', function () {
+            const opt = this.options[this.selectedIndex];
+            if (opt && opt.getAttribute('data-pct')) {
+                pctInput.value = opt.getAttribute('data-pct');
+            }
+            recomputeLandAdjRow(row);
+        });
+
+        baseMvInput.addEventListener('input', () => recomputeLandAdjRow(row));
+        pctInput.addEventListener('input', () => recomputeLandAdjRow(row));
+
+        recomputeLandAdjRow(row);
+        lucide.createIcons();
+    }
+
+    function recomputeLandAdjRow(row) {
+        const baseMv = parseFloat(row.querySelector('.adj-basemv-input').value) || 0;
+        const pct = parseFloat(row.querySelector('.adj-pct-input').value) || 0;
+        const valAdj = Math.round((baseMv * (pct / 100)) * 100) / 100;
+        const finalAdj = Math.round((baseMv + valAdj) * 100) / 100;
+
+        row.querySelector('.adj-val-cell').textContent = `₱${valAdj.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        row.querySelector('.adj-final-cell').textContent = `₱${finalAdj.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        row.setAttribute('data-adjmv', finalAdj);
+        row.setAttribute('data-pct', pct);
+        recomputeAllLandValuation();
+    }
+
+    function syncAdjustmentsFromClassifications() {
+        const classRows = document.querySelectorAll('.land-class-row');
+        if (classRows.length === 0) return;
+
+        const classMap = {};
+        classRows.forEach(r => {
+            const sel = r.querySelector('.class-dropdown');
+            const name = sel.options[sel.selectedIndex]?.text || 'RESIDENTIAL';
+            const mv = parseFloat(r.getAttribute('data-mv')) || 0;
+            classMap[name] = (classMap[name] || 0) + mv;
+        });
+
+        const tbody = document.getElementById('landAdjustmentTableBody');
+        tbody.innerHTML = '';
+
+        Object.keys(classMap).forEach(k => {
+            addLandAdjustmentRow({
+                ClassificationName: k,
+                BaseMarketValue: classMap[k],
+                PercentAdjustment: 0
+            });
+        });
+
+        toastr?.success('Adjustments synced from Land Appraisal schedule!');
+    }
+
+    // -------------------------------------------------------------
+    // Table 4: Property Assessment Roll Rows
+    // -------------------------------------------------------------
+    function addLandPropertyAssessmentRow(data = null) {
+        const tbody = document.getElementById('landPropertyAssessmentTableBody');
+        if (!tbody) return;
+
+        const row = document.createElement('tr');
+        row.className = 'hover:bg-slate-50 dark:hover:bg-stone-800/40 transition-colors land-roll-row';
+
+        const kind = data ? (data.Kinds || data.kinds || 'LAND') : 'LAND';
+        const selActual = data ? (data.ActualUseName || data.actualUseName || 'RESIDENTIAL') : 'RESIDENTIAL';
+        const mv = data ? (data.MarketValue || data.marketValue || 78000) : 78000;
+        const lvl = data ? (data.AssessmentLevelPercent || data.assessmentLevelPercent || 20) : 20;
+        const av = data ? (data.AssessmentValue || data.assessmentValue || (mv * (lvl / 100))) : (mv * (lvl / 100));
+
+        row.innerHTML = `
+            <td class="p-2.5">
+                <select class="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-bold roll-kind-select text-xs cursor-pointer">
+                    <option value="LAND" ${kind === 'LAND' ? 'selected' : ''}>LAND</option>
+                    <option value="PLANTS / TREES" ${kind === 'PLANTS / TREES' ? 'selected' : ''}>PLANTS / TREES</option>
+                    <option value="OTHER IMPROVEMENTS" ${kind === 'OTHER IMPROVEMENTS' ? 'selected' : ''}>OTHER IMPROVEMENTS</option>
+                </select>
+            </td>
+            <td class="p-2.5">
+                <select class="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-medium roll-actual-select text-xs cursor-pointer">
+                    ${window.landActualUses.map(a => `<option value="${a.ActualUseName}" ${a.ActualUseName == selActual ? 'selected' : ''}>${a.ActualUseName}</option>`).join('')}
+                </select>
+            </td>
+            <td class="p-2.5 text-right">
+                <input type="number" step="0.01" class="w-28 px-2 py-1.5 rounded-lg bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-right text-xs roll-mv-input font-bold" value="${mv}" />
+            </td>
+            <td class="p-2.5 text-right">
+                <input type="number" step="0.01" class="w-20 px-2 py-1.5 rounded-lg bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-right text-xs roll-lvl-input font-bold" value="${lvl}" />
+            </td>
+            <td class="p-2.5 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400 roll-av-cell">
+                ₱${av.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </td>
+            <td class="p-2.5 text-center">
+                <button type="button" onclick="removeLandRow(this)" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors" title="Delete Row">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+            </td>
+        `;
+
+        tbody.appendChild(row);
+
+        const mvInput = row.querySelector('.roll-mv-input');
+        const lvlInput = row.querySelector('.roll-lvl-input');
+        const actualSelect = row.querySelector('.roll-actual-select');
+
+        actualSelect.addEventListener('change', function () {
+            const actualName = this.value;
+            const match = window.landAssessmentLevels.find(l => l.ActualUseName.toUpperCase() === actualName.toUpperCase());
+            if (match) {
+                lvlInput.value = match.AssessmentLevel;
+            }
+            recomputeLandRollRow(row);
+        });
+
+        mvInput.addEventListener('input', () => recomputeLandRollRow(row));
+        lvlInput.addEventListener('input', () => recomputeLandRollRow(row));
+
+        recomputeLandRollRow(row);
+        lucide.createIcons();
+    }
+
+    function recomputeLandRollRow(row) {
+        const mv = parseFloat(row.querySelector('.roll-mv-input').value) || 0;
+        const lvl = parseFloat(row.querySelector('.roll-lvl-input').value) || 0;
+        const av = Math.round((mv * (lvl / 100)) * 100) / 100;
+
+        row.querySelector('.roll-av-cell').textContent = `₱${av.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        row.setAttribute('data-mv', mv);
+        row.setAttribute('data-av', av);
+        recomputeAllLandValuation();
+    }
+
+    function autoGeneratePropertyAssessmentRoll() {
+        // Collect adjusted land market value
+        let totalAdjLandMv = 0;
+        document.querySelectorAll('.land-adj-row').forEach(r => {
+            totalAdjLandMv += parseFloat(r.getAttribute('data-adjmv')) || 0;
+        });
+
+        if (totalAdjLandMv === 0) {
+            document.querySelectorAll('.land-class-row').forEach(r => {
+                totalAdjLandMv += parseFloat(r.getAttribute('data-mv')) || 0;
+            });
+        }
+
+        // Collect total improvements market value
+        let totalImpMv = 0;
+        document.querySelectorAll('.land-imp-row').forEach(r => {
+            totalImpMv += parseFloat(r.getAttribute('data-mv')) || 0;
+        });
+
+        const tbody = document.getElementById('landPropertyAssessmentTableBody');
+        tbody.innerHTML = '';
+
+        // Add Land line
+        if (totalAdjLandMv > 0) {
+            addLandPropertyAssessmentRow({
+                Kinds: 'LAND',
+                ActualUseName: 'RESIDENTIAL',
+                MarketValue: totalAdjLandMv,
+                AssessmentLevelPercent: 20
+            });
+        }
+
+        // Add Plants/Trees line
+        if (totalImpMv > 0) {
+            addLandPropertyAssessmentRow({
+                Kinds: 'PLANTS / TREES',
+                ActualUseName: 'AGRICULTURAL',
+                MarketValue: totalImpMv,
+                AssessmentLevelPercent: 40
+            });
+        }
+
+        toastr?.success('Property Assessment Roll auto-generated from Land & Improvement schedules!');
+    }
+
+    // -------------------------------------------------------------
+    // Overall Valuation Recomputation & Hidden Serialization
+    // -------------------------------------------------------------
+    function recomputeAllLandValuation() {
+        // 1. Table 1 Totals
+        let totalArea = 0;
+        let totalBaseMv = 0;
+        document.querySelectorAll('.land-class-row').forEach(r => {
+            totalArea += parseFloat(r.getAttribute('data-area')) || 0;
+            totalBaseMv += parseFloat(r.getAttribute('data-mv')) || 0;
+        });
+
+        const dispArea = document.getElementById('displayTotalLandArea');
+        if (dispArea) dispArea.textContent = `${totalArea.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} sq.m.`;
+        const dispBaseMv = document.getElementById('displayTotalBaseMarketValue');
+        if (dispBaseMv) dispBaseMv.textContent = `₱${totalBaseMv.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+        // 2. Table 2 Totals
+        let totalImpMv = 0;
+        document.querySelectorAll('.land-imp-row').forEach(r => {
+            totalImpMv += parseFloat(r.getAttribute('data-mv')) || 0;
+        });
+        const dispImpMv = document.getElementById('displayTotalImprovementsValue');
+        if (dispImpMv) dispImpMv.textContent = `₱${totalImpMv.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+        // 3. Table 3 Totals
+        let totalAdjMv = 0;
+        let totalPctAdj = 0;
+        const adjRows = document.querySelectorAll('.land-adj-row');
+        adjRows.forEach(r => {
+            totalAdjMv += parseFloat(r.getAttribute('data-adjmv')) || 0;
+            totalPctAdj += parseFloat(r.getAttribute('data-pct')) || 0;
+        });
+        const dispAdjMv = document.getElementById('displayTotalAdjustedMarketValue');
+        if (dispAdjMv) dispAdjMv.textContent = `₱${totalAdjMv.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        const dispPctAdj = document.getElementById('displayTotalPercentAdjustment');
+        if (dispPctAdj) dispPctAdj.textContent = `${totalPctAdj.toFixed(2)}%`;
+
+        // 4. Table 4 Totals
+        let grandMv = 0;
+        let grandAv = 0;
+        document.querySelectorAll('.land-roll-row').forEach(r => {
+            grandMv += parseFloat(r.getAttribute('data-mv')) || 0;
+            grandAv += parseFloat(r.getAttribute('data-av')) || 0;
+        });
+
+        // Fallback to table 1 + table 2 if table 4 is empty
+        if (grandMv === 0) grandMv = (totalAdjMv > 0 ? totalAdjMv : totalBaseMv) + totalImpMv;
+        if (grandAv === 0) grandAv = Math.round(grandMv * 0.20 * 100) / 100;
+
+        const dispRollMv = document.getElementById('displayTotalAssessmentMarketValue');
+        if (dispRollMv) dispRollMv.textContent = `₱${grandMv.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        const dispRollAv = document.getElementById('displayTotalAssessedValue');
+        if (dispRollAv) dispRollAv.textContent = `₱${grandAv.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+        // Taxes
+        const basicRpt = Math.round(grandAv * 0.02 * 100) / 100;
+        const sefTax = Math.round(grandAv * 0.01 * 100) / 100;
+        const totalAnnualTax = basicRpt + sefTax;
+
+        // KPI Badges
+        document.getElementById('kpiLandMarketValue').textContent = `₱${grandMv.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        document.getElementById('kpiLandAssessedValue').textContent = `₱${grandAv.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        document.getElementById('kpiLandBasicRpt').textContent = `₱${basicRpt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        document.getElementById('kpiLandAnnualTax').textContent = `₱${totalAnnualTax.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+        // Sync main model fields if present on parent form
+        const mainArea = document.querySelector('input[name="AreaSqMeters"]');
+        if (mainArea && totalArea > 0) mainArea.value = totalArea;
+        const mainMv = document.querySelector('input[name="MarketValue"]');
+        if (mainMv) mainMv.value = grandMv;
+        const mainAv = document.querySelector('input[name="AssessedValue"]');
+        if (mainAv) mainAv.value = grandAv;
+        const mainTax = document.querySelector('input[name="AnnualTaxDue"]');
+        if (mainTax) mainTax.value = totalAnnualTax;
+
+        serializeAllLandTables();
+    }
+
+    function removeLandRow(btn) {
+        const row = btn.closest('tr');
+        if (row) {
+            row.remove();
+            recomputeAllLandValuation();
+        }
+    }
+
+    function serializeAllLandTables() {
+        // 1. Serialize Table 1
+        const classItems = [];
+        document.querySelectorAll('.land-class-row').forEach((r, idx) => {
+            const classSel = r.querySelector('.class-dropdown');
+            const subSel = r.querySelector('.subclass-dropdown');
+            const actualSel = r.querySelector('.actualuse-dropdown');
+            const area = parseFloat(r.querySelector('.area-input').value) || 0;
+            const unitVal = parseFloat(r.querySelector('.unitval-input').value) || 0;
+            classItems.push({
+                OrderNo: idx + 1,
+                ClassificationId: parseInt(classSel.value) || null,
+                ClassificationName: classSel.options[classSel.selectedIndex]?.text || 'RESIDENTIAL',
+                SubClassId: parseInt(subSel.value) || null,
+                SubClassName: subSel.options[subSel.selectedIndex]?.text || '1st Class',
+                ActualUseId: null,
+                ActualUseName: actualSel.value || 'RESIDENTIAL',
+                AreaSQM: area,
+                AreaHAS: area / 10000,
+                UnitValue: unitVal,
+                MarketValue: Math.round(area * unitVal * 100) / 100,
+                IsTaxable: true
+            });
+        });
+        const hidClass = document.getElementById('landAppraisalDetailsJson');
+        if (hidClass) hidClass.value = JSON.stringify(classItems);
+
+        // 2. Serialize Table 2
+        const impItems = [];
+        document.querySelectorAll('.land-imp-row').forEach((r, idx) => {
+            const typeSel = r.querySelector('.imp-type-dropdown');
+            const isFruit = r.querySelector('.imp-fruit-cb')?.checked ?? true;
+            const qty = parseFloat(r.querySelector('.imp-qty-input').value) || 0;
+            const age = parseInt(r.querySelector('.imp-age-input').value) || 0;
+            const unitVal = parseFloat(r.querySelector('.imp-unitval-input').value) || 0;
+            const mv = Math.round(qty * unitVal * 100) / 100;
+            impItems.push({
+                OrderNo: idx + 1,
+                TypeId: parseInt(typeSel.value) || null,
+                ProductClass: typeSel.options[typeSel.selectedIndex]?.text || 'COCONUT TREE',
+                AreaPlanted: null,
+                IsFruitBearing: isFruit,
+                Quantity: qty,
+                AgeYears: age,
+                UnitValue: unitVal,
+                MarketValue: mv,
+                AssessmentLevel: 40,
+                AssessedValue: Math.round(mv * 0.40 * 100) / 100,
+                IsTaxable: true
+            });
+        });
+        const hidImp = document.getElementById('landImprovementsJson');
+        if (hidImp) hidImp.value = JSON.stringify(impItems);
+
+        // 3. Serialize Table 3
+        const adjItems = [];
+        document.querySelectorAll('.land-adj-row').forEach((r, idx) => {
+            const classInput = r.querySelector('.adj-class-input');
+            const baseMv = parseFloat(r.querySelector('.adj-basemv-input').value) || 0;
+            const factorSel = r.querySelector('.adj-factor-dropdown');
+            const pct = parseFloat(r.querySelector('.adj-pct-input').value) || 0;
+            const valAdj = Math.round(baseMv * (pct / 100) * 100) / 100;
+            adjItems.push({
+                OrderNo: idx + 1,
+                ClassificationId: null,
+                ClassificationName: classInput.value || 'RESIDENTIAL',
+                BaseMarketValue: baseMv,
+                AdjustmentFactorId: parseInt(factorSel.value) || null,
+                AdjustmentFactor: factorSel.options[factorSel.selectedIndex]?.text || 'Adjustment',
+                PercentAdjustment: pct,
+                ValueAdjustment: valAdj,
+                AdjustedMarketValue: Math.round((baseMv + valAdj) * 100) / 100
+            });
+        });
+        const hidAdj = document.getElementById('landAdjustmentsJson');
+        if (hidAdj) hidAdj.value = JSON.stringify(adjItems);
+
+        // 4. Serialize Table 4
+        const rollItems = [];
+        document.querySelectorAll('.land-roll-row').forEach((r, idx) => {
+            const kindSel = r.querySelector('.roll-kind-select');
+            const actualSel = r.querySelector('.roll-actual-select');
+            const mv = parseFloat(r.querySelector('.roll-mv-input').value) || 0;
+            const lvl = parseFloat(r.querySelector('.roll-lvl-input').value) || 0;
+            rollItems.push({
+                OrderNo: idx + 1,
+                Kinds: kindSel.value || 'LAND',
+                ActualUseId: null,
+                ActualUseName: actualSel.value || 'RESIDENTIAL',
+                MarketValue: mv,
+                AssessmentLevelPercent: lvl,
+                AssessmentValue: Math.round(mv * (lvl / 100) * 100) / 100
+            });
+        });
+        const hidRoll = document.getElementById('landPropertyAssessmentsJson');
+        if (hidRoll) hidRoll.value = JSON.stringify(rollItems);
+    }
+</script>

@@ -1,0 +1,202 @@
+@model PropertyAssessmentApp.Models.TaxDeclarationRequest
+@using System.Text.Json
+
+@{
+    ViewData["Title"] = $"Request Details - {Model.TrackingNumber}";
+    List<PropertyAssessmentApp.Models.RequestedDocumentItem> requestedDocs = new();
+    if (!string.IsNullOrEmpty(Model.RequestedDocumentsJson))
+    {
+        try
+        {
+            requestedDocs = JsonSerializer.Deserialize<List<PropertyAssessmentApp.Models.RequestedDocumentItem>>(Model.RequestedDocumentsJson) ?? new();
+        }
+        catch { }
+    }
+}
+
+<div class="space-y-8 font-mono text-xs">
+    
+    <!-- Action Header Bar -->
+    <div class="flex items-center justify-between">
+        <a asp-action="Index" class="px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 hover:bg-slate-50 dark:hover:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold border border-slate-200 dark:border-stone-800 shadow-sm flex items-center gap-2">
+            <i data-lucide="arrow-left" class="w-4 h-4"></i>
+            Back to Directory
+        </a>
+        <div class="flex items-center gap-3">
+            <a asp-action="Edit" asp-route-id="@Model.Id" class="px-5 py-2.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold flex items-center gap-2 shadow-sm">
+                <i data-lucide="edit" class="w-4 h-4"></i>
+                Edit Request
+            </a>
+        </div>
+    </div>
+
+    <!-- Request Details Card -->
+    <div class="p-8 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-6">
+        
+        <div class="border-b border-slate-200 dark:border-stone-800 pb-4 flex items-center justify-between">
+            <div>
+                <span class="text-[10px] text-teal-700 dark:text-teal-400 font-bold uppercase tracking-wider">Tax Declaration Service Record</span>
+                <h2 class="text-2xl font-black text-slate-900 dark:text-white font-mono">@Model.TrackingNumber</h2>
+            </div>
+            <span class="px-3 py-1 rounded-xl bg-teal-100 dark:bg-teal-500/20 text-teal-800 dark:text-teal-300 border border-teal-300 font-bold uppercase">@Model.Status</span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
+            <div>
+                <span class="text-slate-500 dark:text-stone-400 block text-[10px] font-bold uppercase">Tax Declaration (TDN) No:</span>
+                <span class="text-slate-900 dark:text-white font-bold font-mono text-sm">@(string.IsNullOrEmpty(Model.TaxDeclarationNumber) ? "N/A" : Model.TaxDeclarationNumber)</span>
+            </div>
+            <div>
+                <span class="text-slate-500 dark:text-stone-400 block text-[10px] font-bold uppercase">Owner / Taxpayer Name:</span>
+                <span class="text-slate-900 dark:text-white font-bold text-sm">@Model.OwnerName</span>
+            </div>
+            <div>
+                <span class="text-slate-500 dark:text-stone-400 block text-[10px] font-bold uppercase">Contact No:</span>
+                <span class="text-slate-900 dark:text-white font-bold">@(string.IsNullOrEmpty(Model.ContactNo) ? "N/A" : Model.ContactNo)</span>
+            </div>
+            <div>
+                <span class="text-slate-500 dark:text-stone-400 block text-[10px] font-bold uppercase">Location of Property:</span>
+                <span class="text-slate-900 dark:text-white font-bold">@(string.IsNullOrEmpty(Model.PropertyLocation) ? "N/A" : Model.PropertyLocation)</span>
+            </div>
+        </div>
+
+        <!-- Requester & Official Receipt Details -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 rounded-2xl bg-teal-50/40 dark:bg-teal-950/20 border border-teal-200/80 dark:border-teal-800/40">
+            <div>
+                <span class="text-teal-800 dark:text-teal-300 block text-[10px] font-bold uppercase">Requester Name:</span>
+                <span class="text-slate-900 dark:text-white font-bold text-sm">@(string.IsNullOrEmpty(Model.RequesterName) ? Model.OwnerName : Model.RequesterName)</span>
+            </div>
+            <div>
+                <span class="text-teal-800 dark:text-teal-300 block text-[10px] font-bold uppercase">Official Receipt (O.R.) No:</span>
+                <span class="text-teal-700 dark:text-teal-400 font-bold font-mono text-sm">@(string.IsNullOrEmpty(Model.ORNumber) ? "N/A" : Model.ORNumber)</span>
+            </div>
+            <div>
+                <span class="text-teal-800 dark:text-teal-300 block text-[10px] font-bold uppercase">Date Issued:</span>
+                <span class="text-slate-900 dark:text-white font-bold font-mono">@(Model.ORDateIssued.HasValue ? Model.ORDateIssued.Value.ToString("MMMM dd, yyyy") : "N/A")</span>
+            </div>
+            <div>
+                <span class="text-teal-800 dark:text-teal-300 block text-[10px] font-bold uppercase">Specific Purpose/s:</span>
+                <span class="text-slate-900 dark:text-white font-bold">@(string.IsNullOrEmpty(Model.Purposes) ? "N/A" : Model.Purposes)</span>
+            </div>
+        </div>
+
+        <!-- Requirements Submitted Display -->
+        <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 space-y-3 border-l-4 border-l-teal-700">
+            <h4 class="text-xs font-black uppercase text-slate-900 dark:text-white flex items-center gap-1.5">
+                <i data-lucide="file-check" class="w-4 h-4 text-teal-700"></i>
+                REQUIREMENTS SUBMITTED
+            </h4>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
+                @if (Model.ReqIdOfOwner) { <div class="p-2.5 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 text-teal-800 dark:text-teal-300 font-bold">✓ ID OF OWNER</div> }
+                @if (Model.ReqIdOfRepresentative) { <div class="p-2.5 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 text-teal-800 dark:text-teal-300 font-bold">✓ ID OF REPRESENTATIVE</div> }
+                @if (Model.ReqAuthorizationLetter) { <div class="p-2.5 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 text-teal-800 dark:text-teal-300 font-bold">✓ AUTHORIZATION LETTER / SPA</div> }
+                @if (Model.ReqDeedOfConveyance) { <div class="p-2.5 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 text-teal-800 dark:text-teal-300 font-bold">✓ DEED OF CONVEYANCE</div> }
+                @if (Model.ReqCertIndigency) { <div class="p-2.5 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 text-teal-800 dark:text-teal-300 font-bold">✓ CERTIFICATE OF INDIGENCY</div> }
+                @if (!Model.ReqIdOfOwner && !Model.ReqIdOfRepresentative && !Model.ReqAuthorizationLetter && !Model.ReqDeedOfConveyance && !Model.ReqCertIndigency) {
+                    <div class="text-[10px] text-slate-400 italic col-span-2">No requirement documents submitted.</div>
+                }
+            </div>
+        </div>
+
+        <!-- Request Certificate Option/s Display -->
+        <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 space-y-3 border-l-4 border-l-teal-700">
+            <h4 class="text-xs font-black uppercase text-slate-900 dark:text-white flex items-center gap-1.5">
+                <i data-lucide="check-square" class="w-4 h-4 text-teal-700"></i>
+                * REQUEST CERTIFICATE OPTION/S SELECTED
+            </h4>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
+                @if (Model.CertTaxDeclaration) { <div class="p-2.5 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 text-teal-800 dark:text-teal-300 font-bold">✓ TAX DECLARATION</div> }
+                @if (Model.CertRecordsVerification) { <div class="p-2.5 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 text-teal-800 dark:text-teal-300 font-bold">✓ RECORDS VERIFICATION</div> }
+                @if (Model.CertTaxDecTimeOfDeath) { <div class="p-2.5 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 text-teal-800 dark:text-teal-300 font-bold">✓ TAX DECLARATION (FROM THE TIME OF DEATH)</div> }
+                @if (Model.CertAnnotationBailBond) { <div class="p-2.5 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 text-teal-800 dark:text-teal-300 font-bold">✓ ANNOTATION OF BAIL BOND</div> }
+                @if (Model.CertPropertyHistory) { <div class="p-2.5 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 text-teal-800 dark:text-teal-300 font-bold">✓ CERTIFICATE OF PROPERTY HISTORY</div> }
+                @if (Model.CertAnnotationMortgages) { <div class="p-2.5 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 text-teal-800 dark:text-teal-300 font-bold">✓ ANNOTATION OF MORTGAGES</div> }
+                @if (Model.CertNoImprovement) { <div class="p-2.5 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 text-teal-800 dark:text-teal-300 font-bold">✓ CERTIFICATE OF NO IMPROVEMENT</div> }
+                @if (Model.CertCancellationAnnotation) { <div class="p-2.5 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 text-teal-800 dark:text-teal-300 font-bold">✓ CANCELLATION OF ANNOTATION</div> }
+                @if (Model.CertSupportingDocuments) { <div class="p-2.5 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 text-teal-800 dark:text-teal-300 font-bold">✓ SUPPORTING DOCUMENTS</div> }
+            </div>
+        </div>
+
+        <!-- Requested Documents Table -->
+        <div class="space-y-3">
+            <h4 class="text-xs font-bold uppercase text-slate-900 dark:text-white flex items-center gap-1.5">
+                <i data-lucide="file-text" class="w-4 h-4 text-teal-700"></i>
+                DOCUMENT TO BE REQUESTED TABLE
+            </h4>
+            <div class="border border-slate-200 dark:border-stone-800 rounded-2xl overflow-x-auto">
+                <table class="w-full text-left text-xs font-mono">
+                    <thead class="bg-slate-100 dark:bg-stone-950 text-slate-600 dark:text-stone-400 border-b border-slate-200 dark:border-stone-800 font-bold">
+                        <tr>
+                            <th class="px-3 sm:px-4 py-2.5">PARTICULAR DESCRIPTION</th>
+                            <th class="hidden sm:table-cell px-4 py-2.5 text-right">FEES (₱)</th>
+                            <th class="hidden sm:table-cell px-4 py-2.5 text-center">NO. OF PIECES</th>
+                            <th class="px-3 sm:px-4 py-2.5 text-right">TOTAL (₱)</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-stone-800/60">
+                        @if (!requestedDocs.Any())
+                        {
+                            <tr>
+                                <td colspan="4" class="text-center py-4 text-slate-400 dark:text-stone-500 italic">
+                                    No standard fee items attached for this request.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            foreach (var item in requestedDocs)
+                            {
+                                <tr>
+                                    <td class="px-3 sm:px-4 py-2.5 font-bold text-slate-900 dark:text-white">
+                                        @item.Particular
+                                        <div class="sm:hidden text-[10px] text-slate-500 font-normal mt-0.5">
+                                            ₱@item.UnitCost.ToString("N2") &times; @item.Quantity pc@(item.Quantity > 1 ? "s" : "")
+                                        </div>
+                                    </td>
+                                    <td class="hidden sm:table-cell px-4 py-2.5 text-right font-bold text-teal-700 dark:text-teal-400">₱@item.UnitCost.ToString("N2")</td>
+                                    <td class="hidden sm:table-cell px-4 py-2.5 text-center font-bold">@item.Quantity</td>
+                                    <td class="px-3 sm:px-4 py-2.5 text-right font-bold text-slate-900 dark:text-white">₱@item.LineTotal.ToString("N2")</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                    <tfoot class="bg-slate-100/80 dark:bg-stone-950/80 border-t border-slate-200 dark:border-stone-800">
+                        <tr>
+                            <td colspan="3" class="hidden sm:table-cell px-4 py-2.5 text-right font-extrabold uppercase text-slate-700 dark:text-stone-300">TOTAL:</td>
+                            <td class="sm:hidden px-3 py-2.5 text-left font-extrabold uppercase text-slate-700 dark:text-stone-300">TOTAL:</td>
+                            <td class="px-3 sm:px-4 py-2.5 text-right font-black text-teal-700 dark:text-teal-400 text-base">₱@Model.TotalFeesAmount.ToString("N2")</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        <!-- File Attachment Container -->
+        <div class="p-4 rounded-2xl bg-teal-50/50 dark:bg-teal-950/20 border border-teal-200/80 dark:border-teal-800/40 space-y-3">
+            <div class="flex items-center justify-between">
+                <h4 class="text-xs font-bold uppercase text-teal-800 dark:text-teal-300 flex items-center gap-1.5">
+                    <i data-lucide="paperclip" class="w-4 h-4 text-teal-600 dark:text-teal-400"></i>
+                    Attached Document File
+                </h4>
+                @if (!string.IsNullOrEmpty(Model.AttachmentFileName))
+                {
+                    <a asp-action="DownloadAttachment" asp-route-id="@Model.Id" class="px-3 py-1.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm">
+                        <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                        Download File
+                    </a>
+                }
+            </div>
+
+            @if (!string.IsNullOrEmpty(Model.AttachmentFileName))
+            {
+                <div class="space-y-1">
+                    <div class="text-[10px] text-slate-500 dark:text-stone-400">Attached File: <strong class="text-slate-900 dark:text-white font-bold">@Model.AttachmentFileName</strong> (@Model.AttachmentFileSize)</div>
+                </div>
+            }
+            else
+            {
+                <div class="text-[10px] text-slate-400 dark:text-stone-500 italic">No document file attached for this request.</div>
+            }
+        </div>
+    </div>
+</div>

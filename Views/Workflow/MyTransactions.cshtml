@@ -1,0 +1,663 @@
+@model IEnumerable<PropertyAssessmentApp.Services.WorkflowQueueItemDto>
+@using PropertyAssessmentApp.Models
+@using PropertyAssessmentApp.Services
+@inject PropertyAssessmentApp.Services.IPermissionService PermissionService
+
+@{
+    ViewData["Title"] = "My Transactions (Claimed Workspace)";
+    var divisionId = ViewBag.DivisionId as int?;
+    var search = ViewBag.Search as string ?? "";
+    var typeFilter = ViewBag.TypeFilter as string ?? "";
+    var statusFilter = ViewBag.StatusFilter as string ?? "";
+
+    bool canChangeDivision = ViewBag.CanChangeDivision is bool b && b;
+    bool isSuperAdminOrHead = ViewBag.IsSuperAdminOrHead is bool s && s;
+    int? userDivId = ViewBag.UserDivisionId as int?;
+    string userWorkflowRole = ViewBag.UserWorkflowRoleName as string ?? "";
+    string currentUserName = ViewBag.CurrentUserName as string ?? "Staff User";
+    string currentUserRole = ViewBag.CurrentUserRole as string ?? "Property Appraiser";
+
+    int totalPool = ViewBag.TotalPool is int p ? p : 0;
+    int totalMy = ViewBag.TotalMy is int m ? m : 0;
+    int totalDeferred = ViewBag.TotalDeferred is int d ? d : 0;
+    int totalCancelled = ViewBag.TotalCancelled is int c ? c : 0;
+    int totalNeedApproval = ViewBag.TotalNeedApproval is int na ? na : 0;
+
+    string activeDivisionLabel = divisionId switch
+    {
+        1 => "Division 1: Appraisal and Assessment",
+        2 => "Division 2: Tax Mapping",
+        3 => "Division 3: Records",
+        _ => "All Divisions"
+    };
+}
+
+<div class="space-y-6 font-mono text-xs">
+    
+    <!-- Top Hub Header -->
+    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white dark:bg-stone-900 p-6 rounded-3xl border border-slate-200 dark:border-stone-800 shadow-sm">
+        <div class="space-y-1.5">
+            <div class="inline-flex items-center gap-2 text-xs font-mono text-blue-700 dark:text-blue-400 font-bold">
+                <i data-lucide="user-check" class="w-4 h-4"></i>
+                <span>Personal Processing Workspace</span>
+            </div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-3">
+                <span>My Transactions (Claimed Workspace)</span>
+                <span class="px-3 py-1 rounded-full text-xs font-black bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300">
+                    @totalMy Claimed
+                </span>
+                @if (totalDeferred > 0)
+                {
+                    <span class="px-3 py-1 rounded-full text-xs font-black bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                        <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i>
+                        @totalDeferred Deferred
+                    </span>
+                }
+            </h1>
+            <p class="text-slate-500 dark:text-stone-400 text-xs">
+                Real property transactions claimed by you. Complete your evaluation, forward to the next stage, or defer for revisions.
+            </p>
+        </div>
+
+        <!-- Header Actions: User Badge & Link to Department Pool -->
+        <div class="flex items-center gap-3 flex-wrap">
+            <div class="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 shadow-xs">
+                <i data-lucide="@(canChangeDivision ? "shield" : "lock")" class="w-4 h-4 @(canChangeDivision ? "text-purple-600" : "text-amber-500")"></i>
+                <div>
+                    <div class="font-extrabold text-slate-900 dark:text-white text-xs">@activeDivisionLabel</div>
+                    <div class="text-[10px] text-slate-400 dark:text-stone-500 font-bold flex items-center gap-1.5">
+                        <span>Role: <strong>@(string.IsNullOrEmpty(userWorkflowRole) ? currentUserRole : userWorkflowRole)</strong></span>
+                        <span class="px-1.5 py-0.2 rounded bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300 text-[9px] uppercase font-black">Personal Queue</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Switch to Department Pool Button -->
+            <a asp-action="Pool" asp-route-divisionId="@(canChangeDivision ? divisionId : null)" class="px-4 py-2.5 rounded-2xl font-bold bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 flex items-center gap-2 shadow-xs transition-all">
+                <i data-lucide="inbox" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                <span>Department Pool</span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] bg-emerald-600 text-white font-black">@totalPool</span>
+            </a>
+
+            @if (isSuperAdminOrHead)
+            {
+                <a asp-action="Settings" class="p-2.5 rounded-2xl bg-white dark:bg-stone-900 hover:bg-slate-100 dark:hover:bg-stone-800 border border-slate-200 dark:border-stone-800 text-slate-700 dark:text-stone-300 shadow-xs" title="Transaction Workflow Settings">
+                    <i data-lucide="settings" class="w-4 h-4 text-emerald-600"></i>
+                </a>
+            }
+        </div>
+    </div>
+
+    <!-- Unified 1-Form Filter Bar -->
+    <form method="get" asp-action="MyTransactions" class="bg-white dark:bg-stone-900 p-5 rounded-3xl border border-slate-200 dark:border-stone-800 shadow-sm font-mono text-xs">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+            <!-- 1. Division Filter (Locked to assigned division if not admin/head) -->
+            <div>
+                <label class="block text-[11px] font-extrabold text-slate-500 dark:text-stone-400 uppercase mb-1.5 flex items-center gap-1.5">
+                    <i data-lucide="building" class="w-3.5 h-3.5 text-blue-600"></i>
+                    <span>Division</span>
+                </label>
+                @if (canChangeDivision)
+                {
+                    <select name="divisionId" onchange="this.form.submit()" class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-stone-950 text-slate-900 dark:text-white border border-slate-200 dark:border-stone-800 font-bold focus:outline-none focus:border-blue-600 cursor-pointer">
+                        <option value="" selected="@(!divisionId.HasValue ? "selected" : null)">All Divisions (Full Access)</option>
+                        <option value="1" selected="@(divisionId == 1 ? "selected" : null)">Division 1: Appraisal & Assessment</option>
+                        <option value="2" selected="@(divisionId == 2 ? "selected" : null)">Division 2: Tax Mapping</option>
+                        <option value="3" selected="@(divisionId == 3 ? "selected" : null)">Division 3: Records</option>
+                    </select>
+                }
+                else
+                {
+                    <div class="px-3.5 py-2.5 rounded-2xl bg-slate-100 dark:bg-stone-950 text-slate-900 dark:text-white border border-slate-200 dark:border-stone-800 font-bold flex items-center gap-2">
+                        <i data-lucide="lock" class="w-3.5 h-3.5 text-amber-500"></i>
+                        <span class="truncate">@activeDivisionLabel</span>
+                    </div>
+                    <input type="hidden" name="divisionId" value="@divisionId" />
+                }
+            </div>
+
+            <!-- 2. Transaction Type Filter -->
+            <div>
+                <label class="block text-[11px] font-extrabold text-slate-500 dark:text-stone-400 uppercase mb-1.5 flex items-center gap-1.5">
+                    <i data-lucide="file-text" class="w-3.5 h-3.5 text-purple-600"></i>
+                    <span>Transaction Type</span>
+                </label>
+                <select name="type" onchange="this.form.submit()" class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-stone-950 text-slate-900 dark:text-white border border-slate-200 dark:border-stone-800 font-bold focus:outline-none focus:border-blue-600 cursor-pointer">
+                    <option value="" selected="@(string.IsNullOrEmpty(typeFilter) ? "selected" : null)">All Transaction Types</option>
+                    <option value="TaxDeclarationRequest" selected="@(typeFilter == "TaxDeclarationRequest" ? "selected" : null)">Tax Declaration Request</option>
+                    <option value="LandHoldingRequest" selected="@(typeFilter == "LandHoldingRequest" ? "selected" : null)">Land Holding Certificate</option>
+                    <option value="TaxMappingRequest" selected="@(typeFilter == "TaxMappingRequest" ? "selected" : null)">Tax Mapping Request</option>
+                    <option value="PropertyAssessmentRequest" selected="@(typeFilter == "PropertyAssessmentRequest" ? "selected" : null)">Property Assessment (RPA)</option>
+                    <option value="RequestForInspection" selected="@(typeFilter == "RequestForInspection" ? "selected" : null)">Field Inspection (RFI)</option>
+                </select>
+            </div>
+
+            <!-- 3. Status Filter (Deferred, Cancelled, Need Approval) -->
+            <div>
+                <label class="block text-[11px] font-extrabold text-slate-500 dark:text-stone-400 uppercase mb-1.5 flex items-center gap-1.5">
+                    <i data-lucide="activity" class="w-3.5 h-3.5 text-emerald-600"></i>
+                    <span>Status</span>
+                </label>
+                <select name="status" onchange="this.form.submit()" class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-stone-950 text-slate-900 dark:text-white border border-slate-200 dark:border-stone-800 font-bold focus:outline-none focus:border-blue-600 cursor-pointer">
+                    <option value="" selected="@(string.IsNullOrEmpty(statusFilter) ? "selected" : null)">All Statuses (@totalMy)</option>
+                    <option value="deferred" selected="@(statusFilter == "deferred" ? "selected" : null)">Deferred (@totalDeferred)</option>
+                    <option value="cancelled" selected="@(statusFilter == "cancelled" ? "selected" : null)">Cancelled (@totalCancelled)</option>
+                    <option value="need_approval" selected="@(statusFilter == "need_approval" ? "selected" : null)">Need Approval (@totalNeedApproval)</option>
+                </select>
+            </div>
+
+            <!-- 4. Search & Submit/Reset -->
+            <div>
+                <label class="block text-[11px] font-extrabold text-slate-500 dark:text-stone-400 uppercase mb-1.5 flex items-center gap-1.5">
+                    <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400"></i>
+                    <span>Search</span>
+                </label>
+                <div class="flex items-center gap-2">
+                    <div class="relative flex-1">
+                        <input type="text" name="search" value="@search" placeholder="Tracking No, Owner, PIN..." class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-stone-950 text-slate-900 dark:text-white border border-slate-200 dark:border-stone-800 focus:outline-none focus:border-blue-600 text-xs" />
+                    </div>
+                    <button type="submit" class="px-4 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold flex items-center gap-1.5 shadow-md shadow-blue-600/20 transition-all shrink-0">
+                        <i data-lucide="filter" class="w-3.5 h-3.5"></i>
+                        <span>Filter</span>
+                    </button>
+                    @if (!string.IsNullOrEmpty(search) || !string.IsNullOrEmpty(typeFilter) || !string.IsNullOrEmpty(statusFilter) || (canChangeDivision && divisionId.HasValue))
+                    {
+                        <a asp-action="MyTransactions" asp-route-divisionId="@(canChangeDivision ? null : divisionId)" class="p-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-slate-600 dark:text-stone-300 transition-all shrink-0" title="Reset Filters">
+                            <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                        </a>
+                    }
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <!-- Transaction Queue Table Card -->
+    <div class="bg-white dark:bg-stone-900 rounded-3xl border border-slate-200 dark:border-stone-800 shadow-sm paginated-table-card">
+        <div class="overflow-x-auto min-h-[320px] pb-4 rounded-3xl">
+            <table class="w-full text-left text-xs font-mono">
+                <thead class="bg-slate-100 dark:bg-stone-950 text-slate-600 dark:text-stone-400 border-b border-slate-200 dark:border-stone-800 font-bold">
+                    <tr>
+                        <th class="px-4 py-3.5">TRACKING & REQUEST TYPE</th>
+                        <th class="px-4 py-3.5">OWNER / APPLICANT</th>
+                        <th class="hidden md:table-cell px-4 py-3.5">CURRENT STAGE & ROLE</th>
+                        <th class="hidden lg:table-cell px-4 py-3.5">STATUS & WORKSPACE</th>
+                        <th class="hidden xl:table-cell px-4 py-3.5">LAST ROUTING & NOTES</th>
+                        <th class="px-4 py-3.5 text-center">ACTION</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-stone-800/60">
+                    @if (!Model.Any())
+                    {
+                        <tr>
+                            <td colspan="6" class="p-12 text-center text-slate-400 dark:text-stone-500 font-bold space-y-2">
+                                <i data-lucide="user-check" class="w-12 h-12 mx-auto stroke-1 text-slate-300 dark:text-stone-600"></i>
+                                <p class="text-sm">No claimed transactions found in your workspace.</p>
+                                <p class="text-[11px] font-normal">Go to the Department Pool to claim available transactions for processing.</p>
+                                <div class="pt-2">
+                                    <a asp-action="Pool" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-all">
+                                        <i data-lucide="inbox" class="w-4 h-4"></i>
+                                        <span>Browse Department Pool</span>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var item in Model)
+                        {
+                            var divBadgeClass = item.Division switch
+                            {
+                                DivisionType.Division1_TaxAssessmentAndLandHolding => "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300",
+                                DivisionType.Division2_GIS_TaxMapping => "bg-teal-100 text-teal-800 dark:bg-teal-500/20 dark:text-teal-300",
+                                DivisionType.Division3_RecordsAndCertification => "bg-purple-100 text-purple-800 dark:bg-purple-500/20 dark:text-purple-300",
+                                _ => "bg-slate-100 text-slate-800 dark:bg-stone-800 dark:text-stone-300"
+                            };
+
+                            var divShort = item.Division switch
+                            {
+                                DivisionType.Division1_TaxAssessmentAndLandHolding => "DIV 1 (ASMT)",
+                                DivisionType.Division2_GIS_TaxMapping => "DIV 2 (GIS)",
+                                DivisionType.Division3_RecordsAndCertification => "DIV 3 (RECS)",
+                                _ => "ALL DIV"
+                            };
+
+                            <tr class="hover:bg-slate-50/80 dark:hover:bg-stone-800/40 transition-colors @(item.IsDeferred ? "bg-amber-50/30 dark:bg-amber-950/10" : "")">
+                                <!-- Tracking & Request Type -->
+                                <td class="px-4 py-3.5 space-y-1">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <span class="px-2 py-0.5 rounded-lg text-[10px] font-bold @divBadgeClass">
+                                            @divShort
+                                        </span>
+                                        <span class="font-extrabold text-slate-900 dark:text-white text-xs">
+                                            @item.TrackingNumber
+                                        </span>
+                                    </div>
+                                    <div class="text-[11px] text-slate-500 dark:text-stone-400 font-bold">
+                                        @item.DisplayType
+                                    </div>
+                                    <div class="text-[10px] text-slate-400 dark:text-stone-500">
+                                        @item.DateSubmitted.ToString("MMM dd, yyyy hh:mm tt")
+                                    </div>
+                                </td>
+
+                                <!-- Owner / Applicant -->
+                                <td class="px-4 py-3.5">
+                                    <div class="font-bold text-slate-900 dark:text-white text-xs">
+                                        @item.OwnerOrApplicant
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(item.ReferenceNumber))
+                                    {
+                                        <div class="text-[10px] text-slate-500 dark:text-stone-400">
+                                            Ref: @item.ReferenceNumber
+                                        </div>
+                                    }
+                                    @if (!string.IsNullOrEmpty(item.ORNumber))
+                                    {
+                                        <div class="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-1 mt-0.5">
+                                            <i data-lucide="receipt" class="w-3 h-3 text-emerald-600"></i>
+                                            <span>OR: @item.ORNumber</span>
+                                        </div>
+                                    }
+                                    else if (item.RequestType == "TaxMappingRequest" || item.RequestType == "LandHoldingRequest" || item.RequestType == "TaxDeclarationRequest" || item.RequestType == "PropertyAssessmentRequest")
+                                    {
+                                        <div class="text-[10px] text-amber-600 dark:text-amber-400 font-bold flex items-center gap-1 mt-0.5">
+                                            <i data-lucide="alert-circle" class="w-3 h-3 text-amber-500"></i>
+                                            <span>No O.R. (Required on transfer)</span>
+                                        </div>
+                                    }
+                                </td>
+
+                                <!-- Current Stage & Assigned Role -->
+                                <td class="hidden md:table-cell px-4 py-3.5 space-y-1">
+                                    <span class="px-2.5 py-1 rounded-xl text-[10px] font-extrabold bg-slate-100 dark:bg-stone-800 text-slate-800 dark:text-stone-200 border border-slate-200 dark:border-stone-700 inline-block">
+                                        @item.CurrentStageName
+                                    </span>
+                                    <div class="text-[10px] text-slate-500 dark:text-stone-400 flex items-center gap-1">
+                                        <i data-lucide="user" class="w-3 h-3 text-slate-400"></i>
+                                        <span>Target: @item.AssignedToRole</span>
+                                    </div>
+                                </td>
+
+                                <!-- Status & Workspace -->
+                                <td class="hidden lg:table-cell px-4 py-3.5 space-y-1">
+                                    @if (item.IsDeferred)
+                                    {
+                                        <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-50 dark:bg-amber-500/10 text-amber-800 dark:text-amber-300 font-bold border border-amber-300 dark:border-amber-700/60 text-[10px]">
+                                            <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-600 dark:text-amber-400"></i>
+                                            <span>Deferred / Returned</span>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 font-bold border border-blue-200 dark:border-blue-800/60 text-[10px]">
+                                            <i data-lucide="user-check" class="w-3.5 h-3.5 text-blue-600"></i>
+                                            <span>Claimed (In Progress)</span>
+                                        </div>
+                                    }
+                                </td>
+
+                                <!-- Last Routing & Notes -->
+                                <td class="hidden xl:table-cell px-4 py-3.5">
+                                    @if (!string.IsNullOrEmpty(item.LastForwardedBy))
+                                    {
+                                        <div class="text-[10px] text-slate-700 dark:text-stone-300 font-bold">
+                                            From: @item.LastForwardedBy
+                                        </div>
+                                        <div class="text-[10px] text-slate-400 dark:text-stone-500">
+                                            @item.LastForwardedDate?.ToString("MMM dd, yyyy hh:mm tt")
+                                        </div>
+                                    }
+                                    @if (!string.IsNullOrEmpty(item.LastRemarks))
+                                    {
+                                        <div class="text-[10px] @(item.IsDeferred ? "text-amber-700 dark:text-amber-400 font-bold" : "text-slate-500 dark:text-stone-400 italic") line-clamp-2 mt-0.5">
+                                            "@item.LastRemarks"
+                                        </div>
+                                    }
+                                </td>
+
+                                <!-- Action Buttons -->
+                                <td class="px-4 py-3.5 text-center">
+                                    @{
+                                        bool hasItemAccess = PermissionService.CanAccess(User, "Workflow", "MyTransactions") || PermissionService.CanAccess(User, "Workflow", "Pool");
+                                    }
+                                    @if (!hasItemAccess)
+                                    {
+                                        <span class="px-2.5 py-1 rounded-xl text-[10px] font-mono bg-slate-100 dark:bg-stone-800 text-slate-400 dark:text-stone-500 inline-flex items-center gap-1 border border-slate-200 dark:border-stone-700/60" title="Your user role has no permission to access this transaction module">
+                                            <i data-lucide="lock" class="w-3 h-3 text-slate-400"></i>
+                                            <span>No Access</span>
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <div class="flex items-center justify-center gap-1.5 flex-wrap">
+                                            <!-- Forward / Route Button -->
+                                            <button type="button" onclick="openForwardModal('@item.RequestId', '@item.RequestType', '@item.TrackingNumber', '@((int)item.CurrentStage)', '@((int)item.Division)', '@(item.ORNumber ?? "")', '@(item.ORDateIssued?.ToString("yyyy-MM-dd") ?? "")')" class="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[11px] flex items-center gap-1 shadow-xs transition-all" title="Route transaction to next workflow stage">
+                                                <i data-lucide="git-pull-request" class="w-3.5 h-3.5"></i>
+                                                Forward
+                                            </button>
+
+                                            <!-- Release Back to Pool -->
+                                            <form asp-action="Release" method="post" class="inline">
+                                                <input type="hidden" name="requestId" value="@item.RequestId" />
+                                                <input type="hidden" name="requestType" value="@item.RequestType" />
+                                                <input type="hidden" name="division" value="@item.Division" />
+                                                <button type="submit" class="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-slate-700 dark:text-stone-300 border border-slate-200 dark:border-stone-700" title="Release document back to Department Pool">
+                                                    <i data-lucide="arrow-left-right" class="w-3.5 h-3.5"></i>
+                                                </button>
+                                            </form>
+
+                                            <!-- Return / Defer Button -->
+                                            <button type="button" onclick="openDeferModal('@item.RequestId', '@item.RequestType', '@item.TrackingNumber', '@((int)item.Division)')" class="p-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800/60" title="Mark as Deferred / Returned for revision">
+                                                <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                                            </button>
+
+                                            <!-- Details Deep Link -->
+                                            @{
+                                                string detailsUrl = item.RequestType switch
+                                                {
+                                                    "TaxDeclarationRequest" => Url.Action("Details", "TaxDeclarationRequest", new { id = item.RequestId }) ?? "#",
+                                                    "LandHoldingRequest" => Url.Action("Details", "LandHoldingRequest", new { id = item.RequestId }) ?? "#",
+                                                    "TaxMappingRequest" => Url.Action("Details", "TaxMapping", new { id = item.RequestId }) ?? "#",
+                                                    "PropertyAssessmentRequest" => Url.Action("Details", "PropertyAssessmentRequest", new { id = item.RequestId }) ?? "#",
+                                                    "RequestForInspection" => Url.Action("Details", "RequestForInspection", new { id = item.RequestId }) ?? "#",
+                                                    _ => "#"
+                                                };
+                                            }
+                                            <a href="@detailsUrl" class="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-slate-700 dark:text-stone-300 font-bold text-[10px] flex items-center gap-1 border border-slate-200 dark:border-stone-700" title="Open Document Details">
+                                                <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+                                                Details
+                                            </a>
+                                        </div>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination Controls -->
+        <div class="table-pagination-footer p-4 sm:p-6 pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-200 dark:border-stone-800 text-xs font-mono">
+            <div class="text-slate-500 dark:text-stone-400 text-center sm:text-left">
+                Showing <span class="font-bold text-slate-900 dark:text-white table-showing-start">1</span> to 
+                <span class="font-bold text-slate-900 dark:text-white table-showing-end">10</span> of 
+                <span class="font-bold text-slate-900 dark:text-white table-total-count">@Model.Count()</span> entries
+            </div>
+            <div class="flex items-center gap-1.5 flex-wrap justify-center table-pagination-buttons">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Forward Document Modal Component -->
+<div id="forwardModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+    <div class="bg-white dark:bg-stone-900 rounded-3xl border border-slate-200 dark:border-stone-800 p-6 max-w-lg w-full shadow-2xl space-y-4 font-mono text-xs">
+        <div class="flex items-center justify-between border-b border-slate-200 dark:border-stone-800 pb-3">
+            <h3 class="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2">
+                <i data-lucide="git-pull-request" class="w-4 h-4 text-emerald-600"></i>
+                Forward Document Transaction
+            </h3>
+            <button type="button" onclick="closeForwardModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+
+        <form asp-action="Forward" method="post" class="space-y-4">
+            <input type="hidden" name="requestId" id="modalRequestId" />
+            <input type="hidden" name="requestType" id="modalRequestType" />
+            <input type="hidden" name="division" id="modalDivision" />
+
+            <div>
+                <label class="block font-bold text-slate-700 dark:text-stone-300 mb-1">Tracking Number</label>
+                <input type="text" id="modalTrackingNo" readonly class="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-500 font-bold border border-slate-200 dark:border-stone-700 focus:outline-none" />
+            </div>
+
+            <!-- Official Receipt (O.R.) Section (Required for Tax Mapping, Land Holding, Tax Declaration before transfer) -->
+            <div id="orSection" class="p-3.5 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 space-y-2">
+                <div class="flex items-center justify-between">
+                    <label class="block font-bold text-amber-900 dark:text-amber-300 text-xs flex items-center gap-1.5">
+                        <i data-lucide="receipt" class="w-3.5 h-3.5 text-amber-600"></i>
+                        <span>Official Receipt (O.R.) Details</span>
+                    </label>
+                    <span id="orStatusBadge" class="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-300">
+                        O.R. Required to Transfer
+                    </span>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-700 dark:text-stone-300 mb-1 flex items-center justify-between">
+                            <span>O.R. NUMBER</span>
+                            <span id="orRequiredStar" class="text-rose-600 font-bold">*</span>
+                        </label>
+                        <input type="text" name="orNumber" id="modalOrNumber" placeholder="OR-2026-XXXX" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 text-slate-900 dark:text-white border border-slate-200 dark:border-stone-700 font-mono font-bold focus:outline-none focus:border-emerald-600 text-xs" />
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-700 dark:text-stone-300 mb-1">
+                            DATE ISSUED
+                        </label>
+                        <input type="date" name="orDateIssued" id="modalOrDateIssued" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 text-slate-900 dark:text-white border border-slate-200 dark:border-stone-700 font-mono font-bold focus:outline-none focus:border-emerald-600 text-xs" />
+                    </div>
+                </div>
+                <p id="orHintText" class="text-[10px] text-amber-800 dark:text-amber-400 font-sans">
+                    Notice: Official Receipt (O.R.) Number is required before transferring this transaction out of Receiving.
+                </p>
+            </div>
+
+            <div>
+                <label class="block font-bold text-slate-700 dark:text-stone-300 mb-1 flex items-center justify-between">
+                    <span>Target Workflow Stage</span>
+                    <span id="targetStageLoading" class="hidden text-[10px] text-emerald-600 font-semibold animate-pulse">Checking workflow rules...</span>
+                </label>
+                <select name="targetStage" id="modalTargetStage" required class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-950 text-slate-900 dark:text-white border border-slate-200 dark:border-stone-700 focus:outline-none focus:border-emerald-600 font-bold">
+                    <option value="" disabled selected>Loading allowed stages from Workflow Manager...</option>
+                </select>
+                <p class="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+                    <i data-lucide="git-merge" class="w-3 h-3 text-emerald-600"></i>
+                    Target stages are loaded directly from the Transaction Workflow Manager.
+                </p>
+            </div>
+
+            <div>
+                <label class="block font-bold text-slate-700 dark:text-stone-300 mb-1">Endorsement / Remarks</label>
+                <textarea name="remarks" rows="3" required placeholder="Add assessment notes, appraisal endorsements, or parcel verification remarks..." class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-950 text-slate-900 dark:text-white border border-slate-200 dark:border-stone-700 focus:outline-none focus:border-emerald-600"></textarea>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 pt-2">
+                <div>
+                    <label class="block text-[10px] text-slate-400">Forwarded By</label>
+                    <input type="text" name="forwardedByName" value="@currentUserName" readonly class="w-full px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-400 text-[11px]" />
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-400">Role</label>
+                    <input type="text" name="role" value="@(string.IsNullOrEmpty(userWorkflowRole) ? currentUserRole : userWorkflowRole)" readonly class="w-full px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-400 text-[11px]" />
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 pt-4 border-t border-slate-200 dark:border-stone-800">
+                <button type="button" onclick="closeForwardModal()" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold hover:bg-slate-200">Cancel</button>
+                <button type="submit" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold flex items-center gap-1.5 shadow-md shadow-emerald-600/20">
+                    <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                    <span>Confirm & Route</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Defer Document Modal Component -->
+<div id="deferModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+    <div class="bg-white dark:bg-stone-900 rounded-3xl border border-slate-200 dark:border-stone-800 p-6 max-w-lg w-full shadow-2xl space-y-4 font-mono text-xs">
+        <div class="flex items-center justify-between border-b border-slate-200 dark:border-stone-800 pb-3">
+            <h3 class="text-sm font-bold text-amber-700 dark:text-amber-400 uppercase flex items-center gap-2">
+                <i data-lucide="rotate-ccw" class="w-4 h-4 text-amber-600"></i>
+                Defer Transaction (Needs Revision)
+            </h3>
+            <button type="button" onclick="closeDeferModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+
+        <form asp-action="Defer" method="post" class="space-y-4">
+            <input type="hidden" name="requestId" id="deferModalRequestId" />
+            <input type="hidden" name="requestType" id="deferModalRequestType" />
+            <input type="hidden" name="division" id="deferModalDivision" />
+
+            <div>
+                <label class="block font-bold text-slate-700 dark:text-stone-300 mb-1">Tracking Number</label>
+                <input type="text" id="deferModalTrackingNo" readonly class="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-500 font-bold border border-slate-200 dark:border-stone-700 focus:outline-none" />
+            </div>
+
+            <div class="p-3 rounded-2xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-800/60 text-amber-900 dark:text-amber-300 text-[11px] space-y-1">
+                <div class="font-extrabold flex items-center gap-1.5">
+                    <i data-lucide="info" class="w-3.5 h-3.5"></i>
+                    <span>Notice: Personal Workspace Retention</span>
+                </div>
+                <p>
+                    This transaction will remain in your <strong>My Transactions</strong> workspace marked as <strong>Deferred</strong> so you can resolve issues and make revisions.
+                </p>
+            </div>
+
+            <div>
+                <label class="block font-bold text-slate-700 dark:text-stone-300 mb-1">Reason for Deferral / Required Corrections <span class="text-rose-500">*</span></label>
+                <textarea name="remarks" rows="3" required placeholder="Specify missing documents, valuation discrepancy, or survey plot revisions needed..." class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-950 text-slate-900 dark:text-white border border-slate-200 dark:border-stone-700 focus:outline-none focus:border-amber-600"></textarea>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 pt-4 border-t border-slate-200 dark:border-stone-800">
+                <button type="button" onclick="closeDeferModal()" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold hover:bg-slate-200">Cancel</button>
+                <button type="submit" class="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold flex items-center gap-1.5 shadow-md shadow-amber-600/20">
+                    <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                    <span>Mark as Deferred</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function openForwardModal(reqId, reqType, trkNo, currentStage, div, orNumber, orDate) {
+            document.getElementById('modalRequestId').value = reqId;
+            document.getElementById('modalRequestType').value = reqType;
+            document.getElementById('modalTrackingNo').value = trkNo;
+            document.getElementById('modalDivision').value = div;
+
+            var isORType = (reqType === 'TaxMappingRequest' || reqType === 'LandHoldingRequest' || reqType === 'TaxDeclarationRequest' || reqType === 'PropertyAssessmentRequest');
+            var orSection = document.getElementById('orSection');
+            var modalOrNumber = document.getElementById('modalOrNumber');
+            var modalOrDate = document.getElementById('modalOrDateIssued');
+            var orBadge = document.getElementById('orStatusBadge');
+            var orRequiredStar = document.getElementById('orRequiredStar');
+
+            if (orSection) {
+                if (isORType) {
+                    orSection.classList.remove('hidden');
+                    modalOrNumber.value = orNumber || '';
+                    modalOrDate.value = orDate || new Date().toISOString().split('T')[0];
+                    modalOrNumber.required = true;
+
+                    if (orNumber && orNumber.trim() !== '') {
+                        if (orBadge) {
+                            orBadge.className = 'text-[10px] font-bold px-2 py-0.5 rounded-lg bg-emerald-100 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300';
+                            orBadge.textContent = 'O.R. Recorded';
+                        }
+                    } else {
+                        if (orBadge) {
+                            orBadge.className = 'text-[10px] font-bold px-2 py-0.5 rounded-lg bg-rose-100 dark:bg-rose-900/50 text-rose-800 dark:text-rose-300 animate-pulse';
+                            orBadge.textContent = 'O.R. Required to Transfer';
+                        }
+                    }
+                } else {
+                    orSection.classList.add('hidden');
+                    modalOrNumber.required = false;
+                    modalOrNumber.value = '';
+                }
+            }
+
+            var stageSelect = document.getElementById('modalTargetStage');
+            var loadingIndicator = document.getElementById('targetStageLoading');
+            if (loadingIndicator) loadingIndicator.classList.remove('hidden');
+
+            stageSelect.innerHTML = '<option value="" disabled selected>Loading allowed stages from Transaction Workflow Manager...</option>';
+
+            fetch(`/Workflow/GetNextWorkflowStages?requestId=${reqId}&requestType=${encodeURIComponent(reqType)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (loadingIndicator) loadingIndicator.classList.add('hidden');
+                    stageSelect.innerHTML = '';
+                    if (data.success && data.stages && data.stages.length > 0) {
+                        data.stages.forEach(function(stg, idx) {
+                            var opt = document.createElement('option');
+                            opt.value = stg.statusId;
+                            opt.textContent = stg.statusName;
+                            if (idx === 0) opt.selected = true;
+                            stageSelect.appendChild(opt);
+                        });
+                    } else {
+                        var opt = document.createElement('option');
+                        opt.value = 5; // Completed
+                        opt.textContent = 'Completed & Issued (Final Release)';
+                        stageSelect.appendChild(opt);
+                    }
+                    if (window.lucide) {
+                        window.lucide.createIcons();
+                    }
+                })
+                .catch(err => {
+                    console.error('Error fetching workflow stages:', err);
+                    if (loadingIndicator) loadingIndicator.classList.add('hidden');
+                    stageSelect.innerHTML = '<option value="5">Completed & Issued (Final Release)</option>';
+                });
+
+            document.getElementById('forwardModal').classList.remove('hidden');
+            if (window.lucide) {
+                window.lucide.createIcons();
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            var forwardForm = document.querySelector('#forwardModal form');
+            if (forwardForm) {
+                forwardForm.addEventListener('submit', function(e) {
+                    var reqType = document.getElementById('modalRequestType').value;
+                    var isORType = (reqType === 'TaxMappingRequest' || reqType === 'LandHoldingRequest' || reqType === 'TaxDeclarationRequest' || reqType === 'PropertyAssessmentRequest');
+                    if (isORType) {
+                        var orVal = document.getElementById('modalOrNumber').value;
+                        if (!orVal || !orVal.trim()) {
+                            e.preventDefault();
+                            if (typeof toastr !== 'undefined') {
+                                toastr.warning('Official Receipt (O.R.) Number is required before transferring this transaction.', 'O.R. Required');
+                            } else {
+                                alert('Official Receipt (O.R.) Number is required before transferring this transaction.');
+                            }
+                            document.getElementById('modalOrNumber').focus();
+                            return false;
+                        }
+                    }
+                });
+            }
+        });
+
+        function closeForwardModal() {
+            document.getElementById('forwardModal').classList.add('hidden');
+        }
+
+        function openDeferModal(reqId, reqType, trkNo, div) {
+            document.getElementById('deferModalRequestId').value = reqId;
+            document.getElementById('deferModalRequestType').value = reqType;
+            document.getElementById('deferModalTrackingNo').value = trkNo;
+            document.getElementById('deferModalDivision').value = div;
+            document.getElementById('deferModal').classList.remove('hidden');
+        }
+
+        function closeDeferModal() {
+            document.getElementById('deferModal').classList.add('hidden');
+        }
+
+        // Real-Time SignalR Auto-Sync for My Transactions
+        window.addEventListener('workflow:transactionForwarded', function(e) {
+            // When an item currently in My Transactions is forwarded by this or another session
+            var myRequestId = document.getElementById('modalRequestId')?.value;
+            if (myRequestId && myRequestId === e.detail.requestId) {
+                setTimeout(function() { window.location.reload(); }, 1200);
+            }
+        });
+    </script>
+}

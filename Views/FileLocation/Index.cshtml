@@ -1,0 +1,194 @@
+@model IEnumerable<PropertyAssessmentApp.Models.FileLocation>
+@{
+    ViewData["Title"] = "File Location Setup";
+}
+
+<div class="space-y-8 font-mono text-xs">
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <div class="inline-flex items-center gap-2 text-xs font-mono text-emerald-700 dark:text-emerald-400 font-bold mb-1">
+                <i data-lucide="hard-drive" class="w-4 h-4"></i>
+                <span>CAST Reference Configuration</span>
+            </div>
+            <h1 class="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">File Location Setup</h1>
+            <p class="text-slate-500 dark:text-stone-400 text-sm">Centralized physical and network storage directory configuration referenced from CAST system architecture.</p>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30 text-xs font-bold">
+                <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
+                <span>Default Seeding Active</span>
+            </span>
+        </div>
+    </div>
+
+    <!-- Alert / Information Banner -->
+    <div class="p-4 rounded-2xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 text-amber-800 dark:text-amber-300 flex items-start gap-3 shadow-xs">
+        <i data-lucide="info" class="w-5 h-5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400"></i>
+        <div class="space-y-1">
+            <span class="font-bold text-sm">Storage Routing Architecture:</span>
+            <p class="text-xs leading-relaxed text-amber-700 dark:text-amber-400">
+                Primary file uploads check for <strong>Network Storage</strong> (IDs 1–6) when network storage is connected. If network access is disabled or unreachable, the system automatically falls back to the corresponding <strong>Local Web Base</strong> (IDs 11–16: <code class="bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 rounded">~/UploadFile/...</code>) to ensure uninterrupted service.
+            </p>
+        </div>
+    </div>
+
+    <!-- File Locations Table Card -->
+    <div class="rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm paginated-table-card">
+        <div class="p-4 sm:p-6 pb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-stone-800">
+            <div>
+                <h2 class="text-lg font-extrabold text-slate-900 dark:text-white">Configured Storage Directories</h2>
+                <span class="text-slate-500 text-xs">Table: <code class="font-bold text-emerald-600 dark:text-emerald-400">[dbo].[FileLocation]</code></span>
+            </div>
+            <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2 bg-slate-50 dark:bg-stone-800 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-stone-700 shadow-xs shrink-0">
+                    <span class="limit-label text-[10px] text-slate-500 dark:text-emerald-400 font-extrabold uppercase">Limit:</span>
+                    <select class="table-limit-select bg-transparent font-extrabold text-slate-900 dark:text-white focus:outline-none cursor-pointer">
+                        <option value="5" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">5</option>
+                        <option value="10" selected class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">10</option>
+                        <option value="25" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">25</option>
+                        <option value="50" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">50</option>
+                        <option value="100" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">100</option>
+                    </select>
+                </div>
+                <span class="px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold text-[11px]">
+                    @Model.Count() Locations
+                </span>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto min-h-[260px] pb-4 rounded-3xl">
+            <table class="w-full text-left text-xs font-mono">
+                <thead class="bg-slate-100 dark:bg-stone-950 text-slate-600 dark:text-stone-400 border-b border-slate-200 dark:border-stone-800 font-bold">
+                    <tr>
+                        <th class="hidden sm:table-cell px-4 py-3.5">ID</th>
+                        <th class="px-3 sm:px-4 py-3.5">CATEGORY / NAME</th>
+                        <th class="hidden sm:table-cell px-4 py-3.5">TARGET SCOPE</th>
+                        <th class="px-3 sm:px-4 py-3.5">CONFIGURED PATH / DIRECTORY</th>
+                        <th class="px-2 sm:px-4 py-3.5 text-right">ACTION</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-stone-800/60">
+                    @foreach (var item in Model)
+                    {
+                        var isNetwork = item.FileLocationId < 10;
+                        <tr class="hover:bg-slate-50/50 dark:hover:bg-stone-800/40 transition-colors">
+                            <td class="hidden sm:table-cell py-3 px-3 font-bold text-slate-900 dark:text-white font-mono">
+                                #@item.FileLocationId
+                            </td>
+                            <td class="py-3 px-3 font-semibold text-slate-800 dark:text-stone-200">
+                                @item.Name
+                                <div class="sm:hidden mt-1">
+                                    @if (isNetwork)
+                                    {
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-bold bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-400 border border-sky-200">
+                                            UNC
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200">
+                                            Local
+                                        </span>
+                                    }
+                                </div>
+                            </td>
+                            <td class="hidden sm:table-cell py-3 px-3">
+                                @if (isNetwork)
+                                {
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-400 border border-sky-200 dark:border-sky-500/20">
+                                        <i data-lucide="cloud" class="w-3 h-3"></i>
+                                        Network UNC
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20">
+                                        <i data-lucide="hard-drive" class="w-3 h-3"></i>
+                                        Local Base
+                                    </span>
+                                }
+                            </td>
+                            <td class="py-3 px-3 sm:px-4 font-mono text-[11px] text-slate-600 dark:text-stone-400 break-all select-all">
+                                @item.Location
+                            </td>
+                            <td class="py-3 px-2 sm:px-3 text-right">
+                                <button type="button" 
+                                        onclick="openEditModal(@item.FileLocationId, '@Html.Raw(Html.Encode(item.Name))', '@Html.Raw(Html.Encode(item.Location))')"
+                                        class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-emerald-50 dark:bg-stone-800 dark:hover:bg-emerald-950/40 text-slate-700 hover:text-emerald-700 dark:text-stone-300 dark:hover:text-emerald-400 font-bold transition-all border border-slate-200 dark:border-stone-700">
+                                    <i data-lucide="edit-2" class="w-3 h-3 inline mr-1"></i> Edit
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination Controls -->
+        <div class="table-pagination-footer p-4 sm:p-6 pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-200 dark:border-stone-800 text-xs font-mono">
+            <div class="text-slate-500 dark:text-stone-400 text-center sm:text-left">
+                Showing <span class="font-bold text-slate-900 dark:text-white table-showing-start">1</span> to 
+                <span class="font-bold text-slate-900 dark:text-white table-showing-end">10</span> of 
+                <span class="font-bold text-slate-900 dark:text-white table-total-count">@Model.Count()</span> entries
+            </div>
+            <div class="flex items-center gap-1.5 flex-wrap justify-center table-pagination-buttons">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- EDIT LOCATION MODAL -->
+<div id="editLocationModal" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 rounded-3xl p-6 w-full max-w-lg shadow-xl space-y-5 font-mono text-xs">
+        <div class="flex items-center justify-between border-b border-slate-200 dark:border-stone-800 pb-3">
+            <div class="flex items-center gap-2">
+                <i data-lucide="edit" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                <h3 class="text-base font-extrabold text-slate-900 dark:text-white">Edit Storage Location</h3>
+            </div>
+            <button type="button" onclick="closeEditModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-stone-200">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+
+        <form asp-action="Edit" method="post" class="space-y-4">
+            @Html.AntiForgeryToken()
+            <input type="hidden" id="editFileLocationId" name="fileLocationId" />
+
+            <div>
+                <label class="block text-slate-700 dark:text-stone-300 font-bold mb-1">Location Identifier / Name</label>
+                <input type="text" id="editName" name="name" required class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-700 bg-slate-50 dark:bg-stone-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold" />
+            </div>
+
+            <div>
+                <label class="block text-slate-700 dark:text-stone-300 font-bold mb-1">Configured Path (UNC Network Share or Local Virtual Path)</label>
+                <input type="text" id="editLocation" name="location" required class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-700 bg-slate-50 dark:bg-stone-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono text-xs" />
+                <span class="text-[10px] text-slate-400 mt-1 block">Examples: <code>\\192.168.0.182\mapping_system\...</code> or <code>~/UploadFile/Attachment</code></span>
+            </div>
+
+            <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-200 dark:border-stone-800">
+                <button type="button" onclick="closeEditModal()" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-slate-700 dark:text-stone-300 font-bold">
+                    Cancel
+                </button>
+                <button type="submit" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center gap-2 shadow-sm">
+                    <i data-lucide="check" class="w-4 h-4"></i>
+                    Save Location
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openEditModal(id, name, location) {
+        document.getElementById('editFileLocationId').value = id;
+        document.getElementById('editName').value = name;
+        document.getElementById('editLocation').value = location;
+        document.getElementById('editLocationModal').classList.remove('hidden');
+    }
+
+    function closeEditModal() {
+        document.getElementById('editLocationModal').classList.add('hidden');
+    }
+</script>

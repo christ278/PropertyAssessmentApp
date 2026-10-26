@@ -1,0 +1,272 @@
+/* Sinsilyo-Architecture Light Mode Enterprise CSS Stylesheet */
+
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #059669;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+    display: none;
+}
+.scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+/* Glassmorphism utility for light mode */
+.glass-panel-light {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+/* Light Card Elevation */
+.sinsilyo-card-light {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+}
+.sinsilyo-card-light:hover {
+    transform: translateY(-2px);
+    border-color: rgba(16, 185, 129, 0.4);
+    box-shadow: 0 10px 25px -5px rgba(5, 150, 105, 0.12), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* Searchable Select (Tom Select) Custom Styling for Dark & Light Mode */
+.ts-control {
+    background-color: transparent !important;
+    border-color: #cbd5e1 !important;
+    border-radius: 0.75rem !important;
+    padding: 0.625rem 1rem !important;
+    font-family: inherit !important;
+    font-size: 0.75rem !important;
+    font-weight: 700 !important;
+    color: #0f172a !important;
+    box-shadow: none !important;
+}
+.dark .ts-control {
+    background-color: #030202 !important;
+    border-color: #262626 !important;
+    color: #ffffff !important;
+}
+.dark .ts-control input {
+    color: #ffffff !important;
+}
+.ts-dropdown {
+    border-radius: 0.75rem !important;
+    overflow: hidden !important;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+    border-color: #e2e8f0 !important;
+    font-size: 0.75rem !important;
+}
+.dark .ts-dropdown {
+    background-color: #0c0a09 !important;
+    color: #f5f5f4 !important;
+    border-color: #262626 !important;
+}
+.ts-dropdown .option {
+    padding: 0.625rem 1rem !important;
+    font-weight: 600 !important;
+}
+.dark .ts-dropdown .option {
+    color: #d6d3d1 !important;
+}
+.dark .ts-dropdown .option.active, .dark .ts-dropdown .option:hover {
+    background-color: #059669 !important;
+    color: #ffffff !important;
+}
+.ts-dropdown .option.active, .ts-dropdown .option:hover {
+    background-color: #10b981 !important;
+    color: #ffffff !important;
+}
+
+/* Toastr Notification Custom Dark/Light Mode Styling */
+#toast-container > div {
+    border-radius: 1rem !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 0.75rem !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+    opacity: 0.98 !important;
+    padding: 1rem 1rem 1rem 3rem !important;
+}
+#toast-container > .toast-success {
+    background-color: #047857 !important;
+    border: 1px solid #10b981 !important;
+}
+#toast-container > .toast-error {
+    background-color: #be123c !important;
+    border: 1px solid #f43f5e !important;
+}
+.toast-title {
+    font-weight: 800 !important;
+    font-size: 0.85rem !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+}
+
+/* Responsive Form Utilities for Mobile, Tablet & Desktop */
+input, select, textarea {
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+/* Ensure mobile form fields have comfortable tap targets and readable text size to prevent iOS zoom */
+@media (max-width: 640px) {
+    input, select, textarea {
+        font-size: 14px !important;
+    }
+    
+    .form-header-responsive {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 0.75rem !important;
+    }
+
+    .form-header-responsive a,
+    .form-header-responsive button {
+        width: 100% !important;
+        text-align: center !important;
+        justify-content: center !important;
+    }
+
+    .form-actions-responsive {
+        flex-direction: column-reverse !important;
+        gap: 0.5rem !important;
+    }
+
+    .form-actions-responsive a,
+    .form-actions-responsive button {
+        width: 100% !important;
+        text-align: center !important;
+        justify-content: center !important;
+    }
+}
+
+/* Table Responsive Container */
+.table-responsive-container {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Print Styles for Tax Declarations */
+@media print {
+    aside, header, nav, button, form, .no-print {
+        display: none !important;
+    }
+    
+    body {
+        background: #ffffff !important;
+        color: #000000 !important;
+        margin: 0 !important;
+        padding: 10px !important;
+    }
+
+    body * {
+        color: #000000 !important;
+        background: transparent !important;
+        border-color: #d1d5db !important;
+        box-shadow: none !important;
+        text-shadow: none !important;
+    }
+
+    #printableTaxDeclaration {
+        display: block !important;
+        visibility: visible !important;
+        width: 100% !important;
+    }
+
+    table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+        color: #000000 !important;
+    }
+
+    th, td {
+        color: #000000 !important;
+        border: 1px solid #d1d5db !important;
+        padding: 6px 8px !important;
+    }
+
+    @page {
+        margin: 10mm;
+    }
+}
+
+/* High-Contrast Dark Mode Select & Pagination Limit Readability */
+.dark select {
+    color: #f8fafc !important;
+}
+
+.dark select option,
+.dark option {
+    background-color: #1c1917 !important;
+    color: #f8fafc !important;
+}
+
+.dark .table-limit-select {
+    color: #ffffff !important;
+    font-weight: 800 !important;
+    background-color: transparent !important;
+}
+
+.dark .table-limit-select option {
+    background-color: #1c1917 !important;
+    color: #ffffff !important;
+    font-weight: 700 !important;
+    padding: 6px 10px !important;
+}
+
+.dark select option:checked,
+.dark .table-limit-select option:checked {
+    background-color: #059669 !important;
+    color: #ffffff !important;
+}
+
+/* Limit Container & Label Styling for High Contrast */
+.limit-label {
+    font-weight: 800 !important;
+    letter-spacing: 0.05em !important;
+}
+
+.dark .limit-label {
+    color: #34d399 !important; /* Vivid emerald in dark mode */
+}
+
+/* ASP.NET Core Validation Summary Display Rules */
+.validation-summary-valid {
+    display: none !important;
+}
+
+/* Chrome / WebKit Autofill Anti-Flicker & Transition Suppressor */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus, 
+input:-webkit-autofill:active,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus {
+    -webkit-text-fill-color: inherit !important;
+    -webkit-transition-delay: 99999s !important;
+    transition-delay: 99999s !important;
+    -webkit-transition: background-color 50000s ease-in-out 0s, color 50000s ease-in-out 0s !important;
+    transition: background-color 50000s ease-in-out 0s, color 50000s ease-in-out 0s !important;
+    caret-color: inherit !important;
+}
+
+
+
+

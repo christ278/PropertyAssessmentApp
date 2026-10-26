@@ -1,0 +1,532 @@
+@model PropertyAssessmentApp.Models.PropertyAssessmentRequest
+@using PropertyAssessmentApp.Models
+
+@{
+    ViewData["Title"] = $"Assessment Details - {Model.TrackingNumber}";
+}
+
+<div class="space-y-6 font-mono text-xs">
+    
+    <!-- Top Action Bar -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <div class="inline-flex items-center gap-2 text-xs font-mono text-emerald-700 dark:text-emerald-400 font-bold mb-1">
+                <i data-lucide="layers" class="w-4 h-4"></i>
+                <span>Property Assessment Dossier</span>
+            </div>
+            <div class="flex items-center gap-3">
+                <h1 class="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">@Model.TrackingNumber</h1>
+                <span class="px-3 py-1 rounded-full text-xs font-bold 
+                    @(Model.Status == PropertyAssessmentStatus.Approved ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300" :
+                      Model.Status == PropertyAssessmentStatus.Deferred ? "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300" :
+                      "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300")">
+                    Status: @Model.Status
+                </span>
+            </div>
+            <p class="text-slate-500 dark:text-stone-400 text-sm">[@Model.TransactionTypeCode] @Model.TransactionTypeName | Filed on @Model.RequestDate.ToString("MMMM dd, yyyy hh:mm tt")</p>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+            @if (Model.Status == PropertyAssessmentStatus.Receiving || Model.Status == PropertyAssessmentStatus.Pending)
+            {
+                <button type="button" onclick="openForwardModal()" class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition-all flex items-center gap-1.5 shadow-sm shadow-emerald-600/30">
+                    <i data-lucide="arrow-right-circle" class="w-4 h-4"></i>
+                    <span>Forward to GIS Mapping</span>
+                </button>
+            }
+            <a asp-action="Edit" asp-route-id="@Model.Id" class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold transition-all flex items-center gap-1.5">
+                <i data-lucide="edit" class="w-4 h-4"></i>
+                <span>Edit Request</span>
+            </a>
+            <a asp-action="Index" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold hover:bg-slate-200 transition-all">
+                Back to List
+            </a>
+        </div>
+    </div>
+
+    <!-- LGU Workflow Status Pipeline -->
+    <div class="p-4 sm:p-5 rounded-2xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm">
+        <div class="flex flex-wrap items-center justify-between border-b border-slate-100 dark:border-stone-800 pb-3 mb-4 gap-2">
+            <span class="text-xs font-bold text-slate-700 dark:text-stone-300 uppercase flex items-center gap-2">
+                <i data-lucide="git-branch" class="w-4 h-4 text-emerald-600"></i>
+                LGU Assessor Workflow Stage
+            </span>
+            @if (string.IsNullOrWhiteSpace(Model.ORNumber))
+            {
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300">
+                    <i data-lucide="alert-circle" class="w-3.5 h-3.5 text-amber-600"></i>
+                    O.R. Pending (Required to Forward)
+                </span>
+            }
+            else
+            {
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300">
+                    <i data-lucide="receipt" class="w-3.5 h-3.5 text-emerald-600"></i>
+                    O.R. #@Model.ORNumber Paid
+                </span>
+            }
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center text-[11px] font-sans">
+            @{
+                var cur = (int)Model.Status;
+            }
+            <div class="p-2.5 rounded-xl border @(cur >= 1 ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 font-bold" : "bg-slate-50 dark:bg-stone-950 border-slate-200 dark:border-stone-800 text-slate-400")">
+                <div class="font-mono text-[10px] text-slate-400 mb-0.5">STEP 1</div>
+                <div>Receiving & Encoding</div>
+            </div>
+            <div class="p-2.5 rounded-xl border @(cur >= 2 ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 font-bold" : "bg-slate-50 dark:bg-stone-950 border-slate-200 dark:border-stone-800 text-slate-400")">
+                <div class="font-mono text-[10px] text-slate-400 mb-0.5">STEP 2</div>
+                <div>GIS Replotting / Mapping</div>
+            </div>
+            <div class="p-2.5 rounded-xl border @(cur >= 3 ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 font-bold" : "bg-slate-50 dark:bg-stone-950 border-slate-200 dark:border-stone-800 text-slate-400")">
+                <div class="font-mono text-[10px] text-slate-400 mb-0.5">STEP 3</div>
+                <div>Appraisal & Valuation</div>
+            </div>
+            <div class="p-2.5 rounded-xl border @(cur >= 4 ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 font-bold" : "bg-slate-50 dark:bg-stone-950 border-slate-200 dark:border-stone-800 text-slate-400")">
+                <div class="font-mono text-[10px] text-slate-400 mb-0.5">STEP 4</div>
+                <div>Check and Review</div>
+            </div>
+            <div class="p-2.5 rounded-xl border @(cur >= 5 ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 font-bold" : "bg-slate-50 dark:bg-stone-950 border-slate-200 dark:border-stone-800 text-slate-400")">
+                <div class="font-mono text-[10px] text-slate-400 mb-0.5">STEP 5</div>
+                <div>Assessor Approval / TD</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Messages -->
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 font-bold">
+            @TempData["SuccessMessage"]
+        </div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300 font-bold">
+            @TempData["ErrorMessage"]
+        </div>
+    }
+
+    <!-- CAST Partitioning & TDN Generation Card -->
+    <div class="p-6 rounded-3xl bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-slate-500/10 dark:from-emerald-950/30 dark:via-teal-950/20 dark:to-stone-900 border border-emerald-200 dark:border-emerald-800/60 shadow-sm space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-bold text-[10px] bg-emerald-600 text-white uppercase">
+                    CAST InitialSave Architecture
+                </span>
+                <h3 class="text-base font-black text-slate-900 dark:text-white mt-1">
+                    Assessment Partitions & Automated Tax Declaration Generation
+                </h3>
+                <p class="text-xs text-slate-600 dark:text-stone-400">
+                    Configured for <strong class="text-emerald-700 dark:text-emerald-400">@Model.Partitions partition lot@(Model.Partitions > 1 ? "s" : "")</strong>. Subdivide the property into child TDNs (Partitions A, B, C...) with computed assessed values.
+                </p>
+            </div>
+
+            <form asp-action="Partition" method="post" class="flex items-center gap-2 self-start sm:self-auto">
+                <input type="hidden" name="id" value="@Model.Id" />
+                <div class="flex items-center gap-2 bg-white dark:bg-stone-900 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-stone-800">
+                    <label class="text-[11px] font-bold text-slate-500">Lots:</label>
+                    <input type="number" name="partitionCount" value="@Model.Partitions" min="1" max="50" class="w-14 px-2 py-1 rounded bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 font-mono font-bold text-center" />
+                </div>
+                <button type="submit" onclick="return confirm('Generate Tax Declarations from this assessment partition?')" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold shadow-sm transition-all flex items-center gap-2">
+                    <i data-lucide="split" class="w-4 h-4"></i>
+                    <span>Generate TDNs</span>
+                </button>
+            </form>
+        </div>
+
+        @{
+            List<PropertyAssessmentApp.Models.AssessmentPartitionItem> savedPartitions = new();
+            if (!string.IsNullOrWhiteSpace(Model.GeneratedPartitionsJson))
+            {
+                try { savedPartitions = System.Text.Json.JsonSerializer.Deserialize<List<PropertyAssessmentApp.Models.AssessmentPartitionItem>>(Model.GeneratedPartitionsJson) ?? new(); }
+                catch {}
+            }
+        }
+
+        @if (savedPartitions.Any())
+        {
+            <div class="mt-4 pt-4 border-t border-emerald-200/60 dark:border-emerald-800/60 space-y-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-slate-800 dark:text-stone-200 uppercase flex items-center gap-1.5">
+                        <i data-lucide="layers" class="w-3.5 h-3.5 text-emerald-600"></i>
+                        Generated Partition/s
+                    </span>
+                    <span class="text-[10px] text-slate-500">Duplicated from selected reference property</span>
+                </div>
+                <div class="border border-slate-200 dark:border-stone-800 rounded-2xl overflow-x-auto bg-white dark:bg-stone-900 shadow-sm">
+                    <table class="w-full text-left text-xs font-mono">
+                        <thead class="bg-slate-100 dark:bg-stone-950 text-slate-600 dark:text-stone-400 border-b border-slate-200 dark:border-stone-800 font-bold uppercase text-[10px]">
+                            <tr>
+                                <th class="px-4 py-3">TDN</th>
+                                <th class="px-4 py-3">Kind</th>
+                                <th class="px-4 py-3">Owner</th>
+                                <th class="px-4 py-3">Property Location</th>
+                                <th class="px-4 py-3 text-center w-24">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 dark:divide-stone-800/60 font-sans">
+                            @for (int pIdx = 0; pIdx < savedPartitions.Count; pIdx++)
+                            {
+                                var pt = savedPartitions[pIdx];
+                                <tr class="hover:bg-slate-50 dark:hover:bg-stone-800/40 transition-colors">
+                                    <td class="px-4 py-3 align-middle">
+                                        <div class="flex items-center gap-2">
+                                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-bold font-mono text-xs shrink-0" title="Partition Lot @pt.PartitionIndex">
+                                                @pt.PartitionIndex
+                                            </span>
+                                            <div>
+                                                <span class="font-bold font-mono text-slate-900 dark:text-white text-xs block">
+                                                    @(string.IsNullOrWhiteSpace(pt.SystemGeneratedTDN) ? "TDN-PENDING" : pt.SystemGeneratedTDN)
+                                                </span>
+                                                <div class="flex items-center gap-1.5 mt-0.5">
+                                                    @if (Model.Status == PropertyAssessmentApp.Models.PropertyAssessmentStatus.Approved)
+                                                    {
+                                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/50">Active</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-700/50">Pending Approval</span>
+                                                    }
+                                                    @if (!string.IsNullOrWhiteSpace(pt.PIN))
+                                                    {
+                                                        <span class="text-[10px] text-slate-500 dark:text-stone-400 font-mono">PIN: @pt.PIN</span>
+                                                    }
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-3 align-middle">
+                                        <span class="inline-block px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60 font-mono">
+                                            @(string.IsNullOrWhiteSpace(pt.Kind) ? "Land" : pt.Kind)
+                                        </span>
+                                        @if (!string.IsNullOrWhiteSpace(pt.Classification))
+                                        {
+                                            <span class="block text-[10px] text-slate-500 dark:text-stone-400 font-sans mt-0.5">@pt.Classification</span>
+                                        }
+                                    </td>
+                                    <td class="px-4 py-3 align-middle">
+                                        <span class="font-medium text-slate-900 dark:text-white text-xs block">
+                                            @(string.IsNullOrWhiteSpace(pt.NewOwnerName) ? "N/A" : pt.NewOwnerName)
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3 align-middle">
+                                        <span class="text-slate-600 dark:text-stone-300 text-xs block font-sans">
+                                            @pt.DisplayPropertyLocation
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3 align-middle text-center">
+                                        <a asp-action="EditPartition" asp-route-requestId="@Model.Id" asp-route-index="@pIdx" asp-route-returnUrl="@Url.Action("Details", new { id = Model.Id })" class="inline-flex p-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition-colors" title="Edit Full CAST Appraisal (Pencil)">
+                                            <i data-lucide="pencil" class="w-4 h-4"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+    </div>
+
+    <!-- Request Details Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        <!-- Previous Property & Transaction Details -->
+        <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-4">
+            <h3 class="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2 border-b border-slate-100 dark:border-stone-800 pb-2">
+                <i data-lucide="history" class="w-4 h-4 text-emerald-600"></i>
+                Previous Property Reference
+            </h3>
+            
+            <dl class="grid grid-cols-2 gap-3">
+                <div>
+                    <dt class="text-[10px] text-slate-400 font-bold uppercase">Transaction Type</dt>
+                    <dd class="text-xs font-black text-slate-900 dark:text-white">@Model.TransactionTypeDisplayName</dd>
+                </div>
+                <div>
+                    <dt class="text-[10px] text-slate-400 font-bold uppercase">Property Kind</dt>
+                    <dd class="text-xs font-bold text-emerald-600">@Model.Kind</dd>
+                </div>
+                <div>
+                    <dt class="text-[10px] text-slate-400 font-bold uppercase">Previous TDN</dt>
+                    <dd class="text-sm font-black text-slate-900 dark:text-white">@Model.PrevTDN</dd>
+                </div>
+                <div>
+                    <dt class="text-[10px] text-slate-400 font-bold uppercase">Previous PIN</dt>
+                    <dd class="text-sm font-black text-slate-900 dark:text-white">@Model.PrevPIN</dd>
+                </div>
+                <div class="col-span-2">
+                    <dt class="text-[10px] text-slate-400 font-bold uppercase">Previous Owner</dt>
+                    <dd class="text-sm font-bold text-slate-900 dark:text-white">@Model.PrevOwner</dd>
+                </div>
+                <div>
+                    <dt class="text-[10px] text-slate-400 font-bold uppercase">Lot / Survey No.</dt>
+                    <dd class="text-xs font-semibold text-slate-700 dark:text-stone-300">@Model.LotNo</dd>
+                </div>
+                <div>
+                    <dt class="text-[10px] text-slate-400 font-bold uppercase">Location Address</dt>
+                    <dd class="text-xs font-semibold text-slate-700 dark:text-stone-300">@Model.PropertyLocation</dd>
+                </div>
+            </dl>
+        </div>
+
+        <!-- New Owner & Declarant Information -->
+        <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-4">
+            <h3 class="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2 border-b border-slate-100 dark:border-stone-800 pb-2">
+                <i data-lucide="user-check" class="w-4 h-4 text-emerald-600"></i>
+                New Owner / Declarant
+            </h3>
+
+            <dl class="grid grid-cols-2 gap-3">
+                <div class="col-span-2">
+                    <dt class="text-[10px] text-slate-400 font-bold uppercase">New Owner Name</dt>
+                    <dd class="text-base font-black text-slate-900 dark:text-white">@Model.NewOwnerName</dd>
+                </div>
+                <div>
+                    <dt class="text-[10px] text-slate-400 font-bold uppercase">Owner TIN</dt>
+                    <dd class="text-xs font-mono font-semibold text-slate-700 dark:text-stone-300">@(Model.OwnerTIN ?? "N/A")</dd>
+                </div>
+                <div>
+                    <dt class="text-[10px] text-slate-400 font-bold uppercase">Contact Number</dt>
+                    <dd class="text-xs font-mono font-semibold text-slate-700 dark:text-stone-300">@(Model.ContactNo ?? "N/A")</dd>
+                </div>
+                <div class="col-span-2">
+                    <dt class="text-[10px] text-slate-400 font-bold uppercase">Resident Address</dt>
+                    <dd class="text-xs font-semibold text-slate-700 dark:text-stone-300">@Model.Address</dd>
+                </div>
+                <div>
+                    <dt class="text-[10px] text-slate-400 font-bold uppercase">Email Address</dt>
+                    <dd class="text-xs font-semibold text-slate-700 dark:text-stone-300">@(Model.EmailAddress ?? "N/A")</dd>
+                </div>
+                <div>
+                    <dt class="text-[10px] text-slate-400 font-bold uppercase">Requestor / Rep</dt>
+                    <dd class="text-xs font-semibold text-slate-700 dark:text-stone-300">@(Model.Requestor ?? "N/A")</dd>
+                </div>
+            </dl>
+        </div>
+    </div>
+
+    <!-- Documents Submitted Checklist Card -->
+    <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-4">
+        <h3 class="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2 border-b border-slate-100 dark:border-stone-800 pb-2">
+            <i data-lucide="check-circle" class="w-4 h-4 text-emerald-600"></i>
+            Documents Submitted Verification
+        </h3>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+            <div class="p-3 rounded-xl border flex items-center gap-2 @(Model.DocTitleTctCloa ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 border-emerald-300" : "bg-slate-50 dark:bg-stone-950 text-slate-400 border-slate-200 dark:border-stone-800")">
+                <i data-lucide="@(Model.DocTitleTctCloa ? "check" : "x")" class="w-4 h-4"></i>
+                <span class="text-[11px] font-bold">Certificate of Title (TCT/OCT)</span>
+            </div>
+            <div class="p-3 rounded-xl border flex items-center gap-2 @(Model.DocDeedOfSaleConveyance ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 border-emerald-300" : "bg-slate-50 dark:bg-stone-950 text-slate-400 border-slate-200 dark:border-stone-800")">
+                <i data-lucide="@(Model.DocDeedOfSaleConveyance ? "check" : "x")" class="w-4 h-4"></i>
+                <span class="text-[11px] font-bold">Deed of Sale / Conveyance</span>
+            </div>
+            <div class="p-3 rounded-xl border flex items-center gap-2 @(Model.DocCarBir ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 border-emerald-300" : "bg-slate-50 dark:bg-stone-950 text-slate-400 border-slate-200 dark:border-stone-800")">
+                <i data-lucide="@(Model.DocCarBir ? "check" : "x")" class="w-4 h-4"></i>
+                <span class="text-[11px] font-bold">BIR CAR Certificate</span>
+            </div>
+            <div class="p-3 rounded-xl border flex items-center gap-2 @(Model.DocTaxClearance ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 border-emerald-300" : "bg-slate-50 dark:bg-stone-950 text-slate-400 border-slate-200 dark:border-stone-800")">
+                <i data-lucide="@(Model.DocTaxClearance ? "check" : "x")" class="w-4 h-4"></i>
+                <span class="text-[11px] font-bold">RPT Tax Clearance</span>
+            </div>
+            <div class="p-3 rounded-xl border flex items-center gap-2 @(Model.DocApprovedSurveyPlan ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 border-emerald-300" : "bg-slate-50 dark:bg-stone-950 text-slate-400 border-slate-200 dark:border-stone-800")">
+                <i data-lucide="@(Model.DocApprovedSurveyPlan ? "check" : "x")" class="w-4 h-4"></i>
+                <span class="text-[11px] font-bold">Approved Survey Plan</span>
+            </div>
+            <div class="p-3 rounded-xl border flex items-center gap-2 @(Model.DocBuildingPermit ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 border-emerald-300" : "bg-slate-50 dark:bg-stone-950 text-slate-400 border-slate-200 dark:border-stone-800")">
+                <i data-lucide="@(Model.DocBuildingPermit ? "check" : "x")" class="w-4 h-4"></i>
+                <span class="text-[11px] font-bold">Building Permit</span>
+            </div>
+            <div class="p-3 rounded-xl border flex items-center gap-2 @(Model.DocCertOccupancy ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 border-emerald-300" : "bg-slate-50 dark:bg-stone-950 text-slate-400 border-slate-200 dark:border-stone-800")">
+                <i data-lucide="@(Model.DocCertOccupancy ? "check" : "x")" class="w-4 h-4"></i>
+                <span class="text-[11px] font-bold">Certificate of Occupancy</span>
+            </div>
+            <div class="p-3 rounded-xl border flex items-center gap-2 @(Model.DocSpaAuthLetter ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 border-emerald-300" : "bg-slate-50 dark:bg-stone-950 text-slate-400 border-slate-200 dark:border-stone-800")">
+                <i data-lucide="@(Model.DocSpaAuthLetter ? "check" : "x")" class="w-4 h-4"></i>
+                <span class="text-[11px] font-bold">SPA / Authorization Letter</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Attachment & Billing Section -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        <!-- Attachment Card -->
+        <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-4">
+            <h3 class="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2 border-b border-slate-100 dark:border-stone-800 pb-2">
+                <i data-lucide="paperclip" class="w-4 h-4 text-emerald-600"></i>
+                Uploaded Assessment Dossier
+            </h3>
+
+            @if (!string.IsNullOrEmpty(Model.AttachmentFileName))
+            {
+                <div class="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="file-check" class="w-8 h-8 text-emerald-600"></i>
+                        <div>
+                            <span class="font-bold text-slate-900 dark:text-white block">@Model.AttachmentFileName</span>
+                            <span class="text-[10px] text-slate-400">Size: @(Model.AttachmentFileSize ?? "Unknown") | Location: ~/UploadFile/PropertyAssessment/@Model.TrackingNumber</span>
+                        </div>
+                    </div>
+                    <a asp-action="DownloadAttachment" asp-route-id="@Model.Id" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 transition-all">
+                        <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                        <span>Download</span>
+                    </a>
+                </div>
+            }
+            else
+            {
+                <div class="p-6 text-center text-slate-400 dark:text-stone-500 bg-slate-50 dark:bg-stone-950 rounded-2xl border border-dashed border-slate-200 dark:border-stone-800">
+                    No attachment uploaded for this assessment request.
+                </div>
+            }
+        </div>
+
+        <!-- Fee & Receipt Card -->
+        <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 dark:border-stone-800 pb-2">
+                <h3 class="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2">
+                    <i data-lucide="receipt" class="w-4 h-4 text-emerald-600"></i>
+                    Billing & Official Receipt Details
+                </h3>
+                @if (string.IsNullOrWhiteSpace(Model.ORNumber))
+                {
+                    <button type="button" onclick="openForwardModal()" class="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all">
+                        <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
+                        <span>Input O.R. & Forward</span>
+                    </button>
+                }
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <span class="text-[10px] text-slate-400 font-bold uppercase block">Official Receipt No.</span>
+                    @if (!string.IsNullOrWhiteSpace(Model.ORNumber))
+                    {
+                        <span class="text-base font-black text-slate-900 dark:text-white font-mono">@Model.ORNumber</span>
+                    }
+                    else
+                    {
+                        <div class="flex items-center gap-2 mt-1">
+                            <span class="px-2.5 py-0.5 rounded text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300">NO O.R. RECORDED</span>
+                            <span class="text-[10px] text-slate-500">Required before forwarding</span>
+                        </div>
+                    }
+                </div>
+                <div>
+                    <span class="text-[10px] text-slate-400 font-bold uppercase block">Total Fees Amount</span>
+                    <span class="text-xl font-black text-emerald-600">₱@Model.TotalFeesAmount.ToString("N2")</span>
+                </div>
+            </div>
+
+            @if (Model.ORDateIssued.HasValue)
+            {
+                <p class="text-[11px] text-slate-500">O.R. Date Issued: @Model.ORDateIssued.Value.ToString("yyyy-MM-dd")</p>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- FORWARD REQUEST MODAL (With O.R. Validation) -->
+<div id="forwardModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="w-full max-w-lg bg-white dark:bg-stone-900 rounded-3xl border border-slate-200 dark:border-stone-800 shadow-2xl p-6 sm:p-8 space-y-6">
+        <div class="flex items-center justify-between border-b border-slate-200 dark:border-stone-800 pb-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 flex items-center justify-center font-bold">
+                    <i data-lucide="arrow-right-circle" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-black text-slate-900 dark:text-white">Forward to GIS Mapping</h3>
+                    <p class="text-xs text-slate-500 dark:text-stone-400">Tracking No: <span class="font-bold text-slate-800 dark:text-stone-200 font-mono">@Model.TrackingNumber</span></p>
+                </div>
+            </div>
+            <button type="button" onclick="closeForwardModal()" class="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-stone-200 rounded-xl hover:bg-slate-100 dark:hover:bg-stone-800 transition-colors">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+
+        <form asp-action="ForwardRequest" method="post" id="forwardForm" class="space-y-4">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" value="@Model.Id" />
+            <input type="hidden" name="targetStatus" value="@PropertyAssessmentStatus.Replotting" />
+            <input type="hidden" name="returnUrl" value="@Url.Action("Details", new { id = Model.Id })" />
+
+            @if (string.IsNullOrWhiteSpace(Model.ORNumber))
+            {
+                <div class="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 text-amber-900 dark:text-amber-200 text-xs space-y-1">
+                    <div class="font-bold flex items-center gap-1.5">
+                        <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-600 shrink-0"></i>
+                        <span>O.R. Number Required Before Forwarding</span>
+                    </div>
+                    <p class="text-[11px] text-amber-800 dark:text-amber-300">
+                        This assessment request was saved without an Official Receipt. Before it can be forwarded to the GIS Replotting / Mapping Division, please input the Official Receipt details below.
+                    </p>
+                </div>
+
+                <div>
+                    <label class="block text-slate-700 dark:text-stone-300 font-bold text-xs mb-1">
+                        OFFICIAL RECEIPT (O.R.) NUMBER <span class="text-rose-500">*</span>
+                    </label>
+                    <input type="text" name="orNumber" id="modalOrNumber" required class="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 font-mono text-xs font-bold text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600" placeholder="e.g. OR-2026-00123" />
+                </div>
+
+                <div>
+                    <label class="block text-slate-700 dark:text-stone-300 font-bold text-xs mb-1">
+                        O.R. DATE ISSUED
+                    </label>
+                    <input type="date" name="orDateIssued" value="@DateTime.Now.ToString("yyyy-MM-dd")" class="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 font-mono text-xs text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600" />
+                </div>
+            }
+            else
+            {
+                <div class="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 text-emerald-900 dark:text-emerald-200 text-xs space-y-1">
+                    <div class="font-bold flex items-center gap-1.5">
+                        <i data-lucide="check-circle" class="w-4 h-4 text-emerald-600 shrink-0"></i>
+                        <span>Official Receipt Verified</span>
+                    </div>
+                    <p class="text-[11px] text-emerald-800 dark:text-emerald-300">
+                        O.R. Number: <span class="font-mono font-bold">@Model.ORNumber</span> (Issued: @(Model.ORDateIssued?.ToString("yyyy-MM-dd") ?? "N/A"))
+                    </p>
+                </div>
+                <input type="hidden" name="orNumber" value="@Model.ORNumber" />
+                <input type="hidden" name="orDateIssued" value="@Model.ORDateIssued?.ToString("yyyy-MM-dd")" />
+            }
+
+            <div>
+                <label class="block text-slate-700 dark:text-stone-300 font-bold text-xs mb-1">
+                    REMARKS / ROUTING NOTES (OPTIONAL)
+                </label>
+                <textarea name="remarks" rows="2" class="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600" placeholder="e.g. Forwarded for GIS cadastral boundary replotting..."></textarea>
+            </div>
+
+            <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-stone-800">
+                <button type="button" onclick="closeForwardModal()" class="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-slate-700 dark:text-stone-300 font-bold text-xs transition-colors">
+                    Cancel
+                </button>
+                <button type="submit" class="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-2 shadow-sm transition-all">
+                    <i data-lucide="arrow-right-circle" class="w-4 h-4"></i>
+                    <span>Confirm & Forward Request</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openForwardModal() {
+        const modal = document.getElementById('forwardModal');
+        if (modal) {
+            modal.classList.remove('hidden');
+            const orInput = document.getElementById('modalOrNumber');
+            if (orInput) orInput.focus();
+            if (window.lucide) lucide.createIcons();
+        }
+    }
+
+    function closeForwardModal() {
+        const modal = document.getElementById('forwardModal');
+        if (modal) modal.classList.add('hidden');
+    }
+</script>
