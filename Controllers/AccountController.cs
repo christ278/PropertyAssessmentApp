@@ -111,7 +111,10 @@ public class AccountController : Controller
 
     private IActionResult RedirectToLocal(string? returnUrl)
     {
-        if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+        if (!string.IsNullOrEmpty(returnUrl) && 
+            Url.IsLocalUrl(returnUrl) && 
+            !returnUrl.Equals("/Account/Login", StringComparison.OrdinalIgnoreCase) &&
+            !returnUrl.Equals("/", StringComparison.OrdinalIgnoreCase))
         {
             return Redirect(returnUrl);
         }

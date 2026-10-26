@@ -69,23 +69,6 @@
                 <span>Account Authentication</span>
             </h2>
 
-            <!-- Quick Credentials Notice / Auto-Fill Pill -->
-            <div class="mb-6 p-4 rounded-2xl bg-emerald-950/60 border border-emerald-500/30 text-xs font-mono space-y-2">
-                <div class="flex items-center justify-between text-emerald-300 font-bold">
-                    <span class="flex items-center gap-1.5">
-                        <i data-lucide="shield-alert" class="w-4 h-4 text-emerald-400"></i>
-                        Default Admin Account Credentials:
-                    </span>
-                    <button type="button" onclick="fillAdminCredentials()" class="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-[10px] font-bold tracking-wider uppercase transition-all">
-                        Auto-Fill
-                    </button>
-                </div>
-                <div class="grid grid-cols-2 gap-2 text-slate-300 text-[11px]">
-                    <div>Username: <code class="text-emerald-400 font-bold">admin</code></div>
-                    <div>Password: <code class="text-emerald-400 font-bold">x</code></div>
-                </div>
-            </div>
-
             <form asp-action="Login" asp-route-returnUrl="@returnUrl" method="post" class="space-y-5">
                 <div asp-validation-summary="ModelOnly" class="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-mono"></div>
 
@@ -132,11 +115,6 @@
 
     <script>
         lucide.createIcons();
-
-        function fillAdminCredentials() {
-            document.getElementById('inputUsername').value = 'admin';
-            document.getElementById('inputPassword').value = 'x';
-        }
     </script>
 </body>
 </html>
