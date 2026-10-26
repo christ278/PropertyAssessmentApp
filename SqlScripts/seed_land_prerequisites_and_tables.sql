@@ -8,10 +8,10 @@
 USE [PropertyAssessmentDb]; -- Update to target database if different
 GO
 
--- 1. Table: refClassification
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'refClassification')
+-- 1. Table: LandRefClassification
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'LandRefClassification')
 BEGIN
-    CREATE TABLE [dbo].[refClassification] (
+    CREATE TABLE [dbo].[LandRefClassification] (
         [Id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
         [ClassificationCode] NVARCHAR(50) NOT NULL,
         [ClassificationName] NVARCHAR(100) NOT NULL,
@@ -23,10 +23,10 @@ BEGIN
 END
 GO
 
--- 2. Table: refSubClassification
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'refSubClassification')
+-- 2. Table: LandRefSubClassification
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'LandRefSubClassification')
 BEGIN
-    CREATE TABLE [dbo].[refSubClassification] (
+    CREATE TABLE [dbo].[LandRefSubClassification] (
         [Id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
         [ClassificationId] INT NOT NULL,
         [SubClass] NVARCHAR(100) NOT NULL,
@@ -37,10 +37,10 @@ BEGIN
 END
 GO
 
--- 3. Table: refActualUse
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'refActualUse')
+-- 3. Table: LandRefActualUse
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'LandRefActualUse')
 BEGIN
-    CREATE TABLE [dbo].[refActualUse] (
+    CREATE TABLE [dbo].[LandRefActualUse] (
         [Id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
         [ActualUseCode] NVARCHAR(50) NOT NULL,
         [ActualUseName] NVARCHAR(100) NOT NULL,
@@ -51,10 +51,10 @@ BEGIN
 END
 GO
 
--- 4. Table: refLandAssessmentLevel
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'refLandAssessmentLevel')
+-- 4. Table: LandRefAssessmentLevel
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'LandRefAssessmentLevel')
 BEGIN
-    CREATE TABLE [dbo].[refLandAssessmentLevel] (
+    CREATE TABLE [dbo].[LandRefAssessmentLevel] (
         [Id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
         [ActualUseId] INT NULL,
         [ActualUseName] NVARCHAR(100) NOT NULL,
@@ -65,10 +65,10 @@ BEGIN
 END
 GO
 
--- 5. Table: refAdjustment
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'refAdjustment')
+-- 5. Table: LandRefAdjustment
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'LandRefAdjustment')
 BEGIN
-    CREATE TABLE [dbo].[refAdjustment] (
+    CREATE TABLE [dbo].[LandRefAdjustment] (
         [Id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
         [Description] NVARCHAR(200) NOT NULL,
         [Distance] NVARCHAR(50) NULL,
@@ -79,10 +79,10 @@ BEGIN
 END
 GO
 
--- 6. Table: refImprovementType
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'refImprovementType')
+-- 6. Table: LandRefImprovementType
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'LandRefImprovementType')
 BEGIN
-    CREATE TABLE [dbo].[refImprovementType] (
+    CREATE TABLE [dbo].[LandRefImprovementType] (
         [Id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
         [TypeCode] NVARCHAR(50) NOT NULL,
         [TypeDescription] NVARCHAR(150) NOT NULL,
@@ -179,11 +179,11 @@ GO
 -- DEFAULT INSERT DATA SEEDING (CAST SYSTEM REFERENCE)
 -- ==========================================================================================
 
--- Seeding refClassification
-IF NOT EXISTS (SELECT 1 FROM [dbo].[refClassification])
+-- Seeding LandRefClassification
+IF NOT EXISTS (SELECT 1 FROM [dbo].[LandRefClassification])
 BEGIN
-    SET IDENTITY_INSERT [dbo].[refClassification] ON;
-    INSERT INTO [dbo].[refClassification] ([Id], [ClassificationCode], [ClassificationName], [Ranking], [Prefix], [IsActive], [SortOrder]) VALUES
+    SET IDENTITY_INSERT [dbo].[LandRefClassification] ON;
+    INSERT INTO [dbo].[LandRefClassification] ([Id], [ClassificationCode], [ClassificationName], [Ranking], [Prefix], [IsActive], [SortOrder]) VALUES
     (1, N'RES', N'RESIDENTIAL', 1, N'RES', 1, 1),
     (4, N'COM', N'COMMERCIAL', 3, N'COM', 1, 2),
     (6, N'IND', N'INDUSTRIAL', 4, N'IND', 1, 3),
@@ -193,15 +193,15 @@ BEGIN
     (12, N'SCI', N'SPECIAL - SCIENTIFIC', 9, N'SCI', 1, 7),
     (49, N'MIN', N'MINERAL', 5, N'MIN', 1, 8),
     (50, N'TIM', N'TIMBERLAND', 6, N'TIM', 1, 9);
-    SET IDENTITY_INSERT [dbo].[refClassification] OFF;
+    SET IDENTITY_INSERT [dbo].[LandRefClassification] OFF;
 END
 GO
 
--- Seeding refSubClassification (Schedule of Unit Values)
-IF NOT EXISTS (SELECT 1 FROM [dbo].[refSubClassification])
+-- Seeding LandRefSubClassification (Schedule of Unit Values)
+IF NOT EXISTS (SELECT 1 FROM [dbo].[LandRefSubClassification])
 BEGIN
-    SET IDENTITY_INSERT [dbo].[refSubClassification] ON;
-    INSERT INTO [dbo].[refSubClassification] ([Id], [ClassificationId], [SubClass], [UnitValue], [RevisionYear], [IsActive]) VALUES
+    SET IDENTITY_INSERT [dbo].[LandRefSubClassification] ON;
+    INSERT INTO [dbo].[LandRefSubClassification] ([Id], [ClassificationId], [SubClass], [UnitValue], [RevisionYear], [IsActive]) VALUES
     -- Residential (PHP/sq.m.)
     (1, 1, N'1st Class Residential', 520.00, 2011, 1),
     (2, 1, N'2nd Class Residential', 468.00, 2011, 1),
@@ -234,15 +234,15 @@ BEGIN
     (23, 48, N'Coconut Land', 100000.00, 2011, 1),
     (24, 48, N'Banana Plantation', 120000.00, 2011, 1),
     (25, 48, N'Fishpond / Aquaculture', 160000.00, 2011, 1);
-    SET IDENTITY_INSERT [dbo].[refSubClassification] OFF;
+    SET IDENTITY_INSERT [dbo].[LandRefSubClassification] OFF;
 END
 GO
 
--- Seeding refActualUse
-IF NOT EXISTS (SELECT 1 FROM [dbo].[refActualUse])
+-- Seeding LandRefActualUse
+IF NOT EXISTS (SELECT 1 FROM [dbo].[LandRefActualUse])
 BEGIN
-    SET IDENTITY_INSERT [dbo].[refActualUse] ON;
-    INSERT INTO [dbo].[refActualUse] ([Id], [ActualUseCode], [ActualUseName], [IsTaxExempt], [Rank], [IsActive]) VALUES
+    SET IDENTITY_INSERT [dbo].[LandRefActualUse] ON;
+    INSERT INTO [dbo].[LandRefActualUse] ([Id], [ActualUseCode], [ActualUseName], [IsTaxExempt], [Rank], [IsActive]) VALUES
     (1, N'RES', N'RESIDENTIAL', 0, 1, 1),
     (2, N'AGR', N'AGRICULTURAL', 0, 2, 1),
     (3, N'COM', N'COMMERCIAL', 0, 3, 1),
@@ -255,15 +255,15 @@ BEGIN
     (10, N'REL', N'RELIGIOUS', 1, 11, 1),
     (11, N'CHAR', N'CHARITABLE', 1, 12, 1),
     (12, N'EDUC', N'EDUCATIONAL', 1, 13, 1);
-    SET IDENTITY_INSERT [dbo].[refActualUse] OFF;
+    SET IDENTITY_INSERT [dbo].[LandRefActualUse] OFF;
 END
 GO
 
--- Seeding refLandAssessmentLevel
-IF NOT EXISTS (SELECT 1 FROM [dbo].[refLandAssessmentLevel])
+-- Seeding LandRefAssessmentLevel
+IF NOT EXISTS (SELECT 1 FROM [dbo].[LandRefAssessmentLevel])
 BEGIN
-    SET IDENTITY_INSERT [dbo].[refLandAssessmentLevel] ON;
-    INSERT INTO [dbo].[refLandAssessmentLevel] ([Id], [ActualUseId], [ActualUseName], [AssessmentLevel], [RevisionYear], [IsActive]) VALUES
+    SET IDENTITY_INSERT [dbo].[LandRefAssessmentLevel] ON;
+    INSERT INTO [dbo].[LandRefAssessmentLevel] ([Id], [ActualUseId], [ActualUseName], [AssessmentLevel], [RevisionYear], [IsActive]) VALUES
     (1, 1, N'RESIDENTIAL', 20.00, 2011, 1),
     (2, 2, N'AGRICULTURAL', 40.00, 2011, 1),
     (3, 3, N'COMMERCIAL', 50.00, 2011, 1),
@@ -273,15 +273,15 @@ BEGIN
     (7, 7, N'SPECIAL - HOSPITAL', 10.00, 2011, 1),
     (8, 8, N'SPECIAL - SCIENTIFIC', 10.00, 2011, 1),
     (9, 9, N'GOVERNMENT', 0.00, 2011, 1);
-    SET IDENTITY_INSERT [dbo].[refLandAssessmentLevel] OFF;
+    SET IDENTITY_INSERT [dbo].[LandRefAssessmentLevel] OFF;
 END
 GO
 
--- Seeding refAdjustment
-IF NOT EXISTS (SELECT 1 FROM [dbo].[refAdjustment])
+-- Seeding LandRefAdjustment
+IF NOT EXISTS (SELECT 1 FROM [dbo].[LandRefAdjustment])
 BEGIN
-    SET IDENTITY_INSERT [dbo].[refAdjustment] ON;
-    INSERT INTO [dbo].[refAdjustment] ([Id], [Description], [Distance], [AdjustmentPercent], [RevisionYear], [IsActive]) VALUES
+    SET IDENTITY_INSERT [dbo].[LandRefAdjustment] ON;
+    INSERT INTO [dbo].[LandRefAdjustment] ([Id], [Description], [Distance], [AdjustmentPercent], [RevisionYear], [IsActive]) VALUES
     (1, N'Corner Influence (Residential)', NULL, 10.00, 2011, 1),
     (2, N'Corner Influence (Commercial)', NULL, 25.00, 2011, 1),
     (3, N'Provincial & National Highway Frontage', NULL, 0.00, 2011, 1),
@@ -293,15 +293,15 @@ BEGIN
     (9, N'Sunken / Lowland / Subject to Inundation', NULL, -30.00, 2011, 1),
     (10, N'Cost of Filling / Stripping (20m depth)', N'20m', -20.00, 2011, 1),
     (11, N'Slightly Eroded Land', NULL, -10.00, 2011, 1);
-    SET IDENTITY_INSERT [dbo].[refAdjustment] OFF;
+    SET IDENTITY_INSERT [dbo].[LandRefAdjustment] OFF;
 END
 GO
 
--- Seeding refImprovementType
-IF NOT EXISTS (SELECT 1 FROM [dbo].[refImprovementType])
+-- Seeding LandRefImprovementType
+IF NOT EXISTS (SELECT 1 FROM [dbo].[LandRefImprovementType])
 BEGIN
-    SET IDENTITY_INSERT [dbo].[refImprovementType] ON;
-    INSERT INTO [dbo].[refImprovementType] ([Id], [TypeCode], [TypeDescription], [Kind], [BaseValue], [AssessmentLevel], [RevisionYear], [IsActive]) VALUES
+    SET IDENTITY_INSERT [dbo].[LandRefImprovementType] ON;
+    INSERT INTO [dbo].[LandRefImprovementType] ([Id], [TypeCode], [TypeDescription], [Kind], [BaseValue], [AssessmentLevel], [RevisionYear], [IsActive]) VALUES
     (1, N'CCT', N'COCONUT TREE', N'FRUIT BEARING', 120.00, 40.00, 2011, 1),
     (2, N'MGO', N'MANGO TREE', N'FRUIT BEARING', 350.00, 40.00, 2011, 1),
     (3, N'BNN', N'BANANA CLUMPS', N'FRUIT BEARING', 35.00, 40.00, 2011, 1),
@@ -315,7 +315,7 @@ BEGIN
     (11, N'NR', N'NARRA TREE', N'HARDWOOD', 500.00, 40.00, 2011, 1),
     (12, N'FENCE', N'CONCRETE FENCE / PERIMETER WALL', N'IMPROVEMENT', 650.00, 40.00, 2011, 1),
     (13, N'PAVE', N'CONCRETE PAVEMENT / DRIVEWAY', N'IMPROVEMENT', 250.00, 40.00, 2011, 1);
-    SET IDENTITY_INSERT [dbo].[refImprovementType] OFF;
+    SET IDENTITY_INSERT [dbo].[LandRefImprovementType] OFF;
 END
 GO
 

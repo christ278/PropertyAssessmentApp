@@ -78,6 +78,16 @@ flowchart LR
 
 ---
 
+### 14. `14_RenameLandPrerequisiteTables.sql`
+- **Purpose:** Standardizes all TDN Land prerequisite lookup tables by prefixing `Land` (e.g. `LandRefClassification`, `LandRefSubClassification`, `LandRefActualUse`, `LandRefAssessmentLevel`, `LandRefAdjustment`, `LandRefImprovementType`). Safely renames legacy tables with `sp_rename` or creates and seeds them.
+
+---
+
+### 15. `15_SeedDefaultProvincesCitiesBarangays.sql`
+- **Purpose:** Seeds master geographic locations into `[dbo].[Provinces]`, `[dbo].[CityMunicipalities]`, and `[dbo].[Barangays]`, including all 26 official Barangays of General Santos City and South Cotabato with deterministic GUIDs matching `GeographicService`.
+
+---
+
 ## 🚀 How to Execute SQL Scripts
 
 ### Option A: PostgreSQL / PostGIS

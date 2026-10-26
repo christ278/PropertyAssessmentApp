@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace PropertyAssessmentApp.Models;
 
-[Table("refSubClassification")]
+[Table("LandRefSubClassification")]
 public class LandSubClassification
 {
     [Key]

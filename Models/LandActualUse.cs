@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace PropertyAssessmentApp.Models;
 
-[Table("refActualUse")]
+[Table("LandRefActualUse")]
 public class LandActualUse
 {
     [Key]
