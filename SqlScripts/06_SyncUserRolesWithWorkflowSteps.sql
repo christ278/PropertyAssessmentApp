@@ -4,8 +4,7 @@
 --              so that User Roles represent the Workflow Steps / Allowed Target Steps
 -- DATABASE: FairTrackDB
 -- =========================================================================
-
-USE [FairTrackDB];
+-- USE []; -- Run against active connected database
 GO
 
 -- 1. Ensure TransactionStatusId column exists on UserRoleSettings

@@ -7,8 +7,7 @@
 --              if not present, and ensures baseline reference data is seeded.
 -- DATABASE: FairTrackDB
 -- =============================================================================
-
-USE [FairTrackDB];
+-- USE []; -- Run against active connected database
 GO
 
 SET NOCOUNT ON;

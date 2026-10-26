@@ -6,8 +6,7 @@
 --              with deterministic ModuleId values, and preserves sorting/routing.
 -- DATABASE: FairTrackDB
 -- =============================================================================
-
-USE [FairTrackDB];
+-- USE []; -- Run against active connected database
 GO
 
 SET NOCOUNT ON;

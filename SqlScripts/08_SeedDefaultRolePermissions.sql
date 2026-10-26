@@ -1,23 +1,23 @@
 -- =========================================================================
 -- SCRIPT: 08_SeedDefaultRolePermissions.sql
 -- DESCRIPTION: Sets up default module permissions in [dbo].[RoleModulePermission]:
---              1. By default, EVERY active role has access to:
+--              1. Automatically ensures [dbo].[SystemModule] and [dbo].[UserRoleSettings]
+--                 contain all required baseline modules and roles.
+--              2. By default, EVERY active role has access to:
 --                 - Pool Transactions (POOL_TRANSACTIONS)
 --                 - My Transactions (MY_TRANSACTIONS)
---              2. Division 1 Receiving role gets:
+--              3. Division 1 Receiving role gets:
 --                 - RPA: Property Assessment Requests (PROPERTY_ASSESSMENT)
 --                 - RFI: Field Inspection Requests (INSPECTION)
---              3. Division 2 Receiving role gets:
+--              4. Division 2 Receiving role gets:
 --                 - Tax Mapping (TAX_MAPPING)
---              4. Division 3 Receiving role gets:
+--              5. Division 3 Receiving role gets:
 --                 - Tax Declaration (TAX_DECLARATION)
 --                 - Land Holding (LAND_HOLDINGS)
---              5. System Administrator gets all active system modules.
+--              6. System Administrator gets all active system modules.
 -- DATABASE: FairTrackDB
--- DATE: 2026-10-25
 -- =========================================================================
-
-USE [FairTrackDB];
+-- USE []; -- Run against active connected database
 GO
 
 SET NOCOUNT ON;
@@ -26,12 +26,125 @@ PRINT '=========================================================================
 PRINT 'Starting Default Role & Module Permissions Seeding';
 PRINT '=========================================================================';
 
+-- -----------------------------------------------------------------------------
+-- Pre-step A: Ensure SystemModule Table & Core Modules Exist
+-- -----------------------------------------------------------------------------
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'SystemModule')
+BEGIN
+    CREATE TABLE [dbo].[SystemModule] (
+        [ModuleId] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [ModuleCode] NVARCHAR(50) NOT NULL UNIQUE,
+        [ModuleName] NVARCHAR(100) NOT NULL,
+        [Category] NVARCHAR(50) NULL,
+        [ControllerName] NVARCHAR(50) NULL,
+        [ActionName] NVARCHAR(50) NULL,
+        [Icon] NVARCHAR(50) NULL,
+        [SortOrder] INT NOT NULL DEFAULT 0,
+        [IsActive] BIT NOT NULL DEFAULT 1
+    );
+    PRINT 'Created table [dbo].[SystemModule].';
+END
+GO
+
+-- Upsert baseline modules if not yet populated
+IF NOT EXISTS (SELECT 1 FROM [dbo].[SystemModule] WHERE [ModuleCode] IN ('POOL_TRANSACTIONS', 'MY_TRANSACTIONS'))
+BEGIN
+    PRINT 'System modules missing; auto-seeding baseline modules into SystemModule...';
+    
+    SET IDENTITY_INSERT [dbo].[SystemModule] ON;
+
+    DECLARE @InitialModules TABLE (
+        [ModuleId] INT, [ModuleCode] NVARCHAR(50), [ModuleName] NVARCHAR(100),
+        [Category] NVARCHAR(50), [ControllerName] NVARCHAR(50), [ActionName] NVARCHAR(50),
+        [Icon] NVARCHAR(50), [SortOrder] INT, [IsActive] BIT
+    );
+
+    INSERT INTO @InitialModules ([ModuleId], [ModuleCode], [ModuleName], [Category], [ControllerName], [ActionName], [Icon], [SortOrder], [IsActive])
+    VALUES
+        (1,  'DASHBOARD',           'Executive Dashboard',                      'Main Menu',                   'Home',                     'Index',          'layout-dashboard', 1,  1),
+        (17, 'POOL_TRANSACTIONS',   'Pool Transactions (Shared Queue)',         'Transaction Workflows',       'Workflow',                 'Pool',           'inbox',            1,  1),
+        (2,  'ANALYTICS',           'Executive Analytics & Reports',            'Main Menu',                   'Analytics',                'Index',          'trending-up',      2,  1),
+        (18, 'MY_TRANSACTIONS',     'My Transactions (Claimed Workspace)',      'Transaction Workflows',       'Workflow',                 'MyTransactions', 'user-check',       2,  1),
+        (3,  'INSPECTION',          'Field Inspection Requests',                'FAAS & Transaction Requests', 'RequestForInspection',     'Index',          'clipboard-check',  10, 1),
+        (4,  'PROPERTY_ASSESSMENT', 'Property Assessment Requests',             'FAAS & Transaction Requests', 'PropertyAssessmentRequest', 'Index',          'building',         11, 1),
+        (5,  'ASSESSMENT_FAAS',     'Real Property Appraisal & Tax Dec (FAAS)', 'FAAS & Transaction Requests', 'Assessment',                'Index',          'file-spreadsheet', 12, 1),
+        (6,  'TAX_MAPPING',         'GIS Spatial & Tax Mapping',                'GIS & Spatial Mapping',       'TaxMapping',               'Index',          'map-pin',          13, 1),
+        (7,  'TAX_DECLARATION',     'Tax Declaration Certification Requests',   'FAAS & Transaction Requests', 'TaxDeclarationRequest',     'Index',          'file-text',        14, 1),
+        (8,  'LAND_HOLDINGS',       'Certificate of Land Holdings',             'FAAS & Transaction Requests', 'LandHoldingRequest',       'Index',          'map',              15, 1),
+        (9,  'ORDER_PAYMENT',       'Order of Payment Billing (OP)',            'Billing & Fee Collections',   'OrderPayment',             'Index',          'receipt',          20, 1),
+        (10, 'OWNER_REGISTRATION',  'Taxpayer Directory & Master Records',      'Master Records',              'Owner',                    'Index',          'users',            21, 1),
+        (11, 'FILE_LOCATION',       'File Storage & Network Setup',             'System Administration',       'FileLocation',             'Index',          'hard-drive',       30, 1),
+        (12, 'WORKFLOW_SETTINGS',   'Workflow Pipeline & Approvals',            'System Administration',       'Workflow',                 'Settings',       'git-pull-request', 31, 1),
+        (13, 'USER_MANAGEMENT',     'User Staff Accounts',                      'System Administration',       'UserAccount',              'Index',          'shield-check',     40, 1),
+        (14, 'USER_ROLES',          'User Roles Directory',                     'System Administration',       'UserRole',                 'Index',          'user-cog',         41, 1),
+        (15, 'ROLE_PERMISSIONS',    'Dynamic Form Permissions',                 'System Administration',       'UserRole',                 'Permissions',    'shield-alert',     42, 1),
+        (16, 'DATA_TRANSFER',       'TD Data Transfer Utility',                 'File Maintenance',            'DataTransferUtility',      'Index',          'arrow-right-left', 50, 1);
+
+    MERGE [dbo].[SystemModule] AS Target
+    USING @InitialModules AS Source
+    ON Target.[ModuleCode] = Source.[ModuleCode]
+    WHEN MATCHED THEN
+        UPDATE SET Target.[ModuleName] = Source.[ModuleName], Target.[ControllerName] = Source.[ControllerName], Target.[ActionName] = Source.[ActionName]
+    WHEN NOT MATCHED BY TARGET THEN
+        INSERT ([ModuleId], [ModuleCode], [ModuleName], [Category], [ControllerName], [ActionName], [Icon], [SortOrder], [IsActive])
+        VALUES (Source.[ModuleId], Source.[ModuleCode], Source.[ModuleName], Source.[Category], Source.[ControllerName], Source.[ActionName], Source.[Icon], Source.[SortOrder], Source.[IsActive]);
+
+    SET IDENTITY_INSERT [dbo].[SystemModule] OFF;
+    PRINT 'Baseline SystemModule records inserted successfully.';
+END
+GO
+
+-- -----------------------------------------------------------------------------
+-- Pre-step B: Ensure UserRoleSettings Table & Baseline Roles Exist
+-- -----------------------------------------------------------------------------
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'UserRoleSettings')
+BEGIN
+    CREATE TABLE [dbo].[UserRoleSettings] (
+        [Id] UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+        [RoleName] NVARCHAR(150) NOT NULL,
+        [TransactionStatusId] INT NULL,
+        [Division] INT NULL,
+        [Description] NVARCHAR(MAX) NULL,
+        [IsActive] BIT NOT NULL DEFAULT 1,
+        [CreatedDate] DATETIME2 NOT NULL DEFAULT GETDATE(),
+        [UpdatedDate] DATETIME2 NOT NULL DEFAULT GETDATE()
+    );
+    PRINT 'Created table [dbo].[UserRoleSettings].';
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[UserRoleSettings] WHERE [RoleName] = 'System Administrator')
+BEGIN
+    INSERT INTO [dbo].[UserRoleSettings] ([Id], [RoleName], [TransactionStatusId], [Division], [Description], [IsActive], [CreatedDate], [UpdatedDate])
+    VALUES ('50147D2F-24FE-4FA9-B270-9F217F58D333', 'System Administrator', NULL, NULL, 'Full administrative access, user accounts, and system configuration.', 1, GETDATE(), GETDATE());
+END
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[UserRoleSettings] WHERE [Division] = 1 AND [TransactionStatusId] = 1)
+BEGIN
+    INSERT INTO [dbo].[UserRoleSettings] ([Id], [RoleName], [TransactionStatusId], [Division], [Description], [IsActive], [CreatedDate], [UpdatedDate])
+    VALUES ('5266D996-43CD-490F-95FE-CED504C44AB1', 'Receiving', 1, 1, 'Document intake, requirements checking, and transaction tracking initiation.', 1, GETDATE(), GETDATE());
+END
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[UserRoleSettings] WHERE [Division] = 2 AND [TransactionStatusId] = 15)
+BEGIN
+    INSERT INTO [dbo].[UserRoleSettings] ([Id], [RoleName], [TransactionStatusId], [Division], [Description], [IsActive], [CreatedDate], [UpdatedDate])
+    VALUES ('F8122558-287D-4309-8BB8-ED5563E52CEE', 'Receiving (GIS)', 15, 2, 'GIS mapping request intake, survey plan verification, and section indexing.', 1, GETDATE(), GETDATE());
+END
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[UserRoleSettings] WHERE [Division] = 3 AND [TransactionStatusId] = 25)
+BEGIN
+    INSERT INTO [dbo].[UserRoleSettings] ([Id], [RoleName], [TransactionStatusId], [Division], [Description], [IsActive], [CreatedDate], [UpdatedDate])
+    VALUES ('E91ECBD7-EDB5-4C31-BB91-8A8830A5B12C', 'Receiving (Records)', 25, 3, 'Intake for Land Holding and Tax Declaration certificates and requests.', 1, GETDATE(), GETDATE());
+END
+GO
+
+-- -----------------------------------------------------------------------------
+-- Core Step: Apply Role Module Permissions
+-- -----------------------------------------------------------------------------
 BEGIN TRANSACTION;
 
 BEGIN TRY
-    -- ---------------------------------------------------------------------
     -- 1. Resolve Module IDs dynamically from [dbo].[SystemModule]
-    -- ---------------------------------------------------------------------
     DECLARE @PoolModuleId INT,
             @MyTransModuleId INT,
             @InspectionModuleId INT,
@@ -48,16 +161,9 @@ BEGIN TRY
     SELECT @TaxDecModuleId = ModuleId FROM [dbo].[SystemModule] WHERE ModuleCode = 'TAX_DECLARATION';
     SELECT @LandHoldingModuleId = ModuleId FROM [dbo].[SystemModule] WHERE ModuleCode = 'LAND_HOLDINGS';
 
-    IF @PoolModuleId IS NULL OR @MyTransModuleId IS NULL
-    BEGIN
-        RAISERROR('Required modules POOL_TRANSACTIONS or MY_TRANSACTIONS not found in SystemModule table.', 16, 1);
-    END
-
     PRINT 'Resolved target System Modules successfully.';
 
-    -- ---------------------------------------------------------------------
     -- 2. Resolve Receiving Role IDs dynamically from [dbo].[UserRoleSettings]
-    -- ---------------------------------------------------------------------
     DECLARE @Div1ReceivingRoleId UNIQUEIDENTIFIER,
             @Div2ReceivingRoleId UNIQUEIDENTIFIER,
             @Div3ReceivingRoleId UNIQUEIDENTIFIER,
@@ -85,49 +191,44 @@ BEGIN TRY
 
     PRINT 'Resolved Receiving and Admin role IDs successfully.';
 
-    -- ---------------------------------------------------------------------
     -- 3. Reset non-admin permissions to clean baseline
-    --    (Ensures roles only have the exact intended permissions)
-    -- ---------------------------------------------------------------------
     PRINT 'Cleaning existing permissions for non-admin roles...';
     
     DELETE FROM [dbo].[RoleModulePermission]
     WHERE RoleId <> @AdminRoleId;
 
-    -- ---------------------------------------------------------------------
     -- 4. Grant EVERY Role default access to POOL_TRANSACTIONS & MY_TRANSACTIONS
-    -- ---------------------------------------------------------------------
     PRINT 'Granting Pool Transactions & My Transactions to ALL active roles...';
 
-    -- 4a. POOL_TRANSACTIONS for all active roles
-    INSERT INTO [dbo].[RoleModulePermission] (RoleId, ModuleId, CanView, CanCreate, CanEdit, CanDelete, CanApprove, UpdatedBy, UpdatedDate)
-    SELECT Id, @PoolModuleId, 1, 1, 1, 1, 1, 'DefaultRoleAccessScript', GETDATE()
-    FROM [dbo].[UserRoleSettings]
-    WHERE IsActive = 1 AND Id <> @AdminRoleId;
+    IF @PoolModuleId IS NOT NULL
+    BEGIN
+        INSERT INTO [dbo].[RoleModulePermission] (RoleId, ModuleId, CanView, CanCreate, CanEdit, CanDelete, CanApprove, UpdatedBy, UpdatedDate)
+        SELECT Id, @PoolModuleId, 1, 1, 1, 1, 1, 'DefaultRoleAccessScript', GETDATE()
+        FROM [dbo].[UserRoleSettings]
+        WHERE IsActive = 1 AND Id <> @AdminRoleId;
+    END
 
-    -- 4b. MY_TRANSACTIONS for all active roles
-    INSERT INTO [dbo].[RoleModulePermission] (RoleId, ModuleId, CanView, CanCreate, CanEdit, CanDelete, CanApprove, UpdatedBy, UpdatedDate)
-    SELECT Id, @MyTransModuleId, 1, 1, 1, 1, 1, 'DefaultRoleAccessScript', GETDATE()
-    FROM [dbo].[UserRoleSettings]
-    WHERE IsActive = 1 AND Id <> @AdminRoleId;
+    IF @MyTransModuleId IS NOT NULL
+    BEGIN
+        INSERT INTO [dbo].[RoleModulePermission] (RoleId, ModuleId, CanView, CanCreate, CanEdit, CanDelete, CanApprove, UpdatedBy, UpdatedDate)
+        SELECT Id, @MyTransModuleId, 1, 1, 1, 1, 1, 'DefaultRoleAccessScript', GETDATE()
+        FROM [dbo].[UserRoleSettings]
+        WHERE IsActive = 1 AND Id <> @AdminRoleId;
+    END
 
     PRINT 'Default Pool & My Transactions access granted to all roles.';
 
-    -- ---------------------------------------------------------------------
     -- 5. Division 1 Receiving: Additional access to RPA (PROPERTY_ASSESSMENT) and RFI (INSPECTION)
-    -- ---------------------------------------------------------------------
     IF @Div1ReceivingRoleId IS NOT NULL
     BEGIN
         PRINT 'Configuring Division 1 Receiving additional permissions (RPA & RFI)...';
 
-        -- Additional: RPA (PROPERTY_ASSESSMENT)
         IF @PropAssessmentModuleId IS NOT NULL
         BEGIN
             INSERT INTO [dbo].[RoleModulePermission] (RoleId, ModuleId, CanView, CanCreate, CanEdit, CanDelete, CanApprove, UpdatedBy, UpdatedDate)
             VALUES (@Div1ReceivingRoleId, @PropAssessmentModuleId, 1, 1, 1, 1, 1, 'DefaultRoleAccessScript', GETDATE());
         END
 
-        -- Additional: RFI (INSPECTION)
         IF @InspectionModuleId IS NOT NULL
         BEGIN
             INSERT INTO [dbo].[RoleModulePermission] (RoleId, ModuleId, CanView, CanCreate, CanEdit, CanDelete, CanApprove, UpdatedBy, UpdatedDate)
@@ -137,9 +238,7 @@ BEGIN TRY
         PRINT 'Division 1 Receiving permissions configured.';
     END
 
-    -- ---------------------------------------------------------------------
     -- 6. Division 2 Receiving: Additional access to Tax Mapping (TAX_MAPPING)
-    -- ---------------------------------------------------------------------
     IF @Div2ReceivingRoleId IS NOT NULL AND @TaxMappingModuleId IS NOT NULL
     BEGIN
         PRINT 'Configuring Division 2 Receiving additional permissions (Tax Mapping)...';
@@ -150,21 +249,17 @@ BEGIN TRY
         PRINT 'Division 2 Receiving permissions configured.';
     END
 
-    -- ---------------------------------------------------------------------
     -- 7. Division 3 Receiving: Additional access to Tax Dec (TAX_DECLARATION) and Land Holding (LAND_HOLDINGS)
-    -- ---------------------------------------------------------------------
     IF @Div3ReceivingRoleId IS NOT NULL
     BEGIN
         PRINT 'Configuring Division 3 Receiving additional permissions (Tax Dec & Land Holding)...';
 
-        -- Additional: Tax Dec (TAX_DECLARATION)
         IF @TaxDecModuleId IS NOT NULL
         BEGIN
             INSERT INTO [dbo].[RoleModulePermission] (RoleId, ModuleId, CanView, CanCreate, CanEdit, CanDelete, CanApprove, UpdatedBy, UpdatedDate)
             VALUES (@Div3ReceivingRoleId, @TaxDecModuleId, 1, 1, 1, 1, 1, 'DefaultRoleAccessScript', GETDATE());
         END
 
-        -- Additional: Land Holding (LAND_HOLDINGS)
         IF @LandHoldingModuleId IS NOT NULL
         BEGIN
             INSERT INTO [dbo].[RoleModulePermission] (RoleId, ModuleId, CanView, CanCreate, CanEdit, CanDelete, CanApprove, UpdatedBy, UpdatedDate)
@@ -174,9 +269,7 @@ BEGIN TRY
         PRINT 'Division 3 Receiving permissions configured.';
     END
 
-    -- ---------------------------------------------------------------------
     -- 8. Ensure System Administrator has access to all active system modules
-    -- ---------------------------------------------------------------------
     IF @AdminRoleId IS NOT NULL
     BEGIN
         PRINT 'Configuring System Administrator full access to all active modules...';
@@ -216,7 +309,7 @@ END CATCH;
 GO
 
 -- -----------------------------------------------------------------------------
--- 8. VERIFICATION QUERY: Display configured permissions for Receiving and Admin
+-- Verification Query
 -- -----------------------------------------------------------------------------
 SELECT 
     ISNULL(CAST(r.Division AS NVARCHAR(10)), 'ADMIN') AS [Div],

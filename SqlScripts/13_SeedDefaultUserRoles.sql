@@ -7,8 +7,7 @@
 --              safe idempotent upserts (MERGE).
 -- DATABASE: FairTrackDB
 -- =============================================================================
-
-USE [FairTrackDB];
+-- USE []; -- Run against active connected database
 GO
 
 SET NOCOUNT ON;

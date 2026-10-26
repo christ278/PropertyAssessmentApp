@@ -8,8 +8,7 @@
 -- DATABASE: FairTrackDB
 -- DATE: 2026-10-26
 -- =========================================================================
-
-USE [FairTrackDB];
+-- USE []; -- Run against active connected database
 GO
 
 SET NOCOUNT ON;

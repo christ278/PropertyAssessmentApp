@@ -7,8 +7,7 @@
 -- TARGET DATABASE: FairTrackDB
 -- DATE: 2026-10-24
 -- =========================================================================
-
-USE [FairTrackDB];
+-- USE []; -- Run against active connected database
 GO
 
 PRINT '=======================================================';

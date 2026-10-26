@@ -3,8 +3,7 @@
 -- Target Database: (localdb)\mssqllocaldb / PropertyAssessmentAppDb
 -- Reference: CAST System (RequestForInspection & PropertyAssessment workflows)
 -- =============================================================================
-
-USE [FairTrackDB];
+-- USE []; -- Run against active connected database
 GO
 
 -- 1. REQUEST FOR INSPECTION TABLE (10-STAGE INSPECTION WORKFLOW)

@@ -4,8 +4,7 @@
 --              for Local Government Unit (LGU) Assessor's Real Property Tax Assessment (CAST Standard),
 --              and populates default seed data (General Santos City / CAST Standard Schedule).
 -- ==========================================================================================
-
-USE [FairTrackDB];
+-- USE []; -- Run against active connected database
 GO
 
 -- 1. Table: LandRefClassification

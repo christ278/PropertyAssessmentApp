@@ -3,8 +3,7 @@
 -- SQL SCRIPT STEP 01: DATABASE SCHEMA & TABLE CREATION
 -- Target Database: Microsoft SQL Server (T-SQL) / FairTrackDB
 -- =============================================================================
-
-USE [FairTrackDB];
+-- USE []; -- Run against active connected database
 GO
 
 SET NOCOUNT ON;
