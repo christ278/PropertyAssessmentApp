@@ -4,7 +4,7 @@
 -- Reference: CAST System (RequestForInspection & PropertyAssessment workflows)
 -- =============================================================================
 
-USE [PropertyAssessmentAppDb];
+USE [FairTrackDB];
 GO
 
 -- 1. REQUEST FOR INSPECTION TABLE (10-STAGE INSPECTION WORKFLOW)

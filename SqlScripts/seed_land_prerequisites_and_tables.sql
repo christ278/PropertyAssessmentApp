@@ -5,7 +5,7 @@
 --              and populates default seed data (General Santos City / CAST Standard Schedule).
 -- ==========================================================================================
 
-USE [PropertyAssessmentDb]; -- Update to target database if different
+USE [FairTrackDB];
 GO
 
 -- 1. Table: LandRefClassification

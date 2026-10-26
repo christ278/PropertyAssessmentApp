@@ -79,18 +79,92 @@ IF NOT EXISTS (SELECT 1 FROM [dbo].[TaxpayerOwners] WHERE [TaxIdentNo] = '987-65
     VALUES ('60000000-0000-0000-0000-000000000002', 0, 'Maria Clara', 'Ocampo', 'Santos', 'Santos Realty & Dev Corp', '987-654-321-000', 'RPTIN-2026-002', '0919-222-3333', 'maria.santos@gmail.com', 'South Cotabato', 'General Santos City', 'Brgy. Dadiangas South', 'Santiago Boulevard, General Santos City', 1, GETDATE(), GETDATE());
 
 -- -----------------------------------------------------------------------------
--- 4. SEED REGISTERED PROPERTY TAX DECLARATIONS
+-- 4. SEED REGISTERED PROPERTY TAX DECLARATIONS (NORMALIZED SCHEMA)
 -- -----------------------------------------------------------------------------
 IF NOT EXISTS (SELECT 1 FROM [dbo].[TaxDeclarations] WHERE [TaxDeclarationNumber] = 'TD-2026-GS-0001')
 BEGIN
-    INSERT INTO [dbo].[TaxDeclarations] ([Id], [Kind], [TaxDeclarationNumber], [TransactionCode], [PropertyIndexNumber], [OwnerName], [OwnerTin], [OwnerPhone], [OwnerEmail], [OwnerAddress], [OwnerSex], [AdminPossessorName], [AdminPossessorSex], [AdminPossessorAddress], [AdminPossessorTin], [AdminPossessorPhone], [AdminPossessorEmail], [RegistrationStatus], [TitleType], [TitleNo], [DateRegistered], [SurveyNo], [LotNo], [BlockNo], [IsLocallyManufactured], [MachineryRegNo], [ImportationPermitNo], [ImportationDateIssued], [CountryOfOrigin], [SupplierSeller], [SupplierAddress], [AcquisitionCost], [OrNoAndDate], [BuildingUseType], [StreetNo], [Municipality], [DistrictOrBarangay], [ProvinceCity], [LandOwnerName], [LandOwnerTin], [LandOwnerPhone], [LandOwnerEmail], [LandOwnerAddress], [LandOwnerSex], [LandTdNo], [LandPin], [LandTitleNo], [LandSurveyNo], [LandLotNo], [LandBlockNo], [LandAreaSqm], [BuildingReferenceName], [BuildingOwnerTin], [BuildingOwnerPhone], [BuildingOwnerEmail], [BuildingOwnerAddress], [BuildingOwnerSex], [BuildingTdNo], [BuildingPin], [BoundaryNorth], [BoundaryEast], [BoundaryWest], [BoundarySouth], [StructuralType], [NoOfStoreys], [BuildingClassification], [BuildingPermitNo], [BuildingAgeYears], [DateCompleted], [OccupancyPermitNo], [DateOccupied], [FloorLevel], [OtherFloorsSubtotal], [TotalBuildingAreaSqm], [StructuralFoundation], [StructuralColumns], [StructuralBeams], [StructuralTrussRoof], [StructuralRoof], [StructuralExteriorWalls], [StructuralFinishFront], [StructuralFinishRear], [StructuralFinishLeft], [StructuralFinishRight], [StructuralInsideFinish], [StructuralPartitionWalls], [StructuralFlooring], [StructuralFloorFinish], [StructuralStairs], [StructuralWindows], [DoorMain], [DoorRoom], [DoorOthers], [ElectricalSystem], [ToiletAndBathroom], [PlumbingSewer], [Paintings], [Ceiling], [MaterialsOrCode], [DescriptionBrand], [RatedCapacity], [ConditionWhenAcquired], [DateAcquired], [EconomicLifeYears], [YearInstalled], [YearOfOperation], [OriginalCost], [InstallationCost], [TotalCost], [YearsUsed], [RemainingEconomicLife], [DepreciationRatePercent], [DepreciatedValue], [Classification], [SubClassification], [AreaSqMeters], [UnitValue], [MarketValue], [ImprovementType], [ImprovementQty], [ImprovementUnitOfMeasure], [ImprovementUnitValue], [ImprovementMarketValue], [AdjustmentFactor], [PercentAdjustment], [ValueAdjustment], [AdjustedMarketValue], [AssessmentLevelPercent], [ActualUse], [BasicTaxRate], [SefTaxRate], [EffectivityYear], [EffectivityQuarter], [Taxability], [TaxabilityBasis], [TaxPeriodFromYear], [TaxPeriodToYear], [PreviousTdNo], [PreviousMarketValue], [PreviousOwner], [PreviousPin], [PreviousAssessedValue], [PreviousEffectivity], [AppraisedByName], [DateAppraised], [AssessedByName], [DateAssessed], [RecommendingApprovalName], [DateRecommended], [Memoranda], [ApprovedByName], [DateApproved], [EntryInRollName], [EntryInRollPosition], [EntryInRollDate], [EncodedByName], [DateEncoded], [Status])
-    VALUES ('90000000-0000-0000-0000-000000000001', 0, N'TD-2026-GS-0001', N'TR-2026-NEW', N'126-00-0001-002-01', N'Engr. Juan Dela Cruz', N'123-456-789-000', N'0917-111-2222', N'juan.delacruz@gmail.com', N'Pioneer Avenue, General Santos City', N'Male', NULL, NULL, NULL, NULL, NULL, NULL, N'Titled', N'TCT', N'TCT-142-99881', NULL, N'Psu-12-00411', N'Lot 4', N'Block 12', 0, N'', N'', NULL, N'', N'', N'', 0.0000, N'', N'Residential Condominium', N'Pioneer Avenue', N'General Santos City', N'Brgy. Dadiangas East', N'South Cotabato', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0.0000, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, N'Lot 101', N'Road Lot', N'Creek', N'Lot 103', N'Type I', 1, N'Class A - Reinforced Concrete', N'', 0, NULL, N'', NULL, N'Ground Floor', 0.0000, 0.0000, N'Reinforced Concrete Footing', N'Reinforced Concrete', N'Reinforced Concrete', N'Steel Truss', N'Long Span Colorbond G.I. Sheets', N'Concrete Hollow Blocks', N'Cement Plaster Paint Finish', N'Cement Plaster Paint Finish', N'Cement Plaster Paint Finish', N'Cement Plaster Paint Finish', N'Painted Plaster', N'Drywall / CHB', N'Concrete Slab', N'Granite Tiles', N'Reinforced Concrete', N'Sliding Glass Windows', N'Solid Wood Panel', N'Flush Door', N'PVC Door', N'Concealed Conduit Wiring', N'Complete Fixtures & Tiled', N'PVC Piping to Septic Vault', N'Acrytex Paint', N'Gypsum Board on Metal Framing', N'MAT-2026-A1', N'', N'', N'New', NULL, 10, 2026, 2026, 0.0000, 0.0000, 0.0000, 0, 10, 0.0000, 0.0000, 0, N'First Class Residential', 450.0000, 5000.0000, 2250000.0000, N'Fence / Pavement', 0.0000, N'sq.m.', 0.0000, 0.0000, N'Location & Elevation', 0.0000, 0.0000, 2250000.0000, 20.0000, N'Residential Lot', 2.0000, 1.0000, 2026, N'1st Quarter', N'Taxable', N'RA 7160 Local Government Code', 2026, 2029, NULL, 0.0000, NULL, NULL, 0.0000, NULL, N'Elena G. Reyes (Property Appraiser)', '2026-10-24 14:32:35', N'Marcus Aurelius Santos (Assessment Officer)', '2026-10-24 14:32:35', N'Engr. Roberto M. Dela Rosa (Assistant Assessor)', '2026-10-24 14:32:35', N'Standard assessment roll entry', N'Atty. Clarissa V. Mendoza (City Assessor)', '2026-10-24 14:32:35', N'Patricia Ann Villanueva', N'Assessment Roll Clerk', '2026-10-24 14:32:35', N'Patricia Ann Villanueva', '2026-10-24 14:32:35', 0);
+    INSERT INTO [dbo].[TaxDeclarations] (
+        [Id], [Kind], [TaxDeclarationNumber], [TransactionCode], [PropertyIndexNumber],
+        [OwnerName], [OwnerTin], [OwnerPhone], [OwnerEmail], [OwnerAddress], [OwnerSex],
+        [AppraisedByName], [DateAppraised], [AssessedByName], [DateAssessed],
+        [RecommendingApprovalName], [DateRecommended], [Memoranda], [ApprovedByName], [DateApproved],
+        [EntryInRollName], [EntryInRollPosition], [EntryInRollDate], [EncodedByName], [DateEncoded], [Status]
+    )
+    VALUES (
+        '90000000-0000-0000-0000-000000000001', 0, N'TD-2026-GS-0001', N'TR-2026-NEW', N'126-00-0001-002-01',
+        N'Engr. Juan Dela Cruz', N'123-456-789-000', N'0917-111-2222', N'juan.delacruz@gmail.com', N'Pioneer Avenue, General Santos City', N'Male',
+        N'Elena G. Reyes (Property Appraiser)', GETDATE(), N'Marcus Aurelius Santos (Assessment Officer)', GETDATE(),
+        N'Engr. Roberto M. Dela Rosa (Assistant Assessor)', GETDATE(), N'Standard residential land assessment',
+        N'Atty. Clarissa V. Mendoza (City Assessor)', GETDATE(), N'Patricia Ann Villanueva', N'Assessment Roll Clerk', GETDATE(),
+        N'Patricia Ann Villanueva', GETDATE(), 0
+    );
+
+    IF NOT EXISTS (SELECT 1 FROM [dbo].[TDNLands] WHERE [TaxDeclarationId] = '90000000-0000-0000-0000-000000000001')
+    BEGIN
+        INSERT INTO [dbo].[TDNLands] (
+            [Id], [TaxDeclarationId], [RegistrationStatus], [TitleType], [TitleNo], [SurveyNo], [LotNo], [BlockNo],
+            [StreetNo], [Municipality], [DistrictOrBarangay], [ProvinceCity],
+            [BoundaryNorth], [BoundaryEast], [BoundaryWest], [BoundarySouth],
+            [Classification], [SubClassification], [ActualUse], [AreaSqMeters], [UnitValue], [MarketValue],
+            [AdjustedMarketValue], [AssessmentLevelPercent], [AssessedValue], [BasicTaxRate], [SefTaxRate], [AnnualTaxDue],
+            [EffectivityYear], [EffectivityQuarter], [Taxability], [TaxabilityBasis],
+            [ImprovementQty], [ImprovementUnitValue], [ImprovementMarketValue], [PercentAdjustment], [ValueAdjustment],
+            [PreviousMarketValue], [PreviousAssessedValue]
+        )
+        VALUES (
+            '91000000-0000-0000-0000-000000000001', '90000000-0000-0000-0000-000000000001', N'Titled', N'TCT', N'TCT-142-99881', N'Psu-12-00411', N'Lot 4', N'Block 12',
+            N'Pioneer Avenue', N'General Santos City', N'Brgy. Dadiangas East', N'South Cotabato',
+            N'Lot 101', N'Road Lot', N'Creek', N'Lot 103',
+            1, N'First Class Residential', N'Residential Lot', 450.00, 5000.00, 2250000.00,
+            2250000.00, 20.00, 450000.00, 0.02, 0.01, 13500.00,
+            2026, N'1st Quarter', N'Taxable', N'RA 7160 Local Government Code',
+            0, 0, 0, 0, 0,
+            0, 0
+        );
+    END
 END
 
 IF NOT EXISTS (SELECT 1 FROM [dbo].[TaxDeclarations] WHERE [TaxDeclarationNumber] = 'TD-2026-GS-0002')
 BEGIN
-    INSERT INTO [dbo].[TaxDeclarations] ([Id], [Kind], [TaxDeclarationNumber], [TransactionCode], [PropertyIndexNumber], [OwnerName], [OwnerTin], [OwnerPhone], [OwnerEmail], [OwnerAddress], [OwnerSex], [AdminPossessorName], [AdminPossessorSex], [AdminPossessorAddress], [AdminPossessorTin], [AdminPossessorPhone], [AdminPossessorEmail], [RegistrationStatus], [TitleType], [TitleNo], [DateRegistered], [SurveyNo], [LotNo], [BlockNo], [IsLocallyManufactured], [MachineryRegNo], [ImportationPermitNo], [ImportationDateIssued], [CountryOfOrigin], [SupplierSeller], [SupplierAddress], [AcquisitionCost], [OrNoAndDate], [BuildingUseType], [StreetNo], [Municipality], [DistrictOrBarangay], [ProvinceCity], [LandOwnerName], [LandOwnerTin], [LandOwnerPhone], [LandOwnerEmail], [LandOwnerAddress], [LandOwnerSex], [LandTdNo], [LandPin], [LandTitleNo], [LandSurveyNo], [LandLotNo], [LandBlockNo], [LandAreaSqm], [BuildingReferenceName], [BuildingOwnerTin], [BuildingOwnerPhone], [BuildingOwnerEmail], [BuildingOwnerAddress], [BuildingOwnerSex], [BuildingTdNo], [BuildingPin], [BoundaryNorth], [BoundaryEast], [BoundaryWest], [BoundarySouth], [StructuralType], [NoOfStoreys], [BuildingClassification], [BuildingPermitNo], [BuildingAgeYears], [DateCompleted], [OccupancyPermitNo], [DateOccupied], [FloorLevel], [OtherFloorsSubtotal], [TotalBuildingAreaSqm], [StructuralFoundation], [StructuralColumns], [StructuralBeams], [StructuralTrussRoof], [StructuralRoof], [StructuralExteriorWalls], [StructuralFinishFront], [StructuralFinishRear], [StructuralFinishLeft], [StructuralFinishRight], [StructuralInsideFinish], [StructuralPartitionWalls], [StructuralFlooring], [StructuralFloorFinish], [StructuralStairs], [StructuralWindows], [DoorMain], [DoorRoom], [DoorOthers], [ElectricalSystem], [ToiletAndBathroom], [PlumbingSewer], [Paintings], [Ceiling], [MaterialsOrCode], [DescriptionBrand], [RatedCapacity], [ConditionWhenAcquired], [DateAcquired], [EconomicLifeYears], [YearInstalled], [YearOfOperation], [OriginalCost], [InstallationCost], [TotalCost], [YearsUsed], [RemainingEconomicLife], [DepreciationRatePercent], [DepreciatedValue], [Classification], [SubClassification], [AreaSqMeters], [UnitValue], [MarketValue], [ImprovementType], [ImprovementQty], [ImprovementUnitOfMeasure], [ImprovementUnitValue], [ImprovementMarketValue], [AdjustmentFactor], [PercentAdjustment], [ValueAdjustment], [AdjustedMarketValue], [AssessmentLevelPercent], [ActualUse], [BasicTaxRate], [SefTaxRate], [EffectivityYear], [EffectivityQuarter], [Taxability], [TaxabilityBasis], [TaxPeriodFromYear], [TaxPeriodToYear], [PreviousTdNo], [PreviousMarketValue], [PreviousOwner], [PreviousPin], [PreviousAssessedValue], [PreviousEffectivity], [AppraisedByName], [DateAppraised], [AssessedByName], [DateAssessed], [RecommendingApprovalName], [DateRecommended], [Memoranda], [ApprovedByName], [DateApproved], [EntryInRollName], [EntryInRollPosition], [EntryInRollDate], [EncodedByName], [DateEncoded], [Status])
-    VALUES ('90000000-0000-0000-0000-000000000002', 1, N'TD-2026-GS-0002', N'TR-2026-NEW', N'126-00-0002-005-08', N'Maria Clara O. Santos', N'987-654-321-000', N'0919-222-3333', N'maria.santos@gmail.com', N'Santiago Boulevard, General Santos City', N'Female', NULL, NULL, NULL, NULL, NULL, NULL, N'Titled', N'TCT', N'TCT-142-55412', NULL, N'Psd-12-00812', N'Lot 8', N'Block 3', 0, N'', N'', NULL, N'', N'', N'', 0.0000, N'', N'Residential Condominium', N'Santiago Boulevard', N'General Santos City', N'Brgy. Dadiangas South', N'South Cotabato', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0.0000, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, N'Lot 101', N'Road Lot', N'Creek', N'Lot 103', N'Type I', 1, N'Class A - Reinforced Concrete', N'', 0, NULL, N'', NULL, N'Ground Floor', 0.0000, 0.0000, N'Reinforced Concrete Footing', N'Reinforced Concrete', N'Reinforced Concrete', N'Steel Truss', N'Long Span Colorbond G.I. Sheets', N'Concrete Hollow Blocks', N'Cement Plaster Paint Finish', N'Cement Plaster Paint Finish', N'Cement Plaster Paint Finish', N'Cement Plaster Paint Finish', N'Painted Plaster', N'Drywall / CHB', N'Concrete Slab', N'Granite Tiles', N'Reinforced Concrete', N'Sliding Glass Windows', N'Solid Wood Panel', N'Flush Door', N'PVC Door', N'Concealed Conduit Wiring', N'Complete Fixtures & Tiled', N'PVC Piping to Septic Vault', N'Acrytex Paint', N'Gypsum Board on Metal Framing', N'MAT-2026-A1', N'', N'', N'New', NULL, 10, 2026, 2026, 0.0000, 0.0000, 0.0000, 0, 10, 0.0000, 0.0000, 1, N'Commercial Building', 620.0000, 13709.6800, 8500000.0000, N'Fence / Pavement', 0.0000, N'sq.m.', 0.0000, 0.0000, N'Location & Elevation', 0.0000, 0.0000, 8500000.0000, 50.0000, N'Commercial Building', 2.0000, 1.0000, 2026, N'1st Quarter', N'Taxable', N'RA 7160 Local Government Code', 2026, 2029, NULL, 0.0000, NULL, NULL, 0.0000, NULL, N'Elena G. Reyes (Property Appraiser)', '2026-10-24 14:32:35', N'Marcus Aurelius Santos (Assessment Officer)', '2026-10-24 14:32:35', N'Engr. Roberto M. Dela Rosa (Assistant Assessor)', '2026-10-24 14:32:35', N'Commercial building assessment entry', N'Atty. Clarissa V. Mendoza (City Assessor)', '2026-10-24 14:32:35', N'Patricia Ann Villanueva', N'Assessment Roll Clerk', '2026-10-24 14:32:35', N'Patricia Ann Villanueva', '2026-10-24 14:32:35', 0);
+    INSERT INTO [dbo].[TaxDeclarations] (
+        [Id], [Kind], [TaxDeclarationNumber], [TransactionCode], [PropertyIndexNumber],
+        [OwnerName], [OwnerTin], [OwnerPhone], [OwnerEmail], [OwnerAddress], [OwnerSex],
+        [AppraisedByName], [DateAppraised], [AssessedByName], [DateAssessed],
+        [RecommendingApprovalName], [DateRecommended], [Memoranda], [ApprovedByName], [DateApproved],
+        [EntryInRollName], [EntryInRollPosition], [EntryInRollDate], [EncodedByName], [DateEncoded], [Status]
+    )
+    VALUES (
+        '90000000-0000-0000-0000-000000000002', 1, N'TD-2026-GS-0002', N'TR-2026-NEW', N'126-00-0002-005-08',
+        N'Maria Clara O. Santos', N'987-654-321-000', N'0919-222-3333', N'maria.santos@gmail.com', N'Santiago Boulevard, General Santos City', N'Female',
+        N'Elena G. Reyes (Property Appraiser)', GETDATE(), N'Marcus Aurelius Santos (Assessment Officer)', GETDATE(),
+        N'Engr. Roberto M. Dela Rosa (Assistant Assessor)', GETDATE(), N'Commercial building assessment entry',
+        N'Atty. Clarissa V. Mendoza (City Assessor)', GETDATE(), N'Patricia Ann Villanueva', N'Assessment Roll Clerk', GETDATE(),
+        N'Patricia Ann Villanueva', GETDATE(), 0
+    );
+
+    IF NOT EXISTS (SELECT 1 FROM [dbo].[TDNBuildings] WHERE [TaxDeclarationId] = '90000000-0000-0000-0000-000000000002')
+    BEGIN
+        INSERT INTO [dbo].[TDNBuildings] (
+            [Id], [TaxDeclarationId], [StreetNo], [Municipality], [DistrictOrBarangay], [ProvinceCity],
+            [LandOwnerName], [LandOwnerTin], [LandOwnerPhone], [LandOwnerEmail], [LandOwnerAddress], [LandOwnerSex],
+            [LandTdNo], [LandPin], [LandAreaSqm],
+            [IsCct], [IsAdministrator],
+            [StructuralType], [BuildingClassification], [BuildingUseType], [NoOfStoreys], [FloorLevel], [BuildingPermitNo], [BuildingAgeYears],
+            [TotalFloorArea], [BaseRcnValue], [ReplacementCostNew], [BuildingDepreciationPercent], [BuildingDepreciationAccumulated],
+            [DepreciatedMarketValue], [TotalAdditionalItemsValue], [MarketValue], [AssessmentLevelPercent], [AssessedValue],
+            [BasicTaxRate], [SefTaxRate], [AnnualTaxDue], [EffectivityYear], [EffectivityQuarter], [Taxability]
+        )
+        VALUES (
+            '92000000-0000-0000-0000-000000000001', '90000000-0000-0000-0000-000000000002', N'Santiago Boulevard', N'General Santos City', N'Brgy. Dadiangas South', N'South Cotabato',
+            N'Engr. Juan Dela Cruz', N'123-456-789-000', N'0917-111-2222', N'juan.delacruz@gmail.com', N'Pioneer Avenue, General Santos City', N'Male',
+            N'TD-2026-GS-0001', N'126-00-0001-002-01', 450.00,
+            0, 0,
+            N'Type I', N'Class A - Reinforced Concrete', N'Commercial Building', 2, N'Ground & 2nd Floor', N'BP-2025-091', 2,
+            620.00, 13709.68, 8500000.00, 0.00, 0.00,
+            8500000.00, 0.00, 8500000.00, 50.00, 4250000.00,
+            0.02, 0.01, 127500.00, 2026, N'1st Quarter', N'Taxable'
+        );
+    END
 END
 
 -- -----------------------------------------------------------------------------
