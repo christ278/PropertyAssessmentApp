@@ -1441,7 +1441,7 @@ namespace PropertyAssessmentApp.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("refActualUse");
+                    b.ToTable("LandRefActualUse");
 
                     b.HasData(
                         new
@@ -1583,7 +1583,7 @@ namespace PropertyAssessmentApp.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("refAdjustment");
+                    b.ToTable("LandRefAdjustment");
 
                     b.HasData(
                         new
@@ -1707,7 +1707,7 @@ namespace PropertyAssessmentApp.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("refLandAssessmentLevel");
+                    b.ToTable("LandRefAssessmentLevel");
 
                     b.HasData(
                         new
@@ -1826,7 +1826,7 @@ namespace PropertyAssessmentApp.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("refClassification");
+                    b.ToTable("LandRefClassification");
 
                     b.HasData(
                         new
@@ -2073,7 +2073,7 @@ namespace PropertyAssessmentApp.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("refImprovementType");
+                    b.ToTable("LandRefImprovementType");
 
                     b.HasData(
                         new
@@ -2249,7 +2249,7 @@ namespace PropertyAssessmentApp.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("refSubClassification");
+                    b.ToTable("LandRefSubClassification");
 
                     b.HasData(
                         new
