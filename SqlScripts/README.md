@@ -67,6 +67,17 @@ flowchart LR
 
 ---
 
+### 12. `12_SeedDefaultModules.sql`
+- **Purpose:** Seeds the 18 default system modules into `[dbo].[SystemModule]` with deterministic Module IDs, routing controllers/actions, categories, and Lucide icons.
+- **Includes:** Dashboard, Pool Transactions, My Transactions, Analytics, Inspection, Property Assessment, FAAS/Assessment, Tax Mapping, Tax Declaration, Land Holdings, Order of Payment, Owner Registration, File Location, Workflow Settings, User Management, User Roles, Role Permissions, Data Transfer.
+
+---
+
+### 13. `13_SeedDefaultUserRoles.sql`
+- **Purpose:** Seeds the 22 default user roles into `[dbo].[UserRoleSettings]` with deterministic GUIDs, workflow step associations (`TransactionStatusId`), and division assignments (Division 1 Appraisal & Assessment, Division 2 Tax Mapping, Division 3 Records, plus System Administrator).
+
+---
+
 ## 🚀 How to Execute SQL Scripts
 
 ### Option A: PostgreSQL / PostGIS
