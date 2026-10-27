@@ -11,7 +11,7 @@ After executing the SQL scripts, you can log in to the application using the def
 | Field | Default Value | Notes |
 | :--- | :--- | :--- |
 | **Username** | `admin` | System Administrator Account |
-| **Password** | `x` | Default Password |
+| **Password** | `P@ssword2026!` | Default Password |
 | **User Role** | `SystemAdministrator` | Full Access Permissions |
 | **Department** | `City Assessor Executive Office` | Primary LGU Division |
 | **Email** | `admin@gensan.gov.ph` | Official Assessor Email |
@@ -42,7 +42,7 @@ flowchart LR
 - **Purpose:** Seeds the primary **Default System Administrator Account**.
 - **Credentials Created:**
   - **Username:** `admin`
-  - **Password:** `x`
+  - **Password:** `admin` (or `x`)
   - **Account Status:** Active (`TRUE`)
   - **Role ID:** `0` (`SystemAdmin`)
 

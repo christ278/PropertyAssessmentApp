@@ -69,7 +69,6 @@ public class UserAccountService : IUserAccountService
 
         var rawPassword = !string.IsNullOrWhiteSpace(user.Password) ? user.Password : "P@ssword2026!";
         user.PasswordHash = _passwordHasher.HashPassword(user, rawPassword);
-        user.Password = rawPassword;
 
         _context.UserAccounts.Add(user);
         _context.SaveChanges();
@@ -95,7 +94,6 @@ public class UserAccountService : IUserAccountService
 
             if (!string.IsNullOrWhiteSpace(user.Password))
             {
-                existing.Password = user.Password;
                 existing.PasswordHash = _passwordHasher.HashPassword(existing, user.Password);
             }
 
@@ -115,23 +113,23 @@ public class UserAccountService : IUserAccountService
 
     public bool VerifyPassword(UserAccount user, string providedPassword)
     {
-        if (user == null || string.IsNullOrWhiteSpace(providedPassword))
+        if (user == null || string.IsNullOrWhiteSpace(providedPassword) || string.IsNullOrWhiteSpace(user.PasswordHash))
         {
             return false;
         }
 
-        // Plaintext direct match
-        if (!string.IsNullOrWhiteSpace(user.Password) && user.Password == providedPassword)
+        // 1. ASP.NET Core PasswordHasher PBKDF2 check against PasswordHash
+        try
         {
-            return true;
+            var result = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, providedPassword);
+            if (result == PasswordVerificationResult.Success || result == PasswordVerificationResult.SuccessRehashNeeded)
+            {
+                return true;
+            }
         }
+        catch { }
 
-        if (user.PasswordHash == providedPassword)
-        {
-            return true;
-        }
-
-        // Legacy CAST SHA256 lower-case hex check
+        // 2. Legacy CAST SHA256 lower-case hex check against PasswordHash
         try
         {
             using var sha256 = System.Security.Cryptography.SHA256.Create();
@@ -144,16 +142,7 @@ public class UserAccountService : IUserAccountService
         }
         catch { }
 
-        // ASP.NET Core PasswordHasher PBKDF2 check
-        try
-        {
-            var result = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, providedPassword);
-            return result == PasswordVerificationResult.Success || result == PasswordVerificationResult.SuccessRehashNeeded;
-        }
-        catch
-        {
-            return false;
-        }
+        return false;
     }
 
     public int GetTotalCount() => _context.UserAccounts.Count();

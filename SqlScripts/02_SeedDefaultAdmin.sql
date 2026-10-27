@@ -1,13 +1,19 @@
 -- =============================================================================
 -- CITY ASSESSOR REAL PROPERTY TAX & FAAS ASSESSMENT MANAGEMENT SYSTEM
 -- SQL SCRIPT STEP 02: DEFAULT ADMIN ACCOUNT SEEDING (T-SQL / SQL SERVER)
--- Target Account: Username: 'admin' | Password: 'x' | Role: 0 ('SystemAdmin')
+-- Target Account: Username: 'admin' | Password: 'P@ssword2026!' | Role: 0 ('SystemAdmin')
 -- =============================================================================
 
 SET NOCOUNT ON;
 
 -- INSERT OR UPDATE DEFAULT SYSTEM ADMINISTRATOR ACCOUNT
--- PasswordHash is verified for ASP.NET Core Identity PasswordHasher for password: 'x'
+-- Password is 'P@ssword2026!' (ASP.NET Core Identity PasswordHasher PBKDF2 hash)
+IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'UserAccounts' AND COLUMN_NAME = 'Password')
+BEGIN
+    ALTER TABLE [dbo].[UserAccounts] DROP COLUMN [Password];
+END;
+GO
+
 IF NOT EXISTS (SELECT 1 FROM [dbo].[UserAccounts] WHERE [Username] = 'admin')
 BEGIN
     INSERT INTO [dbo].[UserAccounts] (
@@ -27,7 +33,7 @@ BEGIN
     VALUES (
         '70000000-0000-0000-0000-000000000000',
         'admin',
-        'AQAAAAIAAYagAAAAEClMCzKQl1OaneUt2imzj7GxgSYrauY0GSDKqNAg8ss6MOlvyFqexJ7lRyltJUsJVw==', -- Hash for password 'x'
+        'AQAAAAIAAYagAAAAEJCWgjd6BWE3zenbZXsPT0DWIi8VACrUhCfR9GgZcewr+N8yLSdGyvJBr9pS8Zr31w==', -- Hash for password 'P@ssword2026!'
         'System Administrator',
         'admin@gensan.gov.ph',
         'EMP-ADMIN-001',
@@ -42,7 +48,7 @@ END
 ELSE
 BEGIN
     UPDATE [dbo].[UserAccounts]
-    SET [PasswordHash] = 'AQAAAAIAAYagAAAAEClMCzKQl1OaneUt2imzj7GxgSYrauY0GSDKqNAg8ss6MOlvyFqexJ7lRyltJUsJVw==',
+    SET [PasswordHash] = 'AQAAAAIAAYagAAAAEJCWgjd6BWE3zenbZXsPT0DWIi8VACrUhCfR9GgZcewr+N8yLSdGyvJBr9pS8Zr31w==',
         [FullName] = 'System Administrator',
         [Role] = 0,
         [IsActive] = 1,

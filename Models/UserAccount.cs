@@ -37,6 +37,7 @@ public class UserAccount
     [Display(Name = "Hashed Password")]
     public string PasswordHash { get; set; } = string.Empty;
 
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
     [DataType(DataType.Password)]
     [Display(Name = "Account Password")]
     [ValidateNever]
