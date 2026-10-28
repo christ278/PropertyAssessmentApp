@@ -63,9 +63,10 @@ public class AssessmentController : Controller
         PopulateLandPrerequisites();
         var model = new TaxDeclaration
         {
-            TaxDeclarationNumber = $"TD-{DateTime.Now.Year}-00{new Random().Next(1000, 9999)}",
+            TaxDeclarationNumber = _assessmentService.GenerateCastTdNumber(DateTime.Now.Year, "0001"),
+            ARPNo = CastTdGenerator.DefaultArpNumber,
             TransactionCode = "DC",
-            PropertyIndexNumber = $"101-01-{new Random().Next(100, 999)}-01-{new Random().Next(10, 99)}",
+            PropertyIndexNumber = $"187-00-0001-001-{new Random().Next(1, 999):D3}",
             EffectivityYear = DateTime.Now.Year,
             AssessmentLevelPercent = 20m
         };
@@ -183,6 +184,7 @@ public class AssessmentController : Controller
 
         return Json(new
         {
+            id = owner.Id,
             name = owner.DisplayName,
             tin = owner.TaxIdentNo,
             phone = owner.ContactNo ?? string.Empty,

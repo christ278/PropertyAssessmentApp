@@ -1656,14 +1656,13 @@ public class DocumentWorkflowService : IDocumentWorkflowService
     {
         if (request == null) return;
 
+        List<AssessmentPartitionItem>? partitions = null;
         List<string> tdnList = new List<string>();
         if (!string.IsNullOrWhiteSpace(request.GeneratedPartitionsJson))
         {
             try
             {
-                var partitions = JsonSerializer.Deserialize<List<AssessmentPartitionItem>>(
-                    request.GeneratedPartitionsJson,
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                partitions = PartitionJsonHelper.ParseList(request.GeneratedPartitionsJson);
                 if (partitions != null)
                 {
                     tdnList = partitions
@@ -1693,6 +1692,198 @@ public class DocumentWorkflowService : IDocumentWorkflowService
             if (td.Status == AssessmentStatus.Pending || td.Status == AssessmentStatus.Active)
             {
                 td.Status = targetStatus;
+            }
+        }
+
+        // Handle Mother Parcel Cancellation & Superseding Workflow (e.g. Subdivision - SD, Consolidation - CS, Physical Change - PC, Transfer - TR, Reclassification - RC)
+        var isSubdivision = string.Equals(request.TransactionTypeCode, "SD", StringComparison.OrdinalIgnoreCase);
+        var isConsolidation = string.Equals(request.TransactionTypeCode, "CS", StringComparison.OrdinalIgnoreCase);
+        var isPhysicalChange = string.Equals(request.TransactionTypeCode, "PC", StringComparison.OrdinalIgnoreCase);
+        var isTransfer = string.Equals(request.TransactionTypeCode, "TR", StringComparison.OrdinalIgnoreCase);
+        var isReclassification = string.Equals(request.TransactionTypeCode, "RC", StringComparison.OrdinalIgnoreCase);
+        var isMotherCancellationTx = isSubdivision || isConsolidation || isPhysicalChange || isTransfer || isReclassification;
+
+        var motherIds = new HashSet<Guid>();
+        if (request.RefTaxDeclarationId.HasValue && request.RefTaxDeclarationId.Value != Guid.Empty)
+        {
+            motherIds.Add(request.RefTaxDeclarationId.Value);
+        }
+        if (!string.IsNullOrWhiteSpace(request.SelectedRefPropertyIdsJson))
+        {
+            try
+            {
+                var parsedIds = System.Text.Json.JsonSerializer.Deserialize<List<Guid>>(request.SelectedRefPropertyIdsJson);
+                if (parsedIds != null)
+                {
+                    foreach (var mId in parsedIds)
+                    {
+                        if (mId != Guid.Empty) motherIds.Add(mId);
+                    }
+                }
+            }
+            catch { }
+        }
+
+        if (partitions != null)
+        {
+            foreach (var p in partitions)
+            {
+                if (p.BasePropertyId.HasValue && p.BasePropertyId.Value != Guid.Empty)
+                {
+                    motherIds.Add(p.BasePropertyId.Value);
+                }
+            }
+        }
+
+        var newTdIds = tds.Select(t => t.Id).ToHashSet();
+        var motherTds = _context.TaxDeclarations
+            .Where(t => motherIds.Contains(t.Id) && !newTdIds.Contains(t.Id))
+            .ToList();
+
+        if (motherTds.Count == 0 && (!string.IsNullOrWhiteSpace(request.PrevTDN) || !string.IsNullOrWhiteSpace(request.PrevPIN)))
+        {
+            var cleanPrevTdn = request.PrevTDN?.Trim();
+            var cleanPrevPin = request.PrevPIN?.Trim();
+            motherTds = _context.TaxDeclarations
+                .Where(t => !newTdIds.Contains(t.Id) &&
+                            ((!string.IsNullOrEmpty(cleanPrevTdn) && t.TaxDeclarationNumber == cleanPrevTdn) ||
+                             (!string.IsNullOrEmpty(cleanPrevPin) && t.PropertyIndexNumber == cleanPrevPin)))
+                .ToList();
+        }
+
+        if (request.Status == PropertyAssessmentStatus.Approved)
+        {
+            var newLotTdns = tds.Select(t => t.TaxDeclarationNumber).Where(s => !string.IsNullOrWhiteSpace(s)).Distinct().ToList();
+            var newLotsDisplay = newLotTdns.Count > 0 ? string.Join(", ", newLotTdns) : (isConsolidation ? "Consolidated Lot TD" : (isPhysicalChange ? "Renovated/Expanded Property TD" : (isTransfer ? "Transferred Property TD" : (isReclassification ? "Reclassified Property TD" : "Segregated Lot TDs"))));
+
+            foreach (var motherTd in motherTds)
+            {
+                if (isMotherCancellationTx)
+                {
+                    motherTd.Status = AssessmentStatus.Cancelled;
+                    motherTd.IsCancelledAndSuperseded = true;
+                    motherTd.CancellationReason = isSubdivision 
+                        ? "Subdivision (SD) · Segregation of Land" 
+                        : (isConsolidation 
+                            ? "Consolidation (CS) · Lot Integration" 
+                            : (isPhysicalChange 
+                                ? "Reassessment Due to Physical Change (PC) · Renovation / Expansion" 
+                                : (isTransfer
+                                    ? "Transfer (TR) · Administrative Title Conveyance"
+                                    : (isReclassification
+                                        ? "Reclassification (RC) · Actual Ground Use Conversion"
+                                        : "Cancelled & Superseded"))));
+                    motherTd.DateCancelled = DateTime.Now;
+                    motherTd.SupersededByTdns = newLotsDisplay;
+                    motherTd.CancelledByRequestId = request.Id;
+
+                    var stampMarker = "*** CANCELLED & SUPERSEDED ***";
+                    if (string.IsNullOrWhiteSpace(motherTd.Memoranda) || !motherTd.Memoranda.Contains(stampMarker))
+                    {
+                        var cancelStamp = isSubdivision
+                            ? $"\n\n*** CANCELLED & SUPERSEDED ***\n" +
+                              $"Cancelled by Subdivision (SD) · Segregation of Land under Assessment Request #{request.TrackingNumber} " +
+                              $"pursuant to LRA/DENR-approved plan on {DateTime.Now:MMMM dd, yyyy}.\n" +
+                              $"Superseded by New Segregated Lot TDs: {newLotsDisplay}.\n" +
+                              $"Tax liabilities and delinquencies apportioned independently."
+                            : (isConsolidation
+                                ? $"\n\n*** CANCELLED & SUPERSEDED ***\n" +
+                                  $"Cancelled by Consolidation (CS) · Lot Integration under Assessment Request #{request.TrackingNumber} " +
+                                  $"pursuant to field inspection and LRA/DENR-approved consolidation plan on {DateTime.Now:MMMM dd, yyyy}.\n" +
+                                  $"Superseded by Consolidated TD: {newLotsDisplay}.\n" +
+                                  $"Real property tax receivables in the Treasury are collapsed from multiple ledgers into a unified bill."
+                                : (isPhysicalChange
+                                    ? $"\n\n*** CANCELLED & SUPERSEDED ***\n" +
+                                      $"Cancelled due to Reassessment Due to Physical Change (PC) · Renovation / Expansion under Assessment Request #{request.TrackingNumber} on {DateTime.Now:MMMM dd, yyyy}.\n" +
+                                      $"Superseded by New Reassessed TD: {newLotsDisplay}.\n" +
+                                      $"Structural renovation/expansion logged with upward Fair Market Value and Assessed Value adjustment."
+                                    : (isTransfer
+                                        ? $"\n\n*** CANCELLED & SUPERSEDED ***\n" +
+                                          $"Cancelled due to Transfer (TR) · Administrative Title Conveyance under Assessment Request #{request.TrackingNumber} on {DateTime.Now:MMMM dd, yyyy}.\n" +
+                                          $"Superseded by Replacement TD: {newLotsDisplay} issued to Transferee: {request.NewOwnerName ?? "New Owner"}.\n" +
+                                          $"Executed upon presentation of TCT, BIR CAR/eCAR, and Transfer Tax Receipt. Billing ledgers redirected to transferee."
+                                        : (isReclassification
+                                            ? $"\n\n*** CANCELLED & SUPERSEDED ***\n" +
+                                              $"Cancelled due to Reclassification (RC) · Actual Ground Use Conversion under Assessment Request #{request.TrackingNumber} on {DateTime.Now:MMMM dd, yyyy}.\n" +
+                                              $"Superseded by Reclassified TD: {newLotsDisplay}.\n" +
+                                              $"Ground physical use converted pursuant to field inspection under Sec. 217, RA 7160. Statutory assessment level adjusted without requiring title re-titling."
+                                            : $"\n\n*** CANCELLED & SUPERSEDED ***\nCancelled under Assessment Request #{request.TrackingNumber} on {DateTime.Now:MMMM dd, yyyy}.\nSuperseded by: {newLotsDisplay}."))));
+                        motherTd.Memoranda = string.IsNullOrWhiteSpace(motherTd.Memoranda)
+                            ? cancelStamp.TrimStart()
+                            : (motherTd.Memoranda + cancelStamp);
+                    }
+                }
+            }
+
+            var primaryMother = motherTds.FirstOrDefault();
+            var motherTdnList = string.Join(", ", motherTds.Select(m => m.TaxDeclarationNumber).Where(n => !string.IsNullOrWhiteSpace(n)));
+            var motherPinList = string.Join(", ", motherTds.Select(m => m.PropertyIndexNumber).Where(n => !string.IsNullOrWhiteSpace(n)));
+
+            foreach (var td in tds)
+            {
+                td.Status = AssessmentStatus.Active;
+                if (primaryMother != null)
+                {
+                    if (string.IsNullOrWhiteSpace(td.PreviousTdNo)) 
+                        td.PreviousTdNo = isConsolidation && !string.IsNullOrWhiteSpace(motherTdnList) ? motherTdnList : primaryMother.TaxDeclarationNumber;
+                    if (string.IsNullOrWhiteSpace(td.PreviousPin)) 
+                        td.PreviousPin = isConsolidation && !string.IsNullOrWhiteSpace(motherPinList) ? motherPinList : primaryMother.PropertyIndexNumber;
+                    if (string.IsNullOrWhiteSpace(td.PreviousOwner)) 
+                        td.PreviousOwner = primaryMother.OwnerName;
+                    if (td.PreviousMarketValue <= 0) 
+                        td.PreviousMarketValue = isConsolidation ? motherTds.Sum(m => m.MarketValue) : primaryMother.MarketValue;
+                    if (td.PreviousAssessedValue <= 0) 
+                        td.PreviousAssessedValue = isConsolidation ? motherTds.Sum(m => m.AssessedValue) : primaryMother.AssessedValue;
+
+                    if (isTransfer)
+                    {
+                        // Retains identical land area, building classifications, and PIN, while redirecting billing ledgers to transferee
+                        if (!string.IsNullOrWhiteSpace(primaryMother.PropertyIndexNumber) && (string.IsNullOrWhiteSpace(td.PropertyIndexNumber) || td.PropertyIndexNumber.EndsWith("-A")))
+                        {
+                            td.PropertyIndexNumber = primaryMother.PropertyIndexNumber;
+                        }
+                        if (td.AreaSqMeters <= 0 && primaryMother.AreaSqMeters > 0)
+                        {
+                            td.AreaSqMeters = primaryMother.AreaSqMeters;
+                        }
+                    }
+                }
+                if (isSubdivision && !string.IsNullOrWhiteSpace(td.Memoranda) && !td.Memoranda.Contains("apportioned independently"))
+                {
+                    td.Memoranda += " Tax liabilities and delinquencies apportioned independently.";
+                }
+                if (isConsolidation && !string.IsNullOrWhiteSpace(td.Memoranda) && !td.Memoranda.Contains("collapsed from multiple ledgers"))
+                {
+                    td.Memoranda += " Real property tax receivables in the Treasury are collapsed from multiple ledgers into a unified bill.";
+                }
+                if (isPhysicalChange && !string.IsNullOrWhiteSpace(td.Memoranda) && !td.Memoranda.Contains("upward adjustment"))
+                {
+                    td.Memoranda += " Upward adjustment in Fair Market Value and Assessed Value following structural renovation/expansion.";
+                }
+                if (isTransfer && !string.IsNullOrWhiteSpace(td.Memoranda) && !td.Memoranda.Contains("Administrative Title Conveyance"))
+                {
+                    td.Memoranda += " Transferred under Administrative Title Conveyance (TR) pursuant to TCT, BIR CAR/eCAR, and Transfer Tax Receipt. Retains identical PIN and classifications. Billing ledgers redirected to transferee.";
+                }
+                if (isReclassification && !string.IsNullOrWhiteSpace(td.Memoranda) && !td.Memoranda.Contains("Actual Ground Use Conversion"))
+                {
+                    td.Memoranda += " Reclassified due to Actual Ground Use Conversion (RC) under Sec. 217 of R.A. 7160. Statutory assessment level and annual property tax dues adjusted based on confirmed economic ground activity.";
+                }
+            }
+        }
+        else
+        {
+            foreach (var motherTd in motherTds)
+            {
+                if (motherTd.IsCancelledAndSuperseded &&
+                    (motherTd.CancelledByRequestId == request.Id || (motherTd.Memoranda != null && motherTd.Memoranda.Contains(request.TrackingNumber))))
+                {
+                    motherTd.Status = AssessmentStatus.Active;
+                    motherTd.IsCancelledAndSuperseded = false;
+                    motherTd.CancellationReason = null;
+                    motherTd.DateCancelled = null;
+                    motherTd.SupersededByTdns = null;
+                    motherTd.CancelledByRequestId = null;
+                }
             }
         }
     }

@@ -49,23 +49,30 @@
                     </span>
 
                     <!-- Status Badge -->
-                    @switch (Model.Status)
+                    @if (Model.IsCancelledAndSuperseded || Model.Status == PropertyAssessmentApp.Models.AssessmentStatus.Cancelled)
                     {
-                        case PropertyAssessmentApp.Models.AssessmentStatus.Active:
-                            <span class="px-3 py-1 rounded-xl bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/40 text-xs font-bold uppercase">Active In-Roll</span>
-                            break;
-                        case PropertyAssessmentApp.Models.AssessmentStatus.Pending:
-                            <span class="px-3 py-1 rounded-xl bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-500/40 text-xs font-bold uppercase">Pending Approval</span>
-                            break;
-                        case PropertyAssessmentApp.Models.AssessmentStatus.UnderReassessment:
-                            <span class="px-3 py-1 rounded-xl bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40 text-xs font-bold uppercase">Under Reassessment</span>
-                            break;
-                        case PropertyAssessmentApp.Models.AssessmentStatus.PendingAppeal:
-                            <span class="px-3 py-1 rounded-xl bg-rose-100 dark:bg-rose-500/20 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-500/40 text-xs font-bold uppercase">Pending Appeal</span>
-                            break;
-                        default:
-                            <span class="px-3 py-1 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 text-xs font-bold uppercase">@Model.Status</span>
-                            break;
+                        <span class="px-3 py-1 rounded-xl bg-rose-100 dark:bg-rose-500/20 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-500/40 text-xs font-bold uppercase">Cancelled &amp; Superseded</span>
+                    }
+                    else
+                    {
+                        @switch (Model.Status)
+                        {
+                            case PropertyAssessmentApp.Models.AssessmentStatus.Active:
+                                <span class="px-3 py-1 rounded-xl bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/40 text-xs font-bold uppercase">Active In-Roll</span>
+                                break;
+                            case PropertyAssessmentApp.Models.AssessmentStatus.Pending:
+                                <span class="px-3 py-1 rounded-xl bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-500/40 text-xs font-bold uppercase">Pending Approval</span>
+                                break;
+                            case PropertyAssessmentApp.Models.AssessmentStatus.UnderReassessment:
+                                <span class="px-3 py-1 rounded-xl bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40 text-xs font-bold uppercase">Under Reassessment</span>
+                                break;
+                            case PropertyAssessmentApp.Models.AssessmentStatus.PendingAppeal:
+                                <span class="px-3 py-1 rounded-xl bg-rose-100 dark:bg-rose-500/20 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-500/40 text-xs font-bold uppercase">Pending Appeal</span>
+                                break;
+                            default:
+                                <span class="px-3 py-1 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 text-xs font-bold uppercase">@Model.Status</span>
+                                break;
+                        }
                     }
                 </div>
             </div>
@@ -82,6 +89,22 @@
                 </div>
             </div>
         </div>
+
+        @if (Model.IsCancelledAndSuperseded || Model.Status == PropertyAssessmentApp.Models.AssessmentStatus.Cancelled)
+        {
+            <div class="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border-2 border-rose-500/60 text-rose-800 dark:text-rose-300 space-y-1">
+                <div class="flex items-center gap-2 font-black uppercase text-xs text-rose-600 dark:text-rose-400">
+                    <i data-lucide="alert-octagon" class="w-4 h-4"></i>
+                    <span>*** CANCELLED &amp; SUPERSEDED ***</span>
+                </div>
+                <p class="text-[11px] font-semibold text-rose-700 dark:text-rose-300">
+                    This Tax Declaration has been cancelled and superseded
+                    @(string.IsNullOrWhiteSpace(Model.CancellationReason) ? "" : $"due to {Model.CancellationReason}")
+                    @(Model.DateCancelled.HasValue ? $"on {Model.DateCancelled.Value:MMMM dd, yyyy}" : $"on {Model.DateAssessed:MMMM dd, yyyy}").
+                    @(string.IsNullOrWhiteSpace(Model.SupersededByTdns) ? "" : $"Superseded by new TD(s): {Model.SupersededByTdns}.")
+                </p>
+            </div>
+        }
 
         <!-- Valuation Summary Stats -->
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">

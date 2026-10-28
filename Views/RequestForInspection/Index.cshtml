@@ -120,10 +120,11 @@
                     <thead class="bg-slate-100 dark:bg-stone-950 text-slate-600 dark:text-stone-400 border-b border-slate-200 dark:border-stone-800 uppercase tracking-wider">
                         <tr>
                             <th class="px-3 sm:px-4 py-3">Tracking No.</th>
+                            <th class="hidden md:table-cell px-4 py-3">Transaction</th>
                             <th class="hidden sm:table-cell px-4 py-3">Property Reference</th>
                             <th class="px-3 sm:px-4 py-3">Declared Owner</th>
-                            <th class="hidden md:table-cell px-4 py-3">Inspection Reason</th>
-                            <th class="hidden lg:table-cell px-4 py-3 text-right">Fee (₱)</th>
+                            <th class="hidden lg:table-cell px-4 py-3">Inspection Reason</th>
+                            <th class="hidden xl:table-cell px-4 py-3 text-right">Fee (₱)</th>
                             <th class="px-2 sm:px-4 py-3">Workflow Stage</th>
                             <th class="hidden xl:table-cell px-4 py-3">Attachment</th>
                             <th class="px-2 sm:px-4 py-3 text-center">Action</th>
@@ -133,7 +134,7 @@
                         @if (!Model.Any())
                         {
                             <tr>
-                                <td colspan="8" class="px-4 py-8 text-center text-slate-400 dark:text-stone-500">
+                                <td colspan="9" class="px-4 py-8 text-center text-slate-400 dark:text-stone-500">
                                     <div class="flex flex-col items-center gap-2">
                                         <i data-lucide="inbox" class="w-8 h-8 stroke-1"></i>
                                         <span>No Inspection Requests found. Click "File Inspection Request" to create one.</span>
@@ -152,9 +153,15 @@
                                             @item.TrackingNumber
                                         </a>
                                         <span class="block text-[10px] text-slate-400 font-normal">@item.RequestDate.ToString("yyyy-MM-dd HH:mm")</span>
-                                        <div class="sm:hidden mt-1 text-[10px] text-slate-600 dark:text-stone-400">
-                                            TDN: @item.TaxDeclarationNumber
+                                        <div class="sm:hidden mt-1 space-y-0.5 text-[10px] text-slate-600 dark:text-stone-400">
+                                            <div>TDN: @item.TaxDeclarationNumber</div>
+                                            <div class="font-bold text-emerald-700 dark:text-emerald-400">@item.TransactionTypeDisplayName</div>
                                         </div>
+                                    </td>
+                                    <td class="hidden md:table-cell px-4 py-3">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-stone-800 text-slate-800 dark:text-stone-300 border border-slate-200 dark:border-stone-700">
+                                            @item.TransactionTypeDisplayName
+                                        </span>
                                     </td>
                                     <td class="hidden sm:table-cell px-4 py-3">
                                         <span class="font-bold text-slate-900 dark:text-white">@item.TaxDeclarationNumber</span>

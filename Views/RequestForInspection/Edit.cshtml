@@ -5,6 +5,7 @@
     ViewData["Title"] = $"Edit RFI - {Model.TrackingNumber}";
     var properties = ViewBag.Properties as IEnumerable<TaxDeclaration> ?? new List<TaxDeclaration>();
     var orderPayments = ViewBag.OrderPayments as IEnumerable<OrderPayment> ?? new List<OrderPayment>();
+    var registeredOwners = ViewBag.RegisteredOwners as IEnumerable<Owner> ?? new List<Owner>();
 }
 
 <div class="space-y-8 font-mono text-xs">
@@ -17,7 +18,7 @@
                 <span>Edit Inspection Request</span>
             </div>
             <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Update Request @Model.TrackingNumber</h1>
-            <p class="text-slate-500 dark:text-stone-400 text-xs sm:text-sm">Modify inspection reasons, contact information, billing particulars, or uploaded attachments.</p>
+            <p class="text-slate-500 dark:text-stone-400 text-xs sm:text-sm">Modify inspection reasons, contact information, partitions, or appraisal particulars.</p>
         </div>
         <a asp-action="Details" asp-route-id="@Model.Id" class="w-full sm:w-auto text-center px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 hover:bg-slate-50 dark:hover:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold text-xs font-mono border border-slate-200 dark:border-stone-800 shadow-sm">
             Cancel
@@ -26,42 +27,260 @@
 
     <!-- Form Container -->
     <div class="p-4 sm:p-6 lg:p-8 rounded-2xl sm:rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm">
-        <form asp-action="Edit" method="post" enctype="multipart/form-data" class="space-y-8">
+        <form asp-action="Edit" method="post" enctype="multipart/form-data" class="space-y-8" id="inspectionEditForm">
             <input type="hidden" asp-for="Id" />
             <input type="hidden" asp-for="TrackingNumber" />
-            <input type="hidden" asp-for="TransactionCode" />
-            <input type="hidden" asp-for="TransactionNo" />
-            <input type="hidden" asp-for="TaxDeclarationId" />
+            <input type="hidden" asp-for="TaxDeclarationId" id="primaryRefPropertyId" />
+            <input type="hidden" asp-for="OwnerId" id="requestOwnerIdInput" />
+            <input type="hidden" asp-for="Partitions" id="Partitions" />
+            <input type="hidden" asp-for="GeneratedPartitionsJson" id="GeneratedPartitionsJson" />
+            <input type="hidden" asp-for="SelectedRefPropertyIdsJson" id="SelectedRefPropertyIdsJson" />
             <input type="hidden" asp-for="RequestedDocumentsJson" id="RequestedDocumentsJson" />
             <input type="hidden" asp-for="TotalFeesAmount" id="TotalFeesAmount" />
             <div asp-validation-summary="ModelOnly" class="p-4 rounded-xl bg-rose-50 dark:bg-rose-500/20 border border-rose-200 dark:border-rose-500/40 text-rose-800 dark:text-rose-300"></div>
 
-            <!-- Property Details -->
+            <!-- Property Details & Reference Property Search -->
             <div class="space-y-4 p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
                 <h3 class="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
                     <i data-lucide="home" class="w-4 h-4 text-emerald-600"></i>
-                    1. Property Reference Details
+                    1. Transaction Type & Reference Property Details
                 </h3>
 
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- Transaction Type Selector -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pb-2 border-b border-slate-200 dark:border-stone-800">
                     <div>
-                        <label asp-for="TaxDeclarationNumber" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">TDN / ARP NO. *</label>
-                        <input asp-for="TaxDeclarationNumber" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono font-bold" required />
+                        <label asp-for="TransactionCode" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold flex items-center gap-1.5">
+                            <i data-lucide="tag" class="w-3.5 h-3.5 text-emerald-600"></i>
+                            TRANSACTION TYPE / CODE <span class="text-rose-500 font-bold">*</span>
+                        </label>
+                        <select asp-for="TransactionCode" id="txCodeSelect" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono font-bold focus:outline-none focus:border-emerald-600 cursor-pointer">
+                            @if (!string.IsNullOrWhiteSpace(Model.TransactionCode) && !PropertyAssessmentApp.Models.RequestForInspection.StandardTransactionCodes.ContainsKey(Model.TransactionCode.Trim().ToUpperInvariant()))
+                            {
+                                <option value="@Model.TransactionCode" selected>@Model.TransactionCode - @Model.TransactionTypeName</option>
+                            }
+                            <option value="SD" data-name="Subdivision" selected="@(Model.TransactionCode == "SD" ? "selected" : null)">Subdivision - SD</option>
+                            <option value="CS" data-name="Consolidation" selected="@(Model.TransactionCode == "CS" ? "selected" : null)">Consolidation - CS</option>
+                            <option value="DC" data-name="Discovery/New Declaration" selected="@(Model.TransactionCode == "DC" || string.IsNullOrEmpty(Model.TransactionCode) ? "selected" : null)">Discovery/New Declaration - DC</option>
+                            <option value="PC" data-name="Reassessment Due to Physical Change" selected="@(Model.TransactionCode == "PC" ? "selected" : null)">Reassessment Due to Physical Change - PC</option>
+                            <option value="RA" data-name="Reassessment" selected="@(Model.TransactionCode == "RA" ? "selected" : null)">Reassessment - RA</option>
+                            <option value="DT" data-name="Reassessment Due to partial Destruction of the property" selected="@(Model.TransactionCode == "DT" ? "selected" : null)">Reassessment Due to partial Destruction of the property - DT</option>
+                            <option value="TR" data-name="Transfer" selected="@(Model.TransactionCode == "TR" ? "selected" : null)">Transfer - TR</option>
+                            <option value="RC" data-name="Reclassification" selected="@(Model.TransactionCode == "RC" ? "selected" : null)">Reclassification - RC</option>
+                            <option value="GR" data-name="General Revision" selected="@(Model.TransactionCode == "GR" ? "selected" : null)">General Revision - GR</option>
+                            <option value="SP" data-name="Special Project" selected="@(Model.TransactionCode == "SP" ? "selected" : null)">Special Project - SP</option>
+                            <option value="DEP" data-name="Reassessment Due to depreciation" selected="@(Model.TransactionCode == "DEP" ? "selected" : null)">Reassessment Due to depreciation - DEP</option>
+                        </select>
+                        <input type="hidden" asp-for="TransactionTypeName" id="txNameInput" value="@(Model.TransactionTypeName ?? "Discovery/New Declaration")" />
+                    </div>
+                    <div>
+                        <label asp-for="TransactionNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">TRANSACTION NO. / REFERENCE</label>
+                        <input asp-for="TransactionNo" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" placeholder="e.g. TX-2026-0001" />
+                    </div>
+                </div>
+
+                <!-- Subdivision (SD) Workflow & Impact Callout Banner -->
+                <div id="sdWorkflowBanner" class="p-4 rounded-2xl bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800/60 hidden space-y-2">
+                    <div class="flex items-center gap-2 text-sky-900 dark:text-sky-300 font-extrabold text-xs uppercase">
+                        <i data-lucide="split" class="w-4 h-4 text-sky-600 dark:text-sky-400"></i>
+                        <span>Subdivision (SD) · Segregation of Land Workflow</span>
+                        <span class="px-2 py-0.5 rounded-full bg-sky-600 text-white text-[9px] font-bold">Segregation</span>
+                    </div>
+                    <p class="text-[11px] text-sky-800 dark:text-sky-300 leading-relaxed">
+                        <strong>Workflow:</strong> Initiated when a registered owner divides a mother parcel into multiple lots. The appraiser and tax mapper inspect boundary pins, road alignments, and mandatory open spaces against the Land Registration Authority (LRA) or DENR-approved plan.
+                    </p>
+                    <p class="text-[11px] text-sky-700 dark:text-sky-400 font-semibold">
+                        <strong>Impact on Property:</strong> The mother Tax Declaration will be stamped <span class="text-rose-600 dark:text-rose-400 font-bold">&quot;CANCELLED &amp; SUPERSEDED&quot;</span> upon approval. New unique PINs and individual TDs will be generated for each segregated lot. Tax liabilities and delinquencies are apportioned independently.
+                    </p>
+                </div>
+
+                <!-- Consolidation (CS) Workflow & Impact Callout Banner -->
+                <div id="csWorkflowBanner" class="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 hidden space-y-2">
+                    <div class="flex items-center gap-2 text-amber-900 dark:text-amber-300 font-extrabold text-xs uppercase">
+                        <i data-lucide="merge" class="w-4 h-4 text-amber-600 dark:text-amber-400"></i>
+                        <span>Consolidation (CS) · Lot Integration Workflow</span>
+                        <span class="px-2 py-0.5 rounded-full bg-amber-600 text-white text-[9px] font-bold">Lot Integration</span>
+                    </div>
+                    <p class="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
+                        <strong>Workflow:</strong> Combines two or more contiguous parcels under identical ownership into a single parcel. Field inspection verifies that parcels physically touch without intervening public access easements, water channels, or third-party encroachments against the Land Registration Authority (LRA) or DENR-approved consolidation plan.
+                    </p>
+                    <p class="text-[11px] text-amber-700 dark:text-amber-400 font-semibold">
+                        <strong>Impact on Property:</strong> All individual parent Tax Declarations are stamped <span class="text-rose-600 dark:text-rose-400 font-bold">&quot;CANCELLED &amp; SUPERSEDED&quot;</span> upon approval. A single consolidated TD and PIN are generated. Real property tax receivables in the Treasury are collapsed from multiple ledgers into a unified bill.
+                    </p>
+                </div>
+
+                <!-- Discovery / New Declaration (DC) Workflow & Impact Callout Banner -->
+                <div id="dcWorkflowBanner" class="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 hidden space-y-2">
+                    <div class="flex items-center gap-2 text-emerald-900 dark:text-emerald-300 font-extrabold text-xs uppercase">
+                        <i data-lucide="sparkles" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                        <span>Discovery / New Declaration (DC) · Original Assessment Workflow</span>
+                        <span class="px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[9px] font-bold">Original Assessment</span>
+                    </div>
+                    <p class="text-[11px] text-emerald-800 dark:text-emerald-300 leading-relaxed">
+                        <strong>Workflow:</strong> Applied when a newly completed building, warehouse, industrial machinery, or previously unmapped land parcel is declared. The appraiser takes tape measurements, establishes structural framing (Types I to V), and verifies operational status.
+                    </p>
+                    <p class="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold">
+                        <strong>Impact on Property:</strong> Does not supersede any prior TD. Creates an original Field Appraisal and Assessment Sheet (FAAS). Under Sec. 222 of R.A. 7160, back taxes may be assessed for up to ten (10) preceding years if unassessed since completion.
+                    </p>
+                </div>
+
+                <!-- Reassessment Due to Physical Change (PC) Workflow & Impact Callout Banner -->
+                <div id="pcWorkflowBanner" class="p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 hidden space-y-2">
+                    <div class="flex items-center gap-2 text-indigo-900 dark:text-indigo-300 font-extrabold text-xs uppercase">
+                        <i data-lucide="hammer" class="w-4 h-4 text-indigo-600 dark:text-indigo-400"></i>
+                        <span>Reassessment Due to Physical Change (PC) · Renovation / Expansion Workflow</span>
+                        <span class="px-2 py-0.5 rounded-full bg-indigo-600 text-white text-[9px] font-bold">Renovation / Expansion</span>
+                    </div>
+                    <p class="text-[11px] text-indigo-800 dark:text-indigo-300 leading-relaxed">
+                        <strong>Workflow:</strong> Triggered by structural renovations, adding vertical floors, floor plan extensions, or constructing accessory improvements (swimming pools, perimeter fences). Inspection logs new square meters and materials against building permits and physical site appraisal.
+                    </p>
+                    <p class="text-[11px] text-indigo-700 dark:text-indigo-400 font-semibold">
+                        <strong>Impact on Property:</strong> The previous Tax Declaration is stamped <span class="text-rose-600 dark:text-rose-400 font-bold">&quot;CANCELLED &amp; SUPERSEDED&quot;</span> upon approval. Fair Market Value (FMV) and Assessed Value increase, recalculating structural effective age and leading to an upward tax adjustment.
+                    </p>
+                </div>
+
+                <!-- Transfer (TR) Workflow & Impact Callout Banner -->
+                <div id="trWorkflowBanner" class="p-4 rounded-2xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800/60 hidden space-y-2">
+                    <div class="flex items-center gap-2 text-teal-900 dark:text-teal-300 font-extrabold text-xs uppercase">
+                        <i data-lucide="arrow-right-left" class="w-4 h-4 text-teal-600 dark:text-teal-400"></i>
+                        <span>Transfer (TR) · Administrative Title Conveyance Workflow</span>
+                        <span class="px-2 py-0.5 rounded-full bg-teal-600 text-white text-[9px] font-bold">Administrative Conveyance</span>
+                    </div>
+                    <p class="text-[11px] text-teal-800 dark:text-teal-300 leading-relaxed">
+                        <strong>Workflow:</strong> Executed upon sale, donation, barter, or extrajudicial settlement. Requires Transfer Certificate of Title (TCT), BIR Certificate Authorizing Registration (CAR/eCAR), and Transfer Tax Receipt. <span class="font-bold underline text-teal-900 dark:text-teal-200">Field inspection is not required</span> (administrative office conveyance).
+                    </p>
+                    <p class="text-[11px] text-teal-700 dark:text-teal-400 font-semibold">
+                        <strong>Impact on Property:</strong> The prior owner's Tax Declaration is stamped <span class="text-rose-600 dark:text-rose-400 font-bold">&quot;CANCELLED &amp; SUPERSEDED&quot;</span> upon approval. The replacement TD retains identical land area, building classifications, and PIN, while redirecting billing ledgers to the transferee.
+                    </p>
+                </div>
+
+                <!-- Reclassification (RC) Workflow & Impact Callout Banner -->
+                <div id="rcWorkflowBanner" class="p-4 rounded-2xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/60 hidden space-y-2">
+                    <div class="flex items-center gap-2 text-purple-900 dark:text-purple-300 font-extrabold text-xs uppercase">
+                        <i data-lucide="layers" class="w-4 h-4 text-purple-600 dark:text-purple-400"></i>
+                        <span>Reclassification (RC) · Actual Ground Use Conversion Workflow</span>
+                        <span class="px-2 py-0.5 rounded-full bg-purple-600 text-white text-[9px] font-bold">Ground Use Conversion</span>
+                    </div>
+                    <p class="text-[11px] text-purple-800 dark:text-purple-300 leading-relaxed">
+                        <strong>Workflow:</strong> Mandated when land or structures convert physical usage (e.g., agricultural land to commercial parking, or residential home to retail grocery). Field inspection confirms actual economic activity pursuant to Sec. 217 of R.A. 7160.
+                    </p>
+                    <p class="text-[11px] text-purple-700 dark:text-purple-400 font-semibold">
+                        <strong>Impact on Property:</strong> The old Tax Declaration is stamped <span class="text-rose-600 dark:text-rose-400 font-bold">&quot;CANCELLED &amp; SUPERSEDED&quot;</span> upon approval. Replaces the statutory assessment level (e.g., from 20% Residential to 50% Commercial), altering annual property tax dues without needing title re-titling.
+                    </p>
+                </div>
+
+                <!-- Remote Search Reference Properties Dropdown -->
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between">
+                        <label class="block text-slate-600 dark:text-stone-400 font-bold uppercase text-[11px] flex items-center gap-1.5">
+                            <i data-lucide="search" class="w-3.5 h-3.5 text-emerald-600"></i>
+                            SEARCH REFERENCE PROPERTY (TDN, PIN, OR OWNER)
+                        </label>
+                        <span class="text-[10px] text-slate-400">Multiple selection supported</span>
+                    </div>
+
+                    <select id="refPropertySelect" class="w-full">
+                        <option value="">-- Search approved reference property by TDN, PIN, or Owner Name... --</option>
+                        @foreach (var prop in properties)
+                        {
+                            <option value="@prop.Id">@prop.TaxDeclarationNumber - @prop.OwnerName (@(prop.PropertyIndexNumber ?? "No PIN"))</option>
+                        }
+                    </select>
+                    <span id="refPropertyValidation" class="text-rose-500 font-bold block mt-1 text-[11px]"></span>
+                </div>
+
+                <!-- Selected Reference Properties Summary Box -->
+                <div id="selectedPropertiesSummary" class="hidden space-y-2 pt-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[11px] font-bold text-slate-700 dark:text-stone-300 uppercase flex items-center gap-1.5">
+                            <i data-lucide="layers" class="w-3.5 h-3.5 text-emerald-600"></i>
+                            Selected Reference Properties (<span id="selectedCountBadge" class="text-emerald-600 font-mono font-bold">0</span>)
+                        </span>
+                    </div>
+                    <div id="selectedPropertiesList" class="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- Partition Generator Panel -->
+                <div id="partitionGeneratorCard" class="p-4 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/80 dark:border-emerald-800/60 space-y-3">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                            <span class="font-bold text-emerald-900 dark:text-emerald-300 text-xs flex items-center gap-1.5 uppercase">
+                                <i data-lucide="grid" class="w-3.5 h-3.5 text-emerald-600"></i>
+                                Partition Generator & Subdivision Lots
+                            </span>
+                            <p class="text-[11px] text-slate-500 dark:text-stone-400">Set partition count and click generate to populate subdivided lots with CAST TDN and ARP combinations.</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="flex items-center gap-1 bg-white dark:bg-stone-900 px-2 py-1 rounded-lg border border-slate-200 dark:border-stone-800">
+                                <label class="text-[10px] font-bold text-slate-500 uppercase">Lots:</label>
+                                <input type="number" id="genPartitionCountInput" min="1" max="26" value="@(Model.Partitions > 0 ? Model.Partitions : 2)" class="w-12 text-center font-mono font-bold text-xs bg-transparent focus:outline-none" />
+                            </div>
+                            <button type="button" id="btnTriggerGeneratePartitions" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1 shadow-sm transition-all">
+                                <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                                Generate Partition Lots
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Multiple Selection Source Choice -->
+                    <div id="duplicateSourceSelector" class="hidden pt-2 border-t border-emerald-200/60 dark:border-emerald-800/40 space-y-1.5">
+                        <label class="block text-[10px] font-bold text-emerald-800 dark:text-emerald-400 uppercase">Select Base Property to Clone from:</label>
+                        <div id="propertyRadioGroup" class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Generated Partitions Table -->
+                <div id="generatedPartitionsContainer" class="space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-slate-800 dark:text-stone-200 uppercase flex items-center gap-1.5">
+                            <i data-lucide="list" class="w-3.5 h-3.5 text-emerald-600"></i>
+                            Generated Partition/s (<span id="footPartitionSummary">0 lot(s)</span>)
+                        </span>
+                        <button type="button" id="btnAddManualPartitionRow" class="px-3 py-1 rounded-lg bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 hover:border-emerald-500 text-emerald-700 dark:text-emerald-400 font-bold text-[11px] flex items-center gap-1 shadow-xs transition-colors">
+                            <i data-lucide="plus" class="w-3 h-3"></i> Add Another Lot
+                        </button>
+                    </div>
+
+                    <div class="border border-slate-200 dark:border-stone-800 rounded-xl overflow-x-auto bg-white dark:bg-stone-900 shadow-sm">
+                        <table class="w-full text-left text-xs font-mono">
+                            <thead class="bg-slate-100 dark:bg-stone-950 text-slate-600 dark:text-stone-400 border-b border-slate-200 dark:border-stone-800 font-bold uppercase text-[10px]">
+                                <tr>
+                                    <th class="px-4 py-2.5">TDN / ARP No.</th>
+                                    <th class="px-4 py-2.5">Kind</th>
+                                    <th class="px-4 py-2.5">Owner Name</th>
+                                    <th class="px-4 py-2.5">Location</th>
+                                    <th class="px-4 py-2.5 text-center w-24">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="generatedPartitionsTbody" class="divide-y divide-slate-100 dark:divide-stone-800/60 font-sans">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                    <div>
+                        <label asp-for="TaxDeclarationNumber" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">PRIMARY TDN / ARP NO. *</label>
+                        <input asp-for="TaxDeclarationNumber" id="tdNoInput" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono font-bold" required />
                     </div>
                     <div>
                         <label asp-for="PropertyIndexNumber" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">PIN / PROPERTY INDEX NO. *</label>
-                        <input asp-for="PropertyIndexNumber" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono font-bold" required />
+                        <input asp-for="PropertyIndexNumber" id="pinInput" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono font-bold" required />
                     </div>
                     <div>
                         <label asp-for="OwnerName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">DECLARED OWNER *</label>
-                        <input asp-for="OwnerName" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold" required />
+                        <input asp-for="OwnerName" id="ownerNameInput" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold" required />
                     </div>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label asp-for="Kind" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">PROPERTY KIND</label>
-                        <select asp-for="Kind" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-semibold">
+                        <select asp-for="Kind" id="kindInput" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-semibold">
                             <option value="Land">Land</option>
                             <option value="Building">Building</option>
                             <option value="Machinery">Machinery</option>
@@ -69,11 +288,11 @@
                     </div>
                     <div>
                         <label asp-for="LotNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">LOT NO. / SURVEY NO.</label>
-                        <input asp-for="LotNo" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-semibold" />
+                        <input asp-for="LotNo" id="lotNoInput" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-semibold" />
                     </div>
                     <div>
                         <label asp-for="PropertyLocation" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">LOCATION ADDRESS</label>
-                        <input asp-for="PropertyLocation" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-semibold" />
+                        <input asp-for="PropertyLocation" id="locationInput" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-semibold" />
                     </div>
                 </div>
             </div>
@@ -127,7 +346,7 @@
                     </div>
                     <div>
                         <label asp-for="ContactNumber" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">CONTACT NUMBER</label>
-                        <input asp-for="ContactNumber" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white" />
+                        <input asp-for="ContactNumber" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" />
                     </div>
                     <div>
                         <label asp-for="EmailAddress" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">EMAIL ADDRESS</label>
@@ -196,3 +415,619 @@
         </form>
     </div>
 </div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        const referencePropertiesData = {
+            @foreach (var p in properties)
+            {
+                @: "@p.Id": {
+                @:     id: "@p.Id",
+                @:     tdn: "@p.TaxDeclarationNumber",
+                @:     pin: "@p.PropertyIndexNumber",
+                @:     owner: "@p.OwnerName",
+                @:     location: "@p.CompleteAddress",
+                @:     kind: "@p.Kind",
+                @:     classification: "@p.Classification",
+                @:     area: @p.AreaSqMeters,
+                @:     unitValue: @p.UnitValue,
+                @:     marketValue: @p.MarketValue,
+                @:     assessLevel: @p.AssessmentLevelPercent,
+                @:     assessedValue: @p.AssessedValue,
+                @:     barangay: "@p.DistrictOrBarangay"
+                @: },
+            }
+        };
+
+        let TomSelectRefProperty = null;
+        let selectedPropertyIds = [];
+        let generatedPartitions = [];
+        const alphabetLetters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+        @if (!string.IsNullOrWhiteSpace(Model.GeneratedPartitionsJson))
+        {
+            <text>
+            try {
+                generatedPartitions = @Html.Raw(Model.GeneratedPartitionsJson) || [];
+            } catch(e) { generatedPartitions = []; }
+            </text>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(Model.SelectedRefPropertyIdsJson))
+        {
+            <text>
+            try {
+                selectedPropertyIds = @Html.Raw(Model.SelectedRefPropertyIdsJson) || [];
+            } catch(e) { selectedPropertyIds = []; }
+            </text>
+        }
+        else if (Model.TaxDeclarationId.HasValue)
+        {
+            <text>
+            selectedPropertyIds = ["@Model.TaxDeclarationId.Value"];
+            </text>
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            // Transaction Code selector sync & SD/CS/DC/PC/TR Banners
+            const txSelect = document.getElementById('txCodeSelect');
+            function updateInspectionBanners() {
+                const val = txSelect ? txSelect.value : '';
+                const sdBanner = document.getElementById('sdWorkflowBanner');
+                const csBanner = document.getElementById('csWorkflowBanner');
+                const dcBanner = document.getElementById('dcWorkflowBanner');
+                const pcBanner = document.getElementById('pcWorkflowBanner');
+                const trBanner = document.getElementById('trWorkflowBanner');
+                const rcBanner = document.getElementById('rcWorkflowBanner');
+                if (sdBanner) {
+                    if (val === 'SD') sdBanner.classList.remove('hidden');
+                    else sdBanner.classList.add('hidden');
+                }
+                if (csBanner) {
+                    if (val === 'CS') csBanner.classList.remove('hidden');
+                    else csBanner.classList.add('hidden');
+                }
+                if (dcBanner) {
+                    if (val === 'DC') dcBanner.classList.remove('hidden');
+                    else dcBanner.classList.add('hidden');
+                }
+                if (pcBanner) {
+                    if (val === 'PC') pcBanner.classList.remove('hidden');
+                    else pcBanner.classList.add('hidden');
+                }
+                if (trBanner) {
+                    if (val === 'TR') trBanner.classList.remove('hidden');
+                    else trBanner.classList.add('hidden');
+                }
+                if (rcBanner) {
+                    if (val === 'RC') rcBanner.classList.remove('hidden');
+                    else rcBanner.classList.add('hidden');
+                }
+                if (val === 'PC') {
+                    const reassessChk = document.getElementById('IsReassessment');
+                    if (reassessChk && !reassessChk.checked) {
+                        reassessChk.checked = true;
+                    }
+                    const cancelChk = document.getElementById('IsCancelled');
+                    if (cancelChk && !cancelChk.checked) {
+                        cancelChk.checked = true;
+                    }
+                }
+                if (val === 'TR') {
+                    const cancelChk = document.getElementById('IsCancelled');
+                    if (cancelChk && !cancelChk.checked) {
+                        cancelChk.checked = true;
+                    }
+                }
+                if (val === 'RC') {
+                    const reassessChk = document.getElementById('IsReassessment');
+                    if (reassessChk && !reassessChk.checked) {
+                        reassessChk.checked = true;
+                    }
+                    const cancelChk = document.getElementById('IsCancelled');
+                    if (cancelChk && !cancelChk.checked) {
+                        cancelChk.checked = true;
+                    }
+                }
+            }
+
+            if (txSelect) {
+                txSelect.addEventListener('change', function () {
+                    const opt = this.options[this.selectedIndex];
+                    const input = document.getElementById('txNameInput');
+                    if (input && opt) input.value = opt.getAttribute('data-name') || opt.text;
+                    updateInspectionBanners();
+                });
+                updateInspectionBanners();
+            }
+
+            if (document.getElementById('refPropertySelect')) {
+                TomSelectRefProperty = new TomSelect('#refPropertySelect', {
+                    plugins: ['remove_button'],
+                    maxItems: null,
+                    persist: false,
+                    create: false,
+                    valueField: 'id',
+                    labelField: 'display',
+                    searchField: ['tdn', 'pin', 'owner', 'display', 'text'],
+                    loadThrottle: 300,
+                    placeholder: 'Search & select approved reference properties by TDN, PIN, or Owner Name...',
+                    load: function(query, callback) {
+                        if (!query || !query.trim().length) return callback();
+                        fetch(`/PropertyAssessmentRequest/SearchApprovedProperties?term=${encodeURIComponent(query)}`)
+                            .then(res => res.json())
+                            .then(data => {
+                                if (Array.isArray(data)) {
+                                    data.forEach(item => {
+                                        referencePropertiesData[item.id] = {
+                                            id: item.id,
+                                            tdn: item.tdn,
+                                            pin: item.pin,
+                                            owner: item.owner,
+                                            location: item.location,
+                                            kind: item.kind,
+                                            classification: item.classification,
+                                            area: item.area,
+                                            unitValue: item.unitVal,
+                                            marketValue: item.marketVal,
+                                            assessLevel: item.assessLevel,
+                                            assessedValue: item.assessedVal,
+                                            barangay: item.barangay
+                                        };
+                                    });
+                                    callback(data);
+                                } else {
+                                    callback();
+                                }
+                            })
+                            .catch(() => callback());
+                    },
+                    render: {
+                        option: function(item, escape) {
+                            return `<div class="py-1">
+                                <span class="font-bold text-slate-900 dark:text-white font-mono">${escape(item.tdn || item.text || '')}</span>
+                                <span class="text-slate-700 dark:text-stone-200 text-xs font-medium"> - ${escape(item.owner || '')}</span>
+                                <span class="text-[11px] text-slate-600 dark:text-stone-300 font-mono">(${escape(item.pin || 'No PIN')})</span>
+                                ${item.kind ? `<div class="text-[11px] text-slate-600 dark:text-stone-300 font-medium mt-0.5">${escape(item.kind)} &bull; ${escape(item.classification || '')} &bull; ${Number(item.area || 0).toLocaleString()} sqm</div>` : ''}
+                            </div>`;
+                        },
+                        item: function(item, escape) {
+                            return `<div>${escape(item.tdn || item.text || '')} - ${escape(item.owner || '')}</div>`;
+                        }
+                    },
+                    onItemAdd: function(value) {
+                        const refSpan = document.getElementById('refPropertyValidation');
+                        if (refSpan) refSpan.textContent = '';
+                        const added = referencePropertiesData[value];
+                        if (!added) return;
+
+                        const others = (this.items || []).filter(v => String(v) !== String(value));
+                        for (let otherId of others) {
+                            const existing = referencePropertiesData[otherId];
+                            if (existing && arePropertiesSameTaxDeclaration(added, existing)) {
+                                this.removeItem(value);
+                                const msg = `Cannot select TD "${added.tdn}". It belongs to the same Tax Declaration / Property as already selected TD "${existing.tdn}".`;
+                                if (refSpan) refSpan.textContent = msg;
+                                if (typeof toastr !== 'undefined') {
+                                    toastr.warning(msg, 'Duplicate Tax Declaration');
+                                }
+                                return;
+                            }
+                        }
+                    },
+                    onChange: function(values) {
+                        const span = document.getElementById('refPropertyValidation');
+                        const list = Array.isArray(values) ? values : (values ? [values] : []);
+                        if (span && list.length > 0 && !/already selected/.test(span.textContent)) {
+                            span.textContent = '';
+                        }
+                        handleReferencePropertiesChange(values);
+                    }
+                });
+
+                if (selectedPropertyIds && selectedPropertyIds.length > 0) {
+                    selectedPropertyIds.forEach(id => {
+                        if (TomSelectRefProperty) TomSelectRefProperty.addItem(id);
+                    });
+                }
+            }
+
+            const btnGen = document.getElementById('btnTriggerGeneratePartitions');
+            if (btnGen) {
+                btnGen.addEventListener('click', handleGeneratePartitions);
+            }
+
+            const btnAddLot = document.getElementById('btnAddManualPartitionRow');
+            if (btnAddLot) {
+                btnAddLot.addEventListener('click', handleAddManualPartitionLot);
+            }
+
+            renderPartitionsTable();
+        });
+
+        function handleReferencePropertiesChange(values) {
+            selectedPropertyIds = Array.isArray(values) ? values : (values ? [values] : []);
+            
+            const summaryContainer = document.getElementById('selectedPropertiesSummary');
+            const summaryList = document.getElementById('selectedPropertiesList');
+            const countBadge = document.getElementById('selectedCountBadge');
+
+            document.getElementById('SelectedRefPropertyIdsJson').value = JSON.stringify(selectedPropertyIds);
+            const primaryIdInput = document.getElementById('primaryRefPropertyId');
+            if (primaryIdInput) primaryIdInput.value = selectedPropertyIds.length > 0 ? selectedPropertyIds[0] : '';
+
+            if (selectedPropertyIds.length === 0) {
+                if (summaryContainer) summaryContainer.classList.add('hidden');
+                return;
+            }
+
+            if (summaryContainer) summaryContainer.classList.remove('hidden');
+            if (countBadge) countBadge.textContent = selectedPropertyIds.length;
+
+            let cardsHtml = '';
+            selectedPropertyIds.forEach((id, idx) => {
+                const prop = referencePropertiesData[id];
+                if (!prop) return;
+
+                cardsHtml += `
+                    <div class="p-3.5 rounded-2xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-xs flex items-start justify-between gap-3 text-xs">
+                        <div class="space-y-1 min-w-0">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="px-2 py-0.5 rounded-md font-bold text-[10px] bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300">
+                                    Ref #${idx + 1}
+                                </span>
+                                <span class="font-bold text-slate-900 dark:text-white font-mono">${prop.tdn}</span>
+                                <span class="text-[10px] text-slate-400 font-mono">(${prop.pin || 'No PIN'})</span>
+                            </div>
+                            <div class="font-bold text-slate-800 dark:text-stone-200 truncate">${prop.owner}</div>
+                            <div class="text-[11px] text-slate-500 dark:text-stone-400">
+                                ${prop.kind} &bull; ${prop.classification} &bull; <strong class="text-slate-700 dark:text-stone-300">${prop.area.toLocaleString()} sqm</strong> &bull; ₱${prop.marketValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </div>
+                            <div class="text-[10px] text-slate-400 truncate">${prop.location}</div>
+                        </div>
+                        <button type="button" onclick="removeSelectedProperty('${id}')" class="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors" title="Remove reference property">
+                            <i data-lucide="x" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                `;
+            });
+
+            if (summaryList) summaryList.innerHTML = cardsHtml;
+            renderDuplicateSourceOptions();
+            lucide.createIcons();
+        }
+
+        function removeSelectedProperty(id) {
+            if (TomSelectRefProperty) {
+                TomSelectRefProperty.removeItem(id);
+            }
+        }
+
+        function renderDuplicateSourceOptions() {
+            const radioGroup = document.getElementById('propertyRadioGroup');
+            const dupSection = document.getElementById('duplicateSourceSelector');
+            if (!radioGroup || !dupSection) return;
+
+            if (selectedPropertyIds.length === 0) {
+                dupSection.classList.add('hidden');
+                return;
+            }
+
+            dupSection.classList.remove('hidden');
+            let radiosHtml = '';
+
+            if (selectedPropertyIds.length === 1) {
+                const prop = referencePropertiesData[selectedPropertyIds[0]];
+                radiosHtml = `
+                    <label class="flex items-center gap-2.5 p-3 rounded-xl bg-white dark:bg-stone-900 border-2 border-emerald-500 cursor-pointer text-xs">
+                        <input type="radio" name="dupSourceChoice" value="${prop.id}" checked class="text-emerald-600 focus:ring-emerald-500" />
+                        <div>
+                            <span class="font-bold text-slate-900 dark:text-white font-mono">${prop.tdn}</span>
+                            <span class="text-slate-500 dark:text-stone-400 block text-[11px]">${prop.owner} (${prop.kind} &bull; ${prop.area} sqm)</span>
+                        </div>
+                    </label>
+                `;
+            } else {
+                selectedPropertyIds.forEach((id, idx) => {
+                    const prop = referencePropertiesData[id];
+                    if (!prop) return;
+                    radiosHtml += `
+                        <label class="flex items-center gap-2.5 p-3 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 hover:border-emerald-500 cursor-pointer text-xs transition-colors">
+                            <input type="radio" name="dupSourceChoice" value="${prop.id}" ${idx === 0 ? 'checked' : ''} class="text-emerald-600 focus:ring-emerald-500" />
+                            <div>
+                                <span class="font-bold text-slate-900 dark:text-white font-mono">${prop.tdn}</span>
+                                <span class="text-slate-500 dark:text-stone-400 block text-[11px]">${prop.owner} (${prop.kind} &bull; ${prop.area.toLocaleString()} sqm)</span>
+                            </div>
+                        </label>
+                    `;
+                });
+
+                radiosHtml += `
+                    <label class="flex items-center gap-2.5 p-3 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 hover:border-emerald-500 cursor-pointer text-xs transition-colors md:col-span-2">
+                        <input type="radio" name="dupSourceChoice" value="ALL" class="text-emerald-600 focus:ring-emerald-500" />
+                        <div>
+                            <span class="font-bold text-emerald-700 dark:text-emerald-400">Duplicate All ${selectedPropertyIds.length} Reference Properties</span>
+                            <span class="text-slate-500 dark:text-stone-400 block text-[11px]">Generate partition lots cloned across all chosen reference parcels</span>
+                        </div>
+                    </label>
+                `;
+            }
+
+            radioGroup.innerHTML = radiosHtml;
+        }
+
+        function handleGeneratePartitions() {
+            if (selectedPropertyIds.length === 0) {
+                toastr.warning('Please choose at least one Reference Property first.');
+                return;
+            }
+
+            const chosenRadio = document.querySelector('input[name="dupSourceChoice"]:checked');
+            const chosenValue = chosenRadio ? chosenRadio.value : selectedPropertyIds[0];
+            const countInput = document.getElementById('genPartitionCountInput');
+            const count = Math.max(1, Math.min(26, parseInt(countInput ? countInput.value : 2) || 2));
+            const ownerName = (document.getElementById('ownerNameInput') ? document.getElementById('ownerNameInput').value : '').trim();
+            const reqKindEl = document.getElementById('kindInput');
+            const reqKind = reqKindEl && reqKindEl.value ? reqKindEl.value : null;
+
+            generatedPartitions = [];
+
+            if (chosenValue === "ALL") {
+                let globalIdx = 0;
+                selectedPropertyIds.forEach((propId) => {
+                    const baseProp = referencePropertiesData[propId];
+                    if (!baseProp) return;
+                    for (let i = 0; i < count; i++) {
+                        const letterSuffix = alphabetLetters[globalIdx % alphabetLetters.length];
+                        const dividedArea = Math.round((baseProp.area / count) * 100) / 100;
+                        const marketVal = Math.round((dividedArea * baseProp.unitValue) * 100) / 100;
+                        const assessedVal = Math.round((marketVal * (baseProp.assessLevel / 100)) * 100) / 100;
+                        const effKind = (reqKind === 'Machinery' || reqKind === 'Building') ? reqKind : baseProp.kind;
+
+                        generatedPartitions.push({
+                            partitionIndex: letterSuffix,
+                            baseTDN: baseProp.tdn,
+                            basePropertyId: baseProp.id,
+                            systemGeneratedTDN: generateSystemTDN(letterSuffix, baseProp.barangay, globalIdx + 1),
+                            pin: baseProp.pin ? `${baseProp.pin}-${letterSuffix}` : '',
+                            lotNumber: `Lot ${(globalIdx + 1)}-${letterSuffix}`,
+                            kind: effKind,
+                            classification: baseProp.classification,
+                            areaSqMeters: dividedArea,
+                            unitValue: baseProp.unitValue,
+                            marketValue: marketVal,
+                            assessmentLevelPercent: baseProp.assessLevel,
+                            assessedValue: assessedVal,
+                            newOwnerName: ownerName || baseProp.owner,
+                            districtOrBarangay: baseProp.barangay,
+                            propertyLocation: (document.getElementById('locationInput') ? document.getElementById('locationInput').value : '') || baseProp.location || baseProp.barangay || '',
+                            customOwner: false,
+                            customLocation: false
+                        });
+                        globalIdx++;
+                    }
+                });
+            } else {
+                const baseProp = referencePropertiesData[chosenValue];
+                if (!baseProp) return;
+
+                for (let i = 0; i < count; i++) {
+                    const letterSuffix = alphabetLetters[i % alphabetLetters.length];
+                    const dividedArea = Math.round((baseProp.area / count) * 100) / 100;
+                    const marketVal = Math.round((dividedArea * baseProp.unitValue) * 100) / 100;
+                    const assessedVal = Math.round((marketVal * (baseProp.assessLevel / 100)) * 100) / 100;
+                    const effKind = (reqKind === 'Machinery' || reqKind === 'Building') ? reqKind : baseProp.kind;
+
+                    generatedPartitions.push({
+                        partitionIndex: letterSuffix,
+                        baseTDN: baseProp.tdn,
+                        basePropertyId: baseProp.id,
+                        systemGeneratedTDN: generateSystemTDN(letterSuffix, baseProp.barangay, i + 1),
+                        pin: baseProp.pin ? `${baseProp.pin}-${letterSuffix}` : '',
+                        lotNumber: `Lot ${i + 1}-${letterSuffix}`,
+                        kind: effKind,
+                        classification: baseProp.classification,
+                        areaSqMeters: dividedArea,
+                        unitValue: baseProp.unitValue,
+                        marketValue: marketVal,
+                        assessmentLevelPercent: baseProp.assessLevel,
+                        assessedValue: assessedVal,
+                        newOwnerName: ownerName || baseProp.owner,
+                        districtOrBarangay: baseProp.barangay,
+                        propertyLocation: (document.getElementById('locationInput') ? document.getElementById('locationInput').value : '') || baseProp.location || baseProp.barangay || '',
+                        customOwner: false,
+                        customLocation: false
+                    });
+                }
+            }
+
+            renderPartitionsTable();
+            toastr.success(`Generated ${generatedPartitions.length} partition lots!`);
+        }
+
+        function generateSystemTDN(letterSuffix, brgyVal, seqIndex) {
+            const revYearLastTwo = String(new Date().getFullYear() % 100).padStart(2, '0');
+            const seqNum = typeof seqIndex === 'number' && seqIndex > 0 ? seqIndex : 1;
+            return `${revYearLastTwo}-0001-${String(seqNum).padStart(5, '0')}`;
+        }
+
+        function renderPartitionsTable() {
+            const tbody = document.getElementById('generatedPartitionsTbody');
+            const footSummary = document.getElementById('footPartitionSummary');
+            if (footSummary) footSummary.textContent = `${generatedPartitions.length} lot(s)`;
+
+            if (!tbody) return;
+
+            let rowsHtml = '';
+            generatedPartitions.forEach((p, idx) => {
+                const locText = p.propertyLocation || p.location || p.districtOrBarangay || 'N/A';
+
+                rowsHtml += `
+                    <tr class="hover:bg-slate-50 dark:hover:bg-stone-800/40 transition-colors" data-partition-idx="${idx}">
+                        <td class="px-4 py-3 align-middle">
+                            <div class="flex items-center gap-2">
+                                <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-bold font-mono text-xs shrink-0">
+                                    ${p.partitionIndex || alphabetLetters[idx % alphabetLetters.length]}
+                                </span>
+                                <div>
+                                    <span class="font-bold font-mono text-slate-900 dark:text-white text-xs block">
+                                        ${p.systemGeneratedTDN || 'TDN-PENDING'}
+                                    </span>
+                                    ${p.pin ? `<span class="text-[10px] text-slate-500 dark:text-stone-400 font-mono block">PIN: ${p.pin}</span>` : ''}
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-4 py-3 align-middle">
+                            <span class="inline-block px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60 font-mono">
+                                ${p.kind || 'Land'}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 align-middle">
+                            <span class="font-medium text-slate-900 dark:text-white text-xs block">
+                                ${p.newOwnerName || 'N/A'}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 align-middle">
+                            <span class="text-slate-600 dark:text-stone-300 text-xs block font-sans">
+                                ${locText}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 align-middle text-center">
+                            <div class="flex items-center justify-center gap-1.5">
+                                <button type="button" onclick="handleEditPartition(${idx})" class="p-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition-colors" title="Edit Partition Appraisal">
+                                    <i data-lucide="pencil" class="w-4 h-4"></i>
+                                </button>
+                                <button type="button" onclick="removePartition(${idx})" class="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors" title="Delete partition row">
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = rowsHtml;
+            serializePartitions();
+            lucide.createIcons();
+        }
+
+        function removePartition(idx) {
+            generatedPartitions.splice(idx, 1);
+            generatedPartitions.forEach((p, i) => {
+                p.partitionIndex = alphabetLetters[i % alphabetLetters.length];
+            });
+            renderPartitionsTable();
+        }
+
+        function handleAddManualPartitionLot() {
+            const baseProp = selectedPropertyIds.length > 0 ? referencePropertiesData[selectedPropertyIds[0]] : null;
+            const idx = generatedPartitions.length;
+            const letter = alphabetLetters[idx % alphabetLetters.length];
+            const ownerName = (document.getElementById('ownerNameInput') ? document.getElementById('ownerNameInput').value : '').trim();
+            const reqKindEl = document.getElementById('kindInput');
+            const reqKind = reqKindEl && reqKindEl.value ? reqKindEl.value : null;
+            const effKind = (reqKind === 'Machinery' || reqKind === 'Building') ? reqKind : (baseProp ? baseProp.kind : "Land");
+
+            generatedPartitions.push({
+                partitionIndex: letter,
+                baseTDN: baseProp ? baseProp.tdn : "Manual",
+                basePropertyId: baseProp ? baseProp.id : null,
+                systemGeneratedTDN: generateSystemTDN(letter, "Central", idx + 1),
+                pin: baseProp && baseProp.pin ? `${baseProp.pin}-${letter}` : '',
+                lotNumber: `Lot ${idx + 1}-${letter}`,
+                kind: effKind,
+                classification: baseProp ? baseProp.classification : "Residential",
+                areaSqMeters: 100,
+                unitValue: baseProp ? baseProp.unitValue : 1500,
+                marketValue: 150000,
+                assessmentLevelPercent: 20,
+                assessedValue: 30000,
+                newOwnerName: ownerName || (baseProp ? baseProp.owner : ""),
+                districtOrBarangay: baseProp ? baseProp.barangay : "Central",
+                propertyLocation: (document.getElementById('locationInput') ? document.getElementById('locationInput').value : '') || '',
+                customOwner: false,
+                customLocation: false
+            });
+
+            renderPartitionsTable();
+        }
+
+        function serializePartitions() {
+            const json = JSON.stringify(generatedPartitions);
+            const input = document.getElementById('GeneratedPartitionsJson');
+            if (input) input.value = json;
+            
+            const partInput = document.getElementById('Partitions');
+            if (partInput) {
+                partInput.value = generatedPartitions.length > 0 ? generatedPartitions.length : 1;
+            }
+        }
+
+        function editPartitionRedirect(idx) {
+            const reqId = '@Model.Id';
+            const p = generatedPartitions[idx];
+            const kindParam = p && p.kind ? `&kind=${encodeURIComponent(p.kind)}` : '';
+            const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
+            window.location.href = `/PropertyAssessmentRequest/EditPartition?requestId=${reqId}&index=${idx}${kindParam}&returnUrl=${returnUrl}`;
+        }
+
+        function handleEditPartition(idx) {
+            editPartitionRedirect(idx);
+        }
+
+        function normalizeTdnForComparison(tdn) {
+            if (!tdn) return '';
+            return String(tdn)
+                .trim()
+                .toUpperCase()
+                .replace(/[\s\-_]+/g, '-')
+                .replace(/-(LAND|BLDG|BUILDING|MACH|MACHINERY|IMP|IMPROVEMENT)-/gi, '-')
+                .replace(/-(LAND|BLDG|BUILDING|MACH|MACHINERY|IMP|IMPROVEMENT)$/gi, '')
+                .replace(/^(LAND|BLDG|BUILDING|MACH|MACHINERY|IMP|IMPROVEMENT)-/gi, '');
+        }
+
+        function extractTdnSequence(tdn) {
+            if (!tdn) return '';
+            const m = String(tdn).match(/(\d{3,})/g);
+            return m && m.length > 0 ? m[m.length - 1] : '';
+        }
+
+        function normalizePinForComparison(pin) {
+            if (!pin) return '';
+            const clean = String(pin).trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+            if (clean === 'NA' || clean === 'NONE' || /^0+$/.test(clean)) return '';
+            return clean;
+        }
+
+        function normalizeOwnerForComparison(owner) {
+            if (!owner) return '';
+            return String(owner).trim().toUpperCase().replace(/[\s.,'-]+/g, '');
+        }
+
+        function arePropertiesSameTaxDeclaration(a, b) {
+            if (!a || !b) return false;
+            if (a.id && b.id && String(a.id) === String(b.id)) return true;
+
+            const tdnA = String(a.tdn || '').trim().toUpperCase();
+            const tdnB = String(b.tdn || '').trim().toUpperCase();
+            if (tdnA && tdnB && tdnA === tdnB) return true;
+
+            const normA = normalizeTdnForComparison(tdnA);
+            const normB = normalizeTdnForComparison(tdnB);
+            if (normA && normB && normA === normB) return true;
+
+            const pinA = normalizePinForComparison(a.pin);
+            const pinB = normalizePinForComparison(b.pin);
+            if (pinA && pinB && pinA.length >= 6 && pinA === pinB) return true;
+
+            const seqA = extractTdnSequence(tdnA);
+            const seqB = extractTdnSequence(tdnB);
+            const ownerA = normalizeOwnerForComparison(a.owner);
+            const ownerB = normalizeOwnerForComparison(b.owner);
+            if (seqA && seqB && seqA === seqB && ownerA && ownerB && ownerA === ownerB) return true;
+
+            return false;
+        }
+    </script>
+}

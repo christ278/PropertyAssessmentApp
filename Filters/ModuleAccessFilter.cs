@@ -20,6 +20,7 @@ public class ModuleAccessFilter : IActionFilter
 
         // Unrestricted system controllers
         if (controllerName.Equals("Account", StringComparison.OrdinalIgnoreCase) ||
+            controllerName.Equals("Home", StringComparison.OrdinalIgnoreCase) ||
             controllerName.Equals("Location", StringComparison.OrdinalIgnoreCase))
         {
             return;
@@ -79,14 +80,7 @@ public class ModuleAccessFilter : IActionFilter
             controller.TempData["ErrorMessage"] = message;
         }
 
-        string referer = request.Headers.Referer.ToString();
-        string currentPath = request.Path.ToString();
-
-        if (string.IsNullOrWhiteSpace(referer) || referer.Contains(currentPath, StringComparison.OrdinalIgnoreCase))
-        {
-            referer = "/Home/Index";
-        }
-
-        context.Result = new RedirectResult(referer);
+        // Direct to dedicated AccessDenied view in unrestricted AccountController to prevent redirect loops
+        context.Result = new RedirectToActionResult("AccessDenied", "Account", null);
     }
 }

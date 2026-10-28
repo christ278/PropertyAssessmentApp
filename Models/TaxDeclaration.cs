@@ -79,6 +79,13 @@ public class TaxDeclaration
     public string PropertyIndexNumber { get; set; } = string.Empty;
 
     // Owner Demographics
+    [Display(Name = "Registered Owner ID")]
+    public Guid? OwnerId { get; set; }
+
+    [ForeignKey(nameof(OwnerId))]
+    [ValidateNever]
+    public virtual Owner? Owner { get; set; }
+
     [Required(ErrorMessage = "Owner/s Name is required.")]
     [Display(Name = "Owner/s Name")]
     public string OwnerName { get; set; } = string.Empty;
@@ -103,6 +110,46 @@ public class TaxDeclaration
     public string? OwnerCivilStatus { get; set; } = "Single";
 
     // Administrator / Beneficial User / Possessor
+    [Display(Name = "Administrator")]
+    public bool IsAdministrator
+    {
+        get => _isAdministrator || (BuildingDetails?.IsAdministrator ?? false) || (LandDetails?.IsAdministrator ?? false) || (MachineryDetails?.IsAdministrator ?? false);
+        set
+        {
+            _isAdministrator = value;
+            if (BuildingDetails != null) BuildingDetails.IsAdministrator = value;
+            if (LandDetails != null) LandDetails.IsAdministrator = value;
+            if (MachineryDetails != null) MachineryDetails.IsAdministrator = value;
+        }
+    }
+    private bool _isAdministrator;
+
+    [Display(Name = "Beneficial User")]
+    public bool IsBeneficialUser
+    {
+        get => _isBeneficialUser || (LandDetails?.IsBeneficialUser ?? false) || (MachineryDetails?.IsBeneficialUser ?? false);
+        set
+        {
+            _isBeneficialUser = value;
+            if (LandDetails != null) LandDetails.IsBeneficialUser = value;
+            if (MachineryDetails != null) MachineryDetails.IsBeneficialUser = value;
+        }
+    }
+    private bool _isBeneficialUser;
+
+    [Display(Name = "Possessor")]
+    public bool IsPossessor
+    {
+        get => _isPossessor || (LandDetails?.IsPossessor ?? false) || (MachineryDetails?.IsPossessor ?? false);
+        set
+        {
+            _isPossessor = value;
+            if (LandDetails != null) LandDetails.IsPossessor = value;
+            if (MachineryDetails != null) MachineryDetails.IsPossessor = value;
+        }
+    }
+    private bool _isPossessor;
+
     [Display(Name = "Administrator / Possessor Name")]
     public string? AdminPossessorName { get; set; }
 
@@ -137,6 +184,22 @@ public class TaxDeclaration
 
     [Display(Name = "Status")]
     public AssessmentStatus Status { get; set; } = AssessmentStatus.Active;
+
+    // Cancellation & Superseding Explicit Columns
+    [Display(Name = "Is Cancelled & Superseded")]
+    public bool IsCancelledAndSuperseded { get; set; } = false;
+
+    [Display(Name = "Cancellation Reason")]
+    public string? CancellationReason { get; set; }
+
+    [Display(Name = "Date Cancelled")]
+    public DateTime? DateCancelled { get; set; }
+
+    [Display(Name = "Superseded By TDN(s)")]
+    public string? SupersededByTdns { get; set; }
+
+    [Display(Name = "Cancelled By Request ID")]
+    public Guid? CancelledByRequestId { get; set; }
 
     // Signatories (from Creation to Approval)
     [Display(Name = "Appraised By Name")]
@@ -185,9 +248,143 @@ public class TaxDeclaration
     public virtual TDNLand? LandDetails { get; set; }
     public virtual TDNMachinery? MachineryDetails { get; set; }
 
-    public TDNBuilding EnsureBuildingDetails() => BuildingDetails ??= new TDNBuilding { TaxDeclarationId = Id };
-    public TDNLand EnsureLandDetails() => LandDetails ??= new TDNLand { TaxDeclarationId = Id };
-    public TDNMachinery EnsureMachineryDetails() => MachineryDetails ??= new TDNMachinery { TaxDeclarationId = Id };
+    public TDNBuilding EnsureBuildingDetails()
+    {
+        if (BuildingDetails == null)
+        {
+            BuildingDetails = new TDNBuilding
+            {
+                TaxDeclarationId = Id,
+                IsAdministrator = _isAdministrator,
+                AdministratorName = _administratorName ?? AdminPossessorName,
+                AdministratorAddress = _administratorAddress ?? AdminPossessorAddress,
+                AdministratorContactNo = _administratorContactNo ?? AdminPossessorPhone,
+                AdministratorTin = _administratorTin ?? AdminPossessorTin,
+                AdministratorGender = _administratorGender ?? AdminPossessorSex ?? "Male",
+                AdministratorCivilStatus = _administratorCivilStatus ?? "Single",
+                AdministratorEmail = _administratorEmail ?? AdminPossessorEmail
+            };
+        }
+        return BuildingDetails;
+    }
+
+    public TDNLand EnsureLandDetails()
+    {
+        if (LandDetails == null)
+        {
+            LandDetails = new TDNLand
+            {
+                TaxDeclarationId = Id,
+                RegistrationStatus = _registrationStatus ?? "Titled",
+                TitleType = _titleType ?? "OCT",
+                TitleNo = _titleNo,
+                DateRegistered = _dateRegistered,
+                SurveyNo = _surveyNo,
+                CadastralSurveyNo = _cadastralSurveyNo,
+                LotNo = _lotNo,
+                BlockNo = _blockNo,
+                SectionNo = _sectionNo,
+                ParcelNo = _parcelNo,
+                ARPNo = _arpNo,
+                StreetNo = _streetNo,
+                Purok = _purok,
+                Municipality = _municipality ?? "General Santos City",
+                DistrictOrBarangay = _districtOrBarangay ?? "Brgy. Central",
+                ProvinceCity = _provinceCity ?? "South Cotabato",
+                BoundaryNorth = _boundaryNorth ?? "Lot 101",
+                BoundaryEast = _boundaryEast ?? "Road Lot",
+                BoundaryWest = _boundaryWest ?? "Creek",
+                BoundarySouth = _boundarySouth ?? "Lot 103",
+                Nremarks = _nremarks,
+                Eremarks = _eremarks,
+                Sremarks = _sremarks,
+                Wremarks = _wremarks,
+                IsAdministrator = _isAdministrator,
+                IsBeneficialUser = _isBeneficialUser,
+                IsPossessor = _isPossessor,
+                AdministratorName = _administratorName ?? AdminPossessorName,
+                AdministratorSex = _administratorGender ?? AdminPossessorSex ?? "Male",
+                AdministratorAddress = _administratorAddress ?? AdminPossessorAddress,
+                AdministratorTin = _administratorTin ?? AdminPossessorTin,
+                AdministratorPhone = _administratorContactNo ?? AdminPossessorPhone,
+                AdministratorEmail = _administratorEmail ?? AdminPossessorEmail,
+                LandAppraisalDetailsJson = _landAppraisalDetailsJson,
+                LandImprovementsJson = _landImprovementsJson,
+                LandAdjustmentsJson = _landAdjustmentsJson,
+                LandPropertyAssessmentsJson = _landPropertyAssessmentsJson,
+                EffectivityYear = _effYear,
+                EffectivityQuarter = _effQtr ?? "1st Quarter",
+                Taxability = _taxability ?? "Taxable",
+                TaxabilityBasis = _taxBasis ?? "RA 7160 Local Government Code",
+                PreviousTdNo = _prevTdNo,
+                PreviousPin = _prevPin,
+                PreviousOwner = _prevOwner,
+                PreviousMarketValue = _prevMv,
+                PreviousAssessedValue = _prevAv
+            };
+        }
+        return LandDetails;
+    }
+
+    public TDNMachinery EnsureMachineryDetails()
+    {
+        if (MachineryDetails == null)
+        {
+            MachineryDetails = new TDNMachinery
+            {
+                TaxDeclarationId = Id,
+                StreetNo = _streetNo,
+                Municipality = _municipality ?? "General Santos City",
+                DistrictOrBarangay = _districtOrBarangay ?? "Brgy. Central",
+                ProvinceCity = _provinceCity ?? "South Cotabato",
+                ARPNo = _arpNo,
+                SectionNo = _sectionNo,
+                ParcelNo = _parcelNo,
+                LotNo = _lotNo,
+                IsAdministrator = _isAdministrator,
+                IsBeneficialUser = _isBeneficialUser,
+                IsPossessor = _isPossessor,
+                AdministratorName = _administratorName ?? AdminPossessorName,
+                AdministratorSex = _administratorGender ?? AdminPossessorSex ?? "Male",
+                AdministratorAddress = _administratorAddress ?? AdminPossessorAddress,
+                AdministratorTin = _administratorTin ?? AdminPossessorTin,
+                AdministratorPhone = _administratorContactNo ?? AdminPossessorPhone,
+                AdministratorEmail = _administratorEmail ?? AdminPossessorEmail,
+                BuildingReferenceName = _bldgRefName,
+                BuildingPin = _bldgPin,
+                BuildingTdNo = _bldgTdNo,
+                IsLandOwnerAlsoBuildingOwner = _isLandOwnerAlsoBuildingOwner,
+                LandOwnerName = _landOwnerName,
+                LandPin = _landPin,
+                LandTdNo = _landTdNo,
+                IsLocallyManufactured = _isLocallyManufactured,
+                MachineryRegNo = _machineryRegNo,
+                MachineryDateRegistered = _machineryDateRegistered,
+                ImportationPermitNo = _importationPermitNo,
+                ImportationDateIssued = _importationDateIssued,
+                CountryOfOrigin = _countryOfOrigin,
+                SupplierSeller = _supplierSeller,
+                SupplierAddress = _supplierAddress,
+                AcquisitionCost = _acquisitionCost,
+                OrNo = _orNo,
+                OrDate = _orDate,
+                OrNoAndDate = _orNoAndDate,
+                LocalDateIssued = _localDateIssued,
+                MachineryAppraisalDetailsJson = _machineryAppraisalDetailsJson,
+                MachineryPropertyAssessmentsJson = _machineryPropertyAssessmentsJson,
+                EffectivityYear = _effYear,
+                EffectivityQuarter = _effQtr ?? "1st Quarter",
+                Taxability = _taxability ?? "Taxable",
+                TaxabilityBasis = _taxBasis ?? "RA 7160",
+                PreviousTdNo = _prevTdNo,
+                PreviousPin = _prevPin,
+                PreviousOwner = _prevOwner,
+                PreviousMarketValue = _prevMv,
+                PreviousAssessedValue = _prevAv
+            };
+        }
+        return MachineryDetails;
+    }
 
     // -------------------------------------------------------------
     // BACKWARD COMPATIBLE CONVENIENCE PROPERTIES [NotMapped]
@@ -236,8 +433,13 @@ public class TaxDeclaration
     [NotMapped]
     public string LotNo
     {
-        get => LandDetails?.LotNo ?? _lotNo ?? string.Empty;
-        set { _lotNo = value; if (LandDetails != null) LandDetails.LotNo = value; }
+        get => LandDetails?.LotNo ?? MachineryDetails?.LotNo ?? _lotNo ?? string.Empty;
+        set
+        {
+            _lotNo = value;
+            if (LandDetails != null) LandDetails.LotNo = value;
+            if (MachineryDetails != null) MachineryDetails.LotNo = value;
+        }
     }
     private string? _lotNo;
 
@@ -322,6 +524,46 @@ public class TaxDeclaration
     }
     private string? _orNoAndDate;
 
+    [NotMapped]
+    public DateTime? MachineryDateRegistered
+    {
+        get => MachineryDetails?.MachineryDateRegistered ?? _machineryDateRegistered;
+        set { _machineryDateRegistered = value; if (MachineryDetails != null) MachineryDetails.MachineryDateRegistered = value; }
+    }
+    private DateTime? _machineryDateRegistered;
+
+    [NotMapped]
+    public string OrNo
+    {
+        get => MachineryDetails?.OrNo ?? _orNo ?? string.Empty;
+        set { _orNo = value; if (MachineryDetails != null) MachineryDetails.OrNo = value; }
+    }
+    private string? _orNo;
+
+    [NotMapped]
+    public DateTime? OrDate
+    {
+        get => MachineryDetails?.OrDate ?? _orDate;
+        set { _orDate = value; if (MachineryDetails != null) MachineryDetails.OrDate = value; }
+    }
+    private DateTime? _orDate;
+
+    [NotMapped]
+    public DateTime? LocalDateIssued
+    {
+        get => MachineryDetails?.LocalDateIssued ?? _localDateIssued;
+        set { _localDateIssued = value; if (MachineryDetails != null) MachineryDetails.LocalDateIssued = value; }
+    }
+    private DateTime? _localDateIssued;
+
+    [NotMapped]
+    public bool IsLandOwnerAlsoBuildingOwner
+    {
+        get => MachineryDetails?.IsLandOwnerAlsoBuildingOwner ?? _isLandOwnerAlsoBuildingOwner;
+        set { _isLandOwnerAlsoBuildingOwner = value; if (MachineryDetails != null) MachineryDetails.IsLandOwnerAlsoBuildingOwner = value; }
+    }
+    private bool _isLandOwnerAlsoBuildingOwner;
+
     // Building Use Type
     [NotMapped]
     public string BuildingUseType
@@ -391,8 +633,8 @@ public class TaxDeclaration
     [NotMapped]
     public string CompleteAddress => string.Join(", ", new[] { StreetNo, DistrictOrBarangay, Municipality, ProvinceCity }.Where(s => !string.IsNullOrWhiteSpace(s)));
 
-    // Land Reference (Where Erected)
-    [NotMapped] public string? LandOwnerName { get => BuildingDetails?.LandOwnerName ?? _landOwnerName; set { _landOwnerName = value; if (BuildingDetails != null) BuildingDetails.LandOwnerName = value; } }
+    // Land Reference (Where Erected / Situated)
+    [NotMapped] public string? LandOwnerName { get => BuildingDetails?.LandOwnerName ?? MachineryDetails?.LandOwnerName ?? _landOwnerName; set { _landOwnerName = value; if (BuildingDetails != null) BuildingDetails.LandOwnerName = value; if (MachineryDetails != null) MachineryDetails.LandOwnerName = value; } }
     private string? _landOwnerName;
     [NotMapped] public string? LandOwnerTin { get => BuildingDetails?.LandOwnerTin ?? _landOwnerTin; set { _landOwnerTin = value; if (BuildingDetails != null) BuildingDetails.LandOwnerTin = value; } }
     private string? _landOwnerTin;
@@ -404,9 +646,9 @@ public class TaxDeclaration
     private string? _landOwnerAddress;
     [NotMapped] public string? LandOwnerSex { get => BuildingDetails?.LandOwnerSex ?? _landOwnerSex; set { _landOwnerSex = value; if (BuildingDetails != null) BuildingDetails.LandOwnerSex = value; } }
     private string? _landOwnerSex;
-    [NotMapped] public string? LandTdNo { get => BuildingDetails?.LandTdNo ?? _landTdNo; set { _landTdNo = value; if (BuildingDetails != null) BuildingDetails.LandTdNo = value; } }
+    [NotMapped] public string? LandTdNo { get => BuildingDetails?.LandTdNo ?? MachineryDetails?.LandTdNo ?? _landTdNo; set { _landTdNo = value; if (BuildingDetails != null) BuildingDetails.LandTdNo = value; if (MachineryDetails != null) MachineryDetails.LandTdNo = value; } }
     private string? _landTdNo;
-    [NotMapped] public string? LandPin { get => BuildingDetails?.LandPin ?? _landPin; set { _landPin = value; if (BuildingDetails != null) BuildingDetails.LandPin = value; } }
+    [NotMapped] public string? LandPin { get => BuildingDetails?.LandPin ?? MachineryDetails?.LandPin ?? _landPin; set { _landPin = value; if (BuildingDetails != null) BuildingDetails.LandPin = value; if (MachineryDetails != null) MachineryDetails.LandPin = value; } }
     private string? _landPin;
     [NotMapped] public string? LandTitleNo { get => BuildingDetails?.LandTitleNo ?? _landTitleNo; set { _landTitleNo = value; if (BuildingDetails != null) BuildingDetails.LandTitleNo = value; } }
     private string? _landTitleNo;
@@ -455,14 +697,14 @@ public class TaxDeclaration
     [NotMapped] public string? Wremarks { get => LandDetails?.Wremarks ?? _wremarks; set { _wremarks = value; if (LandDetails != null) LandDetails.Wremarks = value; } }
     private string? _wremarks;
 
-    // Additional Land Details (CAST)
+    // Additional Land & Machinery Details (CAST)
     [NotMapped] public string? CadastralSurveyNo { get => LandDetails?.CadastralSurveyNo ?? _cadastralSurveyNo; set { _cadastralSurveyNo = value; if (LandDetails != null) LandDetails.CadastralSurveyNo = value; } }
     private string? _cadastralSurveyNo;
-    [NotMapped] public string? ARPNo { get => LandDetails?.ARPNo ?? _arpNo; set { _arpNo = value; if (LandDetails != null) LandDetails.ARPNo = value; } }
+    [NotMapped] public string? ARPNo { get => LandDetails?.ARPNo ?? MachineryDetails?.ARPNo ?? _arpNo; set { _arpNo = value; if (LandDetails != null) LandDetails.ARPNo = value; if (MachineryDetails != null) MachineryDetails.ARPNo = value; } }
     private string? _arpNo;
-    [NotMapped] public string? SectionNo { get => LandDetails?.SectionNo ?? _sectionNo; set { _sectionNo = value; if (LandDetails != null) LandDetails.SectionNo = value; } }
+    [NotMapped] public string? SectionNo { get => LandDetails?.SectionNo ?? MachineryDetails?.SectionNo ?? _sectionNo; set { _sectionNo = value; if (LandDetails != null) LandDetails.SectionNo = value; if (MachineryDetails != null) MachineryDetails.SectionNo = value; } }
     private string? _sectionNo;
-    [NotMapped] public string? ParcelNo { get => LandDetails?.ParcelNo ?? _parcelNo; set { _parcelNo = value; if (LandDetails != null) LandDetails.ParcelNo = value; } }
+    [NotMapped] public string? ParcelNo { get => LandDetails?.ParcelNo ?? MachineryDetails?.ParcelNo ?? _parcelNo; set { _parcelNo = value; if (LandDetails != null) LandDetails.ParcelNo = value; if (MachineryDetails != null) MachineryDetails.ParcelNo = value; } }
     private string? _parcelNo;
     [NotMapped] public string? Purok { get => LandDetails?.Purok ?? _purok; set { _purok = value; if (LandDetails != null) LandDetails.Purok = value; } }
     private string? _purok;
@@ -476,6 +718,12 @@ public class TaxDeclaration
     private string? _landAdjustmentsJson;
     [NotMapped] public string? LandPropertyAssessmentsJson { get => LandDetails?.LandPropertyAssessmentsJson ?? _landPropertyAssessmentsJson; set { _landPropertyAssessmentsJson = value; if (LandDetails != null) LandDetails.LandPropertyAssessmentsJson = value; } }
     private string? _landPropertyAssessmentsJson;
+
+    // Machinery Multi-line JSON storage
+    [NotMapped] public string? MachineryAppraisalDetailsJson { get => MachineryDetails?.MachineryAppraisalDetailsJson ?? _machineryAppraisalDetailsJson; set { _machineryAppraisalDetailsJson = value; if (MachineryDetails != null) MachineryDetails.MachineryAppraisalDetailsJson = value; } }
+    private string? _machineryAppraisalDetailsJson;
+    [NotMapped] public string? MachineryPropertyAssessmentsJson { get => MachineryDetails?.MachineryPropertyAssessmentsJson ?? _machineryPropertyAssessmentsJson; set { _machineryPropertyAssessmentsJson = value; if (MachineryDetails != null) MachineryDetails.MachineryPropertyAssessmentsJson = value; } }
+    private string? _machineryPropertyAssessmentsJson;
 
     // Building Structural Characteristics
     [NotMapped] public string StructuralType { get => BuildingDetails?.StructuralType ?? _structuralType ?? "Type I"; set { _structuralType = value; if (BuildingDetails != null) BuildingDetails.StructuralType = value; } }
@@ -511,21 +759,19 @@ public class TaxDeclaration
     private DateTime? _cctDateRegistered;
     [NotMapped] public string? OwnerNameReflectedInCct { get => BuildingDetails?.OwnerNameReflectedInCct ?? _ownerReflectedCct; set { _ownerReflectedCct = value; if (BuildingDetails != null) BuildingDetails.OwnerNameReflectedInCct = value; } }
     private string? _ownerReflectedCct;
-    [NotMapped] public bool IsAdministrator { get => BuildingDetails?.IsAdministrator ?? _isAdministrator; set { _isAdministrator = value; if (BuildingDetails != null) BuildingDetails.IsAdministrator = value; } }
-    private bool _isAdministrator;
-    [NotMapped] public string? AdministratorName { get => BuildingDetails?.AdministratorName ?? _administratorName; set { _administratorName = value; if (BuildingDetails != null) BuildingDetails.AdministratorName = value; } }
+    [NotMapped] public string? AdministratorName { get => BuildingDetails?.AdministratorName ?? LandDetails?.AdministratorName ?? MachineryDetails?.AdministratorName ?? AdminPossessorName ?? _administratorName; set { _administratorName = value; AdminPossessorName = value; if (BuildingDetails != null) BuildingDetails.AdministratorName = value; if (LandDetails != null) LandDetails.AdministratorName = value; if (MachineryDetails != null) MachineryDetails.AdministratorName = value; } }
     private string? _administratorName;
-    [NotMapped] public string? AdministratorAddress { get => BuildingDetails?.AdministratorAddress ?? _administratorAddress; set { _administratorAddress = value; if (BuildingDetails != null) BuildingDetails.AdministratorAddress = value; } }
+    [NotMapped] public string? AdministratorAddress { get => BuildingDetails?.AdministratorAddress ?? LandDetails?.AdministratorAddress ?? MachineryDetails?.AdministratorAddress ?? AdminPossessorAddress ?? _administratorAddress; set { _administratorAddress = value; AdminPossessorAddress = value; if (BuildingDetails != null) BuildingDetails.AdministratorAddress = value; if (LandDetails != null) LandDetails.AdministratorAddress = value; if (MachineryDetails != null) MachineryDetails.AdministratorAddress = value; } }
     private string? _administratorAddress;
-    [NotMapped] public string? AdministratorContactNo { get => BuildingDetails?.AdministratorContactNo ?? _administratorContactNo; set { _administratorContactNo = value; if (BuildingDetails != null) BuildingDetails.AdministratorContactNo = value; } }
+    [NotMapped] public string? AdministratorContactNo { get => BuildingDetails?.AdministratorContactNo ?? LandDetails?.AdministratorPhone ?? MachineryDetails?.AdministratorPhone ?? AdminPossessorPhone ?? _administratorContactNo; set { _administratorContactNo = value; AdminPossessorPhone = value; if (BuildingDetails != null) BuildingDetails.AdministratorContactNo = value; if (LandDetails != null) LandDetails.AdministratorPhone = value; if (MachineryDetails != null) MachineryDetails.AdministratorPhone = value; } }
     private string? _administratorContactNo;
-    [NotMapped] public string? AdministratorTin { get => BuildingDetails?.AdministratorTin ?? _administratorTin; set { _administratorTin = value; if (BuildingDetails != null) BuildingDetails.AdministratorTin = value; } }
+    [NotMapped] public string? AdministratorTin { get => BuildingDetails?.AdministratorTin ?? LandDetails?.AdministratorTin ?? MachineryDetails?.AdministratorTin ?? AdminPossessorTin ?? _administratorTin; set { _administratorTin = value; AdminPossessorTin = value; if (BuildingDetails != null) BuildingDetails.AdministratorTin = value; if (LandDetails != null) LandDetails.AdministratorTin = value; if (MachineryDetails != null) MachineryDetails.AdministratorTin = value; } }
     private string? _administratorTin;
-    [NotMapped] public string? AdministratorGender { get => BuildingDetails?.AdministratorGender ?? _administratorGender ?? "Male"; set { _administratorGender = value; if (BuildingDetails != null) BuildingDetails.AdministratorGender = value; } }
+    [NotMapped] public string? AdministratorGender { get => BuildingDetails?.AdministratorGender ?? LandDetails?.AdministratorSex ?? MachineryDetails?.AdministratorSex ?? AdminPossessorSex ?? _administratorGender ?? "Male"; set { _administratorGender = value; AdminPossessorSex = value; if (BuildingDetails != null) BuildingDetails.AdministratorGender = value; if (LandDetails != null) LandDetails.AdministratorSex = value; if (MachineryDetails != null) MachineryDetails.AdministratorSex = value; } }
     private string? _administratorGender;
     [NotMapped] public string? AdministratorCivilStatus { get => BuildingDetails?.AdministratorCivilStatus ?? _administratorCivilStatus ?? "Single"; set { _administratorCivilStatus = value; if (BuildingDetails != null) BuildingDetails.AdministratorCivilStatus = value; } }
     private string? _administratorCivilStatus;
-    [NotMapped] public string? AdministratorEmail { get => BuildingDetails?.AdministratorEmail ?? _administratorEmail; set { _administratorEmail = value; if (BuildingDetails != null) BuildingDetails.AdministratorEmail = value; } }
+    [NotMapped] public string? AdministratorEmail { get => BuildingDetails?.AdministratorEmail ?? LandDetails?.AdministratorEmail ?? MachineryDetails?.AdministratorEmail ?? AdminPossessorEmail ?? _administratorEmail; set { _administratorEmail = value; AdminPossessorEmail = value; if (BuildingDetails != null) BuildingDetails.AdministratorEmail = value; if (LandDetails != null) LandDetails.AdministratorEmail = value; if (MachineryDetails != null) MachineryDetails.AdministratorEmail = value; } }
     private string? _administratorEmail;
 
     // Multi-Floor Breakdown & Additional Items
@@ -626,7 +872,8 @@ public class TaxDeclaration
         {
             if (BuildingDetails != null && BuildingDetails.MarketValue > 0) return BuildingDetails.MarketValue;
             if (LandDetails != null && LandDetails.MarketValue > 0) return LandDetails.MarketValue;
-            if (MachineryDetails != null && MachineryDetails.OriginalCost > 0) return MachineryDetails.OriginalCost;
+            if (MachineryDetails != null && (MachineryDetails.DepreciatedValue > 0 || MachineryDetails.OriginalCost > 0))
+                return MachineryDetails.DepreciatedValue > 0 ? MachineryDetails.DepreciatedValue : MachineryDetails.OriginalCost;
             return _marketValue > 0 ? _marketValue : (AreaSqMeters * UnitValue);
         }
         set
@@ -634,6 +881,11 @@ public class TaxDeclaration
             _marketValue = value;
             if (BuildingDetails != null) BuildingDetails.MarketValue = value;
             if (LandDetails != null) LandDetails.MarketValue = value;
+            if (MachineryDetails != null)
+            {
+                MachineryDetails.DepreciatedValue = value;
+                if (MachineryDetails.OriginalCost == 0) MachineryDetails.OriginalCost = value;
+            }
         }
     }
     private decimal _marketValue = 525000m;
@@ -831,4 +1083,211 @@ public class LandPropertyAssessmentItemDto
     public decimal MarketValue { get; set; }
     public decimal AssessmentLevelPercent { get; set; } = 20m;
     public decimal AssessmentValue => Math.Round(MarketValue * (AssessmentLevelPercent / 100m), 2);
+}
+
+public class MachineryDetailItemDto
+{
+    public string? Classification { get; set; }
+    public string? DescriptionBrand { get; set; }
+    public string? KindOfMachinery { get; set; }
+    public string? BrandModel { get; set; }
+    public string? Capacity { get; set; }
+    public string? AcquiredDate { get; set; }
+    public string? ConditionWhenAcquired { get; set; } = "NEW";
+    public int? EconomicLifeEstimated { get; set; }
+    public int? RemainingEconomicLife { get; set; }
+    public int? YearInstalled { get; set; }
+    public int? YearOfOperation { get; set; }
+    public string? DateOfInstallation { get; set; }
+    public string? DateOfOperation { get; set; }
+    public decimal OriginalCost { get; set; }
+    public decimal InstallationCost { get; set; }
+    public decimal TotalCost { get; set; }
+    public decimal RCN { get; set; }
+    public int? NoOfYearsUsed { get; set; }
+    public decimal MarketValue { get; set; }
+    public decimal DepreciationTotalPercentage { get; set; }
+    public decimal DepreciationTotalValue { get; set; }
+    public decimal DepreciatedValue { get; set; }
+}
+
+public class MachineryPropertyAssessmentItemDto
+{
+    public int? ActualUseId { get; set; }
+    public string ActualUseName { get; set; } = "INDUSTRIAL";
+    public decimal MarketValue { get; set; }
+    public decimal AssessmentLevelPercent { get; set; } = 75m;
+    public decimal AssessmentValue => Math.Round(MarketValue * (AssessmentLevelPercent / 100m), 2);
+}
+
+/// <summary>
+/// Centralized CAST Tax Declaration (TDN1) & ARP Number Generator implementing both CAST combinations:
+/// 1. Combination #1 (FAAS / Partition Encoding ARPNo): {LGUCode}-{DistrictMunicipalityCode}-{BarangayCode:D4}-{SectionNo:D3}-{LotOrParcelNo:D3} (e.g., 187-00-0001-002-015)
+/// 2. Combination #2 (Post-Approval / Official TDN1): {RevisionYearLastTwoDigits:D2}-{BarangayCode:D4}-{DeclarationNo:D5} (e.g., 26-0001-00001)
+/// </summary>
+public static class CastTdGenerator
+{
+    public const string DefaultLguCode = "187";
+    public const string DefaultDistrictMunicipalCode = "00";
+    public const string DefaultArpNumber = "187-00-0000-000-000";
+
+    private static readonly (string Keyword, string Code)[] BarangayCodeMappings = new[]
+    {
+        ("DADIANGAS EAST", "0001"),
+        ("CENTRAL", "0001"),
+        ("POBLACION", "0001"),
+        ("ZONE 1", "0001"),
+        ("LAGAO", "0002"),
+        ("MORALES", "0002"),
+        ("CALUMPANG", "0003"),
+        ("SAN ISIDRO", "0004"),
+        ("CITY HEIGHTS", "0005"),
+        ("DADIANGAS NORTH", "0006"),
+        ("DADIANGAS SOUTH", "0007"),
+        ("DADIANGAS WEST", "0008"),
+        ("LABANGAL", "0009"),
+        ("APOPONG", "0010"),
+        ("BALUAN", "0011"),
+        ("BATOMELONG", "0012"),
+        ("BUAYAN", "0013"),
+        ("BULA", "0014"),
+        ("CONEL", "0015"),
+        ("FATIMA", "0016"),
+        ("KATANGAWAN", "0017"),
+        ("LIGAYA", "0018"),
+        ("MABUHAY", "0019"),
+        ("OLYMPOG", "0020"),
+        ("SAN JOSE", "0021"),
+        ("SIGUEL", "0022"),
+        ("SINAWAL", "0023"),
+        ("TAMBLER", "0024"),
+        ("TINAGACAN", "0025"),
+        ("UPPER LABAY", "0026"),
+        ("SALITRAN", "0027"),
+        ("PALIPARAN", "0028")
+    };
+
+    /// <summary>
+    /// Resolves a 4-digit zero-padded CAST Barangay Code (e.g. "0001"–"0027") from a Barangay name or code string.
+    /// </summary>
+    public static string ResolveBarangayCode(string? barangayNameOrCode, string defaultWhenEmpty = "0000")
+    {
+        if (string.IsNullOrWhiteSpace(barangayNameOrCode))
+            return defaultWhenEmpty;
+
+        var raw = barangayNameOrCode.Trim();
+
+        // Check if already a pure numeric code (e.g. "0018" or "18")
+        if (int.TryParse(raw, out int numericCode) && numericCode >= 0)
+        {
+            return (numericCode % 10000).ToString("D4");
+        }
+
+        // Check if formatted like "BRGY-9500-01" -> extract trailing segment "01" -> "0001"
+        var hyphenParts = raw.Split('-', StringSplitOptions.RemoveEmptyEntries);
+        if (hyphenParts.Length >= 2 && int.TryParse(hyphenParts[^1], out int suffixCode) && suffixCode > 0 && suffixCode < 1000)
+        {
+            return suffixCode.ToString("D4");
+        }
+
+        // Match known Barangay names
+        var upper = raw.ToUpperInvariant();
+        foreach (var (keyword, code) in BarangayCodeMappings)
+        {
+            if (upper.Contains(keyword))
+            {
+                return code;
+            }
+        }
+
+        // Fallback: extract any digits if present
+        var digits = new string(raw.Where(char.IsDigit).ToArray());
+        if (!string.IsNullOrEmpty(digits) && int.TryParse(digits, out int extracted) && extracted > 0)
+        {
+            return (extracted % 10000).ToString("D4");
+        }
+
+        return defaultWhenEmpty == "0000" ? "0001" : defaultWhenEmpty;
+    }
+
+    /// <summary>
+    /// Formats a Section No., Lot No., or Parcel No. into a 3-digit zero-padded segment ("000").
+    /// </summary>
+    public static string FormatThreeDigitSegment(string? rawValue)
+    {
+        if (string.IsNullOrWhiteSpace(rawValue))
+            return "000";
+
+        var clean = rawValue.Trim();
+
+        // Extract first contiguous numeric sequence (e.g. "Section 02" -> "002", "Lot 10-A" -> "010")
+        var digits = new string(clean.SkipWhile(c => !char.IsDigit(c)).TakeWhile(char.IsDigit).ToArray());
+        if (!string.IsNullOrEmpty(digits) && int.TryParse(digits, out int num))
+        {
+            return (num % 1000).ToString("D3");
+        }
+
+        var alnum = new string(clean.Where(char.IsLetterOrDigit).Take(3).ToArray()).ToUpperInvariant();
+        return string.IsNullOrEmpty(alnum) ? "000" : alnum.PadLeft(3, '0');
+    }
+
+    /// <summary>
+    /// CAST Combination #1 (FAAS Encoding ARPNo / Initial TDN):
+    /// {LGUCode}-{DistrictMunicipalityCode}-{BarangayCode:D4}-{SectionNo:D3}-{LotOrParcelNo:D3}
+    /// Example: 187-00-0001-002-015 (default: 187-00-0000-000-000)
+    /// </summary>
+    public static string FormatArpNumber(
+        string? barangay,
+        string? sectionNo,
+        string? lotOrParcelNo,
+        string lguCode = DefaultLguCode,
+        string munCode = DefaultDistrictMunicipalCode)
+    {
+        var lgu = string.IsNullOrWhiteSpace(lguCode) ? DefaultLguCode : lguCode.Trim().PadLeft(3, '0');
+        var mun = string.IsNullOrWhiteSpace(munCode) ? DefaultDistrictMunicipalCode : munCode.Trim().PadLeft(2, '0');
+        var brgy4 = ResolveBarangayCode(barangay, "0000");
+        var sec3 = FormatThreeDigitSegment(sectionNo);
+        var lot3 = FormatThreeDigitSegment(lotOrParcelNo);
+
+        return $"{lgu}-{mun}-{brgy4}-{sec3}-{lot3}";
+    }
+
+    /// <summary>
+    /// CAST Combination #2 (Post-Approval / Official TDN1 & DeclarationNo):
+    /// {RevisionYearLastTwoDigits:D2}-{BarangayCode:D4}-{DeclarationNo:D5}
+    /// Example: 26-0001-00001
+    /// </summary>
+    public static string FormatOfficialTdNumber(int revisionOrEffectivityYear, string? barangay, int sequenceNumber)
+    {
+        int year = revisionOrEffectivityYear > 1900 ? revisionOrEffectivityYear : DateTime.Now.Year;
+        string revYearLastTwo = (year % 100).ToString("D2");
+        string brgyCode = ResolveBarangayCode(barangay, "0001");
+        int safeSeq = Math.Max(1, sequenceNumber);
+        string declarationNo = safeSeq.ToString("D5");
+
+        return $"{revYearLastTwo}-{brgyCode}-{declarationNo}";
+    }
+
+    /// <summary>
+    /// Checks whether a Tax Declaration number is already in official CAST Combination #2 format (YY-BBBB-NNNNN).
+    /// </summary>
+    public static bool IsOfficialCastTdFormat(string? tdNo)
+    {
+        if (string.IsNullOrWhiteSpace(tdNo)) return false;
+        var parts = tdNo.Trim().Split('-');
+        return parts.Length == 3
+            && parts[0].Length == 2 && parts[0].All(char.IsDigit)
+            && parts[1].Length == 4 && parts[1].All(char.IsDigit)
+            && parts[2].Length == 5 && parts[2].All(char.IsDigit);
+    }
+
+    /// <summary>
+    /// Checks whether a string is in CAST Combination #1 ARP format (187-00-BBBB-SSS-LLL).
+    /// </summary>
+    public static bool IsCastArpFormat(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return false;
+        var parts = value.Trim().Split('-');
+        return parts.Length == 5 && parts[0].Length == 3 && parts[1].Length == 2 && parts[2].Length == 4;
+    }
 }

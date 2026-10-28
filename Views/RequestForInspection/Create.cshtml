@@ -5,6 +5,7 @@
     ViewData["Title"] = "New Request for Inspection (RFI)";
     var properties = ViewBag.Properties as IEnumerable<TaxDeclaration> ?? new List<TaxDeclaration>();
     var orderPayments = ViewBag.OrderPayments as IEnumerable<OrderPayment> ?? new List<OrderPayment>();
+    var registeredOwners = ViewBag.RegisteredOwners as IEnumerable<Owner> ?? new List<Owner>();
 }
 
 <div class="space-y-8 font-mono text-xs">
@@ -17,7 +18,7 @@
                 <span>Field Appraisal & Property Inspection</span>
             </div>
             <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">File Request for Inspection</h1>
-            <p class="text-slate-500 dark:text-stone-400 text-xs sm:text-sm">Encode site inspection requests for depreciation adjustments, reassessments, or physical changes.</p>
+            <p class="text-slate-500 dark:text-stone-400 text-xs sm:text-sm">Encode site inspection requests, search reference TDNs, generate partitions, and configure Land, Building, or Machinery appraisals.</p>
         </div>
         <a asp-action="Index" class="w-full sm:w-auto text-center px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 hover:bg-slate-50 dark:hover:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold text-xs font-mono border border-slate-200 dark:border-stone-800 shadow-sm">
             Cancel
@@ -26,11 +27,16 @@
 
     <!-- Form Container -->
     <div class="p-4 sm:p-6 lg:p-8 rounded-2xl sm:rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm">
-        <form asp-action="Create" method="post" enctype="multipart/form-data" id="inspectionForm" class="space-y-8">
+        <form asp-action="Create" method="post" enctype="multipart/form-data" id="inspectionForm" class="space-y-8" novalidate>
             <input type="hidden" asp-for="Id" />
+            <input type="hidden" asp-for="Partitions" id="Partitions" value="1" />
             <input type="hidden" asp-for="RequestedDocumentsJson" id="RequestedDocumentsJson" />
             <input type="hidden" asp-for="TotalFeesAmount" id="TotalFeesAmount" />
-            <div asp-validation-summary="All" class="p-4 rounded-xl bg-rose-50 dark:bg-rose-500/20 border border-rose-200 dark:border-rose-500/40 text-rose-800 dark:text-rose-300 font-sans font-bold"></div>
+            <input type="hidden" asp-for="GeneratedPartitionsJson" id="GeneratedPartitionsJson" />
+            <input type="hidden" asp-for="SelectedRefPropertyIdsJson" id="SelectedRefPropertyIdsJson" />
+            <input type="hidden" asp-for="TaxDeclarationId" id="primaryRefPropertyId" />
+            <input type="hidden" asp-for="OwnerId" id="requestOwnerIdInput" />
+            <div asp-validation-summary="ModelOnly" class="p-4 rounded-xl bg-rose-50 dark:bg-rose-500/20 border border-rose-200 dark:border-rose-500/40 text-rose-800 dark:text-rose-300 font-sans font-bold empty:hidden [&.validation-summary-valid]:hidden"></div>
 
             <!-- Tracking & Status Badge Header -->
             <div class="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 flex flex-wrap items-center justify-between gap-4">
@@ -41,70 +47,315 @@
                     <span class="text-slate-500 dark:text-stone-400 text-[11px]">Auto-generated system reference</span>
                 </div>
                 <input type="hidden" asp-for="TrackingNumber" />
-                <input type="hidden" asp-for="TransactionCode" />
-                <input type="hidden" asp-for="TransactionNo" />
                 <input type="hidden" asp-for="Status" />
             </div>
 
-            <!-- Step 1: Real Property Search & Owner Auto-Fill -->
+            <!-- Step 1: Transaction Type, Real Property TD Search, Partition Generation & Owner Auto-Fill -->
             <div class="space-y-4 p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
-                <div class="border-b border-slate-200 dark:border-stone-800 pb-3 flex items-center justify-between">
+                <div class="border-b border-slate-200 dark:border-stone-800 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div>
                         <h3 class="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2">
-                            <i data-lucide="search" class="w-4 h-4 text-emerald-600"></i>
-                            1. Select Registered Property from Assessment Records
+                            <i data-lucide="tag" class="w-4 h-4 text-emerald-600"></i>
+                            1. Transaction Type, Search TD &amp; Partitions
                         </h3>
-                        <p class="text-slate-500 dark:text-stone-400 text-[11px] mt-0.5">Select existing property to auto-fill TDN, PIN, Declared Owner, and Location.</p>
+                        <p class="text-slate-500 dark:text-stone-400 text-[11px] mt-0.5">Specify Transaction Code, search &amp; select reference Tax Declarations, generate partition lots, and click Edit (pencil) to configure Land, Building, or Machinery appraisal.</p>
                     </div>
                 </div>
 
+                <!-- Transaction Type Selector -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pb-2 border-b border-slate-200 dark:border-stone-800">
+                    <div>
+                        <label asp-for="TransactionCode" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold flex items-center gap-1.5">
+                            <i data-lucide="tag" class="w-3.5 h-3.5 text-emerald-600"></i>
+                            TRANSACTION TYPE / CODE <span class="text-rose-500 font-bold">*</span>
+                        </label>
+                        <select asp-for="TransactionCode" id="txCodeSelect" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono font-bold focus:outline-none focus:border-emerald-600 cursor-pointer">
+                            <option value="SD" data-name="Subdivision">Subdivision - SD</option>
+                            <option value="CS" data-name="Consolidation">Consolidation - CS</option>
+                            <option value="DC" data-name="Discovery/New Declaration" selected>Discovery/New Declaration - DC</option>
+                            <option value="PC" data-name="Reassessment Due to Physical Change">Reassessment Due to Physical Change - PC</option>
+                            <option value="RA" data-name="Reassessment">Reassessment - RA</option>
+                            <option value="DT" data-name="Reassessment Due to partial Destruction of the property">Reassessment Due to partial Destruction of the property - DT</option>
+                            <option value="TR" data-name="Transfer">Transfer - TR</option>
+                            <option value="RC" data-name="Reclassification">Reclassification - RC</option>
+                            <option value="GR" data-name="General Revision">General Revision - GR</option>
+                            <option value="SP" data-name="Special Project">Special Project - SP</option>
+                            <option value="DEP" data-name="Reassessment Due to depreciation">Reassessment Due to depreciation - DEP</option>
+                        </select>
+                        <input type="hidden" asp-for="TransactionTypeName" id="txNameInput" value="Discovery/New Declaration" />
+                    </div>
+                    <div>
+                        <label asp-for="TransactionNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">TRANSACTION NO. / REFERENCE (OPTIONAL)</label>
+                        <input asp-for="TransactionNo" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" placeholder="e.g. TX-2026-0001" />
+                    </div>
+                </div>
+
+                <!-- Subdivision (SD) Workflow & Impact Callout Banner -->
+                <div id="sdWorkflowBanner" class="p-4 rounded-2xl bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800/60 hidden space-y-2">
+                    <div class="flex items-center gap-2 text-sky-900 dark:text-sky-300 font-extrabold text-xs uppercase">
+                        <i data-lucide="split" class="w-4 h-4 text-sky-600 dark:text-sky-400"></i>
+                        <span>Subdivision (SD) · Segregation of Land Workflow</span>
+                        <span class="px-2 py-0.5 rounded-full bg-sky-600 text-white text-[9px] font-bold">Segregation</span>
+                    </div>
+                    <p class="text-[11px] text-sky-800 dark:text-sky-300 leading-relaxed">
+                        <strong>Workflow:</strong> Initiated when a registered owner divides a mother parcel into multiple lots. The appraiser and tax mapper inspect boundary pins, road alignments, and mandatory open spaces against the Land Registration Authority (LRA) or DENR-approved plan.
+                    </p>
+                    <p class="text-[11px] text-sky-700 dark:text-sky-400 font-semibold">
+                        <strong>Impact on Property:</strong> The mother Tax Declaration will be stamped <span class="text-rose-600 dark:text-rose-400 font-bold">&quot;CANCELLED &amp; SUPERSEDED&quot;</span> upon approval. New unique PINs and individual TDs will be generated for each segregated lot. Tax liabilities and delinquencies are apportioned independently.
+                    </p>
+                </div>
+
+                <!-- Consolidation (CS) Workflow & Impact Callout Banner -->
+                <div id="csWorkflowBanner" class="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 hidden space-y-2">
+                    <div class="flex items-center gap-2 text-amber-900 dark:text-amber-300 font-extrabold text-xs uppercase">
+                        <i data-lucide="merge" class="w-4 h-4 text-amber-600 dark:text-amber-400"></i>
+                        <span>Consolidation (CS) · Lot Integration Workflow</span>
+                        <span class="px-2 py-0.5 rounded-full bg-amber-600 text-white text-[9px] font-bold">Lot Integration</span>
+                    </div>
+                    <p class="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
+                        <strong>Workflow:</strong> Combines two or more contiguous parcels under identical ownership into a single parcel. Field inspection verifies that parcels physically touch without intervening public access easements, water channels, or third-party encroachments against the Land Registration Authority (LRA) or DENR-approved consolidation plan.
+                    </p>
+                    <p class="text-[11px] text-amber-700 dark:text-amber-400 font-semibold">
+                        <strong>Impact on Property:</strong> All individual parent Tax Declarations are stamped <span class="text-rose-600 dark:text-rose-400 font-bold">&quot;CANCELLED &amp; SUPERSEDED&quot;</span> upon approval. A single consolidated TD and PIN are generated. Real property tax receivables in the Treasury are collapsed from multiple ledgers into a unified bill.
+                    </p>
+                </div>
+
+                <!-- Discovery / New Declaration (DC) Workflow & Impact Callout Banner -->
+                <div id="dcWorkflowBanner" class="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 hidden space-y-2">
+                    <div class="flex items-center gap-2 text-emerald-900 dark:text-emerald-300 font-extrabold text-xs uppercase">
+                        <i data-lucide="sparkles" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                        <span>Discovery / New Declaration (DC) · Original Assessment Workflow</span>
+                        <span class="px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[9px] font-bold">Original Assessment</span>
+                    </div>
+                    <p class="text-[11px] text-emerald-800 dark:text-emerald-300 leading-relaxed">
+                        <strong>Workflow:</strong> Applied when a newly completed building, warehouse, industrial machinery, or previously unmapped land parcel is declared. The appraiser takes tape measurements, establishes structural framing (Types I to V), and verifies operational status.
+                    </p>
+                    <p class="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold">
+                        <strong>Impact on Property:</strong> Does not supersede any prior TD. Creates an original Field Appraisal and Assessment Sheet (FAAS). Under Sec. 222 of R.A. 7160, back taxes may be assessed for up to ten (10) preceding years if unassessed since completion.
+                    </p>
+                </div>
+
+                <!-- Reassessment Due to Physical Change (PC) Workflow & Impact Callout Banner -->
+                <div id="pcWorkflowBanner" class="p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 hidden space-y-2">
+                    <div class="flex items-center gap-2 text-indigo-900 dark:text-indigo-300 font-extrabold text-xs uppercase">
+                        <i data-lucide="hammer" class="w-4 h-4 text-indigo-600 dark:text-indigo-400"></i>
+                        <span>Reassessment Due to Physical Change (PC) · Renovation / Expansion Workflow</span>
+                        <span class="px-2 py-0.5 rounded-full bg-indigo-600 text-white text-[9px] font-bold">Renovation / Expansion</span>
+                    </div>
+                    <p class="text-[11px] text-indigo-800 dark:text-indigo-300 leading-relaxed">
+                        <strong>Workflow:</strong> Triggered by structural renovations, adding vertical floors, floor plan extensions, or constructing accessory improvements (swimming pools, perimeter fences). Inspection logs new square meters and materials against building permits and physical site appraisal.
+                    </p>
+                    <p class="text-[11px] text-indigo-700 dark:text-indigo-400 font-semibold">
+                        <strong>Impact on Property:</strong> The previous Tax Declaration is stamped <span class="text-rose-600 dark:text-rose-400 font-bold">&quot;CANCELLED &amp; SUPERSEDED&quot;</span> upon approval. Fair Market Value (FMV) and Assessed Value increase, recalculating structural effective age and leading to an upward tax adjustment.
+                    </p>
+                </div>
+
+                <!-- Transfer (TR) Workflow & Impact Callout Banner -->
+                <div id="trWorkflowBanner" class="p-4 rounded-2xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800/60 hidden space-y-2">
+                    <div class="flex items-center gap-2 text-teal-900 dark:text-teal-300 font-extrabold text-xs uppercase">
+                        <i data-lucide="arrow-right-left" class="w-4 h-4 text-teal-600 dark:text-teal-400"></i>
+                        <span>Transfer (TR) · Administrative Title Conveyance Workflow</span>
+                        <span class="px-2 py-0.5 rounded-full bg-teal-600 text-white text-[9px] font-bold">Administrative Conveyance</span>
+                    </div>
+                    <p class="text-[11px] text-teal-800 dark:text-teal-300 leading-relaxed">
+                        <strong>Workflow:</strong> Executed upon sale, donation, barter, or extrajudicial settlement. Requires Transfer Certificate of Title (TCT), BIR Certificate Authorizing Registration (CAR/eCAR), and Transfer Tax Receipt. <span class="font-bold underline text-teal-900 dark:text-teal-200">Field inspection is not required</span> (administrative office conveyance).
+                    </p>
+                    <p class="text-[11px] text-teal-700 dark:text-teal-400 font-semibold">
+                        <strong>Impact on Property:</strong> The prior owner's Tax Declaration is stamped <span class="text-rose-600 dark:text-rose-400 font-bold">&quot;CANCELLED &amp; SUPERSEDED&quot;</span> upon approval. The replacement TD retains identical land area, building classifications, and PIN, while redirecting billing ledgers to the transferee.
+                    </p>
+                </div>
+
+                <!-- Reclassification (RC) Workflow & Impact Callout Banner -->
+                <div id="rcWorkflowBanner" class="p-4 rounded-2xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/60 hidden space-y-2">
+                    <div class="flex items-center gap-2 text-purple-900 dark:text-purple-300 font-extrabold text-xs uppercase">
+                        <i data-lucide="layers" class="w-4 h-4 text-purple-600 dark:text-purple-400"></i>
+                        <span>Reclassification (RC) · Actual Ground Use Conversion Workflow</span>
+                        <span class="px-2 py-0.5 rounded-full bg-purple-600 text-white text-[9px] font-bold">Ground Use Conversion</span>
+                    </div>
+                    <p class="text-[11px] text-purple-800 dark:text-purple-300 leading-relaxed">
+                        <strong>Workflow:</strong> Mandated when land or structures convert physical usage (e.g., agricultural land to commercial parking, or residential home to retail grocery). Field inspection confirms actual economic activity pursuant to Sec. 217 of R.A. 7160.
+                    </p>
+                    <p class="text-[11px] text-purple-700 dark:text-purple-400 font-semibold">
+                        <strong>Impact on Property:</strong> The old Tax Declaration is stamped <span class="text-rose-600 dark:text-rose-400 font-bold">&quot;CANCELLED &amp; SUPERSEDED&quot;</span> upon approval. Replaces the statutory assessment level (e.g., from 20% Residential to 50% Commercial), altering annual property tax dues without needing title re-titling.
+                    </p>
+                </div>
+
                 <div>
-                    <label class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">SEARCH & SELECT PROPERTY</label>
-                    <select id="propertySelect" asp-for="TaxDeclarationId" class="w-full">
-                        <option value="">-- Choose Property from Assessment Records --</option>
+                    <label class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">
+                        SEARCH &amp; SELECT REFERENCE TAX DECLARATION (TD) <span class="text-emerald-600 text-xs font-normal">(Multiple Selection Allowed)</span> <span class="text-rose-500 font-bold">*</span>
+                    </label>
+                    <select id="refPropertySelect" multiple class="w-full">
                         @foreach (var p in properties)
                         {
-                            <option value="@p.Id" data-tdn="@p.TaxDeclarationNumber" data-pin="@p.PropertyIndexNumber" data-owner="@p.OwnerName" data-kind="@p.Kind" data-location="@p.CompleteAddress">
-                                @p.TaxDeclarationNumber - @p.OwnerName (@p.PropertyIndexNumber) [@p.Kind]
+                            <option value="@p.Id"
+                                    data-id="@p.Id"
+                                    data-tdn="@p.TaxDeclarationNumber"
+                                    data-pin="@p.PropertyIndexNumber"
+                                    data-owner="@p.OwnerName"
+                                    data-location="@p.CompleteAddress"
+                                    data-kind="@p.Kind"
+                                    data-classification="@p.Classification"
+                                    data-area="@p.AreaSqMeters"
+                                    data-unitval="@p.UnitValue"
+                                    data-marketval="@p.MarketValue"
+                                    data-assesslevel="@p.AssessmentLevelPercent"
+                                    data-assessedval="@p.AssessedValue"
+                                    data-barangay="@p.DistrictOrBarangay">
+                                @p.TaxDeclarationNumber - @p.OwnerName (@p.PropertyIndexNumber) [@p.Kind &bull; @p.Classification &bull; @p.AreaSqMeters.ToString("N0") sqm]
                             </option>
+                        }
+                    </select>
+                    <span id="refPropertyValidation" class="text-rose-500 font-bold block mt-1 text-[11px]">@string.Join(" ", ViewData.ModelState["SelectedRefPropertyIdsJson"]?.Errors.Select(e => e.ErrorMessage) ?? Enumerable.Empty<string>())</span>
+                </div>
+
+                <!-- Selected Reference Properties Summary List -->
+                <div id="selectedPropertiesSummary" class="hidden space-y-3 pt-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-slate-700 dark:text-stone-300 uppercase flex items-center gap-1.5">
+                            <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-600"></i>
+                            Selected Reference Properties (<span id="selectedCountBadge">0</span>)
+                        </span>
+                        <span class="text-[10px] text-slate-400">Values will be used as baseline for inspection partitions</span>
+                    </div>
+                    <div id="selectedPropertiesList" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- Partition Generator Action Card -->
+                <div id="partitionGeneratorCard" class="hidden p-5 rounded-2xl bg-gradient-to-r from-emerald-50 via-teal-50 to-slate-50 dark:from-emerald-950/40 dark:via-teal-950/30 dark:to-stone-900 border border-emerald-200 dark:border-emerald-800/60 shadow-sm space-y-4">
+                    <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                        <div class="space-y-1">
+                            <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-600 text-white font-bold text-[10px] uppercase">
+                                <i data-lucide="split" class="w-3 h-3"></i>
+                                Generate Partition Action
+                            </div>
+                            <h4 class="text-sm font-extrabold text-slate-900 dark:text-white">
+                                Automated Partition Lot &amp; System TDN Generation
+                            </h4>
+                            <p class="text-[11px] text-slate-600 dark:text-stone-400 max-w-2xl leading-relaxed">
+                                Generate inspection partition lots from your selected reference TD. Each partition can be edited using the dedicated Land, Building, or Machinery appraisal form based on its Property Kind.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Multi-Property Selector -->
+                    <div id="duplicateSourceSelector" class="space-y-2 pt-2 border-t border-emerald-200/60 dark:border-emerald-800/40">
+                        <label class="block text-xs font-bold text-slate-800 dark:text-stone-200 uppercase">
+                            Choose Which Reference Property to Duplicate / Partition From:
+                        </label>
+                        <div id="propertyRadioGroup" class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Partition Generation Controls -->
+                    <div class="flex flex-wrap items-center gap-3 pt-2">
+                        <div class="flex items-center gap-2 bg-white dark:bg-stone-900 px-3 py-2 rounded-xl border border-emerald-200 dark:border-emerald-800 shadow-xs">
+                            <label class="text-xs font-bold text-slate-700 dark:text-stone-300">Partition Count (Lots):</label>
+                            <input type="number" id="genPartitionCountInput" min="1" max="26" value="1" class="w-16 px-2 py-1 rounded bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 font-mono font-bold text-center text-sm" />
+                        </div>
+                        <button type="button" id="btnTriggerGeneratePartitions" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-2 shadow-md shadow-emerald-600/20 transition-all">
+                            <i data-lucide="zap" class="w-4 h-4"></i>
+                            Generate Partition Lots
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Generated Partitions Table -->
+                <div id="generatedPartitionsContainer" class="hidden space-y-3 pt-2">
+                    <div class="flex items-center justify-between">
+                        <h4 class="text-xs font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2">
+                            <i data-lucide="layers" class="w-4 h-4 text-emerald-600"></i>
+                            Generated Partition/s
+                        </h4>
+                        <button type="button" id="btnAddManualPartitionRow" class="px-3 py-1.5 rounded-lg bg-white dark:bg-stone-900 hover:bg-slate-50 dark:hover:bg-stone-800 text-emerald-700 dark:text-emerald-400 font-bold text-[11px] border border-slate-200 dark:border-stone-800 flex items-center gap-1 shadow-xs">
+                            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                            Add Another Lot
+                        </button>
+                    </div>
+
+                    <div class="border border-slate-200 dark:border-stone-800 rounded-2xl overflow-x-auto bg-white dark:bg-stone-900 shadow-sm">
+                        <table class="w-full text-left text-xs font-mono">
+                            <thead class="bg-slate-100 dark:bg-stone-950 text-slate-600 dark:text-stone-400 border-b border-slate-200 dark:border-stone-800 font-bold uppercase text-[10px]">
+                                <tr>
+                                    <th class="px-4 py-3">TDN</th>
+                                    <th class="px-4 py-3">Kind</th>
+                                    <th class="px-4 py-3">Owner</th>
+                                    <th class="px-4 py-3">Property Location</th>
+                                    <th class="px-4 py-3 text-center w-24">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="generatedPartitionsTbody" class="divide-y divide-slate-100 dark:divide-stone-800/60 font-sans">
+                                <!-- Populated by JS -->
+                            </tbody>
+                            <tfoot class="bg-slate-50 dark:bg-stone-950/80 font-bold text-slate-900 dark:text-white border-t border-slate-200 dark:border-stone-800">
+                                <tr>
+                                    <td colspan="5" class="px-4 py-2.5 text-xs text-slate-500">
+                                        <div class="flex items-center justify-between">
+                                            <span id="footPartitionSummary" class="font-bold text-slate-800 dark:text-stone-200">Total Partitions: 0 lot(s)</span>
+                                            <span class="text-slate-400 text-[10px]">Click pencil icon to configure detailed Land, Building, or Machinery appraisal specifications</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Searchable Registered Owner Dropdown (Auto-fill) -->
+                <div class="p-4 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 space-y-2 mt-2">
+                    <label class="block text-xs font-bold text-emerald-800 dark:text-emerald-300 uppercase flex items-center gap-2">
+                        <i data-lucide="user-search" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                        Fetch Registered Owner from Database (Auto-fill)
+                    </label>
+                    <select id="registeredOwnerSelect" class="w-full">
+                        <option value="">-- Search registered owner by Name, TIN, or RPTIN (Optional) --</option>
+                        @foreach (var owner in registeredOwners)
+                        {
+                            <option value="@owner.Id">@owner.DisplayName (TIN: @owner.TaxIdentNo | @owner.BarangayName)</option>
                         }
                     </select>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
                     <div>
-                        <label asp-for="TaxDeclarationNumber" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">TDN / ARP NO. *</label>
-                        <input asp-for="TaxDeclarationNumber" id="tdNoInput" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono font-bold focus:outline-none focus:border-emerald-600" placeholder="TD-2026-GS-0001" required />
-                        <span asp-validation-for="TaxDeclarationNumber" class="text-rose-500 font-bold block mt-1 text-[11px]"></span>
+                        <label asp-for="TaxDeclarationNumber" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">TDN / ARP NO. <span class="text-rose-500 font-bold">*</span></label>
+                        <input asp-for="TaxDeclarationNumber" id="tdNoInput" maxlength="50" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono font-bold focus:outline-none focus:border-emerald-600" placeholder="TD-2026-GS-0001" required />
+                        <span asp-validation-for="TaxDeclarationNumber" data-for="tdNoInput" class="js-field-error text-rose-500 font-bold block mt-1 text-[11px]"></span>
                     </div>
                     <div>
-                        <label asp-for="PropertyIndexNumber" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">PIN / PROPERTY INDEX NO. *</label>
-                        <input asp-for="PropertyIndexNumber" id="pinInput" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono font-bold focus:outline-none focus:border-emerald-600" placeholder="126-00-0000" required />
-                        <span asp-validation-for="PropertyIndexNumber" class="text-rose-500 font-bold block mt-1 text-[11px]"></span>
+                        <label asp-for="PropertyIndexNumber" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">PIN / PROPERTY INDEX NO. <span class="text-rose-500 font-bold">*</span></label>
+                        <input asp-for="PropertyIndexNumber" id="pinInput" maxlength="50" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono font-bold focus:outline-none focus:border-emerald-600" placeholder="126-00-0000" required />
+                        <span asp-validation-for="PropertyIndexNumber" data-for="pinInput" class="js-field-error text-rose-500 font-bold block mt-1 text-[11px]"></span>
                     </div>
                     <div>
-                        <label asp-for="OwnerName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">DECLARED OWNER *</label>
-                        <input asp-for="OwnerName" id="ownerNameInput" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold focus:outline-none focus:border-emerald-600" placeholder="Owner / Declarant Name" required />
-                        <span asp-validation-for="OwnerName" class="text-rose-500 font-bold block mt-1 text-[11px]"></span>
+                        <label asp-for="OwnerName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">DECLARED OWNER <span class="text-rose-500 font-bold">*</span></label>
+                        <input asp-for="OwnerName" id="ownerNameInput" maxlength="150" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold focus:outline-none focus:border-emerald-600" placeholder="Owner / Declarant Name" required />
+                        <span asp-validation-for="OwnerName" data-for="ownerNameInput" class="js-field-error text-rose-500 font-bold block mt-1 text-[11px]"></span>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <label asp-for="Kind" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">PROPERTY KIND</label>
-                        <select asp-for="Kind" id="kindInput" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-semibold focus:outline-none focus:border-emerald-600">
+                        <label asp-for="Kind" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">PROPERTY KIND <span class="text-rose-500 font-bold">*</span></label>
+                        <select asp-for="Kind" id="kindInput" required class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-semibold focus:outline-none focus:border-emerald-600">
+                            <option value="">-- Select Property Kind --</option>
                             <option value="Land">Land</option>
                             <option value="Building">Building</option>
                             <option value="Machinery">Machinery</option>
                         </select>
+                        <span asp-validation-for="Kind" data-for="kindInput" class="js-field-error text-rose-500 font-bold block mt-1 text-[11px]"></span>
                     </div>
                     <div>
-                        <label asp-for="LotNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">LOT NO. / SURVEY NO.</label>
-                        <input asp-for="LotNo" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-semibold focus:outline-none focus:border-emerald-600" placeholder="Lot 12, Blk 4" />
+                        <label asp-for="LotNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">LOT NO. / SURVEY NO. <span class="text-rose-500 font-bold">*</span></label>
+                        <input asp-for="LotNo" id="lotNoInput" maxlength="100" required class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-semibold focus:outline-none focus:border-emerald-600" placeholder="Lot 12, Blk 4" />
+                        <span asp-validation-for="LotNo" data-for="lotNoInput" class="js-field-error text-rose-500 font-bold block mt-1 text-[11px]"></span>
                     </div>
                     <div>
-                        <label asp-for="PropertyLocation" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">LOCATION ADDRESS</label>
-                        <input asp-for="PropertyLocation" id="locationInput" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-semibold focus:outline-none focus:border-emerald-600" placeholder="Street, Barangay, City" />
+                        <label asp-for="PropertyLocation" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">LOCATION ADDRESS <span class="text-rose-500 font-bold">*</span></label>
+                        <input asp-for="PropertyLocation" id="locationInput" maxlength="250" required class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-semibold focus:outline-none focus:border-emerald-600" placeholder="Street, Barangay, City" />
+                        <span asp-validation-for="PropertyLocation" data-for="locationInput" class="js-field-error text-rose-500 font-bold block mt-1 text-[11px]"></span>
                     </div>
                 </div>
             </div>
@@ -114,11 +365,11 @@
                 <div class="border-b border-slate-200 dark:border-stone-800 pb-2">
                     <h3 class="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2">
                         <i data-lucide="check-square" class="w-4 h-4 text-emerald-600"></i>
-                        2. Purpose of Inspection (Select Applicable)
+                        2. Purpose of Inspection (Select Applicable) <span class="text-rose-500 font-bold">*</span>
                     </h3>
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                <div id="purposeCheckboxGroup" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                     <label class="flex items-center gap-3 p-3.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 cursor-pointer hover:border-emerald-600 transition-colors">
                         <input type="checkbox" asp-for="IsDepreciation" class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 dark:border-stone-700" />
                         <span class="font-bold text-slate-800 dark:text-stone-200 uppercase">DEPRECIATION</span>
@@ -139,10 +390,12 @@
                         <span class="font-bold text-slate-800 dark:text-stone-200 uppercase">OTHER REASONS</span>
                     </label>
                 </div>
+                <span id="purposeValidation" class="text-rose-500 font-bold block text-[11px]">@string.Join(" ", ViewData.ModelState["PurposeOfInspection"]?.Errors.Select(e => e.ErrorMessage) ?? Enumerable.Empty<string>())</span>
 
                 <div>
-                    <label asp-for="OtherPurposeDetails" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">SPECIFIC PURPOSE DETAILS</label>
-                    <input asp-for="OtherPurposeDetails" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-semibold focus:outline-none focus:border-emerald-600" placeholder="Provide notes on the requested field inspection or physical change..." />
+                    <label asp-for="OtherPurposeDetails" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">SPECIFIC PURPOSE DETAILS <span id="otherPurposeRequiredMark" class="text-rose-500 font-bold hidden">*</span></label>
+                    <input asp-for="OtherPurposeDetails" maxlength="500" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-semibold focus:outline-none focus:border-emerald-600" placeholder="Provide notes on the requested field inspection or physical change..." />
+                    <span asp-validation-for="OtherPurposeDetails" data-for="OtherPurposeDetails" class="js-field-error text-rose-500 font-bold block mt-1 text-[11px]"></span>
                 </div>
             </div>
 
@@ -157,20 +410,24 @@
 
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
-                        <label asp-for="ContactPerson" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">CONTACT PERSON</label>
-                        <input asp-for="ContactPerson" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-semibold focus:outline-none focus:border-emerald-600" placeholder="Contact Name" />
+                        <label asp-for="ContactPerson" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">CONTACT PERSON <span class="text-rose-500 font-bold">*</span></label>
+                        <input asp-for="ContactPerson" maxlength="150" required class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-semibold focus:outline-none focus:border-emerald-600" placeholder="Contact Name" />
+                        <span asp-validation-for="ContactPerson" data-for="ContactPerson" class="js-field-error text-rose-500 font-bold block mt-1 text-[11px]"></span>
                     </div>
                     <div>
-                        <label asp-for="ContactNumber" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">MOBILE / PHONE NO.</label>
-                        <input asp-for="ContactNumber" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono focus:outline-none focus:border-emerald-600" placeholder="0917-000-0000" />
+                        <label asp-for="ContactNumber" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">MOBILE / PHONE NO. <span class="text-rose-500 font-bold">*</span></label>
+                        <input asp-for="ContactNumber" maxlength="20" required inputmode="tel" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono focus:outline-none focus:border-emerald-600" placeholder="0917-000-0000" />
+                        <span asp-validation-for="ContactNumber" data-for="ContactNumber" class="js-field-error text-rose-500 font-bold block mt-1 text-[11px]"></span>
                     </div>
                     <div>
-                        <label asp-for="EmailAddress" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">EMAIL ADDRESS</label>
-                        <input asp-for="EmailAddress" type="email" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600" placeholder="email@domain.com" />
+                        <label asp-for="EmailAddress" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">EMAIL ADDRESS <span class="text-rose-500 font-bold">*</span></label>
+                        <input asp-for="EmailAddress" type="email" maxlength="100" required class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600" placeholder="email@domain.com" />
+                        <span asp-validation-for="EmailAddress" data-for="EmailAddress" class="js-field-error text-rose-500 font-bold block mt-1 text-[11px]"></span>
                     </div>
                     <div>
-                        <label asp-for="Representative" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">REPRESENTATIVE NAME</label>
-                        <input asp-for="Representative" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-semibold focus:outline-none focus:border-emerald-600" placeholder="Authorized Representative" />
+                        <label asp-for="Representative" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">REPRESENTATIVE NAME <span class="text-rose-500 font-bold">*</span></label>
+                        <input asp-for="Representative" maxlength="150" required class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-semibold focus:outline-none focus:border-emerald-600" placeholder="Authorized Representative" />
+                        <span asp-validation-for="Representative" data-for="Representative" class="js-field-error text-rose-500 font-bold block mt-1 text-[11px]"></span>
                     </div>
                 </div>
             </div>
@@ -219,9 +476,9 @@
                         <thead class="bg-slate-200/60 dark:bg-stone-900 text-slate-700 dark:text-stone-300 font-bold border-b border-slate-300 dark:border-stone-800">
                             <tr>
                                 <th class="px-3 py-2.5 w-12 text-center">ACTION</th>
-                                <th class="px-3 py-2.5">PARTICULAR (ORDER OF PAYMENT)</th>
+                                <th class="px-3 py-2.5">PARTICULAR (ORDER OF PAYMENT) <span class="text-rose-500 font-bold">*</span></th>
                                 <th class="px-3 py-2.5 w-32 text-right">FEES (₱)</th>
-                                <th class="px-3 py-2.5 w-32 text-center">QUANTITY</th>
+                                <th class="px-3 py-2.5 w-32 text-center">QUANTITY <span class="text-rose-500 font-bold">*</span></th>
                                 <th class="px-3 py-2.5 w-36 text-right">TOTAL (₱)</th>
                             </tr>
                         </thead>
@@ -230,6 +487,10 @@
                         </tbody>
                     </table>
                 </div>
+                <span id="feesValidation" class="text-rose-500 font-bold block text-[11px]">@foreach (var feeErr in (ViewData.ModelState["RequestedDocumentsJson"]?.Errors ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.ModelBinding.ModelError>()).Concat(ViewData.ModelState["TotalFeesAmount"]?.Errors ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.ModelBinding.ModelError>()))
+                {
+                    <span class="block">&bull; @feeErr.ErrorMessage</span>
+                }</span>
 
                 <div class="flex items-center justify-between pt-4 border-t border-slate-200 dark:border-stone-800">
                     <span class="text-sm font-extrabold text-slate-900 dark:text-white uppercase font-mono">Total Inspection Fees:</span>
@@ -254,8 +515,21 @@
 </div>
 
 @section Scripts {
-    <partial name="_ValidationScriptsPartial" />
+    @* jQuery unobtrusive validation is intentionally not loaded here: this form uses its own
+       client-side validation (validateInspectionForm) that renders messages in the spans below each field. *@
     <script>
+        window.serverUpdatedPartition = null;
+        window.serverUpdatedIdx = -1;
+        @if (TempData["LastUpdatedPartitionJson"] != null)
+        {
+            <text>
+            try {
+                window.serverUpdatedPartition = @Html.Raw(TempData["LastUpdatedPartitionJson"]);
+                window.serverUpdatedIdx = @(TempData["LastUpdatedPartitionIndex"] ?? -1);
+            } catch(e) { }
+            </text>
+        }
+
         const availableParticulars = [
             @foreach (var op in orderPayments)
             {
@@ -263,95 +537,1301 @@
             }
         ];
 
-        let TomSelectProperty = null;
+        // Dictionary of properties for fast, reactive client-side cloning & partitioning
+        const referencePropertiesData = {
+            @foreach (var p in properties)
+            {
+                @: "@p.Id": {
+                @:     id: "@p.Id",
+                @:     tdn: "@p.TaxDeclarationNumber",
+                @:     pin: "@p.PropertyIndexNumber",
+                @:     owner: "@p.OwnerName",
+                @:     location: "@p.CompleteAddress",
+                @:     kind: "@p.Kind",
+                @:     classification: "@p.Classification",
+                @:     area: @p.AreaSqMeters,
+                @:     unitValue: @p.UnitValue,
+                @:     marketValue: @p.MarketValue,
+                @:     assessLevel: @p.AssessmentLevelPercent,
+                @:     assessedValue: @p.AssessedValue,
+                @:     barangay: "@p.DistrictOrBarangay"
+                @: },
+            }
+        };
+
+        let TomSelectRefProperty = null;
+        let selectedPropertyIds = [];
+        let generatedPartitions = [];
+        const alphabetLetters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
         document.addEventListener('DOMContentLoaded', function () {
-            if (document.getElementById('propertySelect')) {
-                TomSelectProperty = new TomSelect('#propertySelect', {
+            // Transaction Code selector sync & SD/CS/DC/PC/TR Workflow Banners
+            const txSelect = document.getElementById('txCodeSelect');
+            function updateInspectionBanners() {
+                const val = txSelect ? txSelect.value : '';
+                const sdBanner = document.getElementById('sdWorkflowBanner');
+                const csBanner = document.getElementById('csWorkflowBanner');
+                const dcBanner = document.getElementById('dcWorkflowBanner');
+                const pcBanner = document.getElementById('pcWorkflowBanner');
+                const trBanner = document.getElementById('trWorkflowBanner');
+                const rcBanner = document.getElementById('rcWorkflowBanner');
+                if (sdBanner) {
+                    if (val === 'SD') sdBanner.classList.remove('hidden');
+                    else sdBanner.classList.add('hidden');
+                }
+                if (csBanner) {
+                    if (val === 'CS') csBanner.classList.remove('hidden');
+                    else csBanner.classList.add('hidden');
+                }
+                if (dcBanner) {
+                    if (val === 'DC') dcBanner.classList.remove('hidden');
+                    else dcBanner.classList.add('hidden');
+                }
+                if (pcBanner) {
+                    if (val === 'PC') pcBanner.classList.remove('hidden');
+                    else pcBanner.classList.add('hidden');
+                }
+                if (trBanner) {
+                    if (val === 'TR') trBanner.classList.remove('hidden');
+                    else trBanner.classList.add('hidden');
+                }
+                if (rcBanner) {
+                    if (val === 'RC') rcBanner.classList.remove('hidden');
+                    else rcBanner.classList.add('hidden');
+                }
+                if (val === 'CS') {
+                    const cancelChk = document.getElementById('IsCancelled');
+                    if (cancelChk && !cancelChk.checked) {
+                        cancelChk.checked = true;
+                    }
+                }
+                if (val === 'PC') {
+                    const reassessChk = document.getElementById('IsReassessment');
+                    if (reassessChk && !reassessChk.checked) {
+                        reassessChk.checked = true;
+                    }
+                    const cancelChk = document.getElementById('IsCancelled');
+                    if (cancelChk && !cancelChk.checked) {
+                        cancelChk.checked = true;
+                    }
+                }
+                if (val === 'TR') {
+                    const cancelChk = document.getElementById('IsCancelled');
+                    if (cancelChk && !cancelChk.checked) {
+                        cancelChk.checked = true;
+                    }
+                }
+                if (val === 'RC') {
+                    const reassessChk = document.getElementById('IsReassessment');
+                    if (reassessChk && !reassessChk.checked) {
+                        reassessChk.checked = true;
+                    }
+                    const cancelChk = document.getElementById('IsCancelled');
+                    if (cancelChk && !cancelChk.checked) {
+                        cancelChk.checked = true;
+                    }
+                }
+            }
+
+            if (txSelect) {
+                txSelect.addEventListener('change', function () {
+                    const opt = this.options[this.selectedIndex];
+                    const input = document.getElementById('txNameInput');
+                    if (input && opt) input.value = opt.getAttribute('data-name') || opt.text;
+                    updateInspectionBanners();
+                });
+                updateInspectionBanners();
+            }
+
+            // Multi-Select TomSelect on Reference Properties (Server-Side Remote Search)
+            if (document.getElementById('refPropertySelect')) {
+                TomSelectRefProperty = new TomSelect('#refPropertySelect', {
+                    plugins: ['remove_button'],
+                    maxItems: null,
+                    persist: false,
                     create: false,
-                    placeholder: 'Search property by TDN, Owner Name, or PIN...',
-                    onChange: function(val) {
-                        if (val) {
-                            const sel = document.getElementById('propertySelect');
-                            const opt = sel.options[sel.selectedIndex];
-                            if (opt) {
-                                document.getElementById('tdNoInput').value = opt.getAttribute('data-tdn') || '';
-                                document.getElementById('pinInput').value = opt.getAttribute('data-pin') || '';
-                                document.getElementById('ownerNameInput').value = opt.getAttribute('data-owner') || '';
-                                document.getElementById('kindInput').value = opt.getAttribute('data-kind') || 'Land';
-                                document.getElementById('locationInput').value = opt.getAttribute('data-location') || '';
+                    valueField: 'id',
+                    labelField: 'display',
+                    searchField: ['tdn', 'pin', 'owner', 'display', 'text'],
+                    loadThrottle: 300,
+                    placeholder: 'Search & select approved reference properties by TDN, PIN, or Owner Name...',
+                    load: function(query, callback) {
+                        if (!query || !query.trim().length) return callback();
+                        fetch(`/PropertyAssessmentRequest/SearchApprovedProperties?term=${encodeURIComponent(query)}`)
+                            .then(res => res.json())
+                            .then(data => {
+                                if (Array.isArray(data)) {
+                                    data.forEach(item => {
+                                        referencePropertiesData[item.id] = {
+                                            id: item.id,
+                                            tdn: item.tdn,
+                                            pin: item.pin,
+                                            owner: item.owner,
+                                            location: item.location,
+                                            kind: item.kind,
+                                            classification: item.classification,
+                                            area: item.area,
+                                            unitValue: item.unitVal,
+                                            marketValue: item.marketVal,
+                                            assessLevel: item.assessLevel,
+                                            assessedValue: item.assessedVal,
+                                            barangay: item.barangay
+                                        };
+                                    });
+                                    callback(data);
+                                } else {
+                                    callback();
+                                }
+                            })
+                            .catch(() => callback());
+                    },
+                    render: {
+                        option: function(item, escape) {
+                            return `<div class="py-1">
+                                <span class="font-bold text-slate-900 dark:text-white font-mono">${escape(item.tdn || item.text || '')}</span>
+                                <span class="text-slate-700 dark:text-stone-200 text-xs font-medium"> - ${escape(item.owner || '')}</span>
+                                <span class="text-[11px] text-slate-600 dark:text-stone-300 font-mono">(${escape(item.pin || 'No PIN')})</span>
+                                ${item.kind ? `<div class="text-[11px] text-slate-600 dark:text-stone-300 font-medium mt-0.5">${escape(item.kind)} &bull; ${escape(item.classification || '')} &bull; ${Number(item.area || 0).toLocaleString()} sqm</div>` : ''}
+                            </div>`;
+                        },
+                        item: function(item, escape) {
+                            return `<div>${escape(item.tdn || item.text || '')} - ${escape(item.owner || '')}</div>`;
+                        }
+                    },
+                    onItemAdd: function(value) {
+                        const refSpan = document.getElementById('refPropertyValidation');
+                        if (refSpan) refSpan.textContent = '';
+                        const added = referencePropertiesData[value];
+                        if (!added) return;
+
+                        const others = (this.items || []).filter(v => String(v) !== String(value));
+                        for (let otherId of others) {
+                            const existing = referencePropertiesData[otherId];
+                            if (existing && arePropertiesSameTaxDeclaration(added, existing)) {
+                                this.removeItem(value);
+                                const msg = `Cannot select TD "${added.tdn}". It belongs to the same Tax Declaration / Property as already selected TD "${existing.tdn}".`;
+                                if (refSpan) refSpan.textContent = msg;
+                                if (typeof toastr !== 'undefined') {
+                                    toastr.warning(msg, 'Duplicate Tax Declaration');
+                                }
+                                return;
                             }
                         }
+                    },
+                    onChange: function(values) {
+                        const span = document.getElementById('refPropertyValidation');
+                        const list = Array.isArray(values) ? values : (values ? [values] : []);
+                        if (span && list.length > 0 && !/already selected/.test(span.textContent)) {
+                            span.textContent = '';
+                            if (this.wrapper) this.wrapper.classList.remove('border-rose-500', 'ring-2', 'ring-rose-500/30');
+                        }
+                        handleReferencePropertiesChange(values);
                     }
                 });
             }
 
+            // Searchable Registered Owner TomSelect (Auto-fill with Server-Side Remote Search)
+            if (document.getElementById('registeredOwnerSelect')) {
+                new TomSelect('#registeredOwnerSelect', {
+                    create: false,
+                    valueField: 'id',
+                    labelField: 'display',
+                    searchField: ['name', 'tin', 'text', 'display'],
+                    loadThrottle: 300,
+                    placeholder: 'Search active registered owner by name, TIN, or RPTIN...',
+                    load: function(query, callback) {
+                        if (!query || !query.trim().length) return callback();
+                        fetch(`/PropertyAssessmentRequest/SearchRegisteredOwners?term=${encodeURIComponent(query)}`)
+                            .then(res => res.json())
+                            .then(data => callback(Array.isArray(data) ? data : []))
+                            .catch(() => callback());
+                    },
+                    render: {
+                        option: function(item, escape) {
+                            if (item.name) {
+                                return `<div class="py-1">
+                                    <span class="font-bold text-slate-900 dark:text-white">${escape(item.name)}</span>
+                                    <span class="text-[11px] text-slate-600 dark:text-stone-300 font-medium"> (TIN: ${escape(item.tin || 'N/A')} | ${escape(item.barangay || 'N/A')})</span>
+                                </div>`;
+                            }
+                            return `<div class="py-1">${escape(item.text || item.display || '')}</div>`;
+                        },
+                        item: function(item, escape) {
+                            if (item.name) {
+                                return `<div>${escape(item.name)} (TIN: ${escape(item.tin || 'N/A')})</div>`;
+                            }
+                            return `<div>${escape(item.text || item.display || '')}</div>`;
+                        }
+                    },
+                    onChange: function (ownerId) {
+                        const ownerIdInput = document.getElementById('requestOwnerIdInput');
+                        if (ownerIdInput) ownerIdInput.value = ownerId || '';
+                        if (!ownerId) return;
+                        fetch(`/PropertyAssessmentRequest/GetOwnerDetails?id=${encodeURIComponent(ownerId)}`)
+                            .then(res => res.json())
+                            .then(data => {
+                                if (data) {
+                                    if (ownerIdInput) ownerIdInput.value = data.id || ownerId;
+                                    const nameInput = document.getElementById('ownerNameInput');
+                                    const phoneInput = document.getElementById('ContactNumber');
+                                    const emailInput = document.getElementById('EmailAddress');
+                                    const contactPersonInput = document.getElementById('ContactPerson');
+
+                                    if (nameInput) {
+                                        nameInput.value = data.name || '';
+                                        nameInput.dispatchEvent(new Event('input', { bubbles: true }));
+                                    }
+                                    if (phoneInput && data.phone) phoneInput.value = data.phone;
+                                    if (emailInput && data.email) emailInput.value = data.email;
+                                    if (contactPersonInput && !contactPersonInput.value) contactPersonInput.value = data.name || '';
+
+                                    generatedPartitions.forEach(p => {
+                                        if (!p.customOwner) {
+                                            p.newOwnerName = data.name || p.newOwnerName;
+                                            p.ownerId = data.id || ownerId;
+                                        }
+                                    });
+                                    serializePartitions();
+                                    renderPartitionsTable();
+
+                                    if (typeof toastr !== 'undefined') {
+                                        toastr.success(`Owner details auto-filled for ${data.name}!`, 'Registered Owner Loaded');
+                                    }
+                                }
+                            })
+                            .catch(err => console.error('Error fetching owner details:', err));
+                    }
+                });
+            }
+
+            // Generate Partitions Button Click
+            const btnGen = document.getElementById('btnTriggerGeneratePartitions');
+            if (btnGen) {
+                btnGen.addEventListener('click', handleGeneratePartitions);
+            }
+
+            // Add Manual Lot Button Click
+            const btnAddLot = document.getElementById('btnAddManualPartitionRow');
+            if (btnAddLot) {
+                btnAddLot.addEventListener('click', handleAddManualPartitionLot);
+            }
+
+            // Sync Property Kind dropdown into generated partitions
+            const reqKindSelect = document.getElementById('kindInput');
+            if (reqKindSelect) {
+                reqKindSelect.addEventListener('change', function() {
+                    const selectedKind = this.value;
+                    if (selectedKind && generatedPartitions.length > 0) {
+                        generatedPartitions.forEach((p) => {
+                            p.kind = selectedKind;
+                        });
+                        serializePartitions();
+                        renderPartitionsTable();
+                    }
+                });
+            }
+
+            // Sync Owner Name input into partitions
+            const ownerInput = document.getElementById('ownerNameInput');
+            if (ownerInput) {
+                ownerInput.addEventListener('input', function() {
+                    const val = this.value.trim();
+                    if (generatedPartitions.length > 0) {
+                        generatedPartitions.forEach((p) => {
+                            if (!p.customOwner) {
+                                p.newOwnerName = val;
+                            }
+                        });
+                        serializePartitions();
+                        renderPartitionsTable();
+                    }
+                });
+            }
+
+            // Sync Property Location input into partitions
+            const locInput = document.getElementById('locationInput');
+            if (locInput) {
+                locInput.addEventListener('input', function() {
+                    const val = this.value.trim();
+                    if (generatedPartitions.length > 0) {
+                        generatedPartitions.forEach((p) => {
+                            if (!p.customLocation) {
+                                p.propertyLocation = val;
+                            }
+                        });
+                        serializePartitions();
+                        renderPartitionsTable();
+                    }
+                });
+            }
+
+            // Restore draft if returning from EditPartition
+            try {
+                const rawDraft = sessionStorage.getItem('propertyAssessmentRequest_draft');
+                if (rawDraft) {
+                    const draft = JSON.parse(rawDraft);
+                    if (draft && draft.requestForInspection) {
+                        if (draft.txCode && document.getElementById('txCodeSelect')) {
+                            document.getElementById('txCodeSelect').value = draft.txCode;
+                            const opt = document.getElementById('txCodeSelect').options[document.getElementById('txCodeSelect').selectedIndex];
+                            if (opt && document.getElementById('txNameInput')) document.getElementById('txNameInput').value = opt.getAttribute('data-name') || opt.text;
+                        }
+                        if (draft.transactionNo && document.querySelector('input[name="TransactionNo"]')) document.querySelector('input[name="TransactionNo"]').value = draft.transactionNo;
+                        if (draft.ownerId && document.getElementById('requestOwnerIdInput')) document.getElementById('requestOwnerIdInput').value = draft.ownerId;
+                        if (draft.ownerName && document.getElementById('ownerNameInput')) document.getElementById('ownerNameInput').value = draft.ownerName;
+                        if (draft.contactNumber && document.getElementById('ContactNumber')) document.getElementById('ContactNumber').value = draft.contactNumber;
+                        if (draft.emailAddress && document.getElementById('EmailAddress')) document.getElementById('EmailAddress').value = draft.emailAddress;
+                        if (draft.contactPerson && document.getElementById('ContactPerson')) document.getElementById('ContactPerson').value = draft.contactPerson;
+                        if (draft.representative && document.getElementById('Representative')) document.getElementById('Representative').value = draft.representative;
+                        if (draft.orNumber && document.getElementById('ORNumber')) document.getElementById('ORNumber').value = draft.orNumber;
+                        if (draft.kind && document.getElementById('kindInput')) document.getElementById('kindInput').value = draft.kind;
+                        if (draft.taxDeclarationNumber && document.getElementById('tdNoInput')) document.getElementById('tdNoInput').value = draft.taxDeclarationNumber;
+                        if (draft.propertyIndexNumber && document.getElementById('pinInput')) document.getElementById('pinInput').value = draft.propertyIndexNumber;
+                        if (draft.lotNo && document.getElementById('lotNoInput')) document.getElementById('lotNoInput').value = draft.lotNo;
+                        if (draft.propertyLocation && document.getElementById('locationInput')) document.getElementById('locationInput').value = draft.propertyLocation;
+                        if (draft.otherPurposeDetails && document.getElementById('OtherPurposeDetails')) document.getElementById('OtherPurposeDetails').value = draft.otherPurposeDetails;
+
+                        if (draft.selectedPropertyIds && Array.isArray(draft.selectedPropertyIds) && draft.selectedPropertyIds.length > 0) {
+                            if (TomSelectRefProperty) {
+                                draft.selectedPropertyIds.forEach(id => TomSelectRefProperty.addItem(id));
+                            }
+                        }
+
+                        if (draft.partitions && Array.isArray(draft.partitions) && draft.partitions.length > 0) {
+                            generatedPartitions = draft.partitions;
+                            
+                            // Check server TempData first (guaranteed after SavePartition)
+                            if (window.serverUpdatedPartition && window.serverUpdatedIdx >= 0 && generatedPartitions[window.serverUpdatedIdx]) {
+                                Object.assign(generatedPartitions[window.serverUpdatedIdx], window.serverUpdatedPartition);
+                                sessionStorage.removeItem('lastUpdatedPartition_' + window.serverUpdatedIdx);
+                                draft.partitions = generatedPartitions;
+                                sessionStorage.setItem('propertyAssessmentRequest_draft', JSON.stringify(draft));
+                                toastr.success(`Partition ${generatedPartitions[window.serverUpdatedIdx].partitionIndex || (window.serverUpdatedIdx + 1)} appraisal updated!`);
+                            }
+                            // Fallback to client-side sessionStorage
+                            else if (typeof draft.editingIdx === 'number' && draft.editingIdx >= 0) {
+                                const key = 'lastUpdatedPartition_' + draft.editingIdx;
+                                const updatedRaw = sessionStorage.getItem(key);
+                                if (updatedRaw) {
+                                    try {
+                                        const updated = JSON.parse(updatedRaw);
+                                        if (generatedPartitions[draft.editingIdx]) {
+                                            Object.assign(generatedPartitions[draft.editingIdx], updated);
+                                        }
+                                        sessionStorage.removeItem(key);
+                                        draft.partitions = generatedPartitions;
+                                        sessionStorage.setItem('propertyAssessmentRequest_draft', JSON.stringify(draft));
+                                        toastr.success(`Partition ${generatedPartitions[draft.editingIdx].partitionIndex || (draft.editingIdx + 1)} appraisal updated!`);
+                                    } catch (err) { }
+                                }
+                            }
+                            renderPartitionsTable();
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('Error restoring draft:', e);
+            }
+
+            // Fees table row initialization
+            restorePostedRefSelections();
             addRow();
             document.getElementById('btnAddRow').addEventListener('click', addRow);
 
             var form = document.getElementById('inspectionForm');
             if (form) {
                 form.addEventListener('submit', function (e) {
-                    var isValid = true;
-                    var firstInvalid = null;
+                    recalculateGrandTotal();
+                    var result = validateInspectionForm();
 
-                    document.querySelectorAll('.border-rose-500').forEach(function(el) {
-                        el.classList.remove('border-rose-500', 'ring-2', 'ring-rose-500/30');
-                    });
-
-                    var reqFields = [
-                        { el: document.getElementById('tdNoInput'), name: 'Tax Declaration No. (TDN)' },
-                        { el: document.getElementById('pinInput'), name: 'Property Index No. (PIN)' },
-                        { el: document.getElementById('ownerNameInput'), name: 'Owner / Taxpayer Name' }
-                    ];
-
-                    reqFields.forEach(function (f) {
-                        if (f.el && (!f.el.value || !f.el.value.trim())) {
-                            isValid = false;
-                            f.el.classList.add('border-rose-500', 'ring-2', 'ring-rose-500/30');
-                            if (!firstInvalid) firstInvalid = f.el;
-                        }
-                    });
-
-                    var totalFees = parseFloat(document.getElementById('TotalFeesAmount').value) || 0;
-                    var docJson = document.getElementById('RequestedDocumentsJson').value;
-                    var hasDocs = false;
-                    try {
-                        var parsed = JSON.parse(docJson || '[]');
-                        hasDocs = parsed && parsed.length > 0;
-                    } catch(ex) { hasDocs = false; }
-
-                    var feesTable = document.getElementById('feesTable');
-                    if (!hasDocs || totalFees <= 0) {
-                        isValid = false;
-                        if (feesTable) feesTable.classList.add('border-rose-500', 'ring-2', 'ring-rose-500/30');
-                        if (!firstInvalid) firstInvalid = document.getElementById('btnAddRow');
-                    } else if (feesTable) {
-                        feesTable.classList.remove('border-rose-500', 'ring-2', 'ring-rose-500/30');
-                    }
-
-                    if (!isValid) {
+                    if (!result.isValid) {
                         e.preventDefault();
-                        if (firstInvalid) {
-                            firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            firstInvalid.focus();
+                        e.stopImmediatePropagation();
+                        if (result.firstInvalid) {
+                            result.firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            if (typeof result.firstInvalid.focus === 'function') result.firstInvalid.focus();
                         }
-                        toastr.warning('Please fill in TDN, PIN, Owner Name and select at least one document fee.', 'Validation Notice');
+                        toastr.warning(`Please correct ${result.errorCount} highlighted field(s) before submitting.`, 'Validation Notice');
                         return false;
                     }
+
+                    // Clear draft on successful submission
+                    sessionStorage.removeItem('propertyAssessmentRequest_draft');
                 });
             }
 
+            // Clear field error state as soon as the user edits the field
             document.addEventListener('input', function(e) {
-                if (e.target && e.target.classList.contains('border-rose-500')) {
-                    e.target.classList.remove('border-rose-500', 'ring-2', 'ring-rose-500/30');
+                if (e.target && e.target.classList && e.target.classList.contains('border-rose-500')) {
+                    clearFieldError(e.target);
                 }
             });
+            document.addEventListener('change', function(e) {
+                if (!e.target) return;
+                if (e.target.classList && e.target.classList.contains('border-rose-500')) {
+                    clearFieldError(e.target);
+                }
+                if (e.target.closest && e.target.closest('#purposeCheckboxGroup')) {
+                    setGroupError('purposeValidation', null, document.getElementById('purposeCheckboxGroup'));
+                    syncOtherPurposeRequirement();
+                }
+            });
+            syncOtherPurposeRequirement();
         });
 
+        // -------------------------------------------------------------
+        // Form Validation (Request for Inspection)
+        // -------------------------------------------------------------
+        const RFI_LIMITS = {
+            tdn: 50,
+            pin: 50,
+            owner: 150,
+            lotNo: 100,
+            location: 250,
+            purposeDetails: 500,
+            contactPerson: 150,
+            contactNumber: 20,
+            email: 100,
+            representative: 150,
+            qtyMax: 999
+        };
+        const RFI_ALLOWED_KINDS = ['Land', 'Building', 'Machinery'];
+        const RFI_CODE_PATTERN = /^[A-Za-z0-9\-\/\.\s]+$/;
+        const RFI_PERSON_NAME_PATTERN = /^[\p{L}\s.,'\-]+$/u;
+        const RFI_PHONE_PATTERN = /^(\+63|0)?\d{7,10}$/;
+        const RFI_EMAIL_PATTERN = /^[^\s@@]+@@[^\s@@]+\.[^\s@@]{2,}$/;
+        const RFI_ERROR_CLASSES = ['border-rose-500', 'ring-2', 'ring-rose-500/30'];
+
+        function normalizeTdnForComparison(tdn) {
+            if (!tdn) return '';
+            return String(tdn)
+                .trim()
+                .toUpperCase()
+                .replace(/[\s\-_]+/g, '-')
+                .replace(/-(LAND|BLDG|BUILDING|MACH|MACHINERY|IMP|IMPROVEMENT)-/gi, '-')
+                .replace(/-(LAND|BLDG|BUILDING|MACH|MACHINERY|IMP|IMPROVEMENT)$/gi, '')
+                .replace(/^(LAND|BLDG|BUILDING|MACH|MACHINERY|IMP|IMPROVEMENT)-/gi, '');
+        }
+
+        function extractTdnSequence(tdn) {
+            if (!tdn) return '';
+            const m = String(tdn).match(/(\d{3,})/g);
+            return m && m.length > 0 ? m[m.length - 1] : '';
+        }
+
+        function normalizePinForComparison(pin) {
+            if (!pin) return '';
+            const clean = String(pin).trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+            if (clean === 'NA' || clean === 'NONE' || /^0+$/.test(clean)) return '';
+            return clean;
+        }
+
+        function normalizeOwnerForComparison(owner) {
+            if (!owner) return '';
+            return String(owner).trim().toUpperCase().replace(/[\s.,'-]+/g, '');
+        }
+
+        function arePropertiesSameTaxDeclaration(a, b) {
+            if (!a || !b) return false;
+            if (a.id && b.id && String(a.id) === String(b.id)) return true;
+
+            const tdnA = String(a.tdn || '').trim().toUpperCase();
+            const tdnB = String(b.tdn || '').trim().toUpperCase();
+            if (tdnA && tdnB && tdnA === tdnB) return true;
+
+            const normA = normalizeTdnForComparison(tdnA);
+            const normB = normalizeTdnForComparison(tdnB);
+            if (normA && normB && normA === normB) return true;
+
+            const pinA = normalizePinForComparison(a.pin);
+            const pinB = normalizePinForComparison(b.pin);
+            if (pinA && pinB && pinA.length >= 6 && pinA === pinB) return true;
+
+            const seqA = extractTdnSequence(tdnA);
+            const seqB = extractTdnSequence(tdnB);
+            const ownerA = normalizeOwnerForComparison(a.owner);
+            const ownerB = normalizeOwnerForComparison(b.owner);
+            if (seqA && seqB && seqA === seqB && ownerA && ownerB && ownerA === ownerB) return true;
+
+            return false;
+        }
+
+        function getFieldErrorSpan(el) {
+            if (!el) return null;
+            const key = el.id || el.name;
+            let span = document.querySelector(`.js-field-error[data-for="${key}"]`);
+            if (!span) {
+                span = document.createElement('span');
+                span.className = 'js-field-error text-rose-500 font-bold block mt-1 text-[11px]';
+                span.setAttribute('data-for', key);
+                el.insertAdjacentElement('afterend', span);
+            }
+            return span;
+        }
+
+        function setFieldError(el, message) {
+            if (!el) return;
+            el.classList.add(...RFI_ERROR_CLASSES);
+            const span = getFieldErrorSpan(el);
+            if (span) span.textContent = message;
+        }
+
+        function clearFieldError(el) {
+            if (!el) return;
+            el.classList.remove(...RFI_ERROR_CLASSES);
+            const key = el.id || el.name;
+            const span = document.querySelector(`.js-field-error[data-for="${key}"]`);
+            if (span) span.textContent = '';
+        }
+
+        function setGroupError(spanId, message, highlightEl) {
+            const span = document.getElementById(spanId);
+            if (span) span.textContent = message || '';
+            if (highlightEl) {
+                if (message) highlightEl.classList.add(...RFI_ERROR_CLASSES, 'rounded-xl');
+                else highlightEl.classList.remove(...RFI_ERROR_CLASSES);
+            }
+        }
+
+        function syncOtherPurposeRequirement() {
+            const isOther = document.getElementById('IsOther');
+            const mark = document.getElementById('otherPurposeRequiredMark');
+            if (mark) mark.classList.toggle('hidden', !(isOther && isOther.checked));
+        }
+
+        /**
+         * Validates a required text field with max length and optional pattern.
+         * Returns an error message or null.
+         */
+        function checkTextField(el, label, maxLen, opts) {
+            opts = opts || {};
+            if (!el) return null;
+            const val = (el.value || '').trim();
+            if (!val) return opts.optional ? null : `${label} is required.`;
+            if (/^n\/?a$/i.test(val) && !opts.allowNA) return `${label} is required (N/A is not accepted).`;
+            if (val.length > maxLen) return `${label} must not exceed ${maxLen} characters (currently ${val.length}).`;
+            if (opts.pattern && !opts.pattern.test(opts.normalize ? opts.normalize(val) : val)) return opts.patternMessage || `${label} has an invalid format.`;
+            return null;
+        }
+
+        function validateInspectionForm() {
+            let errorCount = 0;
+            let firstInvalid = null;
+            const flag = (el, msg, focusEl) => {
+                errorCount++;
+                if (el) setFieldError(el, msg);
+                if (!firstInvalid) firstInvalid = focusEl || el;
+            };
+
+            // Reset previous error states
+            document.querySelectorAll('#inspectionForm .border-rose-500').forEach(el => el.classList.remove(...RFI_ERROR_CLASSES));
+            document.querySelectorAll('#inspectionForm .js-field-error').forEach(s => s.textContent = '');
+            ['refPropertyValidation', 'purposeValidation', 'feesValidation'].forEach(id => setGroupError(id, null));
+
+            // ---- 1. Reference Tax Declaration (at least one, no duplicate / same TD) ----
+            const refWrapper = TomSelectRefProperty ? TomSelectRefProperty.wrapper : document.getElementById('refPropertySelect');
+            const refIds = (selectedPropertyIds || []).filter(Boolean);
+            const currentTxCode = (document.getElementById('txCodeSelect')?.value || '').trim().toUpperCase();
+            if (refIds.length === 0) {
+                if (currentTxCode !== 'DC') {
+                    errorCount++;
+                    setGroupError('refPropertyValidation', 'Please search and select at least one Reference Tax Declaration (TD).', refWrapper);
+                    if (!firstInvalid) firstInvalid = TomSelectRefProperty ? TomSelectRefProperty.control_input : refWrapper;
+                }
+            } else {
+                let duplicatePair = null;
+                for (let i = 0; i < refIds.length; i++) {
+                    const p1 = referencePropertiesData[refIds[i]];
+                    for (let j = i + 1; j < refIds.length; j++) {
+                        const p2 = referencePropertiesData[refIds[j]];
+                        if (p1 && p2 && arePropertiesSameTaxDeclaration(p1, p2)) {
+                            duplicatePair = { p1, p2 };
+                            break;
+                        }
+                    }
+                    if (duplicatePair) break;
+                }
+
+                if (duplicatePair) {
+                    errorCount++;
+                    const msg = `Cannot select same Tax Declaration: "${duplicatePair.p1.tdn}" and "${duplicatePair.p2.tdn}" belong to the same TD / property. Please remove duplicate TD.`;
+                    setGroupError('refPropertyValidation', msg, refWrapper);
+                    if (!firstInvalid) firstInvalid = refWrapper;
+                } else if ((document.getElementById('txCodeSelect')?.value || '').trim().toUpperCase() === 'CS') {
+                    if (refIds.length < 2) {
+                        errorCount++;
+                        setGroupError('refPropertyValidation', 'Consolidation (CS) · Lot Integration requires selecting at least 2 contiguous reference parcels.', refWrapper);
+                        if (!firstInvalid) firstInvalid = refWrapper;
+                    } else {
+                        let firstOwner = null;
+                        let diffOwner = false;
+                        for (let id of refIds) {
+                            const p = referencePropertiesData[id];
+                            if (p && p.owner) {
+                                const cleanOwner = p.owner.trim().toLowerCase();
+                                if (!firstOwner) firstOwner = cleanOwner;
+                                else if (firstOwner !== cleanOwner) { diffOwner = true; break; }
+                            }
+                        }
+                        if (diffOwner) {
+                            errorCount++;
+                            setGroupError('refPropertyValidation', 'Consolidation (CS) requires identical ownership. All selected contiguous parcels must belong to the same registered owner.', refWrapper);
+                            if (!firstInvalid) firstInvalid = refWrapper;
+                        }
+                    }
+                }
+            }
+
+            // ---- Property Identification fields ----
+            const tdEl = document.getElementById('tdNoInput');
+            let msg = checkTextField(tdEl, 'TDN / ARP No.', RFI_LIMITS.tdn, { pattern: RFI_CODE_PATTERN, patternMessage: 'TDN / ARP No. may only contain letters, numbers, dashes (-), slashes (/) and periods (.).' });
+            if (msg) flag(tdEl, msg);
+
+            const pinEl = document.getElementById('pinInput');
+            msg = checkTextField(pinEl, 'PIN / Property Index No.', RFI_LIMITS.pin, { pattern: RFI_CODE_PATTERN, patternMessage: 'PIN may only contain letters, numbers, dashes (-), slashes (/) and periods (.).' });
+            if (msg) flag(pinEl, msg);
+
+            const ownerEl = document.getElementById('ownerNameInput');
+            msg = checkTextField(ownerEl, 'Declared Owner', RFI_LIMITS.owner);
+            if (msg) flag(ownerEl, msg);
+
+            const kindEl = document.getElementById('kindInput');
+            if (kindEl && !RFI_ALLOWED_KINDS.includes(kindEl.value)) flag(kindEl, 'Property Kind is required (Land, Building, or Machinery).');
+
+            const lotEl = document.getElementById('lotNoInput');
+            msg = checkTextField(lotEl, 'Lot No. / Survey No.', RFI_LIMITS.lotNo);
+            if (msg) flag(lotEl, msg);
+
+            const locEl = document.getElementById('locationInput');
+            msg = checkTextField(locEl, 'Location Address', RFI_LIMITS.location);
+            if (msg) flag(locEl, msg);
+
+            // ---- 2. Purpose of Inspection ----
+            const purposeGroup = document.getElementById('purposeCheckboxGroup');
+            const purposeChecks = ['IsDepreciation', 'IsReassessment', 'IsCancelled', 'IsOther'].map(id => document.getElementById(id));
+            if (!purposeChecks.some(c => c && c.checked)) {
+                if (currentTxCode === 'DC') {
+                    const isOtherChk = document.getElementById('IsOther');
+                    const detailsInput = document.getElementById('OtherPurposeDetails');
+                    if (isOtherChk) isOtherChk.checked = true;
+                    if (detailsInput && !detailsInput.value.trim()) {
+                        detailsInput.value = 'Discovery / New Declaration (DC) · Original Assessment under Sec. 222 RA 7160';
+                    }
+                } else {
+                    errorCount++;
+                    setGroupError('purposeValidation', 'Please select at least one Purpose of Inspection.', purposeGroup);
+                    if (!firstInvalid) firstInvalid = purposeGroup;
+                }
+            }
+            const isOtherEl = document.getElementById('IsOther');
+            const detailsEl = document.getElementById('OtherPurposeDetails');
+            msg = checkTextField(detailsEl, 'Specific Purpose Details', RFI_LIMITS.purposeDetails, { optional: !(isOtherEl && isOtherEl.checked) });
+            if (msg) flag(detailsEl, isOtherEl && isOtherEl.checked && !(detailsEl.value || '').trim() ? 'Specific Purpose Details is required when "Other Reasons" is selected.' : msg);
+
+            // ---- 3. Contact & Representative Details ----
+            const cpEl = document.getElementById('ContactPerson');
+            msg = checkTextField(cpEl, 'Contact Person', RFI_LIMITS.contactPerson, { pattern: RFI_PERSON_NAME_PATTERN, patternMessage: 'Contact Person may only contain letters, spaces, periods, commas, apostrophes and dashes.' });
+            if (msg) flag(cpEl, msg);
+
+            const phoneEl = document.getElementById('ContactNumber');
+            msg = checkTextField(phoneEl, 'Mobile / Phone No.', RFI_LIMITS.contactNumber, {
+                pattern: RFI_PHONE_PATTERN,
+                normalize: v => v.replace(/[\s\-\(\)]/g, ''),
+                patternMessage: 'Enter a valid mobile/phone no. (e.g. 0917-123-4567, +639171234567, or 083-552-1234).'
+            });
+            if (msg) flag(phoneEl, msg);
+
+            const emailEl = document.getElementById('EmailAddress');
+            msg = checkTextField(emailEl, 'Email Address', RFI_LIMITS.email, { pattern: RFI_EMAIL_PATTERN, patternMessage: 'Enter a valid email address (e.g. juan@domain.com).' });
+            if (msg) flag(emailEl, msg);
+
+            const repEl = document.getElementById('Representative');
+            msg = checkTextField(repEl, 'Representative Name', RFI_LIMITS.representative, { pattern: RFI_PERSON_NAME_PATTERN, patternMessage: 'Representative Name may only contain letters, spaces, periods, commas, apostrophes and dashes.' });
+            if (msg) flag(repEl, msg);
+
+            // ---- 5. Order of Payment & Fee Computation (all columns required, no duplicates) ----
+            const feeRows = Array.from(document.querySelectorAll('#feesTableBody tr'));
+            const feeErrors = [];
+            const seenParticulars = {};
+            if (feeRows.length === 0) feeErrors.push('At least one fee particular is required.');
+            feeRows.forEach((row, i) => {
+                const rowNo = i + 1;
+                const sel = row.querySelector('.particular-select');
+                const qty = row.querySelector('.qty-input');
+                const feeVal = parseFloat(row.querySelector('.fee-amount')?.textContent) || 0;
+
+                if (!sel || sel.value === '') {
+                    feeErrors.push(`Row ${rowNo}: Particular is required.`);
+                    if (sel) { sel.classList.add(...RFI_ERROR_CLASSES); if (!firstInvalid) firstInvalid = sel; }
+                } else {
+                    const p = availableParticulars[sel.value];
+                    const key = p ? String(p.code).trim().toUpperCase() : sel.value;
+                    if (seenParticulars[key]) {
+                        feeErrors.push(`Row ${rowNo}: Duplicate particular "${p ? p.code + ' - ' + p.name : key}" (already in row ${seenParticulars[key]}).`);
+                        sel.classList.add(...RFI_ERROR_CLASSES);
+                        if (!firstInvalid) firstInvalid = sel;
+                    } else {
+                        seenParticulars[key] = rowNo;
+                    }
+                    if (feeVal <= 0) {
+                        feeErrors.push(`Row ${rowNo}: Fee amount must be greater than 0.00.`);
+                        sel.classList.add(...RFI_ERROR_CLASSES);
+                        if (!firstInvalid) firstInvalid = sel;
+                    }
+                }
+
+                const qRaw = qty ? String(qty.value).trim() : '';
+                const qNum = Number(qRaw);
+                if (!qRaw) {
+                    feeErrors.push(`Row ${rowNo}: Quantity is required.`);
+                } else if (!Number.isInteger(qNum) || qNum < 1 || qNum > RFI_LIMITS.qtyMax) {
+                    feeErrors.push(`Row ${rowNo}: Quantity must be a whole number from 1 to ${RFI_LIMITS.qtyMax}.`);
+                }
+                if (qty && (!qRaw || !Number.isInteger(qNum) || qNum < 1 || qNum > RFI_LIMITS.qtyMax)) {
+                    qty.classList.add(...RFI_ERROR_CLASSES);
+                    if (!firstInvalid) firstInvalid = qty;
+                }
+            });
+            const totalFees = parseFloat(document.getElementById('TotalFeesAmount').value) || 0;
+            if (feeErrors.length === 0 && totalFees <= 0) feeErrors.push('Total inspection fees must be greater than 0.00.');
+            if (feeErrors.length > 0) {
+                errorCount += feeErrors.length;
+                const feesSpan = document.getElementById('feesValidation');
+                if (feesSpan) feesSpan.innerHTML = feeErrors.map(m => `<span class="block">&bull; ${m.replace(/</g, '&lt;')}</span>`).join('');
+                if (!firstInvalid) firstInvalid = document.getElementById('btnAddRow');
+            }
+
+            return { isValid: errorCount === 0, errorCount, firstInvalid };
+        }
+
+        // -------------------------------------------------------------
+        // Reference Properties Selection Handler
+        // -------------------------------------------------------------
+        function handleReferencePropertiesChange(values) {
+            selectedPropertyIds = Array.isArray(values) ? values : (values ? [values] : []);
+            
+            const summaryContainer = document.getElementById('selectedPropertiesSummary');
+            const summaryList = document.getElementById('selectedPropertiesList');
+            const generatorCard = document.getElementById('partitionGeneratorCard');
+            const countBadge = document.getElementById('selectedCountBadge');
+
+            document.getElementById('SelectedRefPropertyIdsJson').value = JSON.stringify(selectedPropertyIds);
+            const primaryIdInput = document.getElementById('primaryRefPropertyId');
+            if (primaryIdInput) primaryIdInput.value = selectedPropertyIds.length > 0 ? selectedPropertyIds[0] : '';
+
+            if (selectedPropertyIds.length === 0) {
+                if (summaryContainer) summaryContainer.classList.add('hidden');
+                if (generatorCard) generatorCard.classList.add('hidden');
+                return;
+            }
+
+            if (summaryContainer) summaryContainer.classList.remove('hidden');
+            if (generatorCard) generatorCard.classList.remove('hidden');
+            if (countBadge) countBadge.textContent = selectedPropertyIds.length;
+
+            let cardsHtml = '';
+            const tdnList = [];
+            const pinList = [];
+            const ownerList = [];
+            let primaryLocation = '';
+            let primaryKind = '';
+
+            selectedPropertyIds.forEach((id, idx) => {
+                const prop = referencePropertiesData[id];
+                if (!prop) return;
+
+                tdnList.push(prop.tdn);
+                if (prop.pin) pinList.push(prop.pin);
+                if (prop.owner) ownerList.push(prop.owner);
+                if (!primaryLocation && prop.location) primaryLocation = prop.location;
+                if (!primaryKind && prop.kind) primaryKind = prop.kind;
+
+                cardsHtml += `
+                    <div class="p-3.5 rounded-2xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-xs flex items-start justify-between gap-3 text-xs">
+                        <div class="space-y-1 min-w-0">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="px-2 py-0.5 rounded-md font-bold text-[10px] bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300">
+                                    Ref #${idx + 1}
+                                </span>
+                                <span class="font-bold text-slate-900 dark:text-white font-mono">${prop.tdn}</span>
+                                <span class="text-[10px] text-slate-400 font-mono">(${prop.pin || 'No PIN'})</span>
+                            </div>
+                            <div class="font-bold text-slate-800 dark:text-stone-200 truncate">${prop.owner}</div>
+                            <div class="text-[11px] text-slate-500 dark:text-stone-400">
+                                ${prop.kind} &bull; ${prop.classification} &bull; <strong class="text-slate-700 dark:text-stone-300">${prop.area.toLocaleString()} sqm</strong> &bull; ₱${prop.marketValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </div>
+                            <div class="text-[10px] text-slate-400 truncate">${prop.location}</div>
+                        </div>
+                        <button type="button" onclick="removeSelectedProperty('${id}')" class="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors" title="Remove reference property">
+                            <i data-lucide="x" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                `;
+            });
+
+            if (summaryList) summaryList.innerHTML = cardsHtml;
+
+            // Auto-fill form inputs from reference property
+            if (tdnList.length > 0 && document.getElementById('tdNoInput')) {
+                document.getElementById('tdNoInput').value = tdnList[0];
+            }
+            if (pinList.length > 0 && document.getElementById('pinInput')) {
+                document.getElementById('pinInput').value = pinList[0];
+            }
+            if (ownerList.length > 0 && document.getElementById('ownerNameInput')) {
+                document.getElementById('ownerNameInput').value = ownerList[0];
+            }
+            if (primaryLocation && document.getElementById('locationInput')) {
+                document.getElementById('locationInput').value = primaryLocation;
+            }
+            if (primaryKind && document.getElementById('kindInput')) {
+                document.getElementById('kindInput').value = primaryKind;
+            }
+
+            renderDuplicateSourceOptions();
+            lucide.createIcons();
+        }
+
+        // Re-apply posted Reference TD selections when the page is re-rendered after server-side validation
+        function restorePostedRefSelections() {
+            if (!TomSelectRefProperty || (selectedPropertyIds && selectedPropertyIds.length > 0)) return;
+            const hidden = document.getElementById('SelectedRefPropertyIdsJson');
+            if (!hidden || !hidden.value) return;
+            try {
+                const ids = JSON.parse(hidden.value);
+                if (Array.isArray(ids)) {
+                    ids.forEach(id => {
+                        const prop = referencePropertiesData[id];
+                        if (!prop) return;
+                        if (!TomSelectRefProperty.options[id]) {
+                            TomSelectRefProperty.addOption({ id: prop.id, tdn: prop.tdn, pin: prop.pin, owner: prop.owner, kind: prop.kind, classification: prop.classification, area: prop.area, display: `${prop.tdn} - ${prop.owner}` });
+                        }
+                        TomSelectRefProperty.addItem(id);
+                    });
+                }
+            } catch (e) { }
+        }
+
+        function removeSelectedProperty(id) {
+            if (TomSelectRefProperty) {
+                TomSelectRefProperty.removeItem(id);
+            }
+        }
+
+        function renderDuplicateSourceOptions() {
+            const radioGroup = document.getElementById('propertyRadioGroup');
+            const dupSection = document.getElementById('duplicateSourceSelector');
+            if (!radioGroup || !dupSection) return;
+
+            if (selectedPropertyIds.length === 0) {
+                dupSection.classList.add('hidden');
+                return;
+            }
+
+            dupSection.classList.remove('hidden');
+            let radiosHtml = '';
+
+            if (selectedPropertyIds.length === 1) {
+                const prop = referencePropertiesData[selectedPropertyIds[0]];
+                radiosHtml = `
+                    <label class="flex items-center gap-2.5 p-3 rounded-xl bg-white dark:bg-stone-900 border-2 border-emerald-500 cursor-pointer text-xs">
+                        <input type="radio" name="dupSourceChoice" value="${prop.id}" checked class="text-emerald-600 focus:ring-emerald-500" />
+                        <div>
+                            <span class="font-bold text-slate-900 dark:text-white font-mono">${prop.tdn}</span>
+                            <span class="text-slate-500 dark:text-stone-400 block text-[11px]">${prop.owner} (${prop.kind} &bull; ${prop.area} sqm)</span>
+                        </div>
+                    </label>
+                `;
+            } else {
+                selectedPropertyIds.forEach((id, idx) => {
+                    const prop = referencePropertiesData[id];
+                    if (!prop) return;
+                    radiosHtml += `
+                        <label class="flex items-center gap-2.5 p-3 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 hover:border-emerald-500 cursor-pointer text-xs transition-colors">
+                            <input type="radio" name="dupSourceChoice" value="${prop.id}" ${idx === 0 ? 'checked' : ''} class="text-emerald-600 focus:ring-emerald-500" />
+                            <div>
+                                <span class="font-bold text-slate-900 dark:text-white font-mono">${prop.tdn}</span>
+                                <span class="text-slate-500 dark:text-stone-400 block text-[11px]">${prop.owner} (${prop.kind} &bull; ${prop.area.toLocaleString()} sqm)</span>
+                            </div>
+                        </label>
+                    `;
+                });
+
+                radiosHtml += `
+                    <label class="flex items-center gap-2.5 p-3 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 hover:border-emerald-500 cursor-pointer text-xs transition-colors md:col-span-2">
+                        <input type="radio" name="dupSourceChoice" value="ALL" class="text-emerald-600 focus:ring-emerald-500" />
+                        <div>
+                            <span class="font-bold text-emerald-700 dark:text-emerald-400">Duplicate All ${selectedPropertyIds.length} Reference Properties</span>
+                            <span class="text-slate-500 dark:text-stone-400 block text-[11px]">Generate partition lots cloned across all chosen reference parcels</span>
+                        </div>
+                    </label>
+                `;
+            }
+
+            radioGroup.innerHTML = radiosHtml;
+        }
+
+        // -------------------------------------------------------------
+        // Partition Generation Engine
+        // -------------------------------------------------------------
+        function handleGeneratePartitions() {
+            if (selectedPropertyIds.length === 0) {
+                toastr.warning('Please choose at least one Reference Property first.');
+                return;
+            }
+
+            const chosenRadio = document.querySelector('input[name="dupSourceChoice"]:checked');
+            const chosenValue = chosenRadio ? chosenRadio.value : selectedPropertyIds[0];
+            const countInput = document.getElementById('genPartitionCountInput');
+            const count = Math.max(1, Math.min(26, parseInt(countInput ? countInput.value : 2) || 2));
+            const ownerName = (document.getElementById('ownerNameInput') ? document.getElementById('ownerNameInput').value : '').trim();
+            const reqKindEl = document.getElementById('kindInput');
+            const reqKind = reqKindEl && reqKindEl.value ? reqKindEl.value : null;
+
+            generatedPartitions = [];
+
+            if (chosenValue === "ALL") {
+                let globalIdx = 0;
+                selectedPropertyIds.forEach((propId) => {
+                    const baseProp = referencePropertiesData[propId];
+                    if (!baseProp) return;
+                    for (let i = 0; i < count; i++) {
+                        const letterSuffix = alphabetLetters[globalIdx % alphabetLetters.length];
+                        const dividedArea = Math.round((baseProp.area / count) * 100) / 100;
+                        const marketVal = Math.round((dividedArea * baseProp.unitValue) * 100) / 100;
+                        const assessedVal = Math.round((marketVal * (baseProp.assessLevel / 100)) * 100) / 100;
+                        const lotText = `Lot ${(globalIdx + 1)}-${letterSuffix}`;
+                        const arpCombined = formatCastArpNumber(baseProp.barangay, '001', `${globalIdx + 1}`);
+                        const effKind = (reqKind === 'Machinery' || reqKind === 'Building') ? reqKind : baseProp.kind;
+
+                        generatedPartitions.push({
+                            partitionIndex: letterSuffix,
+                            baseTDN: baseProp.tdn,
+                            basePropertyId: baseProp.id,
+                            systemGeneratedTDN: generateSystemTDN(letterSuffix, baseProp.barangay, globalIdx + 1),
+                            arpNo: arpCombined,
+                            sectionNo: '001',
+                            pin: baseProp.pin ? `${baseProp.pin}-${letterSuffix}` : arpCombined,
+                            lotNumber: lotText,
+                            kind: effKind,
+                            classification: baseProp.classification,
+                            areaSqMeters: dividedArea,
+                            unitValue: baseProp.unitValue,
+                            marketValue: marketVal,
+                            assessmentLevelPercent: baseProp.assessLevel,
+                            assessedValue: assessedVal,
+                            newOwnerName: ownerName || baseProp.owner,
+                            districtOrBarangay: baseProp.barangay,
+                            propertyLocation: (document.getElementById('locationInput') ? document.getElementById('locationInput').value : '') || baseProp.location || baseProp.barangay || '',
+                            customOwner: false,
+                            customLocation: false
+                        });
+                        globalIdx++;
+                    }
+                });
+            } else {
+                const baseProp = referencePropertiesData[chosenValue];
+                if (!baseProp) return;
+
+                for (let i = 0; i < count; i++) {
+                    const letterSuffix = alphabetLetters[i % alphabetLetters.length];
+                    const dividedArea = Math.round((baseProp.area / count) * 100) / 100;
+                    const marketVal = Math.round((dividedArea * baseProp.unitValue) * 100) / 100;
+                    const assessedVal = Math.round((marketVal * (baseProp.assessLevel / 100)) * 100) / 100;
+                    const lotText = `Lot ${i + 1}-${letterSuffix}`;
+                    const arpCombined = formatCastArpNumber(baseProp.barangay, '001', `${i + 1}`);
+                    const effKind = (reqKind === 'Machinery' || reqKind === 'Building') ? reqKind : baseProp.kind;
+
+                    generatedPartitions.push({
+                        partitionIndex: letterSuffix,
+                        baseTDN: baseProp.tdn,
+                        basePropertyId: baseProp.id,
+                        systemGeneratedTDN: generateSystemTDN(letterSuffix, baseProp.barangay, i + 1),
+                        arpNo: arpCombined,
+                        sectionNo: '001',
+                        pin: baseProp.pin ? `${baseProp.pin}-${letterSuffix}` : arpCombined,
+                        lotNumber: lotText,
+                        kind: effKind,
+                        classification: baseProp.classification,
+                        areaSqMeters: dividedArea,
+                        unitValue: baseProp.unitValue,
+                        marketValue: marketVal,
+                        assessmentLevelPercent: baseProp.assessLevel,
+                        assessedValue: assessedVal,
+                        newOwnerName: ownerName || baseProp.owner,
+                        districtOrBarangay: baseProp.barangay,
+                        propertyLocation: (document.getElementById('locationInput') ? document.getElementById('locationInput').value : '') || baseProp.location || baseProp.barangay || '',
+                        customOwner: false,
+                        customLocation: false
+                    });
+                }
+            }
+
+            renderPartitionsTable();
+            toastr.success(`Generated ${generatedPartitions.length} partition lots with CAST TDN & ARP combinations!`);
+        }
+
+        function resolveCastBrgyCode(brgyVal, defaultCode = '0001') {
+            if (!brgyVal) return defaultCode;
+            const raw = String(brgyVal).trim();
+            if (/^\d+$/.test(raw)) return raw.slice(-4).padStart(4, '0');
+            const u = raw.toUpperCase();
+            const map = [
+                ['DADIANGAS EAST', '0001'], ['CENTRAL', '0001'], ['POBLACION', '0001'], ['ZONE 1', '0001'],
+                ['LAGAO', '0002'], ['MORALES', '0002'], ['CALUMPANG', '0003'], ['SAN ISIDRO', '0004'],
+                ['CITY HEIGHTS', '0005'], ['DADIANGAS NORTH', '0006'], ['DADIANGAS SOUTH', '0007'],
+                ['DADIANGAS WEST', '0008'], ['LABANGAL', '0009'], ['APOPONG', '0010'], ['BALUAN', '0011'],
+                ['BATOMELONG', '0012'], ['BUAYAN', '0013'], ['BULA', '0014'], ['CONEL', '0015'],
+                ['FATIMA', '0016'], ['KATANGAWAN', '0017'], ['LIGAYA', '0018'], ['MABUHAY', '0019'],
+                ['OLYMPOG', '0020'], ['SAN JOSE', '0021'], ['SIGUEL', '0022'], ['SINAWAL', '0023'],
+                ['TAMBLER', '0024'], ['TINAGACAN', '0025'], ['UPPER LABAY', '0026'], ['SALITRAN', '0027']
+            ];
+            for (const [k, c] of map) {
+                if (u.includes(k)) return c;
+            }
+            const digits = raw.replace(/\D/g, '');
+            if (digits) return digits.slice(-4).padStart(4, '0');
+            return defaultCode;
+        }
+
+        function formatThreeDigitPart(val) {
+            if (!val) return '000';
+            const m = String(val).match(/\d+/);
+            if (m) return m[0].slice(-3).padStart(3, '0');
+            return String(val).replace(/[^a-zA-Z0-9]/g, '').slice(0, 3).toUpperCase().padStart(3, '0') || '000';
+        }
+
+        function formatCastArpNumber(brgyVal, sectionNo, lotOrParcelNo, lgu = '187', mun = '00') {
+            const brgy4 = resolveCastBrgyCode(brgyVal, '0000');
+            const sec3 = formatThreeDigitPart(sectionNo);
+            const lot3 = formatThreeDigitPart(lotOrParcelNo);
+            return `${String(lgu).padStart(3, '0')}-${String(mun).padStart(2, '0')}-${brgy4}-${sec3}-${lot3}`;
+        }
+
+        function generateSystemTDN(letterSuffix, brgyVal, seqIndex) {
+            const revYearLastTwo = String(new Date().getFullYear() % 100).padStart(2, '0');
+            const brgy4 = resolveCastBrgyCode(brgyVal, '0001');
+            const baseCount = Object.keys(referencePropertiesData || {}).length;
+            const seqNum = typeof seqIndex === 'number' && seqIndex > 0
+                ? (baseCount + seqIndex)
+                : (baseCount + (generatedPartitions ? generatedPartitions.length + 1 : 1));
+            const declNo5 = String(seqNum).padStart(5, '0');
+            return `${revYearLastTwo}-${brgy4}-${declNo5}`;
+        }
+
+        function renderPartitionsTable() {
+            const container = document.getElementById('generatedPartitionsContainer');
+            const tbody = document.getElementById('generatedPartitionsTbody');
+
+            if (generatedPartitions.length === 0) {
+                if (container) container.classList.add('hidden');
+                if (tbody) tbody.innerHTML = '';
+                serializePartitions();
+                return;
+            }
+
+            if (container) container.classList.remove('hidden');
+
+            let rowsHtml = '';
+            generatedPartitions.forEach((p, idx) => {
+                const hasSketch = !!(p.buildingFloorPlanSketchPath || p.buildingFloorPlanSketchBase64);
+                const sketchBadge = hasSketch 
+                    ? `<div class="mt-1"><a href="${p.buildingFloorPlanSketchPath || '#'}" target="_blank" class="inline-flex items-center gap-1 text-[9px] font-mono text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-1 py-0.5 rounded font-bold hover:underline" title="View attached floor plan sketch / blueprint"><i data-lucide="file-check" class="w-3 h-3 text-emerald-600"></i> Sketch</a></div>` 
+                    : '';
+
+                const locText = p.propertyLocation || p.location || [p.streetLocation, p.districtOrBarangay, p.cityMunicipality, p.province].filter(Boolean).join(', ') || 'N/A';
+
+                rowsHtml += `
+                    <tr class="hover:bg-slate-50 dark:hover:bg-stone-800/40 transition-colors" data-partition-idx="${idx}">
+                        <td class="px-4 py-3 align-middle">
+                            <div class="flex items-center gap-2">
+                                <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-bold font-mono text-xs shrink-0" title="Partition Lot ${p.partitionIndex}">
+                                    ${p.partitionIndex}
+                                </span>
+                                <div>
+                                    <span class="font-bold font-mono text-slate-900 dark:text-white text-xs block">
+                                        ${p.systemGeneratedTDN || 'TDN-PENDING'}
+                                    </span>
+                                    ${p.arpNo ? `<span class="text-[10px] text-emerald-700 dark:text-emerald-400 font-mono block">ARP: ${p.arpNo}</span>` : ''}
+                                    ${p.pin ? `<span class="text-[10px] text-slate-500 dark:text-stone-400 font-mono block">PIN: ${p.pin}</span>` : ''}
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-4 py-3 align-middle">
+                            <span class="inline-block px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60 font-mono">
+                                ${p.kind || 'Land'}
+                            </span>
+                            ${p.classification ? `<span class="block text-[10px] text-slate-500 dark:text-stone-400 font-sans mt-0.5">${p.classification}</span>` : ''}
+                        </td>
+                        <td class="px-4 py-3 align-middle">
+                            <span class="font-medium text-slate-900 dark:text-white text-xs block">
+                                ${p.newOwnerName || 'N/A'}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 align-middle">
+                            <span class="text-slate-600 dark:text-stone-300 text-xs block font-sans">
+                                ${locText}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 align-middle text-center">
+                            <div class="flex items-center justify-center gap-1.5">
+                                <button type="button" onclick="handleEditPartition(${idx})" class="p-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition-colors" title="${p.kind === 'Building' ? 'Edit Building Appraisal (Structural Type & Materials)' : (p.kind === 'Machinery' ? 'Edit Machinery Appraisal (CAST Machinery Form)' : 'Edit Land Appraisal (CAST TDN Specification)')}">
+                                    <i data-lucide="pencil" class="w-4 h-4"></i>
+                                </button>
+                                <button type="button" onclick="removePartition(${idx})" class="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors" title="Delete partition row">
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                            ${sketchBadge}
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = rowsHtml;
+            updatePartitionsFootTotals();
+            serializePartitions();
+            lucide.createIcons();
+        }
+
+        function removePartition(idx) {
+            generatedPartitions.splice(idx, 1);
+            generatedPartitions.forEach((p, i) => {
+                p.partitionIndex = alphabetLetters[i % alphabetLetters.length];
+            });
+            renderPartitionsTable();
+        }
+
+        function handleAddManualPartitionLot() {
+            if (selectedPropertyIds.length === 0) {
+                toastr.warning('Please select a reference property first.');
+                return;
+            }
+
+            const baseProp = referencePropertiesData[selectedPropertyIds[0]];
+            const idx = generatedPartitions.length;
+            const letter = alphabetLetters[idx % alphabetLetters.length];
+            const ownerName = (document.getElementById('ownerNameInput') ? document.getElementById('ownerNameInput').value : '').trim();
+            const reqKindEl = document.getElementById('kindInput');
+            const reqKind = reqKindEl && reqKindEl.value ? reqKindEl.value : null;
+            const effKind = (reqKind === 'Machinery' || reqKind === 'Building') ? reqKind : (baseProp ? baseProp.kind : "Land");
+
+            const area = 100;
+            const mv = Math.round((area * (baseProp ? baseProp.unitValue : 1500)) * 100) / 100;
+            const av = Math.round((mv * ((baseProp ? baseProp.assessLevel : 20) / 100)) * 100) / 100;
+
+            const brgyName = baseProp ? baseProp.barangay : "Brgy. Central";
+            const arpCombined = formatCastArpNumber(brgyName, '001', `${idx + 1}`);
+
+            generatedPartitions.push({
+                partitionIndex: letter,
+                baseTDN: baseProp ? baseProp.tdn : "Manual",
+                basePropertyId: baseProp ? baseProp.id : null,
+                systemGeneratedTDN: generateSystemTDN(letter, brgyName, idx + 1),
+                arpNo: arpCombined,
+                sectionNo: '001',
+                pin: baseProp && baseProp.pin ? `${baseProp.pin}-${letter}` : arpCombined,
+                lotNumber: `Lot ${idx + 1}-${letter}`,
+                kind: effKind,
+                classification: baseProp ? baseProp.classification : "Residential",
+                areaSqMeters: area,
+                unitValue: baseProp ? baseProp.unitValue : 1500,
+                marketValue: mv,
+                assessmentLevelPercent: baseProp ? baseProp.assessLevel : 20,
+                assessedValue: av,
+                newOwnerName: ownerName || (baseProp ? baseProp.owner : ""),
+                districtOrBarangay: brgyName,
+                propertyLocation: (document.getElementById('locationInput') ? document.getElementById('locationInput').value : '') || (baseProp ? baseProp.location : '') || (baseProp ? baseProp.barangay : '') || '',
+                customOwner: false,
+                customLocation: false
+            });
+
+            renderPartitionsTable();
+        }
+
+        function updatePartitionsFootTotals() {
+            let totalArea = 0;
+            let totalMV = 0;
+            let totalAV = 0;
+
+            generatedPartitions.forEach(p => {
+                totalArea += parseFloat(p.areaSqMeters) || 0;
+                totalMV += parseFloat(p.marketValue) || 0;
+                totalAV += parseFloat(p.assessedValue) || 0;
+            });
+
+            const footSummary = document.getElementById('footPartitionSummary');
+            if (footSummary) {
+                footSummary.textContent = `Total Partitions: ${generatedPartitions.length} lot(s)`;
+            }
+
+            const footArea = document.getElementById('footTotalArea');
+            if (footArea) footArea.textContent = totalArea.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const footMV = document.getElementById('footTotalMarketValue');
+            if (footMV) footMV.textContent = `₱${totalMV.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            const footAV = document.getElementById('footTotalAssessedValue');
+            if (footAV) footAV.textContent = `₱${totalAV.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        }
+
+        function serializePartitions() {
+            const json = JSON.stringify(generatedPartitions);
+            document.getElementById('GeneratedPartitionsJson').value = json;
+            
+            const partInput = document.getElementById('Partitions');
+            if (partInput) {
+                partInput.value = generatedPartitions.length > 0 ? generatedPartitions.length : 1;
+            }
+        }
+
+        // -------------------------------------------------------------
+        // Dedicated Full-Page Partition Appraisal Redirect (CAST Style)
+        // -------------------------------------------------------------
+        function editPartitionRedirect(idx) {
+            saveCurrentDraft(idx);
+            const p = generatedPartitions[idx];
+            const kindParam = p && p.kind ? `&kind=${encodeURIComponent(p.kind)}` : '';
+            const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
+            window.location.href = `/PropertyAssessmentRequest/EditPartition?index=${idx}${kindParam}&returnUrl=${returnUrl}`;
+        }
+
+        function saveCurrentDraft(editingIdx) {
+            const draft = {
+                editingIdx: editingIdx,
+                requestForInspection: true,
+                txCode: document.getElementById('txCodeSelect')?.value,
+                txName: document.getElementById('txNameInput')?.value,
+                transactionNo: document.querySelector('input[name="TransactionNo"]')?.value,
+                ownerId: document.getElementById('requestOwnerIdInput')?.value,
+                ownerName: document.getElementById('ownerNameInput')?.value,
+                contactNumber: document.getElementById('ContactNumber')?.value,
+                emailAddress: document.getElementById('EmailAddress')?.value,
+                contactPerson: document.getElementById('ContactPerson')?.value,
+                representative: document.getElementById('Representative')?.value,
+                orNumber: document.getElementById('ORNumber')?.value,
+                kind: document.getElementById('kindInput')?.value,
+                taxDeclarationNumber: document.getElementById('tdNoInput')?.value,
+                propertyIndexNumber: document.getElementById('pinInput')?.value,
+                lotNo: document.getElementById('lotNoInput')?.value,
+                propertyLocation: document.getElementById('locationInput')?.value,
+                otherPurposeDetails: document.getElementById('OtherPurposeDetails')?.value,
+                selectedPropertyIds: selectedPropertyIds,
+                partitions: generatedPartitions,
+                feesJson: document.getElementById('RequestedDocumentsJson')?.value,
+                totalFees: document.getElementById('TotalFeesAmount')?.value
+            };
+            sessionStorage.setItem('propertyAssessmentRequest_draft', JSON.stringify(draft));
+        }
+
+        function handleEditPartition(idx) {
+            editPartitionRedirect(idx);
+        }
+
+        // -------------------------------------------------------------
+        // Order of Payment & Fees Table Functions
+        // -------------------------------------------------------------
         function addRow() {
             const tbody = document.getElementById('feesTableBody');
-            const rowCount = tbody.rows.length;
+            if (!tbody) return;
             const tr = document.createElement('tr');
             tr.className = "hover:bg-slate-100/50 dark:hover:bg-stone-900/50 transition-colors";
 
@@ -373,7 +1853,7 @@
                 </td>
                 <td class="px-3 py-2.5 text-right font-mono fee-amount">0.00</td>
                 <td class="px-3 py-2.5 text-center">
-                    <input type="number" min="1" value="1" class="qty-input w-20 px-2 py-1 rounded-lg text-center bg-white dark:bg-stone-900 border border-slate-300 dark:border-stone-700 text-slate-800 dark:text-stone-200 font-mono" />
+                    <input type="number" min="1" max="999" step="1" value="1" required class="qty-input w-20 px-2 py-1 rounded-lg text-center bg-white dark:bg-stone-900 border border-slate-300 dark:border-stone-700 text-slate-800 dark:text-stone-200 font-mono" />
                 </td>
                 <td class="px-3 py-2.5 text-right font-mono font-bold text-emerald-700 dark:text-emerald-400 line-total">0.00</td>
             `;
@@ -389,38 +1869,66 @@
             const qty = row.querySelector('.qty-input');
             const btnRemove = row.querySelector('.btn-remove');
 
-            sel.addEventListener('change', function () {
-                const idx = this.value;
-                const feeCell = row.querySelector('.fee-amount');
-                if (idx !== "") {
-                    const fee = availableParticulars[idx].fee;
-                    feeCell.textContent = fee.toFixed(2);
-                } else {
-                    feeCell.textContent = "0.00";
-                }
-                updateLineTotal(row);
-            });
+            if (sel) {
+                sel.addEventListener('change', function () {
+                    const idx = this.value;
+                    const feeCell = row.querySelector('.fee-amount');
 
-            qty.addEventListener('input', function () {
-                updateLineTotal(row);
-            });
+                    // Reject duplicate particulars across fee rows
+                    if (idx !== "") {
+                        const isDuplicate = Array.from(document.querySelectorAll('#feesTableBody .particular-select'))
+                            .some(other => other !== sel && other.value === idx);
+                        if (isDuplicate) {
+                            const p = availableParticulars[idx];
+                            this.value = "";
+                            if (feeCell) feeCell.textContent = "0.00";
+                            updateLineTotal(row);
+                            const feesSpan = document.getElementById('feesValidation');
+                            if (feesSpan) feesSpan.textContent = `"${p ? p.code + ' - ' + p.name : 'This particular'}" is already added. Duplicate particulars are not allowed.`;
+                            if (typeof toastr !== 'undefined') toastr.warning('This fee particular is already added.', 'Duplicate Particular');
+                            return;
+                        }
+                    }
+                    const feesSpanOk = document.getElementById('feesValidation');
+                    if (feesSpanOk) feesSpanOk.textContent = '';
 
-            btnRemove.addEventListener('click', function () {
-                const tbody = document.getElementById('feesTableBody');
-                if (tbody.rows.length > 1) {
-                    row.remove();
-                    recalculateGrandTotal();
-                } else {
-                    alert("At least one fee row is required.");
-                }
-            });
+                    if (idx !== "") {
+                        const fee = availableParticulars[idx].fee;
+                        if (feeCell) feeCell.textContent = fee.toFixed(2);
+                    } else {
+                        if (feeCell) feeCell.textContent = "0.00";
+                    }
+                    updateLineTotal(row);
+                });
+            }
+
+            if (qty) {
+                qty.addEventListener('input', function () {
+                    updateLineTotal(row);
+                });
+            }
+
+            if (btnRemove) {
+                btnRemove.addEventListener('click', function () {
+                    const tbody = document.getElementById('feesTableBody');
+                    if (tbody && tbody.rows.length > 1) {
+                        row.remove();
+                        recalculateGrandTotal();
+                    } else {
+                        alert("At least one fee row is required.");
+                    }
+                });
+            }
         }
 
         function updateLineTotal(row) {
-            const fee = parseFloat(row.querySelector('.fee-amount').textContent) || 0;
-            const qty = parseInt(row.querySelector('.qty-input').value) || 0;
+            const feeCell = row.querySelector('.fee-amount');
+            const qtyInput = row.querySelector('.qty-input');
+            const lineTotalCell = row.querySelector('.line-total');
+            const fee = parseFloat(feeCell ? feeCell.textContent : 0) || 0;
+            const qty = parseInt(qtyInput ? qtyInput.value : 0) || 0;
             const lineTotal = fee * qty;
-            row.querySelector('.line-total').textContent = lineTotal.toFixed(2);
+            if (lineTotalCell) lineTotalCell.textContent = lineTotal.toFixed(2);
             recalculateGrandTotal();
         }
 
@@ -431,12 +1939,14 @@
 
             rows.forEach(r => {
                 const sel = r.querySelector('.particular-select');
-                const idx = sel.value;
-                const qty = parseInt(r.querySelector('.qty-input').value) || 0;
-                const fee = parseFloat(r.querySelector('.fee-amount').textContent) || 0;
+                const idx = sel ? sel.value : "";
+                const qtyInput = r.querySelector('.qty-input');
+                const qty = parseInt(qtyInput ? qtyInput.value : 0) || 0;
+                const feeCell = r.querySelector('.fee-amount');
+                const fee = parseFloat(feeCell ? feeCell.textContent : 0) || 0;
                 const total = fee * qty;
 
-                if (idx !== "") {
+                if (idx !== "" && availableParticulars[idx]) {
                     grandTotal += total;
                     items.push({
                         ParticularCode: availableParticulars[idx].code,
@@ -448,9 +1958,12 @@
                 }
             });
 
-            document.getElementById('lblOverallTotal').textContent = grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            document.getElementById('TotalFeesAmount').value = grandTotal.toFixed(2);
-            document.getElementById('RequestedDocumentsJson').value = JSON.stringify(items);
+            const lblTotal = document.getElementById('lblOverallTotal');
+            if (lblTotal) lblTotal.textContent = grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const totalFeesInput = document.getElementById('TotalFeesAmount');
+            if (totalFeesInput) totalFeesInput.value = grandTotal.toFixed(2);
+            const reqDocsInput = document.getElementById('RequestedDocumentsJson');
+            if (reqDocsInput) reqDocsInput.value = JSON.stringify(items);
         }
     </script>
 }

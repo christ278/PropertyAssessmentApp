@@ -52,6 +52,7 @@ public static class DataTransferMapper
             Kind = propertyKind,
 
             // Owner Details
+            OwnerId = owner?.Id,
             OwnerName = ownerDisplayName,
             OwnerTin = owner?.TaxIdentNo ?? string.Empty,
             OwnerPhone = owner?.ContactNo ?? (dto.PropAdminContactNo ?? string.Empty),

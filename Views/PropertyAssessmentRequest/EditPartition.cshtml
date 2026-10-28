@@ -1,10 +1,12 @@
-﻿@model PropertyAssessmentApp.Models.AssessmentPartitionItem
+@model PropertyAssessmentApp.Models.AssessmentPartitionItem
 @{
     ViewData["Title"] = $"Edit Partition Appraisal - {(!string.IsNullOrWhiteSpace(Model.SystemGeneratedTDN) ? Model.SystemGeneratedTDN : "TDN System Pending")}";
     var requestId = ViewBag.RequestId as Guid?;
     var partitionIndex = ViewBag.PartitionIndex as int? ?? 0;
     var returnUrl = ViewBag.ReturnUrl as string ?? (requestId.HasValue ? Url.Action("Edit", new { id = requestId.Value }) : Url.Action("Create"));
     var displayTdn = !string.IsNullOrWhiteSpace(Model.SystemGeneratedTDN) ? Model.SystemGeneratedTDN : "TDN System Pending";
+    var registeredOwners = ViewBag.RegisteredOwners as IEnumerable<PropertyAssessmentApp.Models.Owner> ?? Enumerable.Empty<PropertyAssessmentApp.Models.Owner>();
+    var jsonOptions = new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase };
 }
 
 <div class="space-y-8 font-mono text-xs">
@@ -42,7 +44,9 @@
             <input type="hidden" name="index" value="@partitionIndex" id="partitionIndexInput" />
             <input type="hidden" name="requestId" value="@requestId" id="requestIdInput" />
             <input type="hidden" name="returnUrl" value="@returnUrl" id="returnUrlInput" />
+            <input type="hidden" name="partitionJsonPayload" id="partitionJsonPayload" />
             <input type="hidden" asp-for="BasePropertyId" />
+            <input type="hidden" asp-for="OwnerId" id="inputPartitionOwnerId" />
             <input type="hidden" asp-for="BaseTDN" />
             <input type="hidden" asp-for="PartitionIndex" />
             <input type="hidden" asp-for="PropertyLocation" id="inputPropertyLocation" />
@@ -71,6 +75,9 @@
                     <span class="text-slate-700 dark:text-stone-300 text-xs font-mono font-bold">
                         TDN: <span class="text-emerald-700 dark:text-emerald-400 font-mono font-bold" id="bannerDisplayTdn">@displayTdn</span>
                     </span>
+                    <span class="text-slate-700 dark:text-stone-300 text-xs font-mono font-bold">
+                        &bull; ARP NO: <span class="text-emerald-700 dark:text-emerald-400 font-mono font-bold" id="bannerDisplayArpNo">@(string.IsNullOrWhiteSpace(Model.ARPNo) ? "187-00-0000-000-000" : Model.ARPNo)</span>
+                    </span>
                     <span class="text-slate-500 dark:text-stone-400 text-[11px] font-mono">
                         &bull; Reference Base TDN: @(string.IsNullOrWhiteSpace(Model.BaseTDN) ? "New Declaration" : Model.BaseTDN)
                     </span>
@@ -79,8 +86,9 @@
                     CAST Real Property Appraisal Standard (<span id="displayKindBadge">Land Appraisal / FAAS TDN</span>)
                 </div>
                 <div class="inline-flex rounded-xl bg-slate-200 dark:bg-stone-800 p-0.5 border border-slate-300 dark:border-stone-700">
-                    <button type="button" onclick="switchAppraisalKind('Land')" id="btnKindLand" class="px-3 py-1 text-xs font-bold font-mono rounded-lg transition-all @(Model.Kind == "Building" ? "text-slate-600 dark:text-stone-400" : "bg-emerald-600 text-white shadow-xs")">Land</button>
+                    <button type="button" onclick="switchAppraisalKind('Land')" id="btnKindLand" class="px-3 py-1 text-xs font-bold font-mono rounded-lg transition-all @(Model.Kind == "Building" || Model.Kind == "Machinery" ? "text-slate-600 dark:text-stone-400" : "bg-emerald-600 text-white shadow-xs")">Land</button>
                     <button type="button" onclick="switchAppraisalKind('Building')" id="btnKindBuilding" class="px-3 py-1 text-xs font-bold font-mono rounded-lg transition-all @(Model.Kind == "Building" ? "bg-emerald-600 text-white shadow-xs" : "text-slate-600 dark:text-stone-400")">Building</button>
+                    <button type="button" onclick="switchAppraisalKind('Machinery')" id="btnKindMachinery" class="px-3 py-1 text-xs font-bold font-mono rounded-lg transition-all @(Model.Kind == "Machinery" ? "bg-emerald-600 text-white shadow-xs" : "text-slate-600 dark:text-stone-400")">Machinery</button>
                 </div>
             </div>
 
@@ -88,7 +96,7 @@
             <input type="hidden" asp-for="SystemGeneratedTDN" id="inputTdn" />
 
             <!-- CONTAINER 1: LAND APPRAISAL FORM (CAST SPECIFICATION) -->
-            <div id="container-land-appraisal" class="space-y-6 @(Model.Kind == "Building" ? "hidden" : "")">
+            <div id="container-land-appraisal" class="space-y-6 @(Model.Kind == "Building" || Model.Kind == "Machinery" ? "hidden" : "")">
                 <partial name="_LandPartitionForm" model="Model" />
             </div>
 
@@ -185,6 +193,18 @@
                             <label asp-for="AreaSqMeters" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">AREA IN SQR. (SQ.M.)</label>
                             <input asp-for="AreaSqMeters" id="inputAssessedArea" type="number" step="0.01" min="0" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono font-bold text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white text-right" placeholder="0.00" />
                         </div>
+
+                        <!-- 7. SECTION NO. (CAST ARP Combination #1) -->
+                        <div>
+                            <label asp-for="SectionNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">SECTION NO.</label>
+                            <input asp-for="SectionNo" id="inputBldgSectionNo" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="e.g. 001" />
+                        </div>
+
+                        <!-- 8. ARP NO. (CAST Combination #1: 187-00-BBBB-SSS-LLL) -->
+                        <div class="md:col-span-2">
+                            <label asp-for="ARPNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">ARP NO. (CAST FORMAT: LGU-DIST-BRGY-SEC-LOT)</label>
+                            <input asp-for="ARPNo" id="inputBldgArpNo" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono font-bold text-xs focus:outline-none focus:border-emerald-600 text-emerald-700 dark:text-emerald-400" placeholder="187-00-0000-000-000" />
+                        </div>
                     </div>
                 </div>
 
@@ -203,6 +223,24 @@
                         </div>
                     </div>
 
+                    <!-- Searchable Active Registered Owner Lookup (Auto-fill All Demographics Fields) -->
+                    <div class="p-4 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 space-y-2">
+                        <label class="block text-xs font-bold text-emerald-800 dark:text-emerald-300 uppercase flex items-center gap-2">
+                            <i data-lucide="user-search" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                            Fetch Active Registered Owner from Database (Auto-fill All Fields)
+                        </label>
+                        <select id="bldgRegisteredOwnerSelect" class="w-full">
+                            <option value="">-- Search active registered owner by Name, TIN, RPTIN, or Barangay --</option>
+                            @foreach (var owner in registeredOwners)
+                            {
+                                <option value="@owner.Id">@owner.DisplayName (TIN: @owner.TaxIdentNo | @owner.BarangayName)</option>
+                            }
+                        </select>
+                        <p class="text-[11px] text-slate-600 dark:text-stone-300">
+                            Selecting an active registered owner will automatically populate Owner / Administrator Name, Gender/Type, Civil Status, TIN No., Mobile/Contact No., Email Address, and Mailing Address below.
+                        </p>
+                    </div>
+
                     <!-- Single Normalized Demographics Form -->
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div id="divOwnerName" class="md:col-span-2">
@@ -218,36 +256,38 @@
                         </div>
                         <div>
                             <label asp-for="OwnerGender" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">GENDER / SEX</label>
-                            <select asp-for="OwnerGender" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white">
+                            <select asp-for="OwnerGender" id="selectBldgOwnerGender" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white">
                                 <option value="Male">Male</option>
                                 <option value="Female">Female</option>
+                                <option value="Corporate">Corporate / Entity</option>
                             </select>
                         </div>
                         <div>
                             <label asp-for="OwnerCivilStatus" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">CIVIL STATUS</label>
-                            <select asp-for="OwnerCivilStatus" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white">
+                            <select asp-for="OwnerCivilStatus" id="selectBldgOwnerCivilStatus" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white">
                                 <option value="Single">Single</option>
                                 <option value="Married">Married</option>
                                 <option value="Widowed">Widowed</option>
                                 <option value="Divorced">Divorced</option>
                                 <option value="Legally Separated">Legally Separated</option>
+                                <option value="N/A (Corporate / Entity)">N/A (Corporate / Entity)</option>
                             </select>
                         </div>
                         <div>
                             <label asp-for="OwnerTIN" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">TIN NO.</label>
-                            <input asp-for="OwnerTIN" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="000-000-000-000" />
+                            <input asp-for="OwnerTIN" id="inputBldgOwnerTin" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="000-000-000-000" />
                         </div>
                         <div>
                             <label asp-for="OwnerContactNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">MOBILE / CONTACT NO.</label>
-                            <input asp-for="OwnerContactNo" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="09XXXXXXXXX" />
+                            <input asp-for="OwnerContactNo" id="inputBldgOwnerPhone" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="09XXXXXXXXX" />
                         </div>
                         <div class="md:col-span-2">
                             <label asp-for="OwnerEmail" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">EMAIL ADDRESS</label>
-                            <input asp-for="OwnerEmail" type="email" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="email@example.com" />
+                            <input asp-for="OwnerEmail" id="inputBldgOwnerEmail" type="email" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="email@example.com" />
                         </div>
                         <div class="md:col-span-4">
                             <label asp-for="OwnerAddress" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">MAILING ADDRESS</label>
-                            <input asp-for="OwnerAddress" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="House / Unit No., Street, Barangay, City, Province" />
+                            <input asp-for="OwnerAddress" id="inputBldgOwnerAddress" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="House / Unit No., Street, Barangay, City, Province" />
                         </div>
                     </div>
                 </div>
@@ -824,6 +864,13 @@
                         </div>
                     </div>
 
+                    <div class="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-[11px] text-emerald-800 dark:text-emerald-300 flex items-start gap-2">
+                        <i data-lucide="info" class="w-4 h-4 text-emerald-600 shrink-0 mt-0.5"></i>
+                        <div>
+                            <strong class="font-bold">Sec. 222, R.A. 7160 (Back Taxes on Newly Declared Property):</strong> Real property declared for the first time shall be assessed for back taxes for up to ten (10) preceding years if unassessed since completion.
+                        </div>
+                    </div>
+
                     <div>
                         <label asp-for="Memoranda" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">MEMORANDA & LEGAL ANNOTATIONS</label>
                         <textarea asp-for="Memoranda" id="textareaMemoranda" rows="4" class="w-full px-4 py-3 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-xs font-mono uppercase focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="ENTER LEGAL MEMORANDA, BOUNDARIES, DEPRECIATION BASIS, OR PARTITION RESTRICTIONS..."></textarea>
@@ -832,6 +879,11 @@
             </div>
 
             </div> <!-- /#container-building-appraisal -->
+
+            <!-- CONTAINER 3: MACHINERY APPRAISAL FORM (CAST SPECIFICATION) -->
+            <div id="container-machinery-appraisal" class="space-y-6 @(Model.Kind == "Machinery" ? "" : "hidden")">
+                <partial name="_MachineryPartitionForm" model="Model" />
+            </div> <!-- /#container-machinery-appraisal -->
 
             <!-- Submit Button Footer (Matches File Property Assessment Request standard) -->
             <div class="flex flex-col-reverse sm:flex-row sm:items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-stone-800">
@@ -988,27 +1040,51 @@
         window.landAssessmentLevels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.LandAssessmentLevels ?? new List<PropertyAssessmentApp.Models.LandAssessmentLevel>()));
         window.landAdjustments = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.LandAdjustments ?? new List<PropertyAssessmentApp.Models.LandAdjustmentFactor>()));
         window.landImprovementTypes = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.LandImprovementTypes ?? new List<PropertyAssessmentApp.Models.LandImprovementType>()));
+        window.machineryActualUses = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.MachineryActualUses ?? new List<PropertyAssessmentApp.Models.MachineryActualUse>()));
+        window.machineryAssessmentLevels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.MachineryAssessmentLevels ?? new List<PropertyAssessmentApp.Models.MachineryAssessmentLevel>()));
         window.activeAppraisalKind = '@(Model.Kind ?? "Land")';
 
         function switchAppraisalKind(kind) {
             window.activeAppraisalKind = kind;
-            if (kind.toLowerCase() === 'building') {
+            const k = (kind || 'Land').toLowerCase();
+
+            // Reset all 3 buttons
+            ['#btnKindLand', '#btnKindBuilding', '#btnKindMachinery'].forEach(sel => {
+                $(sel).removeClass('bg-emerald-600 text-white shadow-xs').addClass('text-slate-600 dark:text-stone-400 bg-slate-200 dark:bg-stone-800');
+            });
+
+            if (k === 'building') {
                 $('#container-building-appraisal').removeClass('hidden');
                 $('#container-land-appraisal').addClass('hidden');
-                $('#displayKindBadge').text('CAST Real Property Appraisal Standard (Building / Structure)');
+                $('#container-machinery-appraisal').addClass('hidden');
+                $('#displayKindBadge').text('Building / Structure Appraisal (CAST)');
                 $('#inputKindHidden').val('Building');
                 $('#btnKindBuilding').removeClass('text-slate-600 dark:text-stone-400 bg-slate-200 dark:bg-stone-800').addClass('bg-emerald-600 text-white shadow-xs');
-                $('#btnKindLand').removeClass('bg-emerald-600 text-white shadow-xs').addClass('text-slate-600 dark:text-stone-400 bg-slate-200 dark:bg-stone-800');
                 $('#container-land-appraisal :input').prop('disabled', true);
+                $('#container-machinery-appraisal :input').prop('disabled', true);
                 $('#container-building-appraisal :input').prop('disabled', false);
+            } else if (k === 'machinery') {
+                $('#container-machinery-appraisal').removeClass('hidden');
+                $('#container-land-appraisal').addClass('hidden');
+                $('#container-building-appraisal').addClass('hidden');
+                $('#displayKindBadge').text('Machinery & Equipment Appraisal (CAST)');
+                $('#inputKindHidden').val('Machinery');
+                $('#btnKindMachinery').removeClass('text-slate-600 dark:text-stone-400 bg-slate-200 dark:bg-stone-800').addClass('bg-emerald-600 text-white shadow-xs');
+                $('#container-land-appraisal :input').prop('disabled', true);
+                $('#container-building-appraisal :input').prop('disabled', true);
+                $('#container-machinery-appraisal :input').prop('disabled', false);
+                if (!window.machineryTablesInitialized) {
+                    initMachineryFormDynamicTables();
+                }
             } else {
                 $('#container-land-appraisal').removeClass('hidden');
                 $('#container-building-appraisal').addClass('hidden');
-                $('#displayKindBadge').text('CAST Real Property Appraisal Standard (Land Appraisal / FAAS TDN)');
+                $('#container-machinery-appraisal').addClass('hidden');
+                $('#displayKindBadge').text('Land Appraisal / FAAS TDN (CAST)');
                 $('#inputKindHidden').val('Land');
                 $('#btnKindLand').removeClass('text-slate-600 dark:text-stone-400 bg-slate-200 dark:bg-stone-800').addClass('bg-emerald-600 text-white shadow-xs');
-                $('#btnKindBuilding').removeClass('bg-emerald-600 text-white shadow-xs').addClass('text-slate-600 dark:text-stone-400 bg-slate-200 dark:bg-stone-800');
                 $('#container-building-appraisal :input').prop('disabled', true);
+                $('#container-machinery-appraisal :input').prop('disabled', true);
                 $('#container-land-appraisal :input').prop('disabled', false);
             }
             if (window.lucide) lucide.createIcons();
@@ -1648,6 +1724,531 @@
             recomputeAllLandValuation();
         }
 
+        // =============================================================
+        // MACHINERY APPRAISAL & ASSESSMENT ROLL SCHEDULES (CAST)
+        // =============================================================
+        window.machineryDetailsList = [];
+        window.machineryTablesInitialized = false;
+
+        function resolveMachineryAssessmentLevel(actualUseNameOrId) {
+            const levels = window.machineryAssessmentLevels || [];
+            if (!actualUseNameOrId) return 75;
+            const raw = String(actualUseNameOrId).trim().toUpperCase();
+
+            // Prefer RevisionYear 2011 or latest
+            const matches = levels.filter(l =>
+                String(l.ActualUseId) === raw ||
+                (l.ActualUseName && l.ActualUseName.toUpperCase() === raw) ||
+                (l.ActualUseName && raw.includes(l.ActualUseName.toUpperCase()))
+            );
+            if (matches.length > 0) {
+                matches.sort((a, b) => (b.RevisionYear || 0) - (a.RevisionYear || 0));
+                return parseFloat(matches[0].AssessmentLevel) || 75;
+            }
+            if (raw.includes('RES')) return 45;
+            if (raw.includes('AGR')) return 35;
+            if (raw.includes('SPEC') || raw.includes('CUL') || raw.includes('SCI') || raw.includes('HOS') || raw.includes('WATER')) return 10;
+            if (raw.includes('GOV')) return 5;
+            return 75; // Default Commercial / Industrial Machinery Level in CAST
+        }
+
+        function openMachineryDetailModal(editIndex = -1) {
+            $('#machineryModalEditIndex').val(editIndex);
+            const todayIso = new Date().toISOString().split('T')[0];
+            const currentYear = new Date().getFullYear();
+
+            if (editIndex >= 0 && window.machineryDetailsList[editIndex]) {
+                const item = window.machineryDetailsList[editIndex];
+                $('#machineryModalTitle span').text('Edit Machinery Appraisal Detail (CAST Specification)');
+                const classification = item.Classification || item.classification || item.KindOfMachinery || item.kindOfMachinery || 'INDUSTRIAL';
+                const descriptBrand = item.DescriptionBrand || item.descriptionBrand || item.BrandModel || item.brandModel || '';
+                const origCost = parseFloat(item.OriginalCost ?? item.originalCost) || 0;
+                const installCost = parseFloat(item.InstallationCost ?? item.installationCost) || 0;
+                const totalCost = parseFloat(item.TotalCost ?? item.totalCost) || (origCost + installCost);
+                const estLife = parseInt(item.EconomicLifeEstimated ?? item.economicLifeEstimated) || 20;
+                const yrsUsed = parseInt(item.NoOfYearsUsed ?? item.noOfYearsUsed) || 0;
+                const remLife = Math.max(0, estLife - yrsUsed);
+
+                let yrInst = item.YearInstalled ?? item.yearInstalled;
+                if (!yrInst && (item.DateOfInstallation || item.dateOfInstallation)) {
+                    const parsedInst = new Date(item.DateOfInstallation || item.dateOfInstallation).getFullYear();
+                    if (!isNaN(parsedInst)) yrInst = parsedInst;
+                }
+                let yrOp = item.YearOfOperation ?? item.yearOfOperation;
+                if (!yrOp && (item.DateOfOperation || item.dateOfOperation)) {
+                    const parsedOp = new Date(item.DateOfOperation || item.dateOfOperation).getFullYear();
+                    if (!isNaN(parsedOp)) yrOp = parsedOp;
+                }
+
+                $('#m_Classification').val(classification);
+                $('#m_BrandModel').val(descriptBrand);
+                $('#m_Capacity').val(item.Capacity || item.capacity || '');
+                $('#m_Condition').val(item.ConditionWhenAcquired || item.conditionWhenAcquired || 'NEW');
+                $('#m_AcquiredDate').val(formatIsoDate(item.AcquiredDate || item.acquiredDate) || todayIso);
+                $('#m_EstLife').val(estLife);
+                $('#m_YearInstalled').val(yrInst || currentYear);
+                $('#m_YearOperation').val(yrOp || currentYear);
+                $('#m_OriginalCost').val(origCost.toFixed(2));
+                $('#m_InstallationCost').val(installCost.toFixed(2));
+                $('#m_TotalCost').val(totalCost.toFixed(2));
+                $('#m_YearsUsed').val(yrsUsed);
+                $('#m_RemLife').val(remLife);
+                $('#m_DepPercentage').val(item.DepreciationTotalPercentage ?? item.depreciationTotalPercentage ?? 0);
+                $('#m_DepValue').val((parseFloat(item.DepreciationTotalValue ?? item.depreciationTotalValue) || 0).toFixed(2));
+                $('#m_DepreciatedValue').val((parseFloat(item.DepreciatedValue ?? item.depreciatedValue ?? item.MarketValue ?? item.marketValue) || totalCost).toFixed(2));
+            } else {
+                $('#machineryModalTitle span').text('Add Machinery Appraisal Detail (CAST Specification)');
+                $('#m_Classification').val('INDUSTRIAL');
+                $('#m_BrandModel').val('');
+                $('#m_Capacity').val('');
+                $('#m_Condition').val('NEW');
+                $('#m_AcquiredDate').val(todayIso);
+                $('#m_EstLife').val(20);
+                $('#m_YearInstalled').val(currentYear);
+                $('#m_YearOperation').val(currentYear);
+                $('#m_OriginalCost').val('');
+                $('#m_InstallationCost').val('0.00');
+                $('#m_TotalCost').val('0.00');
+                $('#m_YearsUsed').val(0);
+                $('#m_RemLife').val(20);
+                $('#m_DepPercentage').val(0);
+                $('#m_DepValue').val('0.00');
+                $('#m_DepreciatedValue').val('0.00');
+            }
+
+            $('#machineryDetailModal').removeClass('hidden');
+            if (window.lucide) lucide.createIcons();
+        }
+
+        function closeMachineryDetailModal() {
+            $('#machineryDetailModal').addClass('hidden');
+        }
+
+        function onMachineryOperationYearChange() {
+            const opYear = parseInt($('#m_YearOperation').val());
+            const currentYear = new Date().getFullYear();
+            if (!isNaN(opYear) && opYear >= 1900 && opYear <= currentYear) {
+                const yrs = Math.max(0, currentYear - opYear);
+                $('#m_YearsUsed').val(yrs);
+                recomputeMachineryModalValues(false);
+            }
+        }
+
+        function onMachineryCostInput() {
+            const orig = parseFloat($('#m_OriginalCost').val()) || 0;
+            const install = parseFloat($('#m_InstallationCost').val()) || 0;
+            const totalCost = Math.round((orig + install) * 100) / 100;
+            $('#m_TotalCost').val(totalCost.toFixed(2));
+            recomputeMachineryModalValues(true);
+        }
+
+        function recomputeMachineryModalValues(manualPercentChange = false) {
+            const estLife = parseInt($('#m_EstLife').val()) || 0;
+            const yearsUsed = parseInt($('#m_YearsUsed').val()) || 0;
+            const remLife = Math.max(0, estLife - yearsUsed);
+            $('#m_RemLife').val(remLife);
+
+            const orig = parseFloat($('#m_OriginalCost').val()) || 0;
+            const install = parseFloat($('#m_InstallationCost').val()) || 0;
+            const totalCost = Math.round((orig + install) * 100) / 100;
+            $('#m_TotalCost').val(totalCost.toFixed(2));
+
+            let depPct = parseFloat($('#m_DepPercentage').val()) || 0;
+            if (!manualPercentChange && estLife > 0 && yearsUsed > 0) {
+                depPct = Math.min(80, Math.round(((yearsUsed / estLife) * 100) * 100) / 100);
+                $('#m_DepPercentage').val(depPct);
+            }
+
+            const depVal = Math.round((totalCost * (depPct / 100.0)) * 100) / 100;
+            const marketValLessDep = Math.max(0, Math.round((totalCost - depVal) * 100) / 100);
+
+            $('#m_DepValue').val(depVal.toFixed(2));
+            $('#m_DepreciatedValue').val(marketValLessDep.toFixed(2));
+        }
+
+        function saveMachineryDetailModal() {
+            const classification = ($('#m_Classification').val() || '').trim().toUpperCase();
+            const brand = ($('#m_BrandModel').val() || '').trim().toUpperCase();
+            const cap = ($('#m_Capacity').val() || '').trim().toUpperCase();
+            const origCost = parseFloat($('#m_OriginalCost').val()) || 0;
+            const installCost = parseFloat($('#m_InstallationCost').val()) || 0;
+            const totalCost = Math.round((origCost + installCost) * 100) / 100;
+
+            if (!classification) {
+                if (window.toastr) toastr.warning('Please enter Classification.');
+                $('#m_Classification').focus();
+                return;
+            }
+            if (!brand) {
+                if (window.toastr) toastr.warning('Please enter Descript/Brand.');
+                $('#m_BrandModel').focus();
+                return;
+            }
+
+            const estLife = parseInt($('#m_EstLife').val()) || 20;
+            const yrsUsed = parseInt($('#m_YearsUsed').val()) || 0;
+            const remLife = Math.max(0, estLife - yrsUsed);
+            const yrInstalled = parseInt($('#m_YearInstalled').val()) || new Date().getFullYear();
+            const yrOperation = parseInt($('#m_YearOperation').val()) || new Date().getFullYear();
+            const depPct = parseFloat($('#m_DepPercentage').val()) || 0;
+            const depVal = Math.round((totalCost * (depPct / 100.0)) * 100) / 100;
+            const marketValLessDep = Math.max(0, Math.round((totalCost - depVal) * 100) / 100);
+
+            const detailItem = {
+                Classification: classification,
+                DescriptionBrand: brand,
+                KindOfMachinery: classification,
+                BrandModel: brand,
+                Capacity: cap || 'N/A',
+                ConditionWhenAcquired: $('#m_Condition').val() || 'NEW',
+                AcquiredDate: $('#m_AcquiredDate').val() || null,
+                EconomicLifeEstimated: estLife,
+                YearInstalled: yrInstalled,
+                YearOfOperation: yrOperation,
+                DateOfInstallation: `${yrInstalled}-01-01`,
+                DateOfOperation: `${yrOperation}-01-01`,
+                OriginalCost: origCost,
+                InstallationCost: installCost,
+                TotalCost: totalCost,
+                RCN: totalCost,
+                NoOfYearsUsed: yrsUsed,
+                RemainingEconomicLife: remLife,
+                DepreciationTotalPercentage: depPct,
+                DepreciationTotalValue: depVal,
+                MarketValue: marketValLessDep,
+                DepreciatedValue: marketValLessDep
+            };
+
+            const editIdx = parseInt($('#machineryModalEditIndex').val());
+            if (!isNaN(editIdx) && editIdx >= 0 && editIdx < window.machineryDetailsList.length) {
+                window.machineryDetailsList[editIdx] = detailItem;
+            } else {
+                window.machineryDetailsList.push(detailItem);
+            }
+
+            closeMachineryDetailModal();
+            renderMachineryAppraisalTable();
+            syncMachineryAssessmentRollFromAppraisal();
+        }
+
+        function deleteMachineryDetailRow(idx) {
+            if (idx >= 0 && idx < window.machineryDetailsList.length) {
+                window.machineryDetailsList.splice(idx, 1);
+                renderMachineryAppraisalTable();
+                syncMachineryAssessmentRollFromAppraisal();
+            }
+        }
+
+        function renderMachineryAppraisalTable() {
+            const tbody = document.getElementById('machineryAppraisalTableBody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            let totalOrig = 0;
+            let totalInstall = 0;
+            let totalCostSum = 0;
+            let totalDepVal = 0;
+            let totalDepreciated = 0;
+
+            if (!window.machineryDetailsList || window.machineryDetailsList.length === 0) {
+                const emptyTr = document.createElement('tr');
+                emptyTr.innerHTML = `<td colspan="17" class="p-4 text-center text-slate-400 italic">No machinery items encoded yet. Click "+ Add Machinery Detail" to add machinery &amp; equipment.</td>`;
+                tbody.appendChild(emptyTr);
+            } else {
+                window.machineryDetailsList.forEach((item, index) => {
+                    const classification = item.Classification || item.classification || item.KindOfMachinery || item.kindOfMachinery || 'INDUSTRIAL';
+                    const descriptBrand = item.DescriptionBrand || item.descriptionBrand || item.BrandModel || item.brandModel || '';
+                    const orig = parseFloat(item.OriginalCost ?? item.originalCost) || 0;
+                    const install = parseFloat(item.InstallationCost ?? item.installationCost) || 0;
+                    const totalCost = parseFloat(item.TotalCost ?? item.totalCost) || (orig + install);
+                    const estLife = parseInt(item.EconomicLifeEstimated ?? item.economicLifeEstimated) || 0;
+                    const yrsUsed = parseInt(item.NoOfYearsUsed ?? item.noOfYearsUsed) || 0;
+                    const remLife = item.RemainingEconomicLife ?? item.remainingEconomicLife ?? Math.max(0, estLife - yrsUsed);
+                    const depPct = parseFloat(item.DepreciationTotalPercentage ?? item.depreciationTotalPercentage) || 0;
+                    const depVal = parseFloat(item.DepreciationTotalValue ?? item.depreciationTotalValue) || Math.round((totalCost * (depPct / 100.0)) * 100) / 100;
+                    const depreciated = parseFloat(item.DepreciatedValue ?? item.depreciatedValue) || Math.max(0, totalCost - depVal);
+
+                    let yrInst = item.YearInstalled ?? item.yearInstalled;
+                    if (!yrInst && (item.DateOfInstallation || item.dateOfInstallation)) {
+                        const d = new Date(item.DateOfInstallation || item.dateOfInstallation).getFullYear();
+                        if (!isNaN(d)) yrInst = d;
+                    }
+                    let yrOp = item.YearOfOperation ?? item.yearOfOperation;
+                    if (!yrOp && (item.DateOfOperation || item.dateOfOperation)) {
+                        const d = new Date(item.DateOfOperation || item.dateOfOperation).getFullYear();
+                        if (!isNaN(d)) yrOp = d;
+                    }
+
+                    totalOrig += orig;
+                    totalInstall += install;
+                    totalCostSum += totalCost;
+                    totalDepVal += depVal;
+                    totalDepreciated += depreciated;
+
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-slate-50 dark:hover:bg-stone-800/40 transition-colors machinery-detail-row';
+                    tr.innerHTML = `
+                        <td class="p-2 border-r border-slate-100 dark:border-stone-800 font-bold text-slate-900 dark:text-white">${classification}</td>
+                        <td class="p-2 border-r border-slate-100 dark:border-stone-800 font-semibold">${descriptBrand}</td>
+                        <td class="p-2 border-r border-slate-100 dark:border-stone-800 text-center font-mono">${item.Capacity || item.capacity || ''}</td>
+                        <td class="p-2 border-r border-slate-100 dark:border-stone-800 text-center">${item.ConditionWhenAcquired || item.conditionWhenAcquired || 'NEW'}</td>
+                        <td class="p-2 border-r border-slate-100 dark:border-stone-800 text-center font-mono">${formatIsoDate(item.AcquiredDate || item.acquiredDate) || '-'}</td>
+                        <td class="p-2 border-r border-slate-100 dark:border-stone-800 text-center font-mono">${estLife}</td>
+                        <td class="p-2 border-r border-slate-100 dark:border-stone-800 text-center font-mono">${yrInst || '-'}</td>
+                        <td class="p-2 border-r border-slate-100 dark:border-stone-800 text-center font-mono">${yrOp || '-'}</td>
+                        <td class="p-2 border-r border-slate-100 dark:border-stone-800 text-right font-mono">₱${orig.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td class="p-2 border-r border-slate-100 dark:border-stone-800 text-right font-mono">₱${install.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td class="p-2 border-r border-slate-100 dark:border-stone-800 text-right font-mono font-bold">₱${totalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td class="p-2 border-r border-slate-100 dark:border-stone-800 text-center font-mono">${yrsUsed}</td>
+                        <td class="p-2 border-r border-slate-100 dark:border-stone-800 text-center font-mono font-bold">${remLife}</td>
+                        <td class="p-2 border-r border-slate-100 dark:border-stone-800 text-center font-mono text-rose-600 dark:text-rose-400">${depPct.toFixed(2)}%</td>
+                        <td class="p-2 border-r border-slate-100 dark:border-stone-800 text-right font-mono text-rose-600 dark:text-rose-400">₱${depVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td class="p-2 border-r border-slate-100 dark:border-stone-800 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">₱${depreciated.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td class="p-2 text-center">
+                            <div class="inline-flex items-center gap-1">
+                                <button type="button" onclick="openMachineryDetailModal(${index})" class="p-1.5 rounded-lg text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors" title="Edit Machinery Item">
+                                    <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                                </button>
+                                <button type="button" onclick="deleteMachineryDetailRow(${index})" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors" title="Delete Machinery Item">
+                                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                                </button>
+                            </div>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            $('#displayMachineryTotalOrigCost').text(`₱${totalOrig.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+            $('#displayMachineryTotalInstallCost').text(`₱${totalInstall.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+            $('#displayMachineryTotalMarketValue').text(`₱${totalCostSum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+            $('#displayMachineryTotalDepValue').text(`₱${totalDepVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+            $('#displayMachineryTotalDepreciatedValue').text(`₱${totalDepreciated.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+            $('#kpiMachineryOrigCost').text(`₱${totalCostSum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+
+            serializeAllMachineryTables();
+            if (window.lucide) lucide.createIcons();
+        }
+
+        function addMachineryAssessmentRollRow(data = null) {
+            const tbody = document.getElementById('machineryPropertyAssessmentTableBody');
+            if (!tbody) return;
+
+            const activeUses = (window.machineryActualUses || []).filter(u => u.IsActive !== false);
+            const useList = activeUses.length > 0 ? activeUses : [
+                { Id: 6, ActualUseName: 'INDUSTRIAL' },
+                { Id: 4, ActualUseName: 'COMMERCIAL' },
+                { Id: 1, ActualUseName: 'RESIDENTIAL' },
+                { Id: 48, ActualUseName: 'AGRICULTURAL' },
+                { Id: 10, ActualUseName: 'SPECIAL- CULTURAL' },
+                { Id: 11, ActualUseName: 'SPECIAL- HOSPITAL' },
+                { Id: 12, ActualUseName: 'SPECIAL- SCIENTIFIC' },
+                { Id: 73, ActualUseName: 'SPECIAL-LOCAL WATER DISTRICT' }
+            ];
+
+            const selUseName = data ? (data.ActualUseName || data.actualUseName || 'INDUSTRIAL') : 'INDUSTRIAL';
+            let totalDepreciated = 0;
+            (window.machineryDetailsList || []).forEach(it => {
+                totalDepreciated += parseFloat(it.DepreciatedValue ?? it.depreciatedValue) || 0;
+            });
+
+            const mv = data ? (parseFloat(data.MarketValue ?? data.marketValue) || totalDepreciated) : totalDepreciated;
+            const defaultLvl = resolveMachineryAssessmentLevel(selUseName);
+            const lvl = data ? (parseFloat(data.AssessmentLevelPercent ?? data.assessmentLevelPercent) || defaultLvl) : defaultLvl;
+            const av = Math.round((mv * (lvl / 100.0)) * 100) / 100;
+
+            const row = document.createElement('tr');
+            row.className = 'hover:bg-slate-50 dark:hover:bg-stone-800/40 transition-colors machinery-roll-row';
+            row.innerHTML = `
+                <td class="p-2.5">
+                    <select class="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-bold mach-roll-use-dropdown text-xs cursor-pointer">
+                        ${useList.map(u => `<option value="${u.ActualUseName}" data-useid="${u.Id}" ${u.ActualUseName.toUpperCase() === selUseName.toUpperCase() ? 'selected' : ''}>${u.ActualUseName}</option>`).join('')}
+                    </select>
+                </td>
+                <td class="p-2.5 text-right">
+                    <input type="number" step="0.01" class="w-36 px-2.5 py-1.5 rounded-lg bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-right text-xs mach-roll-mv-input font-bold" value="${mv.toFixed(2)}" />
+                </td>
+                <td class="p-2.5 text-right">
+                    <div class="inline-flex items-center gap-1 justify-end">
+                        <input type="number" step="0.01" class="w-20 px-2 py-1.5 rounded-lg bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-right text-xs mach-roll-lvl-input font-bold text-emerald-600 dark:text-emerald-400" value="${lvl}" />
+                        <span class="text-xs font-bold text-slate-400">%</span>
+                    </div>
+                </td>
+                <td class="p-2.5 text-right font-mono font-black text-emerald-600 dark:text-emerald-400 mach-roll-av-cell">
+                    ₱${av.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </td>
+                <td class="p-2.5 text-center">
+                    <button type="button" onclick="this.closest('tr').remove(); recomputeAllMachineryValuation();" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors" title="Delete Row">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
+                </td>
+            `;
+
+            tbody.appendChild(row);
+
+            const useSel = row.querySelector('.mach-roll-use-dropdown');
+            const mvInput = row.querySelector('.mach-roll-mv-input');
+            const lvlInput = row.querySelector('.mach-roll-lvl-input');
+
+            useSel.addEventListener('change', function () {
+                const suggested = resolveMachineryAssessmentLevel(this.value);
+                lvlInput.value = suggested;
+                recomputeMachineryRollRow(row);
+            });
+            mvInput.addEventListener('input', () => recomputeMachineryRollRow(row));
+            lvlInput.addEventListener('input', () => recomputeMachineryRollRow(row));
+
+            recomputeMachineryRollRow(row);
+            if (window.lucide) lucide.createIcons();
+        }
+
+        function recomputeMachineryRollRow(row) {
+            const mv = parseFloat(row.querySelector('.mach-roll-mv-input')?.value) || 0;
+            const lvl = parseFloat(row.querySelector('.mach-roll-lvl-input')?.value) || 0;
+            const av = Math.round((mv * (lvl / 100.0)) * 100) / 100;
+            row.querySelector('.mach-roll-av-cell').textContent = `₱${av.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            row.setAttribute('data-mv', mv);
+            row.setAttribute('data-av', av);
+            recomputeAllMachineryValuation();
+        }
+
+        function syncMachineryAssessmentRollFromAppraisal() {
+            let totalDepreciated = 0;
+            (window.machineryDetailsList || []).forEach(it => {
+                totalDepreciated += parseFloat(it.DepreciatedValue ?? it.depreciatedValue) || 0;
+            });
+
+            const rows = document.querySelectorAll('.machinery-roll-row');
+            if (rows.length === 0) {
+                addMachineryAssessmentRollRow({
+                    ActualUseName: 'INDUSTRIAL',
+                    MarketValue: totalDepreciated,
+                    AssessmentLevelPercent: resolveMachineryAssessmentLevel('INDUSTRIAL')
+                });
+            } else {
+                const firstRow = rows[0];
+                const mvInput = firstRow.querySelector('.mach-roll-mv-input');
+                if (mvInput) {
+                    mvInput.value = totalDepreciated.toFixed(2);
+                    recomputeMachineryRollRow(firstRow);
+                }
+            }
+        }
+
+        function recomputeAllMachineryValuation() {
+            let totalRollMv = 0;
+            let totalRollAv = 0;
+            document.querySelectorAll('.machinery-roll-row').forEach(r => {
+                totalRollMv += parseFloat(r.getAttribute('data-mv')) || 0;
+                totalRollAv += parseFloat(r.getAttribute('data-av')) || 0;
+            });
+
+            $('#displayMachineryRollTotalMv').text(`₱${totalRollMv.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+            $('#displayMachineryRollTotalAv').text(`₱${totalRollAv.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+            $('#kpiMachineryMarketValue').text(`₱${totalRollMv.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+            $('#kpiMachineryAssessedValue').text(`₱${totalRollAv.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+
+            const annualTax = Math.round((totalRollAv * 0.03) * 100) / 100;
+            $('#kpiMachineryAnnualTax').text(`₱${annualTax.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+
+            serializeAllMachineryTables();
+        }
+
+        function serializeAllMachineryTables() {
+            $('#machineryAppraisalDetailsJson').val(JSON.stringify(window.machineryDetailsList || []));
+
+            const rollItems = [];
+            document.querySelectorAll('.machinery-roll-row').forEach(row => {
+                const useSel = row.querySelector('.mach-roll-use-dropdown');
+                const opt = useSel ? useSel.options[useSel.selectedIndex] : null;
+                const useId = opt ? (parseInt(opt.getAttribute('data-useid')) || null) : null;
+                const mv = parseFloat(row.querySelector('.mach-roll-mv-input')?.value) || 0;
+                const lvl = parseFloat(row.querySelector('.mach-roll-lvl-input')?.value) || 75;
+                rollItems.push({
+                    ActualUseId: useId,
+                    ActualUseName: useSel?.value || 'INDUSTRIAL',
+                    MarketValue: mv,
+                    AssessmentLevelPercent: lvl,
+                    AssessmentValue: Math.round((mv * (lvl / 100.0)) * 100) / 100
+                });
+            });
+            $('#machineryPropertyAssessmentsJson').val(JSON.stringify(rollItems));
+        }
+
+        function initMachineryFormDynamicTables(partitionData = null) {
+            window.machineryTablesInitialized = true;
+            window.machineryDetailsList = [];
+
+            let detailsJson = partitionData
+                ? (partitionData.machineryAppraisalDetailsJson || partitionData.MachineryAppraisalDetailsJson)
+                : $('#machineryAppraisalDetailsJson').val();
+
+            if (detailsJson && detailsJson.trim() !== '' && detailsJson.trim() !== '[]') {
+                try {
+                    const parsed = typeof detailsJson === 'string' ? JSON.parse(detailsJson) : detailsJson;
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        window.machineryDetailsList = parsed;
+                    }
+                } catch (e) { }
+            }
+
+            if (window.machineryDetailsList.length === 0) {
+                const defaultMv = partitionData ? (parseFloat(partitionData.marketValue) || 250000) : 250000;
+                const todayIso = new Date().toISOString().split('T')[0];
+                const currentYear = new Date().getFullYear();
+                window.machineryDetailsList.push({
+                    Classification: 'INDUSTRIAL',
+                    DescriptionBrand: 'GENERATOR SET - CATERPILLAR / STANDARD',
+                    KindOfMachinery: 'INDUSTRIAL',
+                    BrandModel: 'GENERATOR SET - CATERPILLAR / STANDARD',
+                    Capacity: '150 HP',
+                    AcquiredDate: todayIso,
+                    ConditionWhenAcquired: 'NEW',
+                    EconomicLifeEstimated: 20,
+                    YearInstalled: currentYear,
+                    YearOfOperation: currentYear,
+                    DateOfInstallation: todayIso,
+                    DateOfOperation: todayIso,
+                    OriginalCost: defaultMv,
+                    InstallationCost: 0,
+                    TotalCost: defaultMv,
+                    RCN: defaultMv,
+                    NoOfYearsUsed: 0,
+                    RemainingEconomicLife: 20,
+                    MarketValue: defaultMv,
+                    DepreciationTotalPercentage: 0,
+                    DepreciationTotalValue: 0,
+                    DepreciatedValue: defaultMv
+                });
+            }
+
+            renderMachineryAppraisalTable();
+
+            const rollBody = document.getElementById('machineryPropertyAssessmentTableBody');
+            if (rollBody) rollBody.innerHTML = '';
+
+            let rollJson = partitionData
+                ? (partitionData.machineryPropertyAssessmentsJson || partitionData.MachineryPropertyAssessmentsJson)
+                : $('#machineryPropertyAssessmentsJson').val();
+
+            let hasRoll = false;
+            if (rollJson && rollJson.trim() !== '' && rollJson.trim() !== '[]') {
+                try {
+                    const parsedRoll = typeof rollJson === 'string' ? JSON.parse(rollJson) : rollJson;
+                    if (Array.isArray(parsedRoll) && parsedRoll.length > 0) {
+                        parsedRoll.forEach(item => addMachineryAssessmentRollRow(item));
+                        hasRoll = true;
+                    }
+                } catch (e) { }
+            }
+
+            if (!hasRoll) {
+                syncMachineryAssessmentRollFromAppraisal();
+            }
+
+            recomputeAllMachineryValuation();
+        }
+
         let buildingFloors = [];
         let buildingAdditions = [];
 
@@ -1706,6 +2307,147 @@
 
             $('#inputAssessedArea').on('input', function () {
                 $('#inputValuationAssessedArea').val($(this).val());
+            });
+
+            initPartitionRegisteredOwnerLookup();
+        }
+
+        function applyRegisteredOwnerToPartition(data) {
+            if (!data) return;
+            if (data.id) {
+                $('#inputPartitionOwnerId').val(data.id);
+            }
+            const ownerName = data.name || '';
+            const ownerTin = data.tin || '';
+            const ownerPhone = data.phone || '';
+            const ownerEmail = data.email || '';
+            const ownerAddress = data.address || data.street || '';
+            const isCorp = (data.ownerType === 'Corporate' || data.ownerType === 'Government');
+            const genderVal = isCorp ? 'Corporate' : 'Male';
+            const civilStatusVal = isCorp ? 'N/A (Corporate / Entity)' : 'Single';
+
+            // 1. Building Owner & Administrator Demographics
+            if ($('#isAdminSwitch').is(':checked')) {
+                $('#inputAdminName').val(ownerName);
+                if (!$('#inputOwnerName').val()) {
+                    $('#inputOwnerName').val(ownerName);
+                }
+            } else {
+                $('#inputOwnerName').val(ownerName);
+            }
+            $('#selectBldgOwnerGender').val(genderVal);
+            $('#selectBldgOwnerCivilStatus').val(civilStatusVal);
+            $('#inputBldgOwnerTin').val(ownerTin);
+            $('#inputBldgOwnerPhone').val(ownerPhone);
+            $('#inputBldgOwnerEmail').val(ownerEmail);
+            $('#inputBldgOwnerAddress').val(ownerAddress);
+
+            // Sync hidden Administrator inputs
+            $('#inputAdminAddress').val(ownerAddress);
+            $('#inputAdminContact').val(ownerPhone);
+            $('#inputAdminTin').val(ownerTin);
+            $('#inputAdminGender').val(genderVal);
+            $('#inputAdminCivilStatus').val(civilStatusVal);
+            $('#inputAdminEmail').val(ownerEmail);
+
+            // Also populate CCT owner name if empty
+            if (!$('input[name="OwnerNameReflectedInCct"]').val()) {
+                $('input[name="OwnerNameReflectedInCct"]').val(ownerName);
+            }
+
+            // 2. Land Owner & Declarant Demographics (keep in sync)
+            if ($('#isLandAdminSwitch').is(':checked')) {
+                $('#inputLandAdminName').val(ownerName);
+                $('#inputLandAdminTin').val(ownerTin);
+                $('#inputLandAdminPhone').val(ownerPhone);
+                $('#inputLandAdminAddress').val(ownerAddress);
+                $('#inputLandAdminEmail').val(ownerEmail);
+                if (!$('#inputLandOwnerName').val()) {
+                    $('#inputLandOwnerName').val(ownerName);
+                }
+            } else {
+                $('#inputLandOwnerName').val(ownerName);
+            }
+            $('#inputLandOwnerTin').val(ownerTin);
+            $('#inputLandOwnerPhone').val(ownerPhone);
+            $('#inputLandOwnerAddress').val(ownerAddress);
+            $('#inputLandOwnerEmail').val(ownerEmail);
+            $('#selectLandOwnerGender').val(genderVal);
+
+            // 3. Machinery Owner & Declarant Demographics (keep in sync)
+            if ($('#isMachineryAdminSwitch').is(':checked')) {
+                $('#inputMachineryAdminName').val(ownerName);
+                $('#inputMachineryAdminTin').val(ownerTin);
+                $('#inputMachineryAdminPhone').val(ownerPhone);
+                $('#inputMachineryAdminAddress').val(ownerAddress);
+                $('#inputMachineryAdminEmail').val(ownerEmail);
+                if (!$('#inputMachineryOwnerName').val()) {
+                    $('#inputMachineryOwnerName').val(ownerName);
+                }
+            } else {
+                $('#inputMachineryOwnerName').val(ownerName);
+            }
+            $('#inputMachineryOwnerTin').val(ownerTin);
+            $('#inputMachineryOwnerPhone').val(ownerPhone);
+            $('#inputMachineryOwnerAddress').val(ownerAddress);
+            $('#inputMachineryOwnerEmail').val(ownerEmail);
+            $('#selectMachineryOwnerGender').val(genderVal);
+
+            if (typeof toastr !== 'undefined') {
+                toastr.success(`All Owner & Administrator Demographics auto-filled for ${ownerName}!`, 'Active Registered Owner Loaded');
+            }
+        }
+
+        function initPartitionRegisteredOwnerLookup() {
+            ['#bldgRegisteredOwnerSelect', '#landRegisteredOwnerSelect', '#machineryRegisteredOwnerSelect'].forEach(function (selector) {
+                const el = document.querySelector(selector);
+                if (!el || el.tomselect) return;
+
+                new TomSelect(el, {
+                    create: false,
+                    preload: true,
+                    valueField: 'id',
+                    labelField: 'display',
+                    searchField: ['name', 'tin', 'rptin', 'barangay', 'text', 'display'],
+                    loadThrottle: 300,
+                    placeholder: 'Search active registered owner by Name, TIN, RPTIN, or Barangay...',
+                    load: function (query, callback) {
+                        const q = (query || '').trim();
+                        fetch(`/PropertyAssessmentRequest/SearchRegisteredOwners?term=${encodeURIComponent(q)}`)
+                            .then(res => res.json())
+                            .then(data => callback(Array.isArray(data) ? data : []))
+                            .catch(() => callback());
+                    },
+                    render: {
+                        option: function (item, escape) {
+                            if (item.name) {
+                                return `<div class="py-1">
+                                    <span class="font-bold text-slate-900 dark:text-white">${escape(item.name)}</span>
+                                    <span class="text-[11px] text-slate-600 dark:text-stone-300 font-medium"> (TIN: ${escape(item.tin || 'N/A')} | ${escape(item.barangay || 'N/A')})</span>
+                                </div>`;
+                            }
+                            return `<div class="py-1">${escape(item.text || item.display || '')}</div>`;
+                        },
+                        item: function (item, escape) {
+                            if (item.name) {
+                                return `<div>${escape(item.name)} (TIN: ${escape(item.tin || 'N/A')})</div>`;
+                            }
+                            return `<div>${escape(item.text || item.display || '')}</div>`;
+                        }
+                    },
+                    onChange: function (ownerId) {
+                        if (!ownerId) return;
+                        $('#inputPartitionOwnerId').val(ownerId);
+                        fetch(`/PropertyAssessmentRequest/GetOwnerDetails?id=${encodeURIComponent(ownerId)}`)
+                            .then(res => res.json())
+                            .then(data => {
+                                if (data) {
+                                    applyRegisteredOwnerToPartition(data);
+                                }
+                            })
+                            .catch(err => console.error('Error fetching owner details:', err));
+                    }
+                });
             });
         }
 
@@ -2257,8 +2999,132 @@
 
         // Save & Return Logic
         function submitPartitionForm() {
-            const isLand = (window.activeAppraisalKind || 'Land').toLowerCase() === 'land';
+            const activeKind = (window.activeAppraisalKind || 'Land').toLowerCase();
+            const isLand = activeKind === 'land';
+            const isMachinery = activeKind === 'machinery';
             let updatedPartition = {};
+
+            if (isMachinery) {
+                serializeAllMachineryTables();
+
+                updatedPartition.id = $('input[name="BasePropertyId"]').val() || '';
+                updatedPartition.basePropertyId = $('input[name="BasePropertyId"]').val() || '';
+                updatedPartition.partitionIndex = document.querySelector('input[name="PartitionIndex"]')?.value || String.fromCharCode(65 + partitionIndex);
+                updatedPartition.kind = 'Machinery';
+                updatedPartition.systemGeneratedTDN = $('#inputTdn').val() || 'TDN Pending';
+                updatedPartition.tdn = updatedPartition.systemGeneratedTDN;
+                updatedPartition.pin = $('#inputMachineryPin').val() || '';
+                updatedPartition.arpNo = $('#inputMachineryArpNo').val() || '';
+                updatedPartition.sectionNo = $('#inputMachinerySectionNo').val() || '';
+                updatedPartition.lotNumber = $('#inputMachineryLotNo').val() || '';
+                updatedPartition.parcelNo = $('#inputMachineryParcelNo').val() || $('#inputMachineryLotNo').val() || '';
+
+                // Location & Building/Land References
+                updatedPartition.isLandOwnerAlsoBuildingOwner = $('#chkIsLandOwnerAlsoBuildingOwner').is(':checked');
+                updatedPartition.buildingReferenceName = $('#inputMachineryBldgOwner').val() || '';
+                updatedPartition.buildingPin = $('#inputMachineryBldgPin').val() || '';
+                updatedPartition.buildingTdNo = $('#inputMachineryBldgTdNo').val() || '';
+                updatedPartition.landOwnerName = $('#inputMachineryLandOwner').val() || '';
+                updatedPartition.landPin = $('#inputMachineryLandPin').val() || '';
+                updatedPartition.landTdNo = $('#inputMachineryLandTdNo').val() || '';
+
+                // Property Registration Details (Outside the Philippines / Local Manufacturer)
+                const isLocalMfg = $('#radioMachineryLocal').is(':checked') || $('#inputIsLocallyManufactured').val() === 'True';
+                updatedPartition.isLocallyManufactured = isLocalMfg;
+                updatedPartition.machineryRegNo = $('#inputMachineryRegNo').val() || '';
+                updatedPartition.machineryDateRegistered = $('#inputMachineryDateRegistered').val() || null;
+                updatedPartition.importationPermitNo = $('#inputMachineryImportPermit').val() || '';
+                updatedPartition.importationDateIssued = $('#inputMachineryImportDateIssued').val() || null;
+                updatedPartition.countryOfOrigin = $('#inputMachineryCountryOrigin').val() || '';
+                updatedPartition.supplierSeller = $('#hiddenMachinerySupplierSeller').val() || (isLocalMfg ? $('#inputMachineryLocalSupplier').val() : $('#inputMachineryImportedSupplier').val()) || '';
+                updatedPartition.supplierAddress = $('#inputMachinerySupplierAddress').val() || '';
+                updatedPartition.acquisitionCost = parseFloat($('#hiddenMachineryAcquisitionCost').val() || (isLocalMfg ? $('#inputMachineryLocalAcqCost').val() : $('#inputMachineryImportedAcqCost').val())) || 0;
+                updatedPartition.orNo = $('#inputMachineryOrNo').val() || '';
+                updatedPartition.orDate = $('#inputMachineryOrDate').val() || null;
+                updatedPartition.orNoAndDate = $('#inputMachineryOrNoAndDate').val() || '';
+                updatedPartition.localDateIssued = $('#inputMachineryLocalDateIssued').val() || null;
+
+                updatedPartition.streetLocation = $('#inputMachineryStreet').val() || '';
+                updatedPartition.districtOrBarangay = $('#selectMachineryBarangay').val() || '';
+                updatedPartition.cityMunicipality = $('#inputMachineryCity').val() || 'General Santos City';
+                updatedPartition.province = $('#inputMachineryProvince').val() || 'South Cotabato';
+                const locParts = [updatedPartition.streetLocation, updatedPartition.districtOrBarangay, updatedPartition.cityMunicipality, updatedPartition.province].filter(Boolean);
+                updatedPartition.propertyLocation = locParts.join(', ');
+                $('#inputPropertyLocation').val(updatedPartition.propertyLocation);
+
+                // Declarant & Administrator / Beneficial User / Possessor
+                updatedPartition.ownerId = $('#inputPartitionOwnerId').val() || null;
+                updatedPartition.newOwnerName = $('#inputMachineryOwnerName').val() || '';
+                updatedPartition.declarantName = updatedPartition.newOwnerName;
+                updatedPartition.ownerTIN = $('#inputMachineryOwnerTin').val() || '';
+                updatedPartition.declarantTin = updatedPartition.ownerTIN;
+                updatedPartition.ownerContactNo = $('#inputMachineryOwnerPhone').val() || '';
+                updatedPartition.declarantContact = updatedPartition.ownerContactNo;
+                updatedPartition.ownerAddress = $('#inputMachineryOwnerAddress').val() || '';
+                updatedPartition.declarantAddress = updatedPartition.ownerAddress;
+                updatedPartition.ownerEmail = $('#inputMachineryOwnerEmail').val() || '';
+                updatedPartition.ownerGender = $('#selectMachineryOwnerGender').val() || 'Male';
+                updatedPartition.isAdministrator = $('#isMachineryAdminSwitch').is(':checked');
+                updatedPartition.isBeneficialUser = $('#isMachineryBeneficialSwitch').is(':checked');
+                updatedPartition.isPossessor = $('#isMachineryPossessorSwitch').is(':checked');
+                updatedPartition.administratorName = $('#inputMachineryAdminName').val() || '';
+                updatedPartition.administratorGender = $('#selectMachineryAdminGender').val() || 'Male';
+                updatedPartition.administratorTin = $('#inputMachineryAdminTin').val() || '';
+                updatedPartition.administratorContactNo = $('#inputMachineryAdminPhone').val() || '';
+                updatedPartition.administratorAddress = $('#inputMachineryAdminAddress').val() || '';
+                updatedPartition.administratorEmail = $('#inputMachineryAdminEmail').val() || '';
+
+                // Valuation & Schedules
+                updatedPartition.machineryAppraisalDetailsJson = $('#machineryAppraisalDetailsJson').val() || '';
+                updatedPartition.machineryPropertyAssessmentsJson = $('#machineryPropertyAssessmentsJson').val() || '';
+
+                let totalRollMv = 0;
+                let totalRollAv = 0;
+                document.querySelectorAll('.machinery-roll-row').forEach(r => {
+                    totalRollMv += parseFloat(r.getAttribute('data-mv')) || 0;
+                    totalRollAv += parseFloat(r.getAttribute('data-av')) || 0;
+                });
+                updatedPartition.marketValue = totalRollMv;
+                updatedPartition.assessedValue = totalRollAv;
+                updatedPartition.unitValue = totalRollMv;
+                const firstLvl = parseFloat($('.mach-roll-lvl-input').first().val()) || 75;
+                updatedPartition.assessmentLevelPercent = firstLvl;
+                updatedPartition.assessmentLevel = firstLvl;
+                const firstActual = $('.mach-roll-use-dropdown').first().val() || 'INDUSTRIAL';
+                updatedPartition.actualUse = firstActual;
+                updatedPartition.classification = firstActual;
+
+                // Effectivity & Memoranda
+                updatedPartition.taxability = $('#selectMachineryTaxability').val() || 'Taxable';
+                updatedPartition.effectivityQuarter = $('#selectMachineryEffQuarter').val() || '1st Quarter';
+                updatedPartition.effectivityYear = parseInt($('#inputMachineryEffYear').val()) || new Date().getFullYear();
+                updatedPartition.assessmentBasis = $('#inputMachineryAssessmentBasis').val() || 'Sec. 224-225 RA 7160';
+                updatedPartition.backTaxesYearFrom = parseInt($('#inputMachineryBackTaxesFrom').val()) || null;
+                updatedPartition.backTaxesYearTo = parseInt($('#inputMachineryBackTaxesTo').val()) || null;
+                updatedPartition.memoranda = $('#textareaMachineryMemoranda').val() || '';
+
+                try {
+                    let savedDraft = sessionStorage.getItem('propertyAssessmentRequest_draft');
+                    if (savedDraft) {
+                        let draftObj = JSON.parse(savedDraft);
+                        if (draftObj && draftObj.partitions && draftObj.partitions[partitionIndex]) {
+                            Object.assign(draftObj.partitions[partitionIndex], updatedPartition);
+                            sessionStorage.setItem('propertyAssessmentRequest_draft', JSON.stringify(draftObj));
+                        }
+                    }
+                    sessionStorage.setItem('lastUpdatedPartition_' + partitionIndex, JSON.stringify(updatedPartition));
+                } catch (e) {
+                    console.error('Session storage error:', e);
+                }
+
+                $('#container-land-appraisal :input').prop('disabled', true);
+                $('#container-building-appraisal :input').prop('disabled', true);
+                $('#partitionJsonPayload').val(JSON.stringify(updatedPartition));
+                $('#container-machinery-appraisal :input').prop('disabled', false);
+                $('#inputKindHidden').val('Machinery');
+                document.getElementById('partitionForm').submit();
+                return;
+            }
 
             if (isLand) {
                 serializeAllLandTables();
@@ -2303,6 +3169,7 @@
                 updatedPartition.wremarks = $('#inputLandWRemarks').val() || '';
 
                 // Declarant & Administrator
+                updatedPartition.ownerId = $('#inputPartitionOwnerId').val() || null;
                 updatedPartition.newOwnerName = $('#inputLandOwnerName').val() || '';
                 updatedPartition.declarantName = updatedPartition.newOwnerName;
                 updatedPartition.ownerTIN = $('#inputLandOwnerTin').val() || '';
@@ -2314,7 +3181,10 @@
                 updatedPartition.ownerEmail = $('#inputLandOwnerEmail').val() || '';
                 updatedPartition.ownerGender = $('#selectLandOwnerGender').val() || 'Male';
                 updatedPartition.isAdministrator = $('#isLandAdminSwitch').is(':checked');
+                updatedPartition.isBeneficialUser = $('#isLandBeneficialSwitch').is(':checked');
+                updatedPartition.isPossessor = $('#isLandPossessorSwitch').is(':checked');
                 updatedPartition.administratorName = $('#inputLandAdminName').val() || '';
+                updatedPartition.administratorGender = $('#selectLandAdminGender').val() || 'Male';
                 updatedPartition.administratorTin = $('#inputLandAdminTin').val() || '';
                 updatedPartition.administratorContactNo = $('#inputLandAdminPhone').val() || '';
                 updatedPartition.administratorAddress = $('#inputLandAdminAddress').val() || '';
@@ -2382,6 +3252,8 @@
                 }
 
                 $('#container-building-appraisal :input').prop('disabled', true);
+                $('#container-machinery-appraisal :input').prop('disabled', true);
+                $('#partitionJsonPayload').val(JSON.stringify(updatedPartition));
                 $('#container-land-appraisal :input').prop('disabled', false);
                 $('#inputKindHidden').val('Land');
                 document.getElementById('partitionForm').submit();
@@ -2390,9 +3262,11 @@
 
             // BUILDING WORKFLOW
             $('#container-land-appraisal :input').prop('disabled', true);
+            $('#container-machinery-appraisal :input').prop('disabled', true);
             $('#container-building-appraisal :input').prop('disabled', false);
             $('#inputKindHidden').val('Building');
             recalculateValuation();
+            $('#partitionJsonPayload').val(JSON.stringify(updatedPartition));
 
             // Sync Total Building Area
             const totalAreaVal = parseFloat($('#inputAssessedArea').val()) || 0;
@@ -2400,12 +3274,12 @@
 
             // Sync Administrator Fields from Owner inputs if Admin Switch is active
             if ($('#isAdminSwitch').is(':checked')) {
-                $('#inputAdminAddress').val($('input[name="OwnerAddress"]').val());
-                $('#inputAdminContact').val($('input[name="OwnerContactNo"]').val());
-                $('#inputAdminTin').val($('input[name="OwnerTIN"]').val());
-                $('#inputAdminGender').val($('select[name="OwnerGender"]').val());
-                $('#inputAdminCivilStatus').val($('select[name="OwnerCivilStatus"]').val());
-                $('#inputAdminEmail').val($('input[name="OwnerEmail"]').val());
+                $('#inputAdminAddress').val($('#inputBldgOwnerAddress').val());
+                $('#inputAdminContact').val($('#inputBldgOwnerPhone').val());
+                $('#inputAdminTin').val($('#inputBldgOwnerTin').val());
+                $('#inputAdminGender').val($('#selectBldgOwnerGender').val());
+                $('#inputAdminCivilStatus').val($('#selectBldgOwnerCivilStatus').val());
+                $('#inputAdminEmail').val($('#inputBldgOwnerEmail').val());
             }
 
             // Extract the updated object for client storage
@@ -2417,6 +3291,8 @@
             updatedPartition.partitionIndex = document.querySelector('input[name="PartitionIndex"]')?.value || String.fromCharCode(65 + partitionIndex);
             updatedPartition.systemGeneratedTDN = $('#inputTdn').val();
             updatedPartition.tdn = $('#inputTdn').val();
+            updatedPartition.arpNo = $('#inputBldgArpNo').val() || $('#inputLandArpNo').val();
+            updatedPartition.sectionNo = $('#inputBldgSectionNo').val() || $('#inputLandSectionNo').val();
             updatedPartition.pin = $('#inputPin').val();
             updatedPartition.lotNumber = $('input[name="LotNumber"]').val();
             updatedPartition.blockNumber = $('input[name="BlockNumber"]').val();
@@ -2438,18 +3314,19 @@
             
             // Declarant / Owner Demographics
             const isAdministratorUser = $('#isAdminSwitch').is(':checked');
-            const effectiveOwnerName = isAdministratorUser ? ($('input[name="AdministratorName"]').val() || '') : ($('input[name="NewOwnerName"]').val() || '');
+            const effectiveOwnerName = isAdministratorUser ? ($('#inputAdminName').val() || '') : ($('#inputOwnerName').val() || '');
+            updatedPartition.ownerId = $('#inputPartitionOwnerId').val() || null;
             updatedPartition.newOwnerName = effectiveOwnerName;
             updatedPartition.declarantName = effectiveOwnerName;
-            updatedPartition.ownerAddress = $('input[name="OwnerAddress"]').val();
-            updatedPartition.declarantAddress = $('input[name="OwnerAddress"]').val();
-            updatedPartition.ownerContactNo = $('input[name="OwnerContactNo"]').val();
-            updatedPartition.declarantContact = $('input[name="OwnerContactNo"]').val();
-            updatedPartition.ownerTIN = $('input[name="OwnerTIN"]').val();
-            updatedPartition.declarantTin = $('input[name="OwnerTIN"]').val();
-            updatedPartition.ownerGender = $('select[name="OwnerGender"]').val();
-            updatedPartition.ownerCivilStatus = $('select[name="OwnerCivilStatus"]').val();
-            updatedPartition.ownerEmail = $('input[name="OwnerEmail"]').val();
+            updatedPartition.ownerAddress = $('#inputBldgOwnerAddress').val();
+            updatedPartition.declarantAddress = $('#inputBldgOwnerAddress').val();
+            updatedPartition.ownerContactNo = $('#inputBldgOwnerPhone').val();
+            updatedPartition.declarantContact = $('#inputBldgOwnerPhone').val();
+            updatedPartition.ownerTIN = $('#inputBldgOwnerTin').val();
+            updatedPartition.declarantTin = $('#inputBldgOwnerTin').val();
+            updatedPartition.ownerGender = $('#selectBldgOwnerGender').val();
+            updatedPartition.ownerCivilStatus = $('#selectBldgOwnerCivilStatus').val();
+            updatedPartition.ownerEmail = $('#inputBldgOwnerEmail').val();
             updatedPartition.customOwner = true;
 
             // Location of Property
@@ -2471,13 +3348,13 @@
             updatedPartition.ownerNameReflectedInCct = $('input[name="OwnerNameReflectedInCct"]').val();
             // Administrator Flagging & Normalized Demographics
             updatedPartition.isAdministrator = $('#isAdminSwitch').is(':checked');
-            updatedPartition.administratorName = $('input[name="AdministratorName"]').val();
-            updatedPartition.administratorGender = $('select[name="OwnerGender"]').val();
-            updatedPartition.administratorCivilStatus = $('select[name="OwnerCivilStatus"]').val();
-            updatedPartition.administratorTin = $('input[name="OwnerTIN"]').val();
-            updatedPartition.administratorContactNo = $('input[name="OwnerContactNo"]').val();
-            updatedPartition.administratorEmail = $('input[name="OwnerEmail"]').val();
-            updatedPartition.administratorAddress = $('input[name="OwnerAddress"]').val();
+            updatedPartition.administratorName = $('#inputAdminName').val();
+            updatedPartition.administratorGender = $('#selectBldgOwnerGender').val();
+            updatedPartition.administratorCivilStatus = $('#selectBldgOwnerCivilStatus').val();
+            updatedPartition.administratorTin = $('#inputBldgOwnerTin').val();
+            updatedPartition.administratorContactNo = $('#inputBldgOwnerPhone').val();
+            updatedPartition.administratorEmail = $('#inputBldgOwnerEmail').val();
+            updatedPartition.administratorAddress = $('#inputBldgOwnerAddress').val();
 
             // Building Floor Plan Sketch Attachment (persist path; exclude giant base64 to avoid quota limits)
             updatedPartition.buildingFloorPlanSketchPath = $('#BuildingFloorPlanSketchPath').val();
@@ -2539,6 +3416,9 @@
                 console.error('Session storage error:', e);
             }
 
+            // Serialize the fully rebuilt building partition (must happen AFTER updatedPartition is populated)
+            $('#partitionJsonPayload').val(JSON.stringify(updatedPartition));
+
             // Always submit the form to the server so database, files, and server TempData persist 100%!
             document.getElementById('partitionForm').submit();
         }
@@ -2547,29 +3427,143 @@
             window.location.href = returnUrl;
         }
 
+        function resolveCastBrgyCode(brgyVal, defaultCode = '0001') {
+            if (!brgyVal) return defaultCode;
+            const raw = String(brgyVal).trim();
+            if (/^\d+$/.test(raw)) return raw.slice(-4).padStart(4, '0');
+            const u = raw.toUpperCase();
+            const map = [
+                ['DADIANGAS EAST', '0001'], ['CENTRAL', '0001'], ['POBLACION', '0001'], ['ZONE 1', '0001'],
+                ['LAGAO', '0002'], ['MORALES', '0002'], ['CALUMPANG', '0003'], ['SAN ISIDRO', '0004'],
+                ['CITY HEIGHTS', '0005'], ['DADIANGAS NORTH', '0006'], ['DADIANGAS SOUTH', '0007'],
+                ['DADIANGAS WEST', '0008'], ['LABANGAL', '0009'], ['APOPONG', '0010'], ['BALUAN', '0011'],
+                ['BATOMELONG', '0012'], ['BUAYAN', '0013'], ['BULA', '0014'], ['CONEL', '0015'],
+                ['FATIMA', '0016'], ['KATANGAWAN', '0017'], ['LIGAYA', '0018'], ['MABUHAY', '0019'],
+                ['OLYMPOG', '0020'], ['SAN JOSE', '0021'], ['SIGUEL', '0022'], ['SINAWAL', '0023'],
+                ['TAMBLER', '0024'], ['TINAGACAN', '0025'], ['UPPER LABAY', '0026'], ['SALITRAN', '0027']
+            ];
+            for (const [k, c] of map) {
+                if (u.includes(k)) return c;
+            }
+            const digits = raw.replace(/\D/g, '');
+            if (digits) return digits.slice(-4).padStart(4, '0');
+            return defaultCode;
+        }
+
+        function formatThreeDigitPart(val) {
+            if (!val) return '000';
+            const m = String(val).match(/\d+/);
+            if (m) return m[0].slice(-3).padStart(3, '0');
+            return String(val).replace(/[^a-zA-Z0-9]/g, '').slice(0, 3).toUpperCase().padStart(3, '0') || '000';
+        }
+
+        // CAST Combination #1 (ARPNo): {LGUCode}-{DistrictMunicipalityCode}-{BarangayCode:D4}-{SectionNo:D3}-{LotOrParcelNo:D3}
+        function formatARPNumber(lgu, mun, brgyVal, sectionNo, parcelOrLotNo) {
+            const lgu3 = String(lgu || '187').padStart(3, '0');
+            const mun2 = String(mun || '00').padStart(2, '0');
+            const brgy4 = resolveCastBrgyCode(brgyVal, '0000');
+            const sec3 = formatThreeDigitPart(sectionNo);
+            const lot3 = formatThreeDigitPart(parcelOrLotNo);
+            return `${lgu3}-${mun2}-${brgy4}-${sec3}-${lot3}`;
+        }
+
+        // CAST Combination #2 (Official TDN1): {RevisionYearLastTwoDigits:D2}-{BarangayCode:D4}-{DeclarationNo:D5}
+        function formatOfficialTDN(effYear, brgyVal, currentTdn, fallbackSeq) {
+            const yr = parseInt(effYear, 10) || new Date().getFullYear();
+            const revYearLastTwo = String(yr % 100).padStart(2, '0');
+            const brgy4 = resolveCastBrgyCode(brgyVal, '0001');
+            let seq5 = String((typeof fallbackSeq === 'number' && fallbackSeq > 0) ? fallbackSeq : (partitionIndex + 1)).padStart(5, '0');
+            if (currentTdn) {
+                const parts = String(currentTdn).trim().split('-');
+                if (parts.length === 3 && /^\d{5}$/.test(parts[2])) {
+                    seq5 = parts[2];
+                }
+            }
+            return `${revYearLastTwo}-${brgy4}-${seq5}`;
+        }
+
+        function syncCastArpAndTdnLive() {
+            const k = ($('#inputKindHidden').val() || 'Land').toLowerCase();
+            const isLand = k === 'land';
+            const isMachinery = k === 'machinery';
+            const brgyVal = isLand
+                ? ($('#selectLandBarangay').val() || '')
+                : (isMachinery
+                    ? ($('#selectMachineryBarangay').val() || '')
+                    : ($('#container-building-appraisal input[name="DistrictOrBarangay"]').val() || ''));
+            const secVal = isLand
+                ? ($('#inputLandSectionNo').val() || '')
+                : (isMachinery
+                    ? ($('#inputMachinerySectionNo').val() || '')
+                    : ($('#inputBldgSectionNo').val() || ''));
+            const lotOrParcelVal = isLand
+                ? ($('#inputLandParcelNo').val() || $('#inputLandLotNo').val() || '')
+                : (isMachinery
+                    ? ($('#inputMachineryLotNo').val() || $('#inputMachineryParcelNo').val() || '')
+                    : ($('#inputLotNumber').val() || ''));
+            const effYearVal = isLand
+                ? ($('#inputLandEffYear').val() || new Date().getFullYear())
+                : (isMachinery
+                    ? ($('#inputMachineryEffYear').val() || new Date().getFullYear())
+                    : ($('#container-building-appraisal input[name="EffectivityYear"]').val() || new Date().getFullYear()));
+
+            const arp = formatARPNumber('187', '00', brgyVal, secVal, lotOrParcelVal);
+            $('#inputLandArpNo').val(arp);
+            $('#inputBldgArpNo').val(arp);
+            $('#inputMachineryArpNo').val(arp);
+            $('#bannerDisplayArpNo').text(arp);
+
+            const officialTdn = formatOfficialTDN(effYearVal, brgyVal, $('#inputTdn').val(), partitionIndex + 1);
+            $('#inputTdn').val(officialTdn);
+            $('#displayHeaderTdn').text(officialTdn);
+            $('#bannerDisplayTdn').text(officialTdn);
+        }
+
         $(document).ready(function () {
             initSwitches();
 
-            // Real-time TDN input reflection into headers
-            $('#inputTdn, #inputLandTitleNo').on('input', function() {
+            // Real-time TDN & ARP input reflection into headers
+            $('#inputTdn').on('input', function() {
                 const v = $(this).val().trim() || 'TDN System Pending';
                 $('#displayHeaderTdn').text(v);
                 $('#bannerDisplayTdn').text(v);
             });
+            $('#inputLandArpNo, #inputBldgArpNo, #inputMachineryArpNo').on('input', function() {
+                const v = $(this).val().trim() || '187-00-0000-000-000';
+                $('#bannerDisplayArpNo').text(v);
+            });
+            $('#selectLandBarangay, #inputLandSectionNo, #inputLandLotNo, #inputLandParcelNo, #inputLandEffYear, #selectMachineryBarangay, #inputMachinerySectionNo, #inputMachineryLotNo, #inputMachineryEffYear, #container-building-appraisal input[name="DistrictOrBarangay"], #inputBldgSectionNo, #inputLotNumber, #container-building-appraisal input[name="EffectivityYear"]').on('input change', function() {
+                syncCastArpAndTdnLive();
+            });
 
-            // Detect Appraisal Kind (Land vs Building)
-            let currentKind = '@(Model.Kind ?? "Land")';
-            let loadedPartition = null;
-            try {
-                const savedDraft = sessionStorage.getItem('propertyAssessmentRequest_draft');
-                if (savedDraft) {
-                    const draftObj = JSON.parse(savedDraft);
-                    if (draftObj && draftObj.partitions && draftObj.partitions[partitionIndex]) {
-                        loadedPartition = draftObj.partitions[partitionIndex];
-                        if (loadedPartition.kind) currentKind = loadedPartition.kind;
+            // Load partition model from Server Model first (database ground truth), with draft fallback
+            const serverModel = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model ?? new PropertyAssessmentApp.Models.AssessmentPartitionItem(), jsonOptions));
+            const hasServerData = serverModel && (
+                (serverModel.systemGeneratedTDN && serverModel.systemGeneratedTDN !== 'TDN System Pending') ||
+                serverModel.pin ||
+                serverModel.arpNo ||
+                (serverModel.areaSqMeters > 0) ||
+                (serverModel.landAppraisalDetailsJson && serverModel.landAppraisalDetailsJson.length > 2) ||
+                (serverModel.machineryAppraisalDetailsJson && serverModel.machineryAppraisalDetailsJson.length > 2) ||
+                (serverModel.buildingFloorBreakdownJson && serverModel.buildingFloorBreakdownJson.length > 2)
+            );
+
+            let currentKind = (serverModel && serverModel.kind) ? serverModel.kind : '@(Model?.Kind ?? "Land")';
+            let loadedPartition = serverModel;
+
+            const isEditFromDb = '@(requestId.HasValue ? "true" : "false")' === 'true';
+            if (!isEditFromDb && !hasServerData) {
+                try {
+                    const savedDraft = sessionStorage.getItem('propertyAssessmentRequest_draft');
+                    if (savedDraft) {
+                        const draftObj = JSON.parse(savedDraft);
+                        if (draftObj && draftObj.partitions && draftObj.partitions[partitionIndex]) {
+                            loadedPartition = draftObj.partitions[partitionIndex];
+                            if (loadedPartition.kind) currentKind = loadedPartition.kind;
+                        }
                     }
-                }
-            } catch (e) { }
+                } catch (e) { }
+            }
 
             switchAppraisalKind(currentKind);
 
@@ -2611,6 +3605,7 @@
                     if (p.wremarks) $('#inputLandWRemarks').val(p.wremarks);
 
                     // Declarant
+                    if (p.ownerId || p.OwnerId) $('#inputPartitionOwnerId').val(p.ownerId || p.OwnerId);
                     if (p.newOwnerName || p.declarantName) $('#inputLandOwnerName').val(p.newOwnerName || p.declarantName);
                     if (p.ownerTIN || p.declarantTin) $('#inputLandOwnerTin').val(p.ownerTIN || p.declarantTin);
                     if (p.ownerContactNo || p.declarantContact) $('#inputLandOwnerPhone').val(p.ownerContactNo || p.declarantContact);
@@ -2618,12 +3613,21 @@
                     if (p.ownerEmail) $('#inputLandOwnerEmail').val(p.ownerEmail);
                     if (p.ownerGender) $('#selectLandOwnerGender').val(p.ownerGender);
 
-                    // Admin
+                    // Admin / Beneficial User / Possessor
                     if (p.isAdministrator) {
-                        $('#isLandAdminSwitch').prop('checked', true).trigger('change');
+                        $('#isLandAdminSwitch').prop('checked', true);
+                    }
+                    if (p.isBeneficialUser) {
+                        $('#isLandBeneficialSwitch').prop('checked', true);
+                    }
+                    if (p.isPossessor) {
+                        $('#isLandPossessorSwitch').prop('checked', true);
+                    }
+                    if (p.isAdministrator || p.isBeneficialUser || p.isPossessor || p.administratorName) {
                         $('#divLandAdminSection').removeClass('hidden');
                     }
                     if (p.administratorName) $('#inputLandAdminName').val(p.administratorName);
+                    if (p.administratorGender) $('#selectLandAdminGender').val(p.administratorGender);
                     if (p.administratorTin) $('#inputLandAdminTin').val(p.administratorTin);
                     if (p.administratorContactNo) $('#inputLandAdminPhone').val(p.administratorContactNo);
                     if (p.administratorAddress) $('#inputLandAdminAddress').val(p.administratorAddress);
@@ -2639,8 +3643,11 @@
                     if (p.memoranda) $('#textareaLandMemoranda').val(p.memoranda);
                 }
 
-                $('#isLandAdminSwitch').on('change', function() {
-                    if ($(this).is(':checked')) {
+                $('#isLandAdminSwitch, #isLandBeneficialSwitch, #isLandPossessorSwitch').on('change', function() {
+                    const anyRoleChecked = $('#isLandAdminSwitch').is(':checked') ||
+                                           $('#isLandBeneficialSwitch').is(':checked') ||
+                                           $('#isLandPossessorSwitch').is(':checked');
+                    if (anyRoleChecked) {
                         $('#divLandAdminSection').removeClass('hidden');
                     } else {
                         $('#divLandAdminSection').addClass('hidden');
@@ -2649,6 +3656,108 @@
 
                 initLandFormDynamicTables(p);
             }
+
+            if (currentKind.toLowerCase() === 'machinery') {
+                const p = loadedPartition;
+                if (p) {
+                    if (p.systemGeneratedTDN || p.tdn) {
+                        const tdnVal = p.systemGeneratedTDN || p.tdn;
+                        $('#inputTdn').val(tdnVal);
+                        $('#displayHeaderTdn').text(tdnVal);
+                        $('#bannerDisplayTdn').text(tdnVal);
+                    }
+                    if (p.pin) $('#inputMachineryPin').val(p.pin);
+                    if (p.arpNo) $('#inputMachineryArpNo').val(p.arpNo);
+                    if (p.sectionNo) $('#inputMachinerySectionNo').val(p.sectionNo);
+                    if (p.lotNumber) $('#inputMachineryLotNo').val(p.lotNumber);
+                    if (p.parcelNo) $('#inputMachineryParcelNo').val(p.parcelNo);
+
+                    // Location & References
+                    if (p.isLandOwnerAlsoBuildingOwner || p.IsLandOwnerAlsoBuildingOwner) {
+                        $('#chkIsLandOwnerAlsoBuildingOwner').prop('checked', true);
+                    }
+                    if (p.buildingReferenceName) $('#inputMachineryBldgOwner').val(p.buildingReferenceName);
+                    if (p.buildingPin) $('#inputMachineryBldgPin').val(p.buildingPin);
+                    if (p.buildingTdNo) $('#inputMachineryBldgTdNo').val(p.buildingTdNo);
+                    if (p.landOwnerName) $('#inputMachineryLandOwner').val(p.landOwnerName);
+                    if (p.landPin) $('#inputMachineryLandPin').val(p.landPin);
+                    if (p.landTdNo) $('#inputMachineryLandTdNo').val(p.landTdNo);
+                    if (p.streetLocation) $('#inputMachineryStreet').val(p.streetLocation);
+                    if (p.districtOrBarangay) $('#selectMachineryBarangay').val(p.districtOrBarangay);
+
+                    // Property Registration Details (Outside the Philippines / Local Manufacturer)
+                    const isLocal = !!(p.isLocallyManufactured || p.IsLocallyManufactured);
+                    if (typeof window.toggleMachineryRegistrationMode === 'function') {
+                        window.toggleMachineryRegistrationMode(isLocal);
+                    }
+                    if (p.machineryRegNo) $('#inputMachineryRegNo').val(p.machineryRegNo);
+                    if (p.machineryDateRegistered) $('#inputMachineryDateRegistered').val(formatIsoDate(p.machineryDateRegistered));
+                    if (p.importationPermitNo) $('#inputMachineryImportPermit').val(p.importationPermitNo);
+                    if (p.importationDateIssued) $('#inputMachineryImportDateIssued').val(formatIsoDate(p.importationDateIssued));
+                    if (p.countryOfOrigin) $('#inputMachineryCountryOrigin').val(p.countryOfOrigin);
+                    if (p.supplierSeller) {
+                        $('#hiddenMachinerySupplierSeller').val(p.supplierSeller);
+                        $('#inputMachineryImportedSupplier').val(p.supplierSeller);
+                        $('#inputMachineryLocalSupplier').val(p.supplierSeller);
+                    }
+                    if (p.supplierAddress) $('#inputMachinerySupplierAddress').val(p.supplierAddress);
+                    if (p.acquisitionCost !== undefined && p.acquisitionCost !== null) {
+                        const acqVal = parseFloat(p.acquisitionCost).toFixed(2);
+                        $('#hiddenMachineryAcquisitionCost').val(acqVal);
+                        $('#inputMachineryImportedAcqCost').val(acqVal);
+                        $('#inputMachineryLocalAcqCost').val(acqVal);
+                    }
+                    if (p.orNo) $('#inputMachineryOrNo').val(p.orNo);
+                    if (p.orDate) $('#inputMachineryOrDate').val(formatIsoDate(p.orDate));
+                    if (p.orNoAndDate) $('#inputMachineryOrNoAndDate').val(p.orNoAndDate);
+                    if (p.localDateIssued) $('#inputMachineryLocalDateIssued').val(formatIsoDate(p.localDateIssued));
+
+                    // Declarant
+                    if (p.ownerId || p.OwnerId) $('#inputPartitionOwnerId').val(p.ownerId || p.OwnerId);
+                    if (p.newOwnerName || p.declarantName) $('#inputMachineryOwnerName').val(p.newOwnerName || p.declarantName);
+                    if (p.ownerTIN || p.declarantTin) $('#inputMachineryOwnerTin').val(p.ownerTIN || p.declarantTin);
+                    if (p.ownerContactNo || p.declarantContact) $('#inputMachineryOwnerPhone').val(p.ownerContactNo || p.declarantContact);
+                    if (p.ownerAddress || p.declarantAddress) $('#inputMachineryOwnerAddress').val(p.ownerAddress || p.declarantAddress);
+                    if (p.ownerEmail) $('#inputMachineryOwnerEmail').val(p.ownerEmail);
+                    if (p.ownerGender) $('#selectMachineryOwnerGender').val(p.ownerGender);
+
+                    // Admin / Beneficial User / Possessor
+                    if (p.isAdministrator) $('#isMachineryAdminSwitch').prop('checked', true);
+                    if (p.isBeneficialUser) $('#isMachineryBeneficialSwitch').prop('checked', true);
+                    if (p.isPossessor) $('#isMachineryPossessorSwitch').prop('checked', true);
+                    if (p.isAdministrator || p.isBeneficialUser || p.isPossessor || p.administratorName) {
+                        $('#divMachineryAdminSection').removeClass('hidden');
+                    }
+                    if (p.administratorName) $('#inputMachineryAdminName').val(p.administratorName);
+                    if (p.administratorGender) $('#selectMachineryAdminGender').val(p.administratorGender);
+                    if (p.administratorTin) $('#inputMachineryAdminTin').val(p.administratorTin);
+                    if (p.administratorContactNo) $('#inputMachineryAdminPhone').val(p.administratorContactNo);
+                    if (p.administratorAddress) $('#inputMachineryAdminAddress').val(p.administratorAddress);
+                    if (p.administratorEmail) $('#inputMachineryAdminEmail').val(p.administratorEmail);
+
+                    // Effectivity & Memoranda
+                    if (p.taxability) $('#selectMachineryTaxability').val(p.taxability);
+                    if (p.effectivityQuarter) $('#selectMachineryEffQuarter').val(p.effectivityQuarter);
+                    if (p.effectivityYear) $('#inputMachineryEffYear').val(p.effectivityYear);
+                    if (p.assessmentBasis) $('#inputMachineryAssessmentBasis').val(p.assessmentBasis);
+                    if (p.backTaxesYearFrom) $('#inputMachineryBackTaxesFrom').val(p.backTaxesYearFrom);
+                    if (p.backTaxesYearTo) $('#inputMachineryBackTaxesTo').val(p.backTaxesYearTo);
+                    if (p.memoranda) $('#textareaMachineryMemoranda').val(p.memoranda);
+                }
+
+                initMachineryFormDynamicTables(p);
+            }
+
+            $('#isMachineryAdminSwitch, #isMachineryBeneficialSwitch, #isMachineryPossessorSwitch').on('change', function() {
+                const anyRoleChecked = $('#isMachineryAdminSwitch').is(':checked') ||
+                                       $('#isMachineryBeneficialSwitch').is(':checked') ||
+                                       $('#isMachineryPossessorSwitch').is(':checked');
+                if (anyRoleChecked) {
+                    $('#divMachineryAdminSection').removeClass('hidden');
+                } else {
+                    $('#divMachineryAdminSection').addClass('hidden');
+                }
+            });
 
             // Load any existing client-side draft if server partition has empty TDN/area
             try {
@@ -2668,6 +3777,15 @@
                             $('#bannerDisplayTdn').text(p.tdn);
                         }
                         if (p.pin && !$('#inputPin').val()) $('#inputPin').val(p.pin);
+                        if (p.arpNo) {
+                            if (!$('#inputBldgArpNo').val()) $('#inputBldgArpNo').val(p.arpNo);
+                            if (!$('#inputLandArpNo').val()) $('#inputLandArpNo').val(p.arpNo);
+                            $('#bannerDisplayArpNo').text(p.arpNo);
+                        }
+                        if (p.sectionNo) {
+                            if (!$('#inputBldgSectionNo').val()) $('#inputBldgSectionNo').val(p.sectionNo);
+                            if (!$('#inputLandSectionNo').val()) $('#inputLandSectionNo').val(p.sectionNo);
+                        }
                         if (p.kind && !$('#selectKind').val()) $('#selectKind').val(p.kind);
                         if (p.classification) $('select[name="Classification"]').val(p.classification);
                         if (p.actualUse) $('input[name="ActualUse"]').val(p.actualUse);
@@ -2687,13 +3805,14 @@
                         if (p.assessedValue && (!parseFloat($('#inputAssessedValue').val()))) $('#inputAssessedValue').val(p.assessedValue);
                         
                         // Declarant Demographics
-                        if ((p.newOwnerName || p.declarantName) && !$('input[name="NewOwnerName"]').val()) $('input[name="NewOwnerName"]').val(p.newOwnerName || p.declarantName);
-                        if ((p.ownerAddress || p.declarantAddress) && !$('input[name="OwnerAddress"]').val()) $('input[name="OwnerAddress"]').val(p.ownerAddress || p.declarantAddress);
-                        if ((p.ownerContactNo || p.declarantContact) && !$('input[name="OwnerContactNo"]').val()) $('input[name="OwnerContactNo"]').val(p.ownerContactNo || p.declarantContact);
-                        if ((p.ownerTIN || p.declarantTin) && !$('input[name="OwnerTIN"]').val()) $('input[name="OwnerTIN"]').val(p.ownerTIN || p.declarantTin);
-                        if (p.ownerGender) $('select[name="OwnerGender"]').val(p.ownerGender);
-                        if (p.ownerCivilStatus) $('select[name="OwnerCivilStatus"]').val(p.ownerCivilStatus);
-                        if (p.ownerEmail) $('input[name="OwnerEmail"]').val(p.ownerEmail);
+                        if ((p.ownerId || p.OwnerId) && !$('#inputPartitionOwnerId').val()) $('#inputPartitionOwnerId').val(p.ownerId || p.OwnerId);
+                        if ((p.newOwnerName || p.declarantName) && !$('#inputOwnerName').val()) $('#inputOwnerName').val(p.newOwnerName || p.declarantName);
+                        if ((p.ownerAddress || p.declarantAddress) && !$('#inputBldgOwnerAddress').val()) $('#inputBldgOwnerAddress').val(p.ownerAddress || p.declarantAddress);
+                        if ((p.ownerContactNo || p.declarantContact) && !$('#inputBldgOwnerPhone').val()) $('#inputBldgOwnerPhone').val(p.ownerContactNo || p.declarantContact);
+                        if ((p.ownerTIN || p.declarantTin) && !$('#inputBldgOwnerTin').val()) $('#inputBldgOwnerTin').val(p.ownerTIN || p.declarantTin);
+                        if (p.ownerGender) $('#selectBldgOwnerGender').val(p.ownerGender);
+                        if (p.ownerCivilStatus) $('#selectBldgOwnerCivilStatus').val(p.ownerCivilStatus);
+                        if (p.ownerEmail) $('#inputBldgOwnerEmail').val(p.ownerEmail);
 
                         // Location of Property
                         if (p.propertyLocation) $('#inputPropertyLocation').val(p.propertyLocation);
@@ -2714,14 +3833,14 @@
                         if (p.cctDateRegistered) $('input[name="CctDateRegistered"]').val(p.cctDateRegistered);
                         if (p.ownerNameReflectedInCct) $('input[name="OwnerNameReflectedInCct"]').val(p.ownerNameReflectedInCct);
                         if (p.isAdministrator) { $('#isAdminSwitch').prop('checked', true).trigger('change'); }
-                        if (p.administratorName) $('input[name="AdministratorName"]').val(p.administratorName);
-                        if (!p.newOwnerName && p.administratorName) $('input[name="NewOwnerName"]').val(p.administratorName);
-                        if (!p.ownerGender && p.administratorGender) $('select[name="OwnerGender"]').val(p.administratorGender);
-                        if (!p.ownerCivilStatus && p.administratorCivilStatus) $('select[name="OwnerCivilStatus"]').val(p.administratorCivilStatus);
-                        if (!p.ownerTIN && p.administratorTin) $('input[name="OwnerTIN"]').val(p.administratorTin);
-                        if (!p.ownerContactNo && p.administratorContactNo) $('input[name="OwnerContactNo"]').val(p.administratorContactNo);
-                        if (!p.ownerEmail && p.administratorEmail) $('input[name="OwnerEmail"]').val(p.administratorEmail);
-                        if (!p.ownerAddress && p.administratorAddress) $('input[name="OwnerAddress"]').val(p.administratorAddress);
+                        if (p.administratorName) $('#inputAdminName').val(p.administratorName);
+                        if (!p.newOwnerName && p.administratorName) $('#inputOwnerName').val(p.administratorName);
+                        if (!p.ownerGender && p.administratorGender) $('#selectBldgOwnerGender').val(p.administratorGender);
+                        if (!p.ownerCivilStatus && p.administratorCivilStatus) $('#selectBldgOwnerCivilStatus').val(p.administratorCivilStatus);
+                        if (!p.ownerTIN && p.administratorTin) $('#inputBldgOwnerTin').val(p.administratorTin);
+                        if (!p.ownerContactNo && p.administratorContactNo) $('#inputBldgOwnerPhone').val(p.administratorContactNo);
+                        if (!p.ownerEmail && p.administratorEmail) $('#inputBldgOwnerEmail').val(p.administratorEmail);
+                        if (!p.ownerAddress && p.administratorAddress) $('#inputBldgOwnerAddress').val(p.administratorAddress);
 
                         // Building Sketch preview
                         if (p.buildingFloorPlanSketchBase64) {
@@ -2867,6 +3986,10 @@
                 const lvl = parseFloat($(this).val()) || 0;
                 updateAssessedValueAndTaxes(fmv, lvl);
             });
+
+            if (!$('#inputLandArpNo').val() || $('#inputLandArpNo').val() === '187-00-0000-000-000' || !$('#inputTdn').val() || $('#inputTdn').val().startsWith('TD-')) {
+                syncCastArpAndTdnLive();
+            }
 
             recalculateValuation();
         });

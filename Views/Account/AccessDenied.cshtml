@@ -9,12 +9,15 @@
     
     <div class="space-y-2">
         <h1 class="text-3xl font-extrabold text-slate-900 dark:text-white">403 - Access Denied</h1>
-        <p class="text-slate-500 dark:text-stone-400 text-sm">You do not have the required administrative permissions to access this feature.</p>
+        <p class="text-slate-500 dark:text-stone-400 text-sm">@(TempData["ErrorMessage"] as string ?? "You do not have the required administrative permissions to access this feature.")</p>
     </div>
 
     <div class="pt-4 flex justify-center gap-4">
-        <a asp-controller="Assessment" asp-action="Index" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs">
-            Return to Assessment Records
+        <a asp-controller="Home" asp-action="Index" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs">
+            Return to Dashboard
+        </a>
+        <a asp-controller="Account" asp-action="Logout" class="px-5 py-2.5 rounded-xl bg-slate-200 dark:bg-stone-800 hover:bg-slate-300 dark:hover:bg-stone-700 text-slate-700 dark:text-stone-300 font-bold text-xs">
+            Sign Out
         </a>
     </div>
 </div>

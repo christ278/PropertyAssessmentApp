@@ -45,6 +45,17 @@ public class TDNLand
     public string? Sremarks { get; set; }
     public string? Wremarks { get; set; }
 
+    // Administrator / Beneficial User / Possessor Demographics (CAST)
+    public bool IsAdministrator { get; set; }
+    public bool IsBeneficialUser { get; set; }
+    public bool IsPossessor { get; set; }
+    public string? AdministratorName { get; set; }
+    public string? AdministratorSex { get; set; } = "Male";
+    public string? AdministratorAddress { get; set; }
+    public string? AdministratorTin { get; set; }
+    public string? AdministratorPhone { get; set; }
+    public string? AdministratorEmail { get; set; }
+
     // Appraisal & Assessment Summary Computations
     public PropertyClassification Classification { get; set; } = PropertyClassification.Residential;
     public string? SubClassification { get; set; } = "First Class Residential";

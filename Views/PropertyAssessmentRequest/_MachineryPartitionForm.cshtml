@@ -1,0 +1,780 @@
+@model PropertyAssessmentApp.Models.AssessmentPartitionItem
+@{
+    var machineryActualUses = ViewBag.MachineryActualUses as IEnumerable<PropertyAssessmentApp.Models.MachineryActualUse> ?? Enumerable.Empty<PropertyAssessmentApp.Models.MachineryActualUse>();
+    var machineryAssessmentLevels = ViewBag.MachineryAssessmentLevels as IEnumerable<PropertyAssessmentApp.Models.MachineryAssessmentLevel> ?? Enumerable.Empty<PropertyAssessmentApp.Models.MachineryAssessmentLevel>();
+    var barangays = ViewBag.Barangays as IEnumerable<PropertyAssessmentApp.Models.Barangay> ?? Enumerable.Empty<PropertyAssessmentApp.Models.Barangay>();
+    var registeredOwners = ViewBag.RegisteredOwners as IEnumerable<PropertyAssessmentApp.Models.Owner> ?? Enumerable.Empty<PropertyAssessmentApp.Models.Owner>();
+}
+
+<script>
+    if (typeof window.switchMachineryTab !== 'function') {
+        window.switchMachineryTab = function(tabId) {
+            document.querySelectorAll('.machinery-tab-content').forEach(function(el) {
+                el.classList.add('hidden');
+            });
+            document.querySelectorAll('.machinery-tab-btn').forEach(function(btn) {
+                btn.classList.remove('bg-emerald-600', 'text-white', 'shadow-sm');
+                btn.classList.add('bg-slate-100', 'dark:bg-stone-800', 'text-slate-600', 'dark:text-stone-400');
+            });
+            var target = document.getElementById(tabId);
+            if (target) {
+                target.classList.remove('hidden');
+            }
+            var activeBtn = document.getElementById('btn-' + tabId);
+            if (activeBtn) {
+                activeBtn.classList.remove('bg-slate-100', 'dark:bg-stone-800', 'text-slate-600', 'dark:text-stone-400');
+                activeBtn.classList.add('bg-emerald-600', 'text-white', 'shadow-sm');
+            }
+            if (window.lucide) {
+                lucide.createIcons();
+            }
+        };
+    }
+
+    window.toggleMachineryRegistrationMode = function(isLocal) {
+        var hiddenLocal = document.getElementById('inputIsLocallyManufactured');
+        if (hiddenLocal) hiddenLocal.value = isLocal ? 'True' : 'False';
+        var divImp = document.getElementById('divMachineryImportedReg');
+        var divLoc = document.getElementById('divMachineryLocalReg');
+        if (divImp) {
+            if (isLocal) divImp.classList.add('hidden');
+            else divImp.classList.remove('hidden');
+        }
+        if (divLoc) {
+            if (isLocal) divLoc.classList.remove('hidden');
+            else divLoc.classList.add('hidden');
+        }
+        var radioImp = document.getElementById('radioMachineryImported');
+        var radioLoc = document.getElementById('radioMachineryLocal');
+        if (radioImp) radioImp.checked = !isLocal;
+        if (radioLoc) radioLoc.checked = !!isLocal;
+    };
+
+    window.syncMachineryRegSupplier = function(val) {
+        var hiddenSup = document.getElementById('hiddenMachinerySupplierSeller');
+        if (hiddenSup) hiddenSup.value = val || '';
+        var impSup = document.getElementById('inputMachineryImportedSupplier');
+        var locSup = document.getElementById('inputMachineryLocalSupplier');
+        if (impSup && impSup.value !== val) impSup.value = val || '';
+        if (locSup && locSup.value !== val) locSup.value = val || '';
+    };
+
+    window.syncMachineryRegAcqCost = function(val) {
+        var hiddenCost = document.getElementById('hiddenMachineryAcquisitionCost');
+        if (hiddenCost) hiddenCost.value = val || '0.00';
+        var impCost = document.getElementById('inputMachineryImportedAcqCost');
+        var locCost = document.getElementById('inputMachineryLocalAcqCost');
+        if (impCost && impCost.value !== val) impCost.value = val || '0.00';
+        if (locCost && locCost.value !== val) locCost.value = val || '0.00';
+    };
+
+    window.syncMachineryCombinedOrNoAndDate = function() {
+        var orNo = (document.getElementById('inputMachineryOrNo')?.value || '').trim();
+        var orDate = (document.getElementById('inputMachineryOrDate')?.value || '').trim();
+        var combinedEl = document.getElementById('inputMachineryOrNoAndDate');
+        if (combinedEl && (orNo || orDate)) {
+            combinedEl.value = [orNo, orDate].filter(Boolean).join(' / ');
+        }
+    };
+
+    window.onLandOwnerAlsoBuildingOwnerToggle = function(isChecked) {
+        if (!isChecked) return;
+        var landOwner = document.getElementById('inputMachineryLandOwner');
+        var bldgOwner = document.getElementById('inputMachineryBldgOwner');
+        if (landOwner && bldgOwner) {
+            if (landOwner.value.trim()) {
+                bldgOwner.value = landOwner.value.trim();
+            } else if (bldgOwner.value.trim()) {
+                landOwner.value = bldgOwner.value.trim();
+            } else {
+                var mainOwner = document.getElementById('inputMachineryOwnerName');
+                if (mainOwner && mainOwner.value.trim()) {
+                    landOwner.value = mainOwner.value.trim();
+                    bldgOwner.value = mainOwner.value.trim();
+                }
+            }
+        }
+    };
+
+    window.syncLandAndBuildingOwnerFields = function(source) {
+        var chk = document.getElementById('chkIsLandOwnerAlsoBuildingOwner');
+        if (!chk || !chk.checked) return;
+        var landOwner = document.getElementById('inputMachineryLandOwner');
+        var bldgOwner = document.getElementById('inputMachineryBldgOwner');
+        if (!landOwner || !bldgOwner) return;
+        if (source === 'land') {
+            bldgOwner.value = landOwner.value;
+        } else if (source === 'bldg') {
+            landOwner.value = bldgOwner.value;
+        }
+    };
+</script>
+
+<!-- Hidden Storage for Machinery Dynamic Breakdown Tables -->
+<input type="hidden" asp-for="MachineryAppraisalDetailsJson" id="machineryAppraisalDetailsJson" />
+<input type="hidden" asp-for="MachineryPropertyAssessmentsJson" id="machineryPropertyAssessmentsJson" />
+
+<!-- Machinery Tab Navigation (CAST Style: 1. Property Information | 2. Property Appraisal | 3. Memoranda & Effectivity) -->
+<div class="flex items-center gap-2 overflow-x-auto border-b border-slate-200 dark:border-stone-800 pb-3" id="machinery-tab-bar">
+    <button type="button" onclick="switchMachineryTab('machinery-tab-info')" id="btn-machinery-tab-info" class="machinery-tab-btn px-4 py-2.5 rounded-xl text-xs font-bold font-mono transition-all bg-emerald-600 text-white shadow-sm flex items-center gap-2 shrink-0">
+        <i data-lucide="info" class="w-4 h-4"></i> 1. Property Information & Owner (CAST)
+    </button>
+    <button type="button" onclick="switchMachineryTab('machinery-tab-appraisal')" id="btn-machinery-tab-appraisal" class="machinery-tab-btn px-4 py-2.5 rounded-xl text-xs font-bold font-mono transition-all bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-400 border border-slate-200 dark:border-stone-800 hover:bg-slate-200 dark:hover:bg-stone-700 flex items-center gap-2 shrink-0">
+        <i data-lucide="cpu" class="w-4 h-4"></i> 2. Property Appraisal & Assessment Roll (CAST)
+    </button>
+    <button type="button" onclick="switchMachineryTab('machinery-tab-memoranda')" id="btn-machinery-tab-memoranda" class="machinery-tab-btn px-4 py-2.5 rounded-xl text-xs font-bold font-mono transition-all bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-400 border border-slate-200 dark:border-stone-800 hover:bg-slate-200 dark:hover:bg-stone-700 flex items-center gap-2 shrink-0">
+        <i data-lucide="file-text" class="w-4 h-4"></i> 3. Memoranda, Effectivity & Back Taxes
+    </button>
+</div>
+
+<!-- ========================================================= -->
+<!-- TAB 1: PROPERTY INFORMATION, OWNER & LOCATION (CAST)      -->
+<!-- ========================================================= -->
+<div id="machinery-tab-info" class="machinery-tab-content space-y-6">
+
+    <!-- Property Identification & ARP / PIN (CAST) -->
+    <div class="p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-stone-800 pb-3">
+            <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+                <i data-lucide="cpu" class="w-4 h-4"></i>
+                Machinery Identification & Parcel Reference (CAST Reference)
+            </h4>
+            <div class="flex items-center gap-2">
+                <span class="text-[11px] font-mono font-bold text-slate-500">ARP NO:</span>
+                <input asp-for="ARPNo" id="inputMachineryArpNo" class="px-3 py-1 text-xs rounded-lg bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono font-bold text-emerald-600 dark:text-emerald-400" placeholder="187-00-0000-000-000" />
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="md:col-span-2">
+                <label asp-for="PIN" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">PROPERTY INDEX NUMBER (PIN)</label>
+                <input asp-for="PIN" id="inputMachineryPin" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono font-bold" placeholder="187-00-0000-000-000" />
+            </div>
+            <div>
+                <label asp-for="SectionNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">SECTION NO.</label>
+                <input asp-for="SectionNo" id="inputMachinerySectionNo" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" placeholder="000" />
+            </div>
+            <div>
+                <label asp-for="LotNumber" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">LOT / PARCEL NO.</label>
+                <input asp-for="LotNumber" id="inputMachineryLotNo" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" placeholder="Lot 10-A / 001" />
+                <input type="hidden" asp-for="ParcelNo" id="inputMachineryParcelNo" />
+            </div>
+        </div>
+    </div>
+
+    <!-- Owner & Declarant Demographics (CAST Standard) -->
+    <div class="p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <div class="border-b border-slate-200 dark:border-stone-800 pb-3 flex flex-wrap items-center justify-between gap-3">
+            <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+                <i data-lucide="users" class="w-4 h-4"></i> Owner & Declarant Demographics (CAST)
+            </h4>
+            <!-- Checkboxes: Administrator, Beneficial User, Possessor -->
+            <div class="flex flex-wrap items-center gap-2">
+                <label class="inline-flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 dark:text-stone-300 bg-white dark:bg-stone-900 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-stone-800 shadow-sm hover:border-emerald-500 transition-colors">
+                    <input type="checkbox" asp-for="IsAdministrator" id="isMachineryAdminSwitch" class="machinery-role-checkbox rounded border-slate-300 text-emerald-600 shadow-sm focus:ring-emerald-500 w-4 h-4" />
+                    <span>ADMINISTRATOR</span>
+                </label>
+                <label class="inline-flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 dark:text-stone-300 bg-white dark:bg-stone-900 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-stone-800 shadow-sm hover:border-emerald-500 transition-colors">
+                    <input type="checkbox" asp-for="IsBeneficialUser" id="isMachineryBeneficialSwitch" class="machinery-role-checkbox rounded border-slate-300 text-emerald-600 shadow-sm focus:ring-emerald-500 w-4 h-4" />
+                    <span>BENEFICIAL USER</span>
+                </label>
+                <label class="inline-flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 dark:text-stone-300 bg-white dark:bg-stone-900 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-stone-800 shadow-sm hover:border-emerald-500 transition-colors">
+                    <input type="checkbox" asp-for="IsPossessor" id="isMachineryPossessorSwitch" class="machinery-role-checkbox rounded border-slate-300 text-emerald-600 shadow-sm focus:ring-emerald-500 w-4 h-4" />
+                    <span>POSSESSOR</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Searchable Active Registered Owner Lookup (Auto-fill All Demographics Fields) -->
+        <div class="p-4 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 space-y-2">
+            <label class="block text-xs font-bold text-emerald-800 dark:text-emerald-300 uppercase flex items-center gap-2">
+                <i data-lucide="user-search" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                Fetch Active Registered Owner from Database (Auto-fill All Fields)
+            </label>
+            <select id="machineryRegisteredOwnerSelect" class="w-full">
+                <option value="">-- Search active registered owner by Name, TIN, RPTIN, or Barangay --</option>
+                @foreach (var owner in registeredOwners)
+                {
+                    <option value="@owner.Id">@owner.DisplayName (TIN: @owner.TaxIdentNo | @owner.BarangayName)</option>
+                }
+            </select>
+            <p class="text-[11px] text-slate-600 dark:text-stone-300">
+                Selecting an active registered owner will automatically populate Owner / Declarant Name, TIN, Phone No., Mailing Address, Email, and Sex below.
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="md:col-span-2">
+                <label asp-for="NewOwnerName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">OWNER / DECLARANT NAME <span class="text-rose-500">*</span></label>
+                <input asp-for="NewOwnerName" id="inputMachineryOwnerName" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-bold font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="Full name of owner / declarant" />
+            </div>
+            <div>
+                <label asp-for="OwnerGender" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">SEX</label>
+                <select asp-for="OwnerGender" id="selectMachineryOwnerGender" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-xs font-bold text-slate-900 dark:text-white">
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Corporate">Corporate / Entity</option>
+                </select>
+            </div>
+            <div>
+                <label asp-for="OwnerTIN" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">TIN</label>
+                <input asp-for="OwnerTIN" id="inputMachineryOwnerTin" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="000-000-000-000" />
+            </div>
+            <div class="md:col-span-2">
+                <label asp-for="OwnerAddress" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">MAILING ADDRESS <span class="text-rose-500">*</span></label>
+                <input asp-for="OwnerAddress" id="inputMachineryOwnerAddress" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="Street, Barangay, City, Province" />
+            </div>
+            <div>
+                <label asp-for="OwnerContactNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">PHONE NO.</label>
+                <input asp-for="OwnerContactNo" id="inputMachineryOwnerPhone" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="09XX-XXX-XXXX" />
+            </div>
+            <div>
+                <label asp-for="OwnerEmail" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">EMAIL</label>
+                <input asp-for="OwnerEmail" id="inputMachineryOwnerEmail" type="email" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="owner@example.com" />
+            </div>
+        </div>
+
+        <!-- Administrator / Beneficial User / Possessor Section (Toggled) -->
+        <div id="divMachineryAdminSection" class="hidden pt-4 border-t border-slate-200 dark:border-stone-800 space-y-3">
+            <h5 class="text-xs font-bold text-amber-700 dark:text-amber-400 flex items-center gap-1.5 uppercase">
+                <i data-lucide="shield-alert" class="w-4 h-4"></i> Administrator / Beneficial User / Possessor Details
+            </h5>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="md:col-span-2">
+                    <label asp-for="AdministratorName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">NAMES (ADMINISTRATOR / BENEFICIAL USER / POSSESSOR)</label>
+                    <input asp-for="AdministratorName" id="inputMachineryAdminName" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-bold font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="Full name of administrator / beneficial user / possessor" />
+                </div>
+                <div>
+                    <label asp-for="AdministratorGender" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">SEX</label>
+                    <select asp-for="AdministratorGender" id="selectMachineryAdminGender" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-xs font-bold text-slate-900 dark:text-white">
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Corporate">Corporate / Entity</option>
+                    </select>
+                </div>
+                <div>
+                    <label asp-for="AdministratorTin" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">TIN</label>
+                    <input asp-for="AdministratorTin" id="inputMachineryAdminTin" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="000-000-000-000" />
+                </div>
+                <div class="md:col-span-2">
+                    <label asp-for="AdministratorAddress" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">MAILING ADDRESS</label>
+                    <input asp-for="AdministratorAddress" id="inputMachineryAdminAddress" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="Complete mailing address" />
+                </div>
+                <div>
+                    <label asp-for="AdministratorContactNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">PHONE NO.</label>
+                    <input asp-for="AdministratorContactNo" id="inputMachineryAdminPhone" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="09XX-XXX-XXXX" />
+                </div>
+                <div>
+                    <label asp-for="AdministratorEmail" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">EMAIL</label>
+                    <input asp-for="AdministratorEmail" id="inputMachineryAdminEmail" type="email" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="admin@example.com" />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Property Registration Details (Outside the Philippines / Imported & Local Manufacturer) -->
+    <div class="p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-stone-800 pb-3">
+            <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+                <i data-lucide="file-badge" class="w-4 h-4"></i>
+                Property Registration Details (TDNMachineries)
+            </h4>
+            <!-- Toggle: Outside the Philippines (Imported) vs Local Manufacturer -->
+            <div class="flex flex-wrap items-center gap-2">
+                <input type="hidden" asp-for="IsLocallyManufactured" id="inputIsLocallyManufactured" />
+                <label class="inline-flex items-center gap-2 cursor-pointer text-xs font-bold bg-white dark:bg-stone-900 px-3.5 py-1.5 rounded-xl border border-slate-200 dark:border-stone-800 shadow-sm hover:border-emerald-500 transition-colors">
+                    <input type="radio" name="machineryOriginMode" id="radioMachineryImported" value="false" @(!Model.IsLocallyManufactured ? "checked" : "") onchange="toggleMachineryRegistrationMode(false)" class="text-emerald-600 focus:ring-emerald-500 w-4 h-4" />
+                    <span class="text-slate-700 dark:text-stone-200">OUTSIDE THE PHILIPPINES (IMPORTED)</span>
+                </label>
+                <label class="inline-flex items-center gap-2 cursor-pointer text-xs font-bold bg-white dark:bg-stone-900 px-3.5 py-1.5 rounded-xl border border-slate-200 dark:border-stone-800 shadow-sm hover:border-emerald-500 transition-colors">
+                    <input type="radio" name="machineryOriginMode" id="radioMachineryLocal" value="true" @(Model.IsLocallyManufactured ? "checked" : "") onchange="toggleMachineryRegistrationMode(true)" class="text-emerald-600 focus:ring-emerald-500 w-4 h-4" />
+                    <span class="text-slate-700 dark:text-stone-200">LOCAL MANUFACTURER</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Panel A: Outside the Philippines (Imported) -->
+        <div id="divMachineryImportedReg" class="@(Model.IsLocallyManufactured ? "hidden" : "") space-y-3">
+            <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 text-[11px] font-bold uppercase">
+                <i data-lucide="globe" class="w-3.5 h-3.5"></i> Outside the Philippines — Registration &amp; Importation Details
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label asp-for="MachineryRegNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">REGISTRATION NO.</label>
+                    <input asp-for="MachineryRegNo" id="inputMachineryRegNo" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="Enter Registration No." />
+                </div>
+                <div>
+                    <label asp-for="MachineryDateRegistered" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">DATE REGISTERED</label>
+                    <input asp-for="MachineryDateRegistered" id="inputMachineryDateRegistered" type="date" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" />
+                </div>
+                <div>
+                    <label asp-for="ImportationPermitNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">IMPORTATION PERMIT</label>
+                    <input asp-for="ImportationPermitNo" id="inputMachineryImportPermit" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="Enter Importation Permit No." />
+                </div>
+                <div>
+                    <label asp-for="ImportationDateIssued" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">DATE ISSUED</label>
+                    <input asp-for="ImportationDateIssued" id="inputMachineryImportDateIssued" type="date" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" />
+                </div>
+                <div>
+                    <label asp-for="CountryOfOrigin" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">COUNTRY OF ORIGIN</label>
+                    <input asp-for="CountryOfOrigin" id="inputMachineryCountryOrigin" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="e.g. Japan, Germany, USA" />
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">SUPPLIER / SELLER</label>
+                    <input type="text" id="inputMachineryImportedSupplier" value="@Model.SupplierSeller" oninput="syncMachineryRegSupplier(this.value)" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="Name of Foreign Supplier / Seller" />
+                </div>
+                <div>
+                    <label class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">ACQUISITION COST (₱)</label>
+                    <input type="number" step="0.01" min="0" id="inputMachineryImportedAcqCost" value="@Model.AcquisitionCost.ToString("0.00")" oninput="syncMachineryRegAcqCost(this.value)" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono font-bold text-right text-xs" placeholder="0.00" />
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel B: Local Manufacturer -->
+        <div id="divMachineryLocalReg" class="@(Model.IsLocallyManufactured ? "" : "hidden") space-y-3">
+            <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-[11px] font-bold uppercase">
+                <i data-lucide="factory" class="w-3.5 h-3.5"></i> Local Manufacturer — Official Receipt &amp; Supplier Details
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label asp-for="OrNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">OR NO.</label>
+                    <input asp-for="OrNo" id="inputMachineryOrNo" oninput="syncMachineryCombinedOrNoAndDate()" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="Official Receipt No." />
+                </div>
+                <div>
+                    <label asp-for="OrDate" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">OR DATE</label>
+                    <input asp-for="OrDate" id="inputMachineryOrDate" type="date" onchange="syncMachineryCombinedOrNoAndDate()" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" />
+                </div>
+                <div>
+                    <label asp-for="OrNoAndDate" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">OR NO. AND DATE</label>
+                    <input asp-for="OrNoAndDate" id="inputMachineryOrNoAndDate" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="OR # / YYYY-MM-DD" />
+                </div>
+                <div>
+                    <label asp-for="LocalDateIssued" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">DATE ISSUED</label>
+                    <input asp-for="LocalDateIssued" id="inputMachineryLocalDateIssued" type="date" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" />
+                </div>
+                <div>
+                    <label class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">ACQUISITION COST (₱)</label>
+                    <input type="number" step="0.01" min="0" id="inputMachineryLocalAcqCost" value="@Model.AcquisitionCost.ToString("0.00")" oninput="syncMachineryRegAcqCost(this.value)" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono font-bold text-right text-xs" placeholder="0.00" />
+                </div>
+                <div>
+                    <label class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">SUPPLIER / SELLER</label>
+                    <input type="text" id="inputMachineryLocalSupplier" value="@Model.SupplierSeller" oninput="syncMachineryRegSupplier(this.value)" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="Name of Local Manufacturer / Supplier" />
+                </div>
+                <div class="md:col-span-2">
+                    <label asp-for="SupplierAddress" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">ADDRESS OF SUPPLIER</label>
+                    <input asp-for="SupplierAddress" id="inputMachinerySupplierAddress" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="Complete Address of Supplier / Manufacturer" />
+                </div>
+            </div>
+        </div>
+
+        <!-- Hidden Bound Fields for Shared SupplierSeller & AcquisitionCost -->
+        <input type="hidden" asp-for="SupplierSeller" id="hiddenMachinerySupplierSeller" />
+        <input type="hidden" asp-for="AcquisitionCost" id="hiddenMachineryAcquisitionCost" />
+    </div>
+
+    <!-- Property Location & Real Estate Reference (CAST _MachineryForm.cshtml) -->
+    <div class="p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-stone-800 pb-2">
+            <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+                <i data-lucide="map-pin" class="w-4 h-4"></i>
+                Property Location &amp; Reference (Building Owner, Building P.I.N, Land Owner, Land Owner P.I.N)
+            </h4>
+            <!-- Checkbox: Land Owner is the Building Owner Also -->
+            <label class="inline-flex items-center gap-2 cursor-pointer text-xs font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50 px-3.5 py-1.5 rounded-xl border border-emerald-200 dark:border-emerald-800 shadow-xs hover:border-emerald-500 transition-colors">
+                <input type="checkbox" asp-for="IsLandOwnerAlsoBuildingOwner" id="chkIsLandOwnerAlsoBuildingOwner" onchange="onLandOwnerAlsoBuildingOwnerToggle(this.checked)" class="rounded border-slate-300 text-emerald-600 shadow-sm focus:ring-emerald-500 w-4 h-4" />
+                <span>LAND OWNER IS ALSO THE BUILDING OWNER</span>
+            </label>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- Row 1: Building Owner, Building P.I.N, Building TD No. -->
+            <div>
+                <label asp-for="BuildingReferenceName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BUILDING OWNER</label>
+                <input asp-for="BuildingReferenceName" id="inputMachineryBldgOwner" oninput="syncLandAndBuildingOwnerFields('bldg')" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="Enter Building Owner Name" />
+            </div>
+            <div>
+                <label asp-for="BuildingPin" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BUILDING P.I.N</label>
+                <input asp-for="BuildingPin" id="inputMachineryBldgPin" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="187-00-0000-000-000" />
+            </div>
+            <div>
+                <label asp-for="BuildingTdNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BUILDING TD NO.</label>
+                <input asp-for="BuildingTdNo" id="inputMachineryBldgTdNo" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="TD-XXXX-XXXX" />
+            </div>
+
+            <!-- Row 2: Land Owner, Land Owner P.I.N, Land TD No. -->
+            <div>
+                <label asp-for="LandOwnerName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">LAND OWNER</label>
+                <input asp-for="LandOwnerName" id="inputMachineryLandOwner" oninput="syncLandAndBuildingOwnerFields('land')" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="Enter Land Owner Name" />
+            </div>
+            <div>
+                <label asp-for="LandPin" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">LAND OWNER P.I.N</label>
+                <input asp-for="LandPin" id="inputMachineryLandPin" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="187-00-0000-000-000" />
+            </div>
+            <div>
+                <label asp-for="LandTdNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">LAND TD NO.</label>
+                <input asp-for="LandTdNo" id="inputMachineryLandTdNo" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="TD-XXXX-XXXX" />
+            </div>
+
+            <!-- Row 3: Building No./Street, Barangay, City, Province -->
+            <div>
+                <label asp-for="StreetLocation" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BUILDING NO. / STREET</label>
+                <input asp-for="StreetLocation" id="inputMachineryStreet" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs" placeholder="e.g. National Highway, Makar" />
+            </div>
+            <div>
+                <label asp-for="DistrictOrBarangay" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BARANGAY <span class="text-rose-500">*</span></label>
+                <select asp-for="DistrictOrBarangay" id="selectMachineryBarangay" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold cursor-pointer text-xs">
+                    @if (barangays.Any())
+                    {
+                        foreach (var b in barangays)
+                        {
+                            <option value="@b.Name">@b.Name</option>
+                        }
+                    }
+                    else
+                    {
+                        <option value="Brgy. Central">Brgy. Central</option>
+                        <option value="Brgy. Dadiangas East">Brgy. Dadiangas East</option>
+                        <option value="Brgy. Dadiangas North">Brgy. Dadiangas North</option>
+                        <option value="Brgy. Dadiangas South">Brgy. Dadiangas South</option>
+                        <option value="Brgy. Dadiangas West">Brgy. Dadiangas West</option>
+                        <option value="Brgy. Lagao">Brgy. Lagao</option>
+                        <option value="Brgy. San Isidro">Brgy. San Isidro</option>
+                        <option value="Brgy. Calumpang">Brgy. Calumpang</option>
+                        <option value="Brgy. City Heights">Brgy. City Heights</option>
+                        <option value="Brgy. Labangal">Brgy. Labangal</option>
+                        <option value="Brgy. Tambler">Brgy. Tambler</option>
+                    }
+                </select>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label asp-for="CityMunicipality" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">CITY</label>
+                    <input asp-for="CityMunicipality" id="inputMachineryCity" class="w-full px-3 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold text-xs" readonly value="General Santos City" />
+                </div>
+                <div>
+                    <label asp-for="Province" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">PROVINCE</label>
+                    <input asp-for="Province" id="inputMachineryProvince" class="w-full px-3 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold text-xs" readonly value="South Cotabato" />
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================= -->
+<!-- TAB 2: PROPERTY APPRAISAL & ASSESSMENT ROLL (CAST)        -->
+<!-- ========================================================= -->
+<div id="machinery-tab-appraisal" class="machinery-tab-content space-y-6 hidden">
+
+    <!-- TABLE 1: MACHINERY APPRAISAL SCHEDULE (16 CAST COLUMNS) -->
+    <div class="p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-stone-800 pb-3">
+            <div>
+                <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+                    <i data-lucide="cpu" class="w-4 h-4"></i>
+                    Table 1: Property Appraisal — Machinery & Equipment Schedule (CAST 16-Column Standard)
+                </h4>
+                <p class="text-[11px] text-slate-500 dark:text-stone-400">Record machinery description, acquisition & lifecycle, original cost, RCN, depreciation, and depreciated market value.</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <button type="button" onclick="openMachineryDetailModal(-1)" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-sm transition-all">
+                    <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i> Add Machinery Detail
+                </button>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-stone-800 bg-white dark:bg-stone-900">
+            <table class="w-full text-[11px] text-left border-collapse" id="machineryAppraisalTable">
+                <thead class="bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-stone-700">
+                    <tr>
+                        <th class="p-2.5 border-r border-slate-200 dark:border-stone-700 align-middle">Classification</th>
+                        <th class="p-2.5 border-r border-slate-200 dark:border-stone-700 align-middle">Descript/Brand</th>
+                        <th class="p-2.5 border-r border-slate-200 dark:border-stone-700 align-middle text-center">Rated Capacity</th>
+                        <th class="p-2.5 border-r border-slate-200 dark:border-stone-700 align-middle text-center">Condition When Acquired</th>
+                        <th class="p-2.5 border-r border-slate-200 dark:border-stone-700 align-middle text-center">Date Acquired</th>
+                        <th class="p-2.5 border-r border-slate-200 dark:border-stone-700 align-middle text-center">Economic Life</th>
+                        <th class="p-2.5 border-r border-slate-200 dark:border-stone-700 align-middle text-center">Year Installed</th>
+                        <th class="p-2.5 border-r border-slate-200 dark:border-stone-700 align-middle text-center">Year Operation</th>
+                        <th class="p-2.5 border-r border-slate-200 dark:border-stone-700 align-middle text-right">Acquisition / Original Cost (₱)</th>
+                        <th class="p-2.5 border-r border-slate-200 dark:border-stone-700 align-middle text-right">Installation &amp; Other (₱)</th>
+                        <th class="p-2.5 border-r border-slate-200 dark:border-stone-700 align-middle text-right">Total Cost (₱)</th>
+                        <th class="p-2.5 border-r border-slate-200 dark:border-stone-700 align-middle text-center">No. of Years</th>
+                        <th class="p-2.5 border-r border-slate-200 dark:border-stone-700 align-middle text-center">Remaining EcoLife (EcoLife - No. of Years)</th>
+                        <th class="p-2.5 border-r border-slate-200 dark:border-stone-700 align-middle text-center">Rate Depreciation</th>
+                        <th class="p-2.5 border-r border-slate-200 dark:border-stone-700 align-middle text-right">Depreciation Value (Auto Compute)</th>
+                        <th class="p-2.5 border-r border-slate-200 dark:border-stone-700 align-middle text-right">Market Value (Less Depreciation)</th>
+                        <th class="p-2.5 align-middle text-center w-20">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="machineryAppraisalTableBody" class="divide-y divide-slate-100 dark:divide-stone-800 font-medium">
+                    <!-- Dynamic rows inserted via JavaScript -->
+                </tbody>
+                <tfoot class="bg-slate-50 dark:bg-stone-950 font-bold text-slate-800 dark:text-stone-200 border-t border-slate-200 dark:border-stone-800">
+                    <tr id="machineryTotalsRow">
+                        <td colspan="8" class="p-3 text-right">TOTAL:</td>
+                        <td class="p-3 text-right font-mono text-slate-900 dark:text-white" id="displayMachineryTotalOrigCost">₱0.00</td>
+                        <td class="p-3 text-right font-mono text-slate-900 dark:text-white" id="displayMachineryTotalInstallCost">₱0.00</td>
+                        <td class="p-3 text-right font-mono text-slate-900 dark:text-white" id="displayMachineryTotalMarketValue">₱0.00</td>
+                        <td colspan="3"></td>
+                        <td class="p-3 text-right font-mono text-rose-600 dark:text-rose-400" id="displayMachineryTotalDepValue">₱0.00</td>
+                        <td class="p-3 text-right font-mono text-emerald-600 dark:text-emerald-400 font-black" id="displayMachineryTotalDepreciatedValue">₱0.00</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+
+    <!-- TABLE 2: PROPERTY ASSESSMENT ROLL (CAST #propMachineAssessment) -->
+    <div class="p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-stone-800 pb-3">
+            <div>
+                <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+                    <i data-lucide="calculator" class="w-4 h-4"></i>
+                    Table 2: Property Assessment (Machinery Actual Use &amp; Assessment Level)
+                </h4>
+                <p class="text-[11px] text-slate-500 dark:text-stone-400">Select Actual Use from MachineryRefActualUse to auto-apply the statutory Assessment Level (%) from MachineryRefAssessmentLevel.</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <button type="button" onclick="syncMachineryAssessmentRollFromAppraisal()" class="px-3 py-1.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 hover:bg-slate-100 dark:hover:bg-stone-800 text-slate-700 dark:text-stone-200 font-bold text-xs inline-flex items-center gap-1.5 shadow-xs transition-all">
+                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Sync Market Value
+                </button>
+                <button type="button" onclick="addMachineryAssessmentRollRow()" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-sm transition-all">
+                    <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add Assessment Row
+                </button>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-stone-800 bg-white dark:bg-stone-900">
+            <table class="w-full text-xs text-left" id="machineryPropertyAssessmentTable">
+                <thead class="bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-stone-700">
+                    <tr>
+                        <th class="p-3">Actual Use</th>
+                        <th class="p-3 text-right">Market Value (₱)</th>
+                        <th class="p-3 text-right">Assessment Level (%)</th>
+                        <th class="p-3 text-right">Assessment Value (₱)</th>
+                        <th class="p-3 text-center w-16">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="machineryPropertyAssessmentTableBody" class="divide-y divide-slate-100 dark:divide-stone-800 font-medium">
+                    <!-- Dynamic rows inserted via JavaScript -->
+                </tbody>
+                <tfoot class="bg-slate-50 dark:bg-stone-950 font-bold text-slate-800 dark:text-stone-200 border-t border-slate-200 dark:border-stone-800">
+                    <tr>
+                        <td class="p-3 text-right">TOTAL:</td>
+                        <td class="p-3 text-right font-mono text-emerald-600 dark:text-emerald-400" id="displayMachineryRollTotalMv">₱0.00</td>
+                        <td class="p-3 text-right">TOTAL ASSESSMENT VALUE:</td>
+                        <td class="p-3 text-right font-mono text-emerald-600 dark:text-emerald-400 font-black" id="displayMachineryRollTotalAv">₱0.00</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <!-- Valuation Summary KPI Dashboard -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 pt-3">
+            <div class="p-3 bg-white dark:bg-stone-900 rounded-xl border border-slate-200 dark:border-stone-800">
+                <span class="text-[10px] font-bold uppercase text-slate-400 block mb-1">Total Original Cost</span>
+                <span class="text-sm font-black font-mono text-slate-900 dark:text-white" id="kpiMachineryOrigCost">₱0.00</span>
+            </div>
+            <div class="p-3 bg-white dark:bg-stone-900 rounded-xl border border-slate-200 dark:border-stone-800">
+                <span class="text-[10px] font-bold uppercase text-slate-400 block mb-1">Depreciated Market Value</span>
+                <span class="text-sm font-black font-mono text-sky-600 dark:text-sky-400" id="kpiMachineryMarketValue">₱0.00</span>
+            </div>
+            <div class="p-3 bg-white dark:bg-stone-900 rounded-xl border border-slate-200 dark:border-stone-800">
+                <span class="text-[10px] font-bold uppercase text-slate-400 block mb-1">Total Assessed Value</span>
+                <span class="text-sm font-black font-mono text-emerald-600 dark:text-emerald-400" id="kpiMachineryAssessedValue">₱0.00</span>
+            </div>
+            <div class="p-3 bg-white dark:bg-stone-900 rounded-xl border border-slate-200 dark:border-stone-800">
+                <span class="text-[10px] font-bold uppercase text-slate-400 block mb-1">Total Annual Tax Due (3%)</span>
+                <span class="text-sm font-black font-mono text-amber-600 dark:text-amber-400" id="kpiMachineryAnnualTax">₱0.00</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================= -->
+<!-- TAB 3: MEMORANDA, EFFECTIVITY & BACK TAXES (CAST)         -->
+<!-- ========================================================= -->
+<div id="machinery-tab-memoranda" class="machinery-tab-content space-y-6 hidden">
+    <!-- Effectivity & Taxability (CAST Standard) -->
+    <div class="p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
+            <i data-lucide="calendar" class="w-4 h-4"></i>
+            Effectivity of Assessment / Re-assessment &amp; Taxability (CAST Standard)
+        </h4>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+                <label asp-for="Taxability" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">TAXABILITY STATUS</label>
+                <select asp-for="Taxability" id="selectMachineryTaxability" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold cursor-pointer text-xs">
+                    <option value="Taxable">Taxable</option>
+                    <option value="Exempt">Exempt</option>
+                </select>
+            </div>
+            <div>
+                <label asp-for="EffectivityQuarter" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">EFFECTIVITY QUARTER (QTR.)</label>
+                <select asp-for="EffectivityQuarter" id="selectMachineryEffQuarter" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold cursor-pointer text-xs">
+                    <option value="1st Quarter">1st Quarter</option>
+                    <option value="2nd Quarter">2nd Quarter</option>
+                    <option value="3rd Quarter">3rd Quarter</option>
+                    <option value="4th Quarter">4th Quarter</option>
+                </select>
+            </div>
+            <div>
+                <label asp-for="EffectivityYear" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">EFFECTIVITY YEAR (YR.)</label>
+                <input asp-for="EffectivityYear" id="inputMachineryEffYear" type="number" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono font-bold text-xs" value="@(Model.EffectivityYear ?? DateTime.Now.Year)" />
+            </div>
+            <div>
+                <label asp-for="AssessmentBasis" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BASIS OF ASSESSMENT</label>
+                <input asp-for="AssessmentBasis" id="inputMachineryAssessmentBasis" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold text-xs" value="Sec. 224-225 RA 7160" />
+            </div>
+            <div>
+                <label asp-for="BackTaxesYearFrom" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BACK TAXES FROM YEAR</label>
+                <input asp-for="BackTaxesYearFrom" id="inputMachineryBackTaxesFrom" type="number" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="YYYY (Optional)" />
+            </div>
+            <div>
+                <label asp-for="BackTaxesYearTo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BACK TAXES TO YEAR</label>
+                <input asp-for="BackTaxesYearTo" id="inputMachineryBackTaxesTo" type="number" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="YYYY (Optional)" />
+            </div>
+        </div>
+    </div>
+
+    <!-- Memoranda & Notes (CAST Standard) -->
+    <div class="p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
+            <i data-lucide="clipboard-list" class="w-4 h-4"></i>
+            Memoranda (CAST Reference)
+        </h4>
+        <div>
+            <textarea asp-for="Memoranda" id="textareaMachineryMemoranda" rows="5" class="w-full px-4 py-3 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs uppercase focus:outline-none focus:border-emerald-600" placeholder="ENTER MEMORANDA, INVOICE REFERENCES, SUPPLIER DETAILS, OR SWORN STATEMENT NOTES..."></textarea>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL: ADD / EDIT MACHINERY DETAIL (EXACT CAST #machineryDetailModal)     -->
+<!-- ========================================================================= -->
+<div id="machineryDetailModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden font-mono text-xs">
+    <div class="bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 rounded-2xl w-full max-w-4xl p-6 shadow-2xl space-y-5 max-h-[92vh] overflow-y-auto">
+        <div class="flex items-center justify-between border-b border-slate-200 dark:border-stone-800 pb-3">
+            <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2" id="machineryModalTitle">
+                <i data-lucide="cpu" class="w-4 h-4 text-emerald-600"></i>
+                <span>Add Machinery Appraisal Detail (CAST Specification)</span>
+            </h3>
+            <button type="button" onclick="closeMachineryDetailModal()" class="text-slate-400 hover:text-slate-600">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+
+        <input type="hidden" id="machineryModalEditIndex" value="-1" />
+
+        <!-- Group 1: Classification, Description/Brand & Capacity -->
+        <div class="p-4 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-3">
+            <h4 class="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase flex items-center gap-1.5 border-b border-slate-200 dark:border-stone-800 pb-2">
+                <span class="w-5 h-5 rounded-full bg-emerald-600 text-white inline-flex items-center justify-center text-[10px]">1</span>
+                Machinery Classification &amp; Specification
+            </h4>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                    <label class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">CLASSIFICATION <span class="text-rose-500">*</span></label>
+                    <input type="text" id="m_Classification" list="machineryClassificationList" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-bold text-slate-900 dark:text-white uppercase" placeholder="e.g. INDUSTRIAL / COMMERCIAL" />
+                    <datalist id="machineryClassificationList">
+                        <option value="INDUSTRIAL"></option>
+                        <option value="COMMERCIAL"></option>
+                        <option value="RESIDENTIAL"></option>
+                        <option value="AGRICULTURAL"></option>
+                        <option value="SPECIAL"></option>
+                    </datalist>
+                </div>
+                <div>
+                    <label class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">DESCRIPT/BRAND <span class="text-rose-500">*</span></label>
+                    <input type="text" id="m_BrandModel" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-bold text-slate-900 dark:text-white uppercase" placeholder="e.g. GENERATOR SET - CATERPILLAR C15" />
+                </div>
+                <div>
+                    <label class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">RATED CAPACITY <span class="text-rose-500">*</span></label>
+                    <input type="text" id="m_Capacity" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-bold text-slate-900 dark:text-white uppercase" placeholder="e.g. 500 KVA / 150 HP" />
+                </div>
+            </div>
+        </div>
+
+        <!-- Group 2: Condition, Dates & Economic Life -->
+        <div class="p-4 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-3">
+            <h4 class="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase flex items-center gap-1.5 border-b border-slate-200 dark:border-stone-800 pb-2">
+                <span class="w-5 h-5 rounded-full bg-emerald-600 text-white inline-flex items-center justify-center text-[10px]">2</span>
+                Condition, Acquisition &amp; Economic Life
+            </h4>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div>
+                    <label class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">CONDITION WHEN ACQUIRED</label>
+                    <select id="m_Condition" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-bold text-slate-900 dark:text-white">
+                        <option value="NEW">NEW</option>
+                        <option value="SECOND HAND">SECOND HAND</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">DATE ACQUIRED</label>
+                    <input type="date" id="m_AcquiredDate" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white" />
+                </div>
+                <div>
+                    <label class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">ECONOMIC LIFE (YRS)</label>
+                    <input type="number" id="m_EstLife" min="0" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-right font-bold text-slate-900 dark:text-white" value="20" oninput="recomputeMachineryModalValues()" />
+                </div>
+                <div>
+                    <label class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">YEAR INSTALLED</label>
+                    <input type="number" id="m_YearInstalled" min="1900" max="2100" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-right font-bold text-slate-900 dark:text-white" placeholder="YYYY" />
+                </div>
+                <div>
+                    <label class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">YEAR OPERATION</label>
+                    <input type="number" id="m_YearOperation" min="1900" max="2100" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-right font-bold text-slate-900 dark:text-white" placeholder="YYYY" oninput="onMachineryOperationYearChange()" />
+                </div>
+                <div>
+                    <label class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">NO. OF YEARS</label>
+                    <input type="number" id="m_YearsUsed" min="0" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-right font-bold text-slate-900 dark:text-white" value="0" oninput="recomputeMachineryModalValues()" />
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">REMAINING ECOLIFE (ECOLIFE - NO. OF YEARS)</label>
+                    <input type="number" id="m_RemLife" min="0" readonly class="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-stone-800 border border-slate-200 dark:border-stone-700 text-right font-bold text-slate-900 dark:text-white" value="20" />
+                </div>
+            </div>
+        </div>
+
+        <!-- Group 3: Cost, Depreciation & Market Value -->
+        <div class="p-4 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-3">
+            <h4 class="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase flex items-center gap-1.5 border-b border-slate-200 dark:border-stone-800 pb-2">
+                <span class="w-5 h-5 rounded-full bg-emerald-600 text-white inline-flex items-center justify-center text-[10px]">3</span>
+                Cost, Depreciation &amp; Market Value Computation
+            </h4>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                    <label class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">ACQUISITION / ORIGINAL COST (₱) <span class="text-rose-500">*</span></label>
+                    <input type="number" step="0.01" min="0" id="m_OriginalCost" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-right font-bold text-slate-900 dark:text-white" placeholder="0.00" value="0.00" oninput="onMachineryCostInput()" />
+                </div>
+                <div>
+                    <label class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">INSTALLATION AND OTHER (₱)</label>
+                    <input type="number" step="0.01" min="0" id="m_InstallationCost" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-right font-bold text-slate-900 dark:text-white" placeholder="0.00" value="0.00" oninput="onMachineryCostInput()" />
+                </div>
+                <div>
+                    <label class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">TOTAL COST (₱)</label>
+                    <input type="number" step="0.01" min="0" id="m_TotalCost" readonly class="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-stone-800 border border-slate-200 dark:border-stone-700 text-right font-bold text-slate-900 dark:text-white" placeholder="0.00" value="0.00" />
+                </div>
+                <div>
+                    <label class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">RATE DEPRECIATION (%)</label>
+                    <input type="number" step="0.01" min="0" max="100" id="m_DepPercentage" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-right font-bold text-rose-600 dark:text-rose-400" placeholder="0.00" value="0" oninput="recomputeMachineryModalValues(true)" />
+                </div>
+                <div>
+                    <label class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">DEPRECIATION VALUE (AUTO COMPUTE) (₱)</label>
+                    <input type="number" step="0.01" min="0" id="m_DepValue" class="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-stone-800 border border-slate-200 dark:border-stone-700 text-right font-bold text-rose-600 dark:text-rose-400" readonly value="0.00" />
+                </div>
+                <div>
+                    <label class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">MARKET VALUE (LESS DEPRECIATION) (₱)</label>
+                    <input type="number" step="0.01" min="0" id="m_DepreciatedValue" class="w-full px-3 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-right font-black text-emerald-700 dark:text-emerald-400" readonly value="0.00" />
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-200 dark:border-stone-800">
+            <button type="button" onclick="closeMachineryDetailModal()" class="px-4 py-2 rounded-xl border border-slate-300 dark:border-stone-700 text-xs font-bold font-mono hover:bg-slate-100 dark:hover:bg-stone-800">Cancel</button>
+            <button type="button" onclick="saveMachineryDetailModal()" class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold font-mono inline-flex items-center gap-1.5 shadow-sm transition-all">
+                <i data-lucide="check" class="w-3.5 h-3.5"></i> Save Machinery Detail
+            </button>
+        </div>
+    </div>
+</div>

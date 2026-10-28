@@ -99,6 +99,12 @@ public class PropertyAssessmentRequest
     public string? PropertyLocation { get; set; } = "N/A";
 
     // * NEW OWNER / DECLARANT INFORMATION
+    [Display(Name = "Registered Owner ID")]
+    public Guid? OwnerId { get; set; }
+
+    [ValidateNever]
+    public virtual Owner? Owner { get; set; }
+
     [Required(ErrorMessage = "New Owner Name is required.")]
     [Display(Name = "New Owner / Buyer Name")]
     public string NewOwnerName { get; set; } = string.Empty;
@@ -249,6 +255,7 @@ public class AssessmentPartitionItem
     public decimal MarketValue { get; set; }
     public decimal AssessmentLevelPercent { get; set; }
     public decimal AssessedValue { get; set; }
+    public Guid? OwnerId { get; set; }
     public string NewOwnerName { get; set; } = string.Empty;
     public string? OwnerAddress { get; set; }
     public string? OwnerContactNo { get; set; }
@@ -274,12 +281,14 @@ public class AssessmentPartitionItem
         }
     }
 
-    // Condominium CCT & Administrator Details (CAST Reference)
+    // Condominium CCT & Administrator / Beneficial User / Possessor Details (CAST Reference)
     public bool IsCct { get; set; }
     public string? CctTitleNo { get; set; }
     public DateTime? CctDateRegistered { get; set; }
     public string? OwnerNameReflectedInCct { get; set; }
     public bool IsAdministrator { get; set; }
+    public bool IsBeneficialUser { get; set; }
+    public bool IsPossessor { get; set; }
     public string? AdministratorName { get; set; }
     public string? AdministratorAddress { get; set; }
     public string? AdministratorContactNo { get; set; }
@@ -376,10 +385,41 @@ public class AssessmentPartitionItem
     public decimal BuildingDepreciationAccumulated { get; set; }
     public decimal BuildingDepreciatedMarketValue { get; set; }
 
-    // Reference Land Information
+    // Reference Land & Building Information (CAST Building & Machinery)
+    public bool IsLandOwnerAlsoBuildingOwner { get; set; }
     public string? LandOwnerName { get; set; }
     public string? LandTdNo { get; set; }
     public string? LandPin { get; set; }
+    public string? BuildingReferenceName { get; set; }
+    public string? BuildingTdNo { get; set; }
+    public string? BuildingPin { get; set; }
+
+    // Machinery Property Registration Details (Outside the Philippines / Imported & Local Manufacturer)
+    public bool IsLocallyManufactured { get; set; }
+    public string? MachineryRegNo { get; set; }
+    [DataType(DataType.Date)]
+    [DisplayFormat(DataFormatString = "{0:yyyy-MM-dd}", ApplyFormatInEditMode = true)]
+    public DateTime? MachineryDateRegistered { get; set; }
+    public string? ImportationPermitNo { get; set; }
+    [DataType(DataType.Date)]
+    [DisplayFormat(DataFormatString = "{0:yyyy-MM-dd}", ApplyFormatInEditMode = true)]
+    public DateTime? ImportationDateIssued { get; set; }
+    public string? CountryOfOrigin { get; set; }
+    public string? SupplierSeller { get; set; }
+    public string? SupplierAddress { get; set; }
+    public decimal AcquisitionCost { get; set; }
+    public string? OrNo { get; set; }
+    [DataType(DataType.Date)]
+    [DisplayFormat(DataFormatString = "{0:yyyy-MM-dd}", ApplyFormatInEditMode = true)]
+    public DateTime? OrDate { get; set; }
+    public string? OrNoAndDate { get; set; }
+    [DataType(DataType.Date)]
+    [DisplayFormat(DataFormatString = "{0:yyyy-MM-dd}", ApplyFormatInEditMode = true)]
+    public DateTime? LocalDateIssued { get; set; }
+
+    // CAST Machinery Calculation Schedules (JSON Strings)
+    public string? MachineryAppraisalDetailsJson { get; set; }
+    public string? MachineryPropertyAssessmentsJson { get; set; }
 
     // Effectivity, Taxability & Back Taxes (CAST Reference)
     public string Taxability { get; set; } = "Taxable";

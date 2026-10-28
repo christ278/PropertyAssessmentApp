@@ -34,6 +34,19 @@
             <span class="text-[10px] text-slate-500 block">Pursuant to Section 222 of Republic Act No. 7160</span>
         </div>
 
+        @if (Model.IsCancelledAndSuperseded || Model.Status == AssessmentStatus.Cancelled)
+        {
+            <div class="p-4 rounded-2xl bg-rose-50 border-2 border-rose-500 text-rose-800 text-center space-y-1">
+                <span class="text-sm font-black tracking-widest uppercase block text-rose-600">*** CANCELLED &amp; SUPERSEDED ***</span>
+                <p class="text-[11px] font-bold text-rose-700">
+                    This Tax Declaration has been cancelled &amp; superseded
+                    @(string.IsNullOrWhiteSpace(Model.CancellationReason) ? "" : $"due to {Model.CancellationReason}")
+                    @(Model.DateCancelled.HasValue ? $"on {Model.DateCancelled.Value:MMMM dd, yyyy}" : $"on {Model.DateAssessed:MMMM dd, yyyy}").
+                    @(string.IsNullOrWhiteSpace(Model.SupersededByTdns) ? "" : $"Superseded by New Segregated/Consolidated TD(s): {Model.SupersededByTdns}.")
+                </p>
+            </div>
+        }
+
         <!-- Reference Numbers Grid -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-200">
             <div>
@@ -128,7 +141,9 @@
 
             <div class="p-5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col justify-between text-center">
                 <span class="text-[10px] text-slate-500 uppercase font-bold">Assessor Verification</span>
-                <div class="text-emerald-700 font-black text-lg uppercase my-2">@Model.Status</div>
+                <div class="@(Model.Status == AssessmentStatus.Cancelled ? "text-rose-600 font-black text-lg uppercase my-2" : "text-emerald-700 font-black text-lg uppercase my-2")">
+                    @(Model.Status == AssessmentStatus.Cancelled ? "CANCELLED & SUPERSEDED" : Model.Status.ToString())
+                </div>
                 <span class="text-[10px] text-slate-500">Date Assessed: @Model.DateAssessed.ToString("MMMM dd, yyyy")</span>
             </div>
         </div>

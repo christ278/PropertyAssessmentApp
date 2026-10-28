@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Property Assessment - List of User Accounts</title>
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 12mm 12mm 12mm 12mm;
+        }
+        * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            color: #0f172a;
+            margin: 0;
+            padding: 0;
+            font-size: 10.5px;
+            line-height: 1.4;
+            background: #ffffff;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #0f766e;
+            padding-bottom: 8px;
+            margin-bottom: 12px;
+        }
+        .header .agency {
+            font-size: 10px;
+            text-transform: uppercase;
+            font-weight: 600;
+            color: #64748b;
+            letter-spacing: 0.5px;
+        }
+        .header .office {
+            font-size: 14px;
+            font-weight: 800;
+            color: #0f172a;
+            margin: 2px 0;
+        }
+        .header .title {
+            font-size: 15px;
+            font-weight: 800;
+            color: #0f766e;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .header .sub {
+            font-size: 10px;
+            color: #475569;
+            font-weight: 500;
+            margin-top: 2px;
+        }
+        .meta-strip {
+            display: flex;
+            justify-content: space-between;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            padding: 6px 12px;
+            margin-bottom: 12px;
+            font-size: 10px;
+        }
+        .meta-strip strong {
+            color: #0f172a;
+        }
+        .badge {
+            background: #0f766e;
+            color: #ffffff;
+            padding: 1px 6px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 9.5px;
+        }
+        .section-bar {
+            background: #0f766e;
+            color: #ffffff;
+            padding: 5px 10px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-radius: 3px;
+            margin-top: 10px;
+            margin-bottom: 6px;
+        }
+        .section-bar.secondary {
+            background: #334155;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+            font-size: 9.5px;
+        }
+        th {
+            background: #f1f5f9;
+            color: #1e293b;
+            font-weight: 700;
+            text-align: left;
+            padding: 5px 7px;
+            border: 1px solid #cbd5e1;
+            text-transform: uppercase;
+            font-size: 9px;
+            letter-spacing: 0.3px;
+        }
+        td {
+            padding: 4.5px 7px;
+            border: 1px solid #e2e8f0;
+            vertical-align: middle;
+        }
+        tr:nth-child(even) td {
+            background: #fafafa;
+        }
+        .step-no {
+            display: inline-block;
+            background: #0f766e;
+            color: #ffffff;
+            font-weight: 800;
+            font-size: 9px;
+            width: 18px;
+            height: 18px;
+            line-height: 18px;
+            text-align: center;
+            border-radius: 50%;
+        }
+        .stage-title {
+            font-weight: 700;
+            color: #0f172a;
+            font-size: 10px;
+        }
+        .uname {
+            font-family: 'Consolas', 'Courier New', monospace;
+            background: #f1f5f9;
+            color: #0f766e;
+            border: 1px solid #cbd5e1;
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-weight: 700;
+            font-size: 9.5px;
+        }
+        .role-tag {
+            display: inline-block;
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-size: 8.5px;
+            font-weight: 600;
+        }
+        .tag-appraiser { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
+        .tag-officer { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+        .tag-clerk { background: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; }
+        .tag-head { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+        .tag-admin { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; }
+        .active-pill {
+            background: #dcfce7;
+            color: #166534;
+            font-size: 8px;
+            font-weight: 700;
+            padding: 1px 4px;
+            border-radius: 6px;
+            border: 1px solid #86efac;
+            text-transform: uppercase;
+        }
+        .cred-box {
+            background: #eff6ff;
+            border-left: 3px solid #2563eb;
+            padding: 6px 10px;
+            margin-top: 8px;
+            font-size: 9.5px;
+            color: #1e3a8a;
+            border-radius: 0 4px 4px 0;
+        }
+        .cred-box code {
+            font-family: 'Consolas', monospace;
+            background: #dbeafe;
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-weight: 700;
+            color: #1d4ed8;
+        }
+        .footer-note {
+            margin-top: 10px;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 5px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 8.5px;
+            color: #64748b;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="agency">Republic of the Philippines &bull; City of General Santos</div>
+        <div class="office">OFFICE OF THE CITY ASSESSOR</div>
+        <div class="title">Property Assessment User Accounts Directory</div>
+        <div class="sub">Division 1: Real Property Appraisal &amp; Assessment &bull; Workflow Pipeline: Receiving to Releasing</div>
+    </div>
+
+    <div class="meta-strip">
+        <div><strong>Department:</strong> Real Property Assessment (Division 1)</div>
+        <div><strong>Pipeline Stages:</strong> <span class="badge">10 Steps</span></div>
+        <div><strong>Staff Accounts:</strong> <span class="badge">32 Active Users</span></div>
+        <div><strong>Default Test Password:</strong> <code>P@ssword2026!</code></div>
+    </div>
+
+    <!-- Executive Accounts -->
+    <div class="section-bar secondary">
+        <span>Executive &amp; Administrative Accounts</span>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 18%;">Username</th>
+                <th style="width: 32%;">Full Name</th>
+                <th style="width: 25%;">System Role</th>
+                <th style="width: 15%;">Department</th>
+                <th style="width: 10%; text-align: center;">Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><span class="uname">admin</span></td>
+                <td><strong>System Administrator</strong></td>
+                <td><span class="role-tag tag-admin">System Administrator</span></td>
+                <td>Executive Office</td>
+                <td style="text-align: center;"><span class="active-pill">Active</span></td>
+            </tr>
+            <tr>
+                <td><span class="uname">admin.gensan</span></td>
+                <td><strong>Engr. Roberto M. Dela Rosa</strong></td>
+                <td><span class="role-tag tag-admin">System Administrator</span></td>
+                <td>Executive Office</td>
+                <td style="text-align: center;"><span class="active-pill">Active</span></td>
+            </tr>
+            <tr>
+                <td><span class="uname">assessor.head</span></td>
+                <td><strong>Atty. Clarissa V. Mendoza</strong></td>
+                <td><span class="role-tag tag-head">City Assessor Head</span></td>
+                <td>Executive Office</td>
+                <td style="text-align: center;"><span class="active-pill">Active</span></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Workflow Table -->
+    <div class="section-bar">
+        <span>Sequential Accounts: Receiving to Releasing (Steps 1 to 10)</span>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 6%; text-align: center;">Step</th>
+                <th style="width: 22%;">Workflow Stage</th>
+                <th style="width: 18%;">Username</th>
+                <th style="width: 30%;">Full Name</th>
+                <th style="width: 16%;">System Role</th>
+                <th style="width: 8%; text-align: center;">Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Step 1 -->
+            <tr>
+                <td rowspan="4" style="text-align: center;"><span class="step-no">1</span></td>
+                <td rowspan="4"><strong class="stage-title">Receiving</strong></td>
+                <td><span class="uname">alexis</span></td>
+                <td>Alexis Jane M. Barcelona</td>
+                <td><span class="role-tag tag-appraiser">Property Appraiser</span></td>
+                <td style="text-align: center;"><span class="active-pill">Active</span></td>
+            </tr>
+            <tr>
+                <td><span class="uname">genia</span></td>
+                <td>Genia G. Redo-do</td>
+                <td><span class="role-tag tag-officer">Taxation Officer</span></td>
+                <td style="text-align: center;"><span class="active-pill">Active</span></td>
+            </tr>
+            <tr>
+                <td><span class="uname">norlyn</span></td>
+                <td>Norlyn Mae P. Buenavides</td>
+                <td><span class="role-tag tag-officer">Taxation Officer</span></td>
+                <td style="text-align: center;"><span class="active-pill">Active</span></td>
+            </tr>
+            <tr>
+                <td><span class="uname">rc1</span></td>
+                <td>rc1</td>
+                <td><span class="role-tag tag-appraiser">Property Appraiser</span></td>
+                <td style="text-align: center;"><span class="active-pill">Active</span></td>
+            </tr>
+
+            <!-- Step 2 -->
+            <tr>
+                <td rowspan="2" style="text-align: center;"><span class="step-no">2</span></td>
+                <td rowspan="2"><strong class="stage-title">Replotting</strong></td>
+                <td><span class="uname">ayan</span></td>
+                <td>Ayan</td>
+                <td><span class="role-tag tag-officer">Taxation Officer</span></td>
+                <td style="text-align: center;"><span class="active-pill">Active</span></td>
+            </tr>
+            <tr>
+                <td><span class="uname">ella</span></td>
+                <td>Ella</td>
+                <td><span class="role-tag tag-officer">Taxation Officer</span></td>
+                <td style="text-align: center;"><span class="active-pill">Active</span></td>
+            </tr>
+
+            <!-- Step 3 -->
+            <tr>
+                <td rowspan="12" style="text-align: center;"><span class="step-no">3</span></td>
+                <td rowspan="12"><strong class="stage-title">Inspection</strong></td>
+                <td><span class="uname">ar jell</span></td>
+                <td>Ar Jell John L. Estember</td>
+                <td><span class="role-tag tag-admin">System Admin</span></td>
+                <td style="text-align: center;"><span class="active-pill">Active</span></td>
+            </tr>
+            <tr>
+                <td><span class="uname">fernan</span></td>
+                <td>Fernan B. Fariaria</td>
+                <td><span class="role-tag tag-officer">Taxation Officer</span></td>
+                <td style="text-align: center;"><span class="active-pill">Active</span></td>
+            </tr>
+            <tr>
+                <td><span class="uname">gian</span></td>
+                <td>Gian Nicolai B. Fabrigas</td>
+                <td><span class="role-tag tag-clerk">Assessment Clerk</span></td>
+                <td style="text-align: center;"><span class="active-pill">Active</span></td>
+            </tr>
+            <tr>
+                <td><span class="uname">jim</span></td>
+                <td>Jim P. Fernandez Jr.</td>
+                <td><span class="role-tag tag-officer">Taxation Officer</span></td>
+                <td style="text-align: center;"><span class="active-pill">Active</span></td>
+            </tr>
+            <tr>
+                <td><span class="uname">john rey</span></td>
+                <td>John Rey G. Peusca</td>
+                <td><span class="role-tag tag-officer">Taxation Officer</span></td>
+                <td style="text-align: center;"><span class="active-pill">Active</span></td>
+            </tr>
+            <tr>
+                <td><span class="uname">jonathan</span></td>
+                <td>Jonathan John C. Parreño</td>
+                <td><span class="role-tag tag-clerk">Assessment Clerk</span></td>
+                <td style="text-align: center;"><span class="active-pill">Active</span></td>
+            </tr>
+            <tr>
+                <td><span class="uname">kaila</span></td>
+                <td>Kaila Fate S. Fresco</td>
+                <td><span class="role-tag tag-officer">Taxation Officer</span></td>
+                <td style="text-align: center;"><span class="active-pill">Active</span></td>
+            </tr>
+            <tr>
+                <td><span class="uname">krish</span></td>
+                <td>Krish Y. Estellina</td>
+                <td><span class="role-tag tag-officer">Taxation Officer</span></td>
+                <td style="text-align: center;"><span class="active-pill">Active</span></td>
+            </tr>
+            <tr>
+                <td><span class="uname">markq</span></td>
+                <td>MarkQ</td>
+                <td><span class="role-tag tag-clerk">Assessment Clerk</span></td>
+                <td style="text-align: center;"><span class="active-pill">Active</span></td>
+            </tr>
+            <tr>
+                <td><span class="uname">renan</span></td>
+                <td>Renan V. Osoteo</td>
+                <td><span class="role-tag tag-officer">Taxation Officer</span></td>
+                <td style="text-align: center;"><span class="active-pill">Active</span></td>
+            </tr>
+            <tr>
+                <td><span class="uname">reymart</span></td>
+                <td>Reymart A. Librado</td>
+                <td><span class="role-tag tag-clerk">Assessment Clerk</span></td>
+                <td style="text-align: center;"><span class="active-pill">Active</span></td>
+            </tr>
+            <tr>
+                <td><span class="uname">suzette</span></td>
+                <td>Suzette M. Gascon</td>
+                <td><span class="role-tag tag-officer">Taxation Officer</span></td>
+                <td style="text-align: center;"><span class="active-pill">Active</span></td>
+            </tr>
+
+            <!-- Step 4 -->
+            <tr>
+                <td rowspan="3" style="text-align: center;"><span class="step-no">4</span></td>
+                <td rowspan="3"><strong class="stage-title">Check and Review</strong></td>
+                <td><span class="uname">jekiriz</span></td>
+                <td>Jekiriz B. Cerna</td>
+                <td><span class="role-tag tag-appraiser">Property Appraiser</span></td>
+                <td style="text-align: center;"><span class="active-pill">Active</span></td>
+            </tr>
+            <tr>
+                <td><span class="uname">pauline</span></td>
+                <td>Pauline Anne Grace R. Cruz</td>
+                <td><span class="role-tag tag-admin">System Admin</span></td>
+                <td style="text-align: center;"><span class="active-pill">Active</span></td>
+            </tr>
+            <tr>
+                <td><span class="uname">rolen</span></td>
+                <td>Rolen</td>
+                <td><span class="role-tag tag-officer">Taxation Officer</span></td>
+                <td style="text-align: center;"><span class="active-pill">Active</span></td>
+            </tr>
+
+            <!-- Step 5 -->
+            <tr>
+                <td style="text-align: center;"><span class="step-no">5</span></td>
+                <td><strong class="stage-title">Repinning</strong></td>
+                <td><span class="uname">marlon</span></td>
+                <td>Marlon A. Cornejo</td>
+                <td><span class="role-tag tag-appraiser">Property Appraiser</span></td>
+                <td style="text-align: center;"><span class="active-pill">Active</span></td>
+            </tr>
+
+            <!-- Step 6 -->
+            <tr>
+                <td rowspan="2" style="text-align: center;"><span class="step-no">6</span></td>
+                <td rowspan="2"><strong class="stage-title">Recommending Approval</strong></td>
+                <td><span class="uname">jerald</span></td>
+                <td>Jerald</td>
+                <td><span class="role-tag tag-clerk">Assessment Clerk</span></td>
+                <td style="text-align: center;"><span class="active-pill">Active</span></td>
+            </tr>
+            <tr>
+                <td><span class="uname">ramz</span></td>
+                <td>Ramizel L. Perania</td>
+                <td><span class="role-tag tag-officer">Taxation Officer</span></td>
+                <td style="text-align: center;"><span class="active-pill">Active</span></td>
+            </tr>
+
+            <!-- Step 7 -->
+            <tr>
+                <td rowspan="3" style="text-align: center;"><span class="step-no">7</span></td>
+                <td rowspan="3"><strong class="stage-title">Valuation &amp; Examination</strong></td>
+                <td><span class="uname">christine</span></td>
+                <td>Christine</td>
+                <td><span class="role-tag tag-clerk">Assessment Clerk</span></td>
+                <td style="text-align: center;"><span class="active-pill">Active</span></td>
+            </tr>
+            <tr>
+                <td><span class="uname">rhea</span></td>
+                <td>Maria Rhea Connie R. Apostol</td>
+                <td><span class="role-tag tag-admin">System Admin</span></td>
+                <td style="text-align: center;"><span class="active-pill">Active</span></td>
+            </tr>
+            <tr>
+                <td><span class="uname">rolenber</span></td>
+                <td>Rolenber</td>
+                <td><span class="role-tag tag-officer">Taxation Officer</span></td>
+                <td style="text-align: center;"><span class="active-pill">Active</span></td>
+            </tr>
+
+            <!-- Step 8 -->
+            <tr>
+                <td rowspan="2" style="text-align: center;"><span class="step-no">8</span></td>
+                <td rowspan="2"><strong class="stage-title">Approval</strong></td>
+                <td><span class="uname">dodong</span></td>
+                <td>Dodong</td>
+                <td><span class="role-tag tag-head">City Assessor Head</span></td>
+                <td style="text-align: center;"><span class="active-pill">Active</span></td>
+            </tr>
+            <tr>
+                <td><span class="uname">judie</span></td>
+                <td>Judie</td>
+                <td><span class="role-tag tag-head">City Assessor Head</span></td>
+                <td style="text-align: center;"><span class="active-pill">Active</span></td>
+            </tr>
+
+            <!-- Step 9 -->
+            <tr>
+                <td rowspan="2" style="text-align: center;"><span class="step-no">9</span></td>
+                <td rowspan="2"><strong class="stage-title">Printing</strong></td>
+                <td><span class="uname">anne</span></td>
+                <td>Anne</td>
+                <td><span class="role-tag tag-officer">Taxation Officer</span></td>
+                <td style="text-align: center;"><span class="active-pill">Active</span></td>
+            </tr>
+            <tr>
+                <td><span class="uname">printing</span></td>
+                <td>Printing</td>
+                <td><span class="role-tag tag-officer">Taxation Officer</span></td>
+                <td style="text-align: center;"><span class="active-pill">Active</span></td>
+            </tr>
+
+            <!-- Step 10 -->
+            <tr>
+                <td style="text-align: center;"><span class="step-no">10</span></td>
+                <td><strong class="stage-title">Releasing</strong></td>
+                <td><span class="uname">mark john</span></td>
+                <td>Mark John I. Bagaforo</td>
+                <td><span class="role-tag tag-appraiser">Property Appraiser</span></td>
+                <td style="text-align: center;"><span class="active-pill">Active</span></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="cred-box">
+        <strong>Default Test Credential:</strong> In local development and testing, all staff accounts listed above use password <code>P@ssword2026!</code>.
+    </div>
+
+    <div class="footer-note">
+        <div>City Assessor Real Property Tax &amp; Assessment Management System (CAST) &bull; General Santos City</div>
+        <div>Generated: October 28, 2026</div>
+    </div>
+
+</body>
+</html>

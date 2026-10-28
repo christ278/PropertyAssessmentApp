@@ -66,6 +66,9 @@ public class AssessmentService : IAssessmentService
             .Include(t => t.LandDetails)
                 .ThenInclude(l => l!.TDNLandPropertyAssessments)
             .Include(t => t.MachineryDetails)
+                .ThenInclude(m => m!.TDNMachineryDetails)
+            .Include(t => t.MachineryDetails)
+                .ThenInclude(m => m!.TDNMachineryPropertyAssessments)
             .FirstOrDefault(t => t.Id == id);
     }
 
@@ -89,8 +92,119 @@ public class AssessmentService : IAssessmentService
             .Include(t => t.LandDetails)
                 .ThenInclude(l => l!.TDNLandPropertyAssessments)
             .Include(t => t.MachineryDetails)
+                .ThenInclude(m => m!.TDNMachineryDetails)
+            .Include(t => t.MachineryDetails)
+                .ThenInclude(m => m!.TDNMachineryPropertyAssessments)
             .AsNoTracking()
             .FirstOrDefault(r => r.TaxDeclarationNumber == clean);
+    }
+
+    private void EnsureOwnerIdBound(TaxDeclaration declaration)
+    {
+        if (declaration == null) return;
+
+        if (declaration.OwnerId.HasValue && declaration.OwnerId.Value != Guid.Empty)
+        {
+            var exists = _context.TaxpayerOwners.AsNoTracking().Any(o => o.Id == declaration.OwnerId.Value);
+            if (exists) return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(declaration.OwnerTin))
+        {
+            var cleanTin = declaration.OwnerTin.Trim();
+            var matchByTin = _context.TaxpayerOwners
+                .AsNoTracking()
+                .Where(o => o.IsActive && o.TaxIdentNo == cleanTin)
+                .Select(o => (Guid?)o.Id)
+                .FirstOrDefault();
+            if (matchByTin.HasValue)
+            {
+                declaration.OwnerId = matchByTin.Value;
+                return;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(declaration.OwnerName))
+        {
+            var cleanName = declaration.OwnerName.Trim();
+            var activeOwners = _context.TaxpayerOwners
+                .AsNoTracking()
+                .Where(o => o.IsActive)
+                .ToList();
+            var matchByName = activeOwners.FirstOrDefault(o =>
+                string.Equals(o.DisplayName, cleanName, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(o.CorporateName, cleanName, StringComparison.OrdinalIgnoreCase));
+            if (matchByName != null)
+            {
+                declaration.OwnerId = matchByName.Id;
+            }
+        }
+    }
+
+    public string GenerateCastTdNumber(int targetYear, string? barangay)
+    {
+        int year = targetYear > 1900 ? targetYear : DateTime.Now.Year;
+        string revYearLastTwo = (year % 100).ToString("D2");
+        var yearPrefix = $"{revYearLastTwo}-";
+
+        int countForYear = _context.TaxDeclarations
+            .AsNoTracking()
+            .Count(t => t.EffectivityYear == year || t.TaxDeclarationNumber.StartsWith(yearPrefix));
+
+        int nextSeq = countForYear + 1;
+        string candidate = CastTdGenerator.FormatOfficialTdNumber(year, barangay, nextSeq);
+
+        while (_context.TaxDeclarations.AsNoTracking().Any(t => t.TaxDeclarationNumber == candidate))
+        {
+            nextSeq++;
+            candidate = CastTdGenerator.FormatOfficialTdNumber(year, barangay, nextSeq);
+        }
+
+        return candidate;
+    }
+
+    public string FormatCastArpNumber(string? barangay, string? sectionNo, string? lotOrParcelNo)
+    {
+        return CastTdGenerator.FormatArpNumber(barangay, sectionNo, lotOrParcelNo);
+    }
+
+    private void EnsureCastTdAndArpCombinations(TaxDeclaration declaration)
+    {
+        if (declaration == null) return;
+
+        // 1. Combination #1 (ARPNo: 187-00-{BarangayCode:D4}-{SectionNo:D3}-{LotOrParcelNo:D3})
+        var lotOrParcel = !string.IsNullOrWhiteSpace(declaration.ParcelNo) ? declaration.ParcelNo : declaration.LotNo;
+        var computedArp = CastTdGenerator.FormatArpNumber(declaration.DistrictOrBarangay, declaration.SectionNo, lotOrParcel);
+        if (string.IsNullOrWhiteSpace(declaration.ARPNo) || declaration.ARPNo == CastTdGenerator.DefaultArpNumber)
+        {
+            declaration.ARPNo = computedArp;
+        }
+
+        // 2. Combination #2 (TaxDeclarationNumber / Official TDN1: {RevYearLastTwo:D2}-{BarangayCode:D4}-{DeclarationNo:D5})
+        var currentTd = declaration.TaxDeclarationNumber?.Trim() ?? string.Empty;
+        bool isLegacyPlaceholder = string.IsNullOrWhiteSpace(currentTd)
+            || currentTd.StartsWith("TD-", StringComparison.OrdinalIgnoreCase)
+            || currentTd.StartsWith("TDN-", StringComparison.OrdinalIgnoreCase);
+
+        if (isLegacyPlaceholder || (declaration.Status == AssessmentStatus.Active && CastTdGenerator.IsCastArpFormat(currentTd)))
+        {
+            declaration.TaxDeclarationNumber = GenerateCastTdNumber(declaration.EffectivityYear, declaration.DistrictOrBarangay);
+        }
+        else if (CastTdGenerator.IsOfficialCastTdFormat(currentTd))
+        {
+            // Keep existing sequence number (last 5 digits), but sync RevisionYear & BarangayCode if updated
+            var parts = currentTd.Split('-');
+            if (int.TryParse(parts[2], out int existingSeq))
+            {
+                int year = declaration.EffectivityYear > 1900 ? declaration.EffectivityYear : DateTime.Now.Year;
+                var syncedTd = CastTdGenerator.FormatOfficialTdNumber(year, declaration.DistrictOrBarangay, existingSeq);
+                if (!string.Equals(syncedTd, currentTd, StringComparison.OrdinalIgnoreCase) &&
+                    !_context.TaxDeclarations.AsNoTracking().Any(t => t.Id != declaration.Id && t.TaxDeclarationNumber == syncedTd))
+                {
+                    declaration.TaxDeclarationNumber = syncedTd;
+                }
+            }
+        }
     }
 
     public void Add(TaxDeclaration declaration)
@@ -99,6 +213,9 @@ public class AssessmentService : IAssessmentService
         {
             declaration.Id = Guid.NewGuid();
         }
+
+        EnsureOwnerIdBound(declaration);
+        EnsureCastTdAndArpCombinations(declaration);
 
         if (declaration.MarketValue <= 0 && declaration.AreaSqMeters > 0 && declaration.UnitValue > 0)
         {
@@ -134,6 +251,12 @@ public class AssessmentService : IAssessmentService
         var existing = _context.TaxDeclarations.Find(declaration.Id);
         if (existing != null)
         {
+            EnsureOwnerIdBound(declaration);
+            if (!declaration.OwnerId.HasValue && existing.OwnerId.HasValue)
+            {
+                declaration.OwnerId = existing.OwnerId;
+            }
+            EnsureCastTdAndArpCombinations(declaration);
             if (declaration.MarketValue <= 0 && declaration.AreaSqMeters > 0 && declaration.UnitValue > 0)
             {
                 declaration.MarketValue = declaration.AreaSqMeters * declaration.UnitValue;
@@ -252,6 +375,17 @@ public class AssessmentService : IAssessmentService
         {
             var land = declaration.EnsureLandDetails();
             land.TaxDeclarationId = declaration.Id;
+
+            // Sync Administrator / Beneficial User / Possessor flags & demographics
+            land.IsAdministrator = declaration.IsAdministrator;
+            land.IsBeneficialUser = declaration.IsBeneficialUser;
+            land.IsPossessor = declaration.IsPossessor;
+            if (!string.IsNullOrWhiteSpace(declaration.AdminPossessorName)) land.AdministratorName = declaration.AdminPossessorName;
+            if (!string.IsNullOrWhiteSpace(declaration.AdminPossessorSex)) land.AdministratorSex = declaration.AdminPossessorSex;
+            if (!string.IsNullOrWhiteSpace(declaration.AdminPossessorAddress)) land.AdministratorAddress = declaration.AdminPossessorAddress;
+            if (!string.IsNullOrWhiteSpace(declaration.AdminPossessorTin)) land.AdministratorTin = declaration.AdminPossessorTin;
+            if (!string.IsNullOrWhiteSpace(declaration.AdminPossessorPhone)) land.AdministratorPhone = declaration.AdminPossessorPhone;
+            if (!string.IsNullOrWhiteSpace(declaration.AdminPossessorEmail)) land.AdministratorEmail = declaration.AdminPossessorEmail;
 
             // 1. Sync Land Appraisal / Classification Breakdown lines
             if (!string.IsNullOrWhiteSpace(land.LandAppraisalDetailsJson))
@@ -432,7 +566,156 @@ public class AssessmentService : IAssessmentService
             var mach = declaration.EnsureMachineryDetails();
             mach.TaxDeclarationId = declaration.Id;
 
-            var existingMach = _context.TDNMachineries.FirstOrDefault(m => m.TaxDeclarationId == declaration.Id);
+            // Sync Property Registration Details & Building/Land Owner Checkbox
+            mach.IsLandOwnerAlsoBuildingOwner = declaration.IsLandOwnerAlsoBuildingOwner;
+            mach.IsLocallyManufactured = declaration.IsLocallyManufactured;
+            if (!string.IsNullOrWhiteSpace(declaration.MachineryRegNo)) mach.MachineryRegNo = declaration.MachineryRegNo;
+            if (declaration.MachineryDateRegistered.HasValue) mach.MachineryDateRegistered = declaration.MachineryDateRegistered;
+            if (!string.IsNullOrWhiteSpace(declaration.ImportationPermitNo)) mach.ImportationPermitNo = declaration.ImportationPermitNo;
+            if (declaration.ImportationDateIssued.HasValue) mach.ImportationDateIssued = declaration.ImportationDateIssued;
+            if (!string.IsNullOrWhiteSpace(declaration.CountryOfOrigin)) mach.CountryOfOrigin = declaration.CountryOfOrigin;
+            if (!string.IsNullOrWhiteSpace(declaration.SupplierSeller)) mach.SupplierSeller = declaration.SupplierSeller;
+            if (!string.IsNullOrWhiteSpace(declaration.SupplierAddress)) mach.SupplierAddress = declaration.SupplierAddress;
+            if (declaration.AcquisitionCost > 0) mach.AcquisitionCost = declaration.AcquisitionCost;
+            if (!string.IsNullOrWhiteSpace(declaration.OrNo)) mach.OrNo = declaration.OrNo;
+            if (declaration.OrDate.HasValue) mach.OrDate = declaration.OrDate;
+            if (!string.IsNullOrWhiteSpace(declaration.OrNoAndDate)) mach.OrNoAndDate = declaration.OrNoAndDate;
+            if (declaration.LocalDateIssued.HasValue) mach.LocalDateIssued = declaration.LocalDateIssued;
+
+            // Sync Administrator / Beneficial User / Possessor flags & demographics
+            mach.IsAdministrator = declaration.IsAdministrator;
+            mach.IsBeneficialUser = declaration.IsBeneficialUser;
+            mach.IsPossessor = declaration.IsPossessor;
+            if (!string.IsNullOrWhiteSpace(declaration.AdminPossessorName)) mach.AdministratorName = declaration.AdminPossessorName;
+            if (!string.IsNullOrWhiteSpace(declaration.AdminPossessorSex)) mach.AdministratorSex = declaration.AdminPossessorSex;
+            if (!string.IsNullOrWhiteSpace(declaration.AdminPossessorAddress)) mach.AdministratorAddress = declaration.AdminPossessorAddress;
+            if (!string.IsNullOrWhiteSpace(declaration.AdminPossessorTin)) mach.AdministratorTin = declaration.AdminPossessorTin;
+            if (!string.IsNullOrWhiteSpace(declaration.AdminPossessorPhone)) mach.AdministratorPhone = declaration.AdminPossessorPhone;
+            if (!string.IsNullOrWhiteSpace(declaration.AdminPossessorEmail)) mach.AdministratorEmail = declaration.AdminPossessorEmail;
+
+            // 1. Sync Machinery Appraisal Details lines (16-column CAST schedule)
+            if (!string.IsNullOrWhiteSpace(mach.MachineryAppraisalDetailsJson))
+            {
+                try
+                {
+                    var items = System.Text.Json.JsonSerializer.Deserialize<List<MachineryDetailItemDto>>(
+                        mach.MachineryAppraisalDetailsJson,
+                        new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    if (items != null && items.Any())
+                    {
+                        mach.TDNMachineryDetails.Clear();
+                        int order = 1;
+                        decimal totalOrig = 0m;
+                        decimal totalInstall = 0m;
+                        decimal totalCostSum = 0m;
+                        decimal totalDepVal = 0m;
+                        decimal totalMarket = 0m;
+                        foreach (var item in items)
+                        {
+                            var rowTotalCost = item.TotalCost > 0 ? item.TotalCost : (item.OriginalCost + item.InstallationCost);
+                            var rowRemLife = item.RemainingEconomicLife ?? Math.Max(0, (item.EconomicLifeEstimated ?? 0) - (item.NoOfYearsUsed ?? 0));
+                            var rowDepVal = item.DepreciationTotalValue > 0
+                                ? item.DepreciationTotalValue
+                                : Math.Round(rowTotalCost * (item.DepreciationTotalPercentage / 100m), 2);
+                            var rowMarketLessDep = item.DepreciatedValue > 0
+                                ? item.DepreciatedValue
+                                : Math.Max(0m, rowTotalCost - rowDepVal);
+
+                            totalOrig += item.OriginalCost;
+                            totalInstall += item.InstallationCost;
+                            totalCostSum += rowTotalCost;
+                            totalDepVal += rowDepVal;
+                            totalMarket += rowMarketLessDep;
+
+                            mach.TDNMachineryDetails.Add(new TDNMachineryDetail
+                            {
+                                TDNMachineryId = mach.Id,
+                                OrderNo = order++,
+                                Classification = item.Classification ?? item.KindOfMachinery ?? "INDUSTRIAL",
+                                KindOfMachinery = item.KindOfMachinery ?? item.Classification ?? "INDUSTRIAL MACHINERY",
+                                BrandModel = item.DescriptionBrand ?? item.BrandModel ?? string.Empty,
+                                Capacity = item.Capacity ?? string.Empty,
+                                AcquiredDate = DateTime.TryParse(item.AcquiredDate, out var acqDt) ? acqDt : null,
+                                ConditionWhenAcquired = item.ConditionWhenAcquired ?? "NEW",
+                                EconomicLifeEstimated = item.EconomicLifeEstimated,
+                                RemainingEconomicLife = rowRemLife,
+                                YearInstalled = item.YearInstalled,
+                                YearOfOperation = item.YearOfOperation,
+                                DateOfInstallation = DateTime.TryParse(item.DateOfInstallation, out var instDt) ? instDt : null,
+                                DateOfOperation = DateTime.TryParse(item.DateOfOperation, out var opDt) ? opDt : null,
+                                OriginalCost = item.OriginalCost,
+                                InstallationCost = item.InstallationCost,
+                                TotalCost = rowTotalCost,
+                                RCN = item.RCN > 0 ? item.RCN : rowTotalCost,
+                                NoOfYearsUsed = item.NoOfYearsUsed,
+                                MarketValue = rowMarketLessDep,
+                                DepreciationTotalPercentage = item.DepreciationTotalPercentage,
+                                DepreciationTotalValue = rowDepVal,
+                                DepreciatedValue = rowMarketLessDep
+                            });
+                        }
+
+                        var first = items[0];
+                        if (!string.IsNullOrWhiteSpace(first.Classification) && Enum.TryParse<PropertyClassification>(first.Classification, true, out var parsedCls))
+                        {
+                            mach.Classification = parsedCls;
+                        }
+                        mach.DescriptionBrand = first.DescriptionBrand ?? first.BrandModel ?? first.KindOfMachinery ?? mach.DescriptionBrand;
+                        mach.RatedCapacity = first.Capacity ?? mach.RatedCapacity;
+                        mach.ConditionWhenAcquired = first.ConditionWhenAcquired ?? mach.ConditionWhenAcquired;
+                        mach.EconomicLifeYears = first.EconomicLifeEstimated ?? mach.EconomicLifeYears;
+                        mach.RemainingEconomicLife = first.RemainingEconomicLife ?? mach.RemainingEconomicLife;
+                        mach.YearInstalled = first.YearInstalled ?? mach.YearInstalled;
+                        mach.YearOfOperation = first.YearOfOperation ?? mach.YearOfOperation;
+                        mach.YearsUsed = first.NoOfYearsUsed ?? mach.YearsUsed;
+                        mach.DepreciationRatePercent = first.DepreciationTotalPercentage;
+                        mach.OriginalCost = totalOrig;
+                        mach.InstallationCost = totalInstall;
+                        mach.TotalCost = totalCostSum;
+                        if (totalMarket > 0)
+                        {
+                            mach.DepreciatedValue = totalMarket;
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            // 2. Sync Machinery Property Assessment Roll lines
+            if (!string.IsNullOrWhiteSpace(mach.MachineryPropertyAssessmentsJson))
+            {
+                try
+                {
+                    var items = System.Text.Json.JsonSerializer.Deserialize<List<MachineryPropertyAssessmentItemDto>>(
+                        mach.MachineryPropertyAssessmentsJson,
+                        new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    if (items != null && items.Any())
+                    {
+                        mach.TDNMachineryPropertyAssessments.Clear();
+                        int order = 1;
+                        foreach (var item in items)
+                        {
+                            mach.TDNMachineryPropertyAssessments.Add(new TDNMachineryPropertyAssessment
+                            {
+                                TDNMachineryId = mach.Id,
+                                OrderNo = order++,
+                                ActualUseId = item.ActualUseId,
+                                ActualUseName = item.ActualUseName ?? "INDUSTRIAL",
+                                MarketValue = item.MarketValue,
+                                AssessmentLevelPercent = item.AssessmentLevelPercent,
+                                AssessmentValue = item.AssessmentValue
+                            });
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            var existingMach = _context.TDNMachineries
+                .Include(m => m.TDNMachineryDetails)
+                .Include(m => m.TDNMachineryPropertyAssessments)
+                .FirstOrDefault(m => m.TaxDeclarationId == declaration.Id);
+
             if (existingMach == null)
             {
                 _context.TDNMachineries.Add(mach);
@@ -440,6 +723,17 @@ public class AssessmentService : IAssessmentService
             else
             {
                 _context.Entry(existingMach).CurrentValues.SetValues(mach);
+
+                if (mach.TDNMachineryDetails.Any())
+                {
+                    existingMach.TDNMachineryDetails.Clear();
+                    foreach (var d in mach.TDNMachineryDetails) existingMach.TDNMachineryDetails.Add(d);
+                }
+                if (mach.TDNMachineryPropertyAssessments.Any())
+                {
+                    existingMach.TDNMachineryPropertyAssessments.Clear();
+                    foreach (var p in mach.TDNMachineryPropertyAssessments) existingMach.TDNMachineryPropertyAssessments.Add(p);
+                }
             }
         }
     }

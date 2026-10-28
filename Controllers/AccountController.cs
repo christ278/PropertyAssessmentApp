@@ -10,10 +10,12 @@ namespace PropertyAssessmentApp.Controllers;
 public class AccountController : Controller
 {
     private readonly IUserAccountService _userService;
+    private readonly IPermissionService _permissionService;
 
-    public AccountController(IUserAccountService userService)
+    public AccountController(IUserAccountService userService, IPermissionService permissionService)
     {
         _userService = userService;
+        _permissionService = permissionService;
     }
 
     // GET: /Account/Login
@@ -114,10 +116,34 @@ public class AccountController : Controller
         if (!string.IsNullOrEmpty(returnUrl) && 
             Url.IsLocalUrl(returnUrl) && 
             !returnUrl.Equals("/Account/Login", StringComparison.OrdinalIgnoreCase) &&
+            !returnUrl.Equals("/Account/Logout", StringComparison.OrdinalIgnoreCase) &&
+            !returnUrl.Equals("/Account/AccessDenied", StringComparison.OrdinalIgnoreCase) &&
             !returnUrl.Equals("/", StringComparison.OrdinalIgnoreCase))
         {
             return Redirect(returnUrl);
         }
-        return RedirectToAction("Pool", "Workflow");
+
+        if (_permissionService.HasModuleAccess(User, "Workflow", "Pool"))
+        {
+            return RedirectToAction("Pool", "Workflow");
+        }
+        if (_permissionService.HasModuleAccess(User, "Workflow", "MyTransactions"))
+        {
+            return RedirectToAction("MyTransactions", "Workflow");
+        }
+        if (_permissionService.HasModuleAccess(User, "Assessment", "Index"))
+        {
+            return RedirectToAction("Index", "Assessment");
+        }
+        if (_permissionService.HasModuleAccess(User, "RequestForInspection", "Index"))
+        {
+            return RedirectToAction("Index", "RequestForInspection");
+        }
+        if (_permissionService.HasModuleAccess(User, "TaxMapping", "Index"))
+        {
+            return RedirectToAction("Index", "TaxMapping");
+        }
+
+        return RedirectToAction("Index", "Home");
     }
 }

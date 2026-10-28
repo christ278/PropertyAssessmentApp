@@ -27,7 +27,7 @@
 
     <!-- Form Container -->
     <div class="p-4 sm:p-6 lg:p-8 rounded-2xl sm:rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm">
-        <form asp-action="Edit" method="post" enctype="multipart/form-data" class="space-y-8">
+        <form asp-action="Edit" method="post" enctype="multipart/form-data" class="space-y-8" id="propertyAssessmentEditForm" novalidate>
             <input type="hidden" asp-for="Id" />
             <input type="hidden" asp-for="TrackingNumber" />
             <input type="hidden" asp-for="Partitions" id="Partitions" />
@@ -48,7 +48,7 @@
 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <label asp-for="TransactionTypeCode" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">TRANSACTION CODE</label>
+                        <label asp-for="TransactionTypeCode" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">TRANSACTION CODE <span class="text-rose-500 font-bold">*</span></label>
                         <select asp-for="TransactionTypeCode" id="txCodeSelect" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono font-bold focus:outline-none focus:border-emerald-600 cursor-pointer">
                             @if (!string.IsNullOrWhiteSpace(Model.TransactionTypeCode) && !PropertyAssessmentApp.Models.PropertyAssessmentRequest.StandardTransactionCodes.ContainsKey(Model.TransactionTypeCode.Trim().ToUpperInvariant()))
                             {
@@ -66,21 +66,114 @@
                             <option value="SP" data-name="Special Project">Special Project - SP</option>
                             <option value="DEP" data-name="Reassessment Due to depreciation">Reassessment Due to depreciation - DEP</option>
                         </select>
+                        <span id="txCodeValidation" class="text-rose-500 js-field-error block mt-1 text-[11px]"></span>
                     </div>
 
                     <div>
-                        <label asp-for="Kind" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">PROPERTY KIND</label>
-                        <select asp-for="Kind" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-semibold">
+                        <label asp-for="Kind" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">PROPERTY KIND <span class="text-rose-500 font-bold">*</span></label>
+                        <select asp-for="Kind" id="kindSelect" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-semibold">
                             <option value="Land">Land</option>
                             <option value="Building">Building</option>
                             <option value="Machinery">Machinery</option>
                         </select>
+                        <span id="kindValidation" class="text-rose-500 js-field-error block mt-1 text-[11px]"></span>
                     </div>
 
                     <div>
                         <label asp-for="LotNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">LOT / SURVEY NO.</label>
-                        <input asp-for="LotNo" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-semibold" />
+                        <input asp-for="LotNo" id="lotNoInput" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-semibold" />
+                        <span id="lotNoValidation" class="text-rose-500 js-field-error block mt-1 text-[11px]"></span>
                     </div>
+                </div>
+
+                <!-- Subdivision (SD) Workflow & Impact Callout Banner -->
+                <div id="sdWorkflowBanner" class="p-4 rounded-2xl bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800/60 hidden space-y-2">
+                    <div class="flex items-center gap-2 text-sky-900 dark:text-sky-300 font-extrabold text-xs uppercase">
+                        <i data-lucide="split" class="w-4 h-4 text-sky-600 dark:text-sky-400"></i>
+                        <span>Subdivision (SD) · Segregation of Land Workflow</span>
+                        <span class="px-2 py-0.5 rounded-full bg-sky-600 text-white text-[9px] font-bold">Segregation</span>
+                    </div>
+                    <p class="text-[11px] text-sky-800 dark:text-sky-300 leading-relaxed">
+                        <strong>Workflow:</strong> Initiated when a registered owner divides a mother parcel into multiple lots. The appraiser and tax mapper inspect boundary pins, road alignments, and mandatory open spaces against the Land Registration Authority (LRA) or DENR-approved plan.
+                    </p>
+                    <p class="text-[11px] text-sky-700 dark:text-sky-400 font-semibold">
+                        <strong>Impact on Property:</strong> The mother Tax Declaration will be stamped <span class="text-rose-600 dark:text-rose-400 font-bold">&quot;CANCELLED &amp; SUPERSEDED&quot;</span> upon approval. New unique PINs and individual TDs will be generated for each segregated lot (minimum 2 lots required). Tax liabilities and delinquencies are apportioned independently.
+                    </p>
+                </div>
+
+                <!-- Consolidation (CS) Workflow & Impact Callout Banner -->
+                <div id="csWorkflowBanner" class="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 hidden space-y-2">
+                    <div class="flex items-center gap-2 text-amber-900 dark:text-amber-300 font-extrabold text-xs uppercase">
+                        <i data-lucide="merge" class="w-4 h-4 text-amber-600 dark:text-amber-400"></i>
+                        <span>Consolidation (CS) · Lot Integration Workflow</span>
+                        <span class="px-2 py-0.5 rounded-full bg-amber-600 text-white text-[9px] font-bold">Lot Integration</span>
+                    </div>
+                    <p class="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
+                        <strong>Workflow:</strong> Combines two or more contiguous parcels under identical ownership into a single parcel. Field inspection verifies that parcels physically touch without intervening public access easements, water channels, or third-party encroachments against the Land Registration Authority (LRA) or DENR-approved consolidation plan.
+                    </p>
+                    <p class="text-[11px] text-amber-700 dark:text-amber-400 font-semibold">
+                        <strong>Impact on Property:</strong> All individual parent Tax Declarations are stamped <span class="text-rose-600 dark:text-rose-400 font-bold">&quot;CANCELLED &amp; SUPERSEDED&quot;</span> upon approval. A single consolidated TD and PIN are generated. Real property tax receivables in the Treasury are collapsed from multiple ledgers into a unified bill.
+                    </p>
+                </div>
+
+                <!-- Discovery / New Declaration (DC) Workflow & Impact Callout Banner -->
+                <div id="dcWorkflowBanner" class="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 hidden space-y-2">
+                    <div class="flex items-center gap-2 text-emerald-900 dark:text-emerald-300 font-extrabold text-xs uppercase">
+                        <i data-lucide="sparkles" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                        <span>Discovery / New Declaration (DC) · Original Assessment Workflow</span>
+                        <span class="px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[9px] font-bold">Original Assessment</span>
+                    </div>
+                    <p class="text-[11px] text-emerald-800 dark:text-emerald-300 leading-relaxed">
+                        <strong>Workflow:</strong> Applied when a newly completed building, warehouse, industrial machinery, or previously unmapped land parcel is declared. The appraiser takes tape measurements, establishes structural framing (Types I to V), and verifies operational status.
+                    </p>
+                    <p class="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold">
+                        <strong>Impact on Property:</strong> Does not supersede any prior TD. Creates an original Field Appraisal and Assessment Sheet (FAAS). Under Sec. 222 of R.A. 7160, back taxes may be assessed for up to ten (10) preceding years if unassessed since completion.
+                    </p>
+                </div>
+
+                <!-- Reassessment Due to Physical Change (PC) Workflow & Impact Callout Banner -->
+                <div id="pcWorkflowBanner" class="p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 hidden space-y-2">
+                    <div class="flex items-center gap-2 text-indigo-900 dark:text-indigo-300 font-extrabold text-xs uppercase">
+                        <i data-lucide="hammer" class="w-4 h-4 text-indigo-600 dark:text-indigo-400"></i>
+                        <span>Reassessment Due to Physical Change (PC) · Renovation / Expansion Workflow</span>
+                        <span class="px-2 py-0.5 rounded-full bg-indigo-600 text-white text-[9px] font-bold">Renovation / Expansion</span>
+                    </div>
+                    <p class="text-[11px] text-indigo-800 dark:text-indigo-300 leading-relaxed">
+                        <strong>Workflow:</strong> Triggered by structural renovations, adding vertical floors, floor plan extensions, or constructing accessory improvements (swimming pools, perimeter fences). Inspection logs new square meters and materials against building permits and physical site appraisal.
+                    </p>
+                    <p class="text-[11px] text-indigo-700 dark:text-indigo-400 font-semibold">
+                        <strong>Impact on Property:</strong> The previous Tax Declaration is stamped <span class="text-rose-600 dark:text-rose-400 font-bold">&quot;CANCELLED &amp; SUPERSEDED&quot;</span> upon approval. Fair Market Value (FMV) and Assessed Value increase, recalculating structural effective age and leading to an upward tax adjustment.
+                    </p>
+                </div>
+
+                <!-- Transfer (TR) Workflow & Impact Callout Banner -->
+                <div id="trWorkflowBanner" class="p-4 rounded-2xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800/60 hidden space-y-2">
+                    <div class="flex items-center gap-2 text-teal-900 dark:text-teal-300 font-extrabold text-xs uppercase">
+                        <i data-lucide="arrow-right-left" class="w-4 h-4 text-teal-600 dark:text-teal-400"></i>
+                        <span>Transfer (TR) · Administrative Title Conveyance Workflow</span>
+                        <span class="px-2 py-0.5 rounded-full bg-teal-600 text-white text-[9px] font-bold">Administrative Conveyance</span>
+                    </div>
+                    <p class="text-[11px] text-teal-800 dark:text-teal-300 leading-relaxed">
+                        <strong>Workflow:</strong> Executed upon sale, donation, barter, or extrajudicial settlement. Requires Transfer Certificate of Title (TCT), BIR Certificate Authorizing Registration (CAR/eCAR), and Transfer Tax Receipt. Field inspection is not required.
+                    </p>
+                    <p class="text-[11px] text-teal-700 dark:text-teal-400 font-semibold">
+                        <strong>Impact on Property:</strong> The prior owner's Tax Declaration is stamped <span class="text-rose-600 dark:text-rose-400 font-bold">&quot;CANCELLED &amp; SUPERSEDED&quot;</span> upon approval. The replacement TD retains identical land area, building classifications, and PIN, while redirecting billing ledgers to the transferee.
+                    </p>
+                </div>
+
+                <!-- Reclassification (RC) Workflow & Impact Callout Banner -->
+                <div id="rcWorkflowBanner" class="p-4 rounded-2xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/60 hidden space-y-2">
+                    <div class="flex items-center gap-2 text-purple-900 dark:text-purple-300 font-extrabold text-xs uppercase">
+                        <i data-lucide="layers" class="w-4 h-4 text-purple-600 dark:text-purple-400"></i>
+                        <span>Reclassification (RC) · Actual Ground Use Conversion Workflow</span>
+                        <span class="px-2 py-0.5 rounded-full bg-purple-600 text-white text-[9px] font-bold">Ground Use Conversion</span>
+                    </div>
+                    <p class="text-[11px] text-purple-800 dark:text-purple-300 leading-relaxed">
+                        <strong>Workflow:</strong> Mandated when land or structures convert physical usage (e.g., agricultural land to commercial parking, or residential home to retail grocery). Field inspection confirms actual economic activity pursuant to Sec. 217 of R.A. 7160.
+                    </p>
+                    <p class="text-[11px] text-purple-700 dark:text-purple-400 font-semibold">
+                        <strong>Impact on Property:</strong> The old Tax Declaration is stamped <span class="text-rose-600 dark:text-rose-400 font-bold">&quot;CANCELLED &amp; SUPERSEDED&quot;</span> upon approval. Replaces the statutory assessment level (e.g., from 20% Residential to 50% Commercial), altering annual property tax dues without needing title re-titling.
+                    </p>
                 </div>
             </div>
 
@@ -107,8 +200,9 @@
                 </div>
 
                 <div>
-                    <label asp-for="PropertyLocation" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">LOCATION ADDRESS</label>
-                    <input asp-for="PropertyLocation" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-semibold" />
+                    <label asp-for="PropertyLocation" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">LOCATION ADDRESS <span class="text-rose-500 font-bold">*</span></label>
+                    <input asp-for="PropertyLocation" id="locationInput" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-semibold" />
+                    <span asp-validation-for="PropertyLocation" id="propertyLocationValidation" class="text-rose-500 js-field-error font-bold block mt-1 text-[11px]"></span>
                 </div>
             </div>
 
@@ -124,6 +218,7 @@
                         Add Another Lot
                     </button>
                 </div>
+                <span id="partitionsValidation" class="text-rose-500 js-field-error font-bold block mt-1 text-[11px]"></span>
 
                 <div class="border border-slate-200 dark:border-stone-800 rounded-2xl overflow-x-auto bg-white dark:bg-stone-900 shadow-sm">
                     <table class="w-full text-left text-xs font-mono">
@@ -185,27 +280,38 @@
 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <label asp-for="NewOwnerName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">NEW OWNER NAME *</label>
+                        <label asp-for="NewOwnerName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">NEW OWNER NAME <span class="text-rose-500 font-bold">*</span></label>
+                        <input type="hidden" asp-for="OwnerId" id="requestOwnerIdInput" />
                         <input asp-for="NewOwnerName" id="newOwnerNameInput" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold" required />
+                        <span asp-validation-for="NewOwnerName" id="newOwnerNameValidation" class="text-rose-500 js-field-error font-bold block mt-1 text-[11px]"></span>
                     </div>
                     <div>
                         <label asp-for="OwnerTIN" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">OWNER TIN</label>
                         <input asp-for="OwnerTIN" id="ownerTinInput" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" />
+                        <span asp-validation-for="OwnerTIN" id="ownerTinValidation" class="text-rose-500 js-field-error font-bold block mt-1 text-[11px]"></span>
                     </div>
                     <div>
                         <label asp-for="ContactNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">CONTACT NO.</label>
                         <input asp-for="ContactNo" id="contactNoInput" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" />
+                        <span asp-validation-for="ContactNo" id="contactNoValidation" class="text-rose-500 js-field-error font-bold block mt-1 text-[11px]"></span>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div class="md:col-span-2">
-                        <label asp-for="Address" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">ADDRESS</label>
+                    <div>
+                        <label asp-for="Address" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">ADDRESS <span class="text-rose-500 font-bold">*</span></label>
                         <input asp-for="Address" id="ownerAddressInput" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white" />
+                        <span asp-validation-for="Address" id="ownerAddressValidation" class="text-rose-500 js-field-error font-bold block mt-1 text-[11px]"></span>
+                    </div>
+                    <div>
+                        <label asp-for="EmailAddress" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">EMAIL ADDRESS</label>
+                        <input asp-for="EmailAddress" id="emailAddressInput" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white" placeholder="taxpayer@example.com" />
+                        <span asp-validation-for="EmailAddress" id="emailAddressValidation" class="text-rose-500 js-field-error font-bold block mt-1 text-[11px]"></span>
                     </div>
                     <div>
                         <label asp-for="Requestor" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">REQUESTOR</label>
                         <input asp-for="Requestor" id="requestorInput" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white" />
+                        <span asp-validation-for="Requestor" id="requestorValidation" class="text-rose-500 js-field-error font-bold block mt-1 text-[11px]"></span>
                     </div>
                 </div>
             </div>
@@ -441,6 +547,58 @@
 
         document.addEventListener('DOMContentLoaded', function () {
             const txSelect = document.getElementById('txCodeSelect');
+            function updateWorkflowBanners() {
+                const val = txSelect ? txSelect.value : '';
+                const sdBanner = document.getElementById('sdWorkflowBanner');
+                const csBanner = document.getElementById('csWorkflowBanner');
+                const dcBanner = document.getElementById('dcWorkflowBanner');
+                const pcBanner = document.getElementById('pcWorkflowBanner');
+                const trBanner = document.getElementById('trWorkflowBanner');
+                const rcBanner = document.getElementById('rcWorkflowBanner');
+                if (sdBanner) {
+                    if (val === 'SD') {
+                        sdBanner.classList.remove('hidden');
+                    } else {
+                        sdBanner.classList.add('hidden');
+                    }
+                }
+                if (csBanner) {
+                    if (val === 'CS') {
+                        csBanner.classList.remove('hidden');
+                    } else {
+                        csBanner.classList.add('hidden');
+                    }
+                }
+                if (dcBanner) {
+                    if (val === 'DC') {
+                        dcBanner.classList.remove('hidden');
+                    } else {
+                        dcBanner.classList.add('hidden');
+                    }
+                }
+                if (pcBanner) {
+                    if (val === 'PC') {
+                        pcBanner.classList.remove('hidden');
+                    } else {
+                        pcBanner.classList.add('hidden');
+                    }
+                }
+                if (trBanner) {
+                    if (val === 'TR') {
+                        trBanner.classList.remove('hidden');
+                    } else {
+                        trBanner.classList.add('hidden');
+                    }
+                }
+                if (rcBanner) {
+                    if (val === 'RC') {
+                        rcBanner.classList.remove('hidden');
+                    } else {
+                        rcBanner.classList.add('hidden');
+                    }
+                }
+            }
+
             if (txSelect) {
                 txSelect.addEventListener('change', function () {
                     const opt = this.options[this.selectedIndex];
@@ -448,7 +606,9 @@
                     if (input && opt) {
                         input.value = opt.getAttribute('data-name') || opt.text;
                     }
+                    updateWorkflowBanners();
                 });
+                updateWorkflowBanners();
             }
 
             const modalKindSelect = document.getElementById('modalKind');
@@ -486,7 +646,7 @@
                             if (item.name) {
                                 return `<div class="py-1">
                                     <span class="font-bold text-slate-900 dark:text-white">${escape(item.name)}</span>
-                                    <span class="text-[11px] text-slate-500 dark:text-stone-400"> (TIN: ${escape(item.tin || 'N/A')} | ${escape(item.barangay || 'N/A')})</span>
+                                    <span class="text-[11px] text-slate-600 dark:text-stone-300 font-medium"> (TIN: ${escape(item.tin || 'N/A')} | ${escape(item.barangay || 'N/A')})</span>
                                 </div>`;
                             }
                             return `<div class="py-1">${escape(item.text || item.display || '')}</div>`;
@@ -499,11 +659,14 @@
                         }
                     },
                     onChange: function (ownerId) {
+                        const ownerIdInput = document.getElementById('requestOwnerIdInput');
+                        if (ownerIdInput) ownerIdInput.value = ownerId || '';
                         if (!ownerId) return;
                         fetch(`/PropertyAssessmentRequest/GetOwnerDetails?id=${encodeURIComponent(ownerId)}`)
                             .then(res => res.json())
                             .then(data => {
                                 if (data) {
+                                    if (ownerIdInput) ownerIdInput.value = data.id || ownerId;
                                     const nameInput = document.getElementById('newOwnerNameInput');
                                     const tinInput = document.getElementById('ownerTinInput');
                                     const phoneInput = document.getElementById('contactNoInput');
@@ -539,6 +702,21 @@
             const btnAddLot = document.getElementById('btnAddManualPartitionRow');
             if (btnAddLot) {
                 btnAddLot.addEventListener('click', handleAddManualPartitionLot);
+            }
+
+            // Sync Property Kind dropdown into generated partitions
+            const reqKindSelect = document.querySelector('select[name="Kind"]');
+            if (reqKindSelect) {
+                reqKindSelect.addEventListener('change', function() {
+                    const selectedKind = this.value;
+                    if (selectedKind && generatedPartitions.length > 0) {
+                        generatedPartitions.forEach((p) => {
+                            p.kind = selectedKind;
+                        });
+                        serializePartitions();
+                        renderPartitionsTable();
+                    }
+                });
             }
         });
 
@@ -577,6 +755,7 @@
                                         <span class="font-bold font-mono text-slate-900 dark:text-white text-xs block">
                                             ${p.systemGeneratedTDN || 'TDN-PENDING'}
                                         </span>
+                                        ${p.arpNo ? `<span class="text-[10px] text-emerald-700 dark:text-emerald-400 font-mono block">ARP: ${p.arpNo}</span>` : ''}
                                         ${p.pin ? `<span class="text-[10px] text-slate-500 dark:text-stone-400 font-mono block">PIN: ${p.pin}</span>` : ''}
                                     </div>
                                 </div>
@@ -599,7 +778,7 @@
                             </td>
                             <td class="px-4 py-3 align-middle text-center">
                                 <div class="flex items-center justify-center gap-1.5">
-                                    <button type="button" onclick="handleEditPartition(${idx})" class="p-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition-colors" title="${p.kind === 'Building' ? 'Edit Building Appraisal (Structural Type & Materials)' : (p.kind === 'Land' ? 'Edit Land Appraisal (CAST TDN Specification)' : 'Edit Partition Details')}">
+                                    <button type="button" onclick="handleEditPartition(${idx})" class="p-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition-colors" title="${p.kind === 'Building' ? 'Edit Building Appraisal (Structural Type & Materials)' : (p.kind === 'Machinery' ? 'Edit Machinery Appraisal (CAST Machinery Form)' : 'Edit Land Appraisal (CAST TDN Specification)')}">
                                         <i data-lucide="pencil" class="w-4 h-4"></i>
                                     </button>
                                     <button type="button" onclick="removePartition(${idx})" class="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors" title="Delete partition row">
@@ -675,13 +854,62 @@
             serializePartitions();
         }
 
+        function resolveCastBrgyCode(brgyVal, defaultCode = '0001') {
+            if (!brgyVal) return defaultCode;
+            const raw = String(brgyVal).trim();
+            if (/^\d+$/.test(raw)) return raw.slice(-4).padStart(4, '0');
+            const u = raw.toUpperCase();
+            const map = [
+                ['DADIANGAS EAST', '0001'], ['CENTRAL', '0001'], ['POBLACION', '0001'], ['ZONE 1', '0001'],
+                ['LAGAO', '0002'], ['MORALES', '0002'], ['CALUMPANG', '0003'], ['SAN ISIDRO', '0004'],
+                ['CITY HEIGHTS', '0005'], ['DADIANGAS NORTH', '0006'], ['DADIANGAS SOUTH', '0007'],
+                ['DADIANGAS WEST', '0008'], ['LABANGAL', '0009'], ['APOPONG', '0010'], ['BALUAN', '0011'],
+                ['BATOMELONG', '0012'], ['BUAYAN', '0013'], ['BULA', '0014'], ['CONEL', '0015'],
+                ['FATIMA', '0016'], ['KATANGAWAN', '0017'], ['LIGAYA', '0018'], ['MABUHAY', '0019'],
+                ['OLYMPOG', '0020'], ['SAN JOSE', '0021'], ['SIGUEL', '0022'], ['SINAWAL', '0023'],
+                ['TAMBLER', '0024'], ['TINAGACAN', '0025'], ['UPPER LABAY', '0026'], ['SALITRAN', '0027']
+            ];
+            for (const [k, c] of map) {
+                if (u.includes(k)) return c;
+            }
+            const digits = raw.replace(/\D/g, '');
+            if (digits) return digits.slice(-4).padStart(4, '0');
+            return defaultCode;
+        }
+
+        function formatThreeDigitPart(val) {
+            if (!val) return '000';
+            const m = String(val).match(/\d+/);
+            if (m) return m[0].slice(-3).padStart(3, '0');
+            return String(val).replace(/[^a-zA-Z0-9]/g, '').slice(0, 3).toUpperCase().padStart(3, '0') || '000';
+        }
+
+        // CAST Combination #1: {LGUCode}-{DistrictMunicipalityCode}-{BarangayCode:D4}-{SectionNo:D3}-{LotOrParcelNo:D3}
+        function formatCastArpNumber(brgyVal, sectionNo, lotOrParcelNo, lgu = '187', mun = '00') {
+            const brgy4 = resolveCastBrgyCode(brgyVal, '0000');
+            const sec3 = formatThreeDigitPart(sectionNo);
+            const lot3 = formatThreeDigitPart(lotOrParcelNo);
+            return `${String(lgu).padStart(3, '0')}-${String(mun).padStart(2, '0')}-${brgy4}-${sec3}-${lot3}`;
+        }
+
+        // CAST Combination #2: {RevisionYearLastTwoDigits:D2}-{BarangayCode:D4}-{DeclarationNo:D5}
+        function generateSystemTDN(letterSuffix, brgyVal, seqIndex) {
+            const revYearLastTwo = String(new Date().getFullYear() % 100).padStart(2, '0');
+            const brgy4 = resolveCastBrgyCode(brgyVal, '0001');
+            const baseCount = Object.keys(referencePropertiesData || {}).length;
+            const seqNum = typeof seqIndex === 'number' && seqIndex > 0
+                ? (baseCount + seqIndex)
+                : (baseCount + (generatedPartitions ? generatedPartitions.length + 1 : 1));
+            const declNo5 = String(seqNum).padStart(5, '0');
+            return `${revYearLastTwo}-${brgy4}-${declNo5}`;
+        }
+
         function regeneratePartitionTDN(idx) {
             if (generatedPartitions[idx]) {
-                const year = new Date().getFullYear();
-                const txCode = document.getElementById('txCodeSelect') ? document.getElementById('txCodeSelect').value : "SD";
-                const rand4 = Math.floor(1000 + Math.random() * 9000);
-                const letter = generatedPartitions[idx].partitionIndex || alphabetLetters[idx % alphabetLetters.length];
-                generatedPartitions[idx].systemGeneratedTDN = `TD-${year}-${txCode}-${rand4}-${letter}`;
+                const p = generatedPartitions[idx];
+                const letter = p.partitionIndex || alphabetLetters[idx % alphabetLetters.length];
+                p.systemGeneratedTDN = generateSystemTDN(letter, p.districtOrBarangay, idx + 1);
+                p.arpNo = formatCastArpNumber(p.districtOrBarangay, p.sectionNo || '001', p.parcelNo || p.lotNumber || `${idx + 1}`);
                 renderPartitionsTable();
             }
         }
@@ -698,18 +926,21 @@
             const idx = generatedPartitions.length;
             const letter = alphabetLetters[idx % alphabetLetters.length];
             const newOwner = (document.querySelector('input[name="NewOwnerName"]').value || '').trim();
-            const year = new Date().getFullYear();
-            const txCode = document.getElementById('txCodeSelect') ? document.getElementById('txCodeSelect').value : "SD";
-            const rand4 = Math.floor(1000 + Math.random() * 9000);
+            const reqKindEl = document.querySelector('select[name="Kind"]');
+            const effKind = reqKindEl && reqKindEl.value ? reqKindEl.value : "Land";
+            const brgyName = "Brgy. Central";
+            const arpCombined = formatCastArpNumber(brgyName, '001', `${idx + 1}`);
 
             generatedPartitions.push({
                 partitionIndex: letter,
                 baseTDN: document.getElementById('PrevTDN') ? document.getElementById('PrevTDN').value : "Manual",
                 basePropertyId: null,
-                systemGeneratedTDN: `TD-${year}-${txCode}-${rand4}-${letter}`,
-                pin: `126-00-0000-${letter}`,
+                systemGeneratedTDN: generateSystemTDN(letter, brgyName, idx + 1),
+                arpNo: arpCombined,
+                sectionNo: '001',
+                pin: arpCombined,
                 lotNumber: `Lot ${idx + 1}-${letter}`,
-                kind: "Land",
+                kind: effKind,
                 classification: "Residential",
                 areaSqMeters: 100,
                 unitValue: 1500,
@@ -717,7 +948,7 @@
                 assessmentLevelPercent: 20,
                 assessedValue: 30000,
                 newOwnerName: newOwner || "",
-                districtOrBarangay: "Brgy. Central"
+                districtOrBarangay: brgyName
             });
 
             renderPartitionsTable();
@@ -764,20 +995,23 @@
         // -------------------------------------------------------------
         function editPartitionRedirect(idx) {
             const reqId = '@Model.Id';
+            const p = generatedPartitions[idx];
+            const kindParam = p && p.kind ? `&kind=${encodeURIComponent(p.kind)}` : '';
             const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
-            window.location.href = `/PropertyAssessmentRequest/EditPartition?requestId=${reqId}&index=${idx}&returnUrl=${returnUrl}`;
+            window.location.href = `/PropertyAssessmentRequest/EditPartition?requestId=${reqId}&index=${idx}${kindParam}&returnUrl=${returnUrl}`;
         }
 
         // -------------------------------------------------------------
-        // Edit Partition Handler: For Land and Building kinds, redirect directly to
+        // Edit Partition Handler: For Land, Building, and Machinery kinds, redirect directly to
         // the dedicated CAST Appraisal Form (Building has Structural Type, BUCC
         // breakdown, and 17 Materials; Land has Cadastral, Boundaries, and 4
-        // dynamic Appraisal & Assessment schedules matching CAST).
+        // dynamic Appraisal & Assessment schedules; Machinery has 16-column Machinery
+        // Appraisal & Property Assessment roll matching CAST).
         // -------------------------------------------------------------
         function handleEditPartition(idx) {
             const p = generatedPartitions[idx];
             const kind = (p && p.kind ? p.kind : '').toLowerCase();
-            if (kind === 'building' || kind === 'land') {
+            if (kind === 'building' || kind === 'land' || kind === 'machinery') {
                 editPartitionRedirect(idx);
             } else {
                 openEditPartitionModal(idx);
@@ -830,10 +1064,8 @@
         function reRollModalTDN() {
             const idx = parseInt(document.getElementById('modalPartitionIdx').value) || 0;
             const letter = generatedPartitions[idx] ? (generatedPartitions[idx].partitionIndex || alphabetLetters[idx % alphabetLetters.length]) : 'A';
-            const year = new Date().getFullYear();
-            const txCode = document.getElementById('txCodeSelect') ? document.getElementById('txCodeSelect').value : "SD";
-            const rand4 = Math.floor(1000 + Math.random() * 9000);
-            document.getElementById('modalTDN').value = `TD-${year}-${txCode}-${rand4}-${letter}`;
+            const brgy = document.getElementById('modalBarangay') ? document.getElementById('modalBarangay').value : (generatedPartitions[idx] ? generatedPartitions[idx].districtOrBarangay : '');
+            document.getElementById('modalTDN').value = generateSystemTDN(letter, brgy, idx + 1);
         }
 
         function recomputeModalValuation() {
@@ -868,6 +1100,11 @@
                 generatedPartitions[idx].customLocation = true;
             }
             generatedPartitions[idx].districtOrBarangay = document.getElementById('modalBarangay').value.trim();
+            generatedPartitions[idx].arpNo = formatCastArpNumber(
+                generatedPartitions[idx].districtOrBarangay,
+                generatedPartitions[idx].sectionNo || '001',
+                generatedPartitions[idx].parcelNo || generatedPartitions[idx].lotNumber || `${idx + 1}`
+            );
             generatedPartitions[idx].areaSqMeters = area;
             generatedPartitions[idx].unitValue = unitVal;
             generatedPartitions[idx].assessmentLevelPercent = assessLvl;
@@ -880,37 +1117,188 @@
             toastr.success(`Partition updated successfully!`);
         }
 
-        // Validate O.R. Number before forwarding beyond Receiving
+        // Form validation on submit & O.R. Number validation before forwarding beyond Receiving
         document.addEventListener('DOMContentLoaded', function () {
-            const form = document.querySelector('form[asp-action="Edit"]') || document.querySelector('form');
+            const form = document.getElementById('propertyAssessmentEditForm') || document.querySelector('form');
             const selectStatus = document.getElementById('selectEditStatus');
             const inputOr = document.getElementById('inputEditORNumber');
+            const txSelect = document.getElementById('txCodeSelect');
 
-            if (form && selectStatus && inputOr) {
+            function updateWorkflowBanners() {
+                const val = txSelect ? txSelect.value : '';
+                const sdBanner = document.getElementById('sdWorkflowBanner');
+                const csBanner = document.getElementById('csWorkflowBanner');
+                const dcBanner = document.getElementById('dcWorkflowBanner');
+                if (sdBanner) {
+                    if (val === 'SD') {
+                        sdBanner.classList.remove('hidden');
+                    } else {
+                        sdBanner.classList.add('hidden');
+                    }
+                }
+                if (csBanner) {
+                    if (val === 'CS') {
+                        csBanner.classList.remove('hidden');
+                    } else {
+                        csBanner.classList.add('hidden');
+                    }
+                }
+                if (dcBanner) {
+                    if (val === 'DC') {
+                        dcBanner.classList.remove('hidden');
+                    } else {
+                        dcBanner.classList.add('hidden');
+                    }
+                }
+            }
+
+            if (txSelect) {
+                txSelect.addEventListener('change', updateWorkflowBanners);
+                updateWorkflowBanners();
+            }
+
+            if (form) {
                 form.addEventListener('submit', function (e) {
-                    const statusVal = selectStatus.value;
-                    const orVal = inputOr.value.trim();
+                    serializePartitions();
+                    var isValid = true;
+                    var firstInvalid = null;
 
-                    // If status is forwarded past Receiving (e.g. Replotting, Valuation, Review, Approval, Approved)
-                    if (statusVal !== 'Pending' && statusVal !== 'Receiving' && statusVal !== 'Deferred' && !orVal) {
-                        e.preventDefault();
-                        if (typeof toastr !== 'undefined') {
-                            toastr.warning('An Official Receipt (O.R.) Number is required before forwarding this request to ' + statusVal + '. Please input the O.R. Number, or keep status as "Receiving".', 'O.R. Number Required');
-                        } else {
-                            alert('An Official Receipt (O.R.) Number is required before forwarding this request to ' + statusVal + '.');
+                    document.querySelectorAll('.border-rose-500').forEach(function(el) {
+                        el.classList.remove('border-rose-500', 'ring-2', 'ring-rose-500/30');
+                    });
+                    document.querySelectorAll('.js-field-error').forEach(function(el) {
+                        el.textContent = '';
+                    });
+
+                    function markInvalid(element, spanId, message) {
+                        isValid = false;
+                        if (element) {
+                            element.classList.add('border-rose-500', 'ring-2', 'ring-rose-500/30');
                         }
-                        inputOr.focus();
-                        inputOr.classList.add('border-amber-500', 'ring-2', 'ring-amber-500/30');
-                        inputOr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        if (spanId) {
+                            var span = document.getElementById(spanId);
+                            if (span) span.textContent = message;
+                        }
+                        if (!firstInvalid && element) {
+                            firstInvalid = element;
+                        }
+                    }
+
+                    const personNameRegex = /^[\p{L}\s.,'\-]+$/u;
+                    const phoneRegex = /^(\+63|0)?\d{7,10}$/;
+                    const emailRegex = /^[^\s@@]+@@[^\s@@]+\.[^\s@@]{2,}$/;
+
+                    // 1. Validate Subdivision (SD) · Segregation of Land Partition Count
+                    const currentTxCode = (txSelect ? txSelect.value : '').trim().toUpperCase();
+                    if (currentTxCode === 'SD') {
+                        const partCount = generatedPartitions.length > 0 ? generatedPartitions.length : (parseInt(document.getElementById('Partitions')?.value, 10) || 1);
+                        if (partCount < 2) {
+                            markInvalid(document.getElementById('btnAddManualPartitionRow'), 'partitionsValidation',
+                                'Subdivision (SD) · Segregation of Land requires at least 2 segregated lot partitions. Please add at least 2 partition lots.');
+                        }
+                    }
+
+                    // 2. Validate New Owner Name
+                    var ownerEl = document.getElementById('newOwnerNameInput');
+                    var ownerVal = ownerEl ? ownerEl.value.trim() : '';
+                    if (!ownerVal) {
+                        markInvalid(ownerEl, 'newOwnerNameValidation', 'New Owner / Declarant Name is required.');
+                    } else if (ownerVal.replace(/\//g, '').toUpperCase() === 'NA') {
+                        markInvalid(ownerEl, 'newOwnerNameValidation', 'New Owner / Declarant Name is required (N/A is not accepted).');
+                    } else if (ownerVal.length > 150) {
+                        markInvalid(ownerEl, 'newOwnerNameValidation', 'New Owner Name must not exceed 150 characters.');
+                    } else if (!personNameRegex.test(ownerVal)) {
+                        markInvalid(ownerEl, 'newOwnerNameValidation', 'New Owner Name contains invalid characters.');
+                    }
+
+                    // 3. Validate Owner Address
+                    var addrEl = document.getElementById('ownerAddressInput');
+                    var addrVal = addrEl ? addrEl.value.trim() : '';
+                    if (!addrVal) {
+                        markInvalid(addrEl, 'ownerAddressValidation', 'Owner Address is required.');
+                    } else if (addrVal.length > 250) {
+                        markInvalid(addrEl, 'ownerAddressValidation', 'Owner Address must not exceed 250 characters.');
+                    }
+
+                    // 4. Validate Property Location
+                    var locEl = document.getElementById('locationInput');
+                    var locVal = locEl ? locEl.value.trim() : '';
+                    if (!locVal) {
+                        markInvalid(locEl, 'propertyLocationValidation', 'Property Location is required.');
+                    } else if (locVal.length > 250) {
+                        markInvalid(locEl, 'propertyLocationValidation', 'Property Location must not exceed 250 characters.');
+                    }
+
+                    // 5. Optional Format Checks
+                    var tinEl = document.getElementById('ownerTinInput');
+                    if (tinEl && tinEl.value.trim().length > 30) {
+                        markInvalid(tinEl, 'ownerTinValidation', 'Owner TIN must not exceed 30 characters.');
+                    }
+
+                    var phoneEl = document.getElementById('contactNoInput');
+                    if (phoneEl && phoneEl.value.trim()) {
+                        var phoneVal = phoneEl.value.trim();
+                        if (phoneVal.length > 20) {
+                            markInvalid(phoneEl, 'contactNoValidation', 'Contact Number must not exceed 20 characters.');
+                        } else if (!phoneRegex.test(phoneVal)) {
+                            markInvalid(phoneEl, 'contactNoValidation', 'Contact number must be 7-11 digits.');
+                        }
+                    }
+
+                    var emailEl = document.getElementById('emailAddressInput');
+                    if (emailEl && emailEl.value.trim()) {
+                        var emailVal = emailEl.value.trim();
+                        if (emailVal.length > 100) {
+                            markInvalid(emailEl, 'emailAddressValidation', 'Email Address must not exceed 100 characters.');
+                        } else if (!emailRegex.test(emailVal)) {
+                            markInvalid(emailEl, 'emailAddressValidation', 'Please enter a valid email address.');
+                        }
+                    }
+
+                    var lotNoEl = document.getElementById('lotNoInput');
+                    if (lotNoEl && lotNoEl.value.trim().length > 100) {
+                        markInvalid(lotNoEl, 'lotNoValidation', 'Lot / Survey No. must not exceed 100 characters.');
+                    }
+
+                    var reqEl = document.getElementById('requestorInput');
+                    if (reqEl && reqEl.value.trim()) {
+                        var reqVal = reqEl.value.trim();
+                        if (reqVal.length > 150) {
+                            markInvalid(reqEl, 'requestorValidation', 'Requestor name must not exceed 150 characters.');
+                        } else if (!personNameRegex.test(reqVal)) {
+                            markInvalid(reqEl, 'requestorValidation', 'Requestor name contains invalid characters.');
+                        }
+                    }
+
+                    // 6. Check O.R. Number if forwarded beyond Receiving
+                    if (selectStatus && inputOr) {
+                        const statusVal = selectStatus.value;
+                        const orVal = inputOr.value.trim();
+                        if (statusVal !== 'Pending' && statusVal !== 'Receiving' && statusVal !== 'Deferred' && !orVal) {
+                            markInvalid(inputOr, null, 'An Official Receipt (O.R.) Number is required before forwarding this request.');
+                            if (typeof toastr !== 'undefined') {
+                                toastr.warning('An Official Receipt (O.R.) Number is required before forwarding this request to ' + statusVal + '.', 'O.R. Number Required');
+                            }
+                        }
+                    }
+
+                    if (!isValid) {
+                        e.preventDefault();
+                        if (firstInvalid) {
+                            firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            if (typeof firstInvalid.focus === 'function') firstInvalid.focus();
+                        }
                         return false;
                     }
                 });
 
-                inputOr.addEventListener('input', function () {
-                    if (this.value.trim().length > 0) {
-                        this.classList.remove('border-amber-500', 'ring-2', 'ring-amber-500/30');
-                    }
-                });
+                if (inputOr) {
+                    inputOr.addEventListener('input', function () {
+                        if (this.value.trim().length > 0) {
+                            this.classList.remove('border-rose-500', 'border-amber-500', 'ring-2');
+                        }
+                    });
+                }
             }
         });
     </script>

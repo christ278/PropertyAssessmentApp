@@ -56,6 +56,10 @@ public class ApplicationDbContext : DbContext
     public DbSet<LandAdjustmentFactor> LandAdjustmentFactors { get; set; } = null!;
     public DbSet<LandImprovementType> LandImprovementTypes { get; set; } = null!;
     public DbSet<TDNMachinery> TDNMachineries { get; set; } = null!;
+    public DbSet<TDNMachineryDetail> TDNMachineryDetails { get; set; } = null!;
+    public DbSet<TDNMachineryPropertyAssessment> TDNMachineryPropertyAssessments { get; set; } = null!;
+    public DbSet<MachineryActualUse> MachineryActualUses { get; set; } = null!;
+    public DbSet<MachineryAssessmentLevel> MachineryAssessmentLevels { get; set; } = null!;
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -148,6 +152,7 @@ public class ApplicationDbContext : DbContext
         {
             entity.Property(r => r.TotalFeesAmount).HasPrecision(18, 2);
             entity.Property(r => r.TransactionCode).IsRequired(false);
+            entity.Property(r => r.TransactionTypeName).IsRequired(false);
             entity.Property(r => r.TransactionNo).IsRequired(false);
             entity.Property(r => r.OtherPurposeDetails).IsRequired(false);
             entity.Property(r => r.LotNo).IsRequired(false);
@@ -186,11 +191,19 @@ public class ApplicationDbContext : DbContext
             entity.Property(p => p.AttachmentFileSize).IsRequired(false);
             entity.Property(p => p.PhysicalStoragePath).IsRequired(false);
             entity.Property(p => p.WebRelativePath).IsRequired(false);
+            entity.HasOne(p => p.Owner)
+                  .WithMany()
+                  .HasForeignKey(p => p.OwnerId)
+                  .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<TaxDeclaration>(entity =>
         {
             entity.HasKey(t => t.Id);
+            entity.HasOne(t => t.Owner)
+                  .WithMany()
+                  .HasForeignKey(t => t.OwnerId)
+                  .OnDelete(DeleteBehavior.SetNull);
             entity.HasOne(t => t.BuildingDetails)
                   .WithOne(b => b.TaxDeclaration)
                   .HasForeignKey<TDNBuilding>(b => b.TaxDeclarationId)
@@ -291,6 +304,16 @@ public class ApplicationDbContext : DbContext
             entity.Property(m => m.BasicTaxRate).HasPrecision(18, 4);
             entity.Property(m => m.SefTaxRate).HasPrecision(18, 4);
             entity.Property(m => m.AnnualTaxDue).HasPrecision(18, 2);
+
+            entity.HasMany(m => m.TDNMachineryDetails)
+                  .WithOne(d => d.TDNMachinery)
+                  .HasForeignKey(d => d.TDNMachineryId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(m => m.TDNMachineryPropertyAssessments)
+                  .WithOne(p => p.TDNMachinery)
+                  .HasForeignKey(p => p.TDNMachineryId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<OrderPayment>()
@@ -533,6 +556,64 @@ public class ApplicationDbContext : DbContext
                 new LandImprovementType { Id = 11, TypeCode = "NR", TypeDescription = "NARRA TREE", Kind = "HARDWOOD", BaseValue = 500.00m, AssessmentLevel = 40.00m, RevisionYear = 2011, IsActive = true },
                 new LandImprovementType { Id = 12, TypeCode = "FENCE", TypeDescription = "CONCRETE FENCE / PERIMETER WALL", Kind = "IMPROVEMENT", BaseValue = 650.00m, AssessmentLevel = 40.00m, RevisionYear = 2011, IsActive = true },
                 new LandImprovementType { Id = 13, TypeCode = "PAVE", TypeDescription = "CONCRETE PAVEMENT / DRIVEWAY", Kind = "IMPROVEMENT", BaseValue = 250.00m, AssessmentLevel = 40.00m, RevisionYear = 2011, IsActive = true }
+            );
+        });
+
+        // -------------------------------------------------------------
+        // MACHINERY REFERENCE TABLES SEEDING (CAST SYSTEM STANDARD)
+        // -------------------------------------------------------------
+        modelBuilder.Entity<MachineryActualUse>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasData(
+                new MachineryActualUse { Id = 1, ActualUseCode = "RES", ActualUseName = "RESIDENTIAL", IsTaxExempt = false, Rank = 1, Prefix = "RES", IsActive = true },
+                new MachineryActualUse { Id = 4, ActualUseCode = "COM", ActualUseName = "COMMERCIAL", IsTaxExempt = false, Rank = 3, Prefix = "COM", IsActive = true },
+                new MachineryActualUse { Id = 6, ActualUseCode = "IND", ActualUseName = "INDUSTRIAL", IsTaxExempt = false, Rank = 4, Prefix = "IND", IsActive = true },
+                new MachineryActualUse { Id = 10, ActualUseCode = "CUL", ActualUseName = "SPECIAL- CULTURAL", IsTaxExempt = false, Rank = 7, Prefix = "CUL", IsActive = true },
+                new MachineryActualUse { Id = 11, ActualUseCode = "HOS", ActualUseName = "SPECIAL- HOSPITAL", IsTaxExempt = false, Rank = 8, Prefix = "HOS", IsActive = true },
+                new MachineryActualUse { Id = 12, ActualUseCode = "SCI", ActualUseName = "SPECIAL- SCIENTIFIC", IsTaxExempt = false, Rank = 9, Prefix = "SCI", IsActive = true },
+                new MachineryActualUse { Id = 13, ActualUseCode = "INS", ActualUseName = "INSTITUTIONAL", IsTaxExempt = true, Rank = 13, Prefix = null, IsActive = false },
+                new MachineryActualUse { Id = 14, ActualUseCode = "REL", ActualUseName = "RELIGIOUS", IsTaxExempt = true, Rank = 11, Prefix = "REL", IsActive = false },
+                new MachineryActualUse { Id = 17, ActualUseCode = "OTH", ActualUseName = "SPECIAL-OTHERS", IsTaxExempt = true, Rank = 14, Prefix = null, IsActive = false },
+                new MachineryActualUse { Id = 19, ActualUseCode = "GOV", ActualUseName = "GOVERNMENT", IsTaxExempt = true, Rank = 10, Prefix = null, IsActive = false },
+                new MachineryActualUse { Id = 20, ActualUseCode = "REC", ActualUseName = "SPECIAL-RECREATIONAL", IsTaxExempt = false, Rank = 10, Prefix = null, IsActive = false },
+                new MachineryActualUse { Id = 47, ActualUseCode = "MACH", ActualUseName = "MACHINERY", IsTaxExempt = false, Rank = 9, Prefix = null, IsActive = true },
+                new MachineryActualUse { Id = 48, ActualUseCode = "AGR", ActualUseName = "AGRICULTURAL", IsTaxExempt = false, Rank = 2, Prefix = "AGR", IsActive = true },
+                new MachineryActualUse { Id = 49, ActualUseCode = "MIN", ActualUseName = "MINERAL", IsTaxExempt = false, Rank = 5, Prefix = "MIN", IsActive = true },
+                new MachineryActualUse { Id = 50, ActualUseCode = "TIM", ActualUseName = "TIMBERLAND", IsTaxExempt = false, Rank = 6, Prefix = "TIM", IsActive = true },
+                new MachineryActualUse { Id = 51, ActualUseCode = "LWD", ActualUseName = "LOCAL WATER DISTRICTS", IsTaxExempt = false, Rank = null, Prefix = "LWD", IsActive = true },
+                new MachineryActualUse { Id = 52, ActualUseCode = "CHAR", ActualUseName = "CHARITABLE", IsTaxExempt = false, Rank = 12, Prefix = null, IsActive = false },
+                new MachineryActualUse { Id = 53, ActualUseCode = "EDUC MAC", ActualUseName = "EDUCATIONAL MACHINERIES", IsTaxExempt = false, Rank = 8, Prefix = null, IsActive = true },
+                new MachineryActualUse { Id = 72, ActualUseCode = "SCL", ActualUseName = "SPECIAL", IsTaxExempt = false, Rank = 6, Prefix = "SCL", IsActive = true },
+                new MachineryActualUse { Id = 73, ActualUseCode = "SLWD", ActualUseName = "SPECIAL-LOCAL WATER DISTRICT", IsTaxExempt = false, Rank = 10, Prefix = null, IsActive = true }
+            );
+        });
+
+        modelBuilder.Entity<MachineryAssessmentLevel>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasData(
+                new MachineryAssessmentLevel { Id = 1, ActualUseId = 10, ActualUseName = "SPECIAL- CULTURAL", AssessmentLevel = 10.00m, RevisionYear = 2011, IsActive = true },
+                new MachineryAssessmentLevel { Id = 2, ActualUseId = 4, ActualUseName = "COMMERCIAL", AssessmentLevel = 80.00m, RevisionYear = 2002, IsActive = true },
+                new MachineryAssessmentLevel { Id = 3, ActualUseId = 6, ActualUseName = "INDUSTRIAL", AssessmentLevel = 80.00m, RevisionYear = 2002, IsActive = true },
+                new MachineryAssessmentLevel { Id = 4, ActualUseId = 48, ActualUseName = "AGRICULTURAL", AssessmentLevel = 40.00m, RevisionYear = 2002, IsActive = true },
+                new MachineryAssessmentLevel { Id = 5, ActualUseId = 48, ActualUseName = "AGRICULTURAL", AssessmentLevel = 35.00m, RevisionYear = 2005, IsActive = true },
+                new MachineryAssessmentLevel { Id = 6, ActualUseId = 1, ActualUseName = "RESIDENTIAL", AssessmentLevel = 45.00m, RevisionYear = 2005, IsActive = true },
+                new MachineryAssessmentLevel { Id = 7, ActualUseId = 4, ActualUseName = "COMMERCIAL", AssessmentLevel = 75.00m, RevisionYear = 2005, IsActive = true },
+                new MachineryAssessmentLevel { Id = 8, ActualUseId = 6, ActualUseName = "INDUSTRIAL", AssessmentLevel = 75.00m, RevisionYear = 2005, IsActive = true },
+                new MachineryAssessmentLevel { Id = 9, ActualUseId = 10, ActualUseName = "SPECIAL- CULTURAL", AssessmentLevel = 10.00m, RevisionYear = 2005, IsActive = true },
+                new MachineryAssessmentLevel { Id = 10, ActualUseId = 12, ActualUseName = "SPECIAL- SCIENTIFIC", AssessmentLevel = 10.00m, RevisionYear = 2005, IsActive = true },
+                new MachineryAssessmentLevel { Id = 11, ActualUseId = 11, ActualUseName = "SPECIAL- HOSPITAL", AssessmentLevel = 10.00m, RevisionYear = 2005, IsActive = true },
+                new MachineryAssessmentLevel { Id = 12, ActualUseId = 51, ActualUseName = "LOCAL WATER DISTRICTS", AssessmentLevel = 5.00m, RevisionYear = 2005, IsActive = true },
+                new MachineryAssessmentLevel { Id = 13, ActualUseId = 19, ActualUseName = "GOVERNMENT", AssessmentLevel = 5.00m, RevisionYear = 2005, IsActive = true },
+                new MachineryAssessmentLevel { Id = 14, ActualUseId = 73, ActualUseName = "SPECIAL-LOCAL WATER DISTRICT", AssessmentLevel = 5.00m, RevisionYear = 2005, IsActive = true },
+                new MachineryAssessmentLevel { Id = 15, ActualUseId = 1, ActualUseName = "RESIDENTIAL", AssessmentLevel = 45.00m, RevisionYear = 2011, IsActive = true },
+                new MachineryAssessmentLevel { Id = 16, ActualUseId = 4, ActualUseName = "COMMERCIAL", AssessmentLevel = 75.00m, RevisionYear = 2011, IsActive = true },
+                new MachineryAssessmentLevel { Id = 17, ActualUseId = 6, ActualUseName = "INDUSTRIAL", AssessmentLevel = 75.00m, RevisionYear = 2011, IsActive = true },
+                new MachineryAssessmentLevel { Id = 18, ActualUseId = 12, ActualUseName = "SPECIAL- SCIENTIFIC", AssessmentLevel = 10.00m, RevisionYear = 2011, IsActive = true },
+                new MachineryAssessmentLevel { Id = 19, ActualUseId = 11, ActualUseName = "SPECIAL- HOSPITAL", AssessmentLevel = 10.00m, RevisionYear = 2011, IsActive = true },
+                new MachineryAssessmentLevel { Id = 20, ActualUseId = 73, ActualUseName = "SPECIAL-LOCAL WATER DISTRICT", AssessmentLevel = 10.00m, RevisionYear = 2011, IsActive = true },
+                new MachineryAssessmentLevel { Id = 21, ActualUseId = 48, ActualUseName = "AGRICULTURAL", AssessmentLevel = 35.00m, RevisionYear = 2011, IsActive = true }
             );
         });
     }

@@ -32,14 +32,16 @@
                         till: { 800: '#1c1917', 900: '#0c0a09', 950: '#030202' }
                     },
                     fontFamily: {
-                        sans: ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
-                        mono: ['JetBrains Mono', 'monospace'],
+                        sans: ['Poppins', 'sans-serif'],
+                        mono: ['Poppins', 'sans-serif'],
+                        serif: ['Poppins', 'sans-serif'],
+
                     }
                 }
             }
         }
     </script>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body class="bg-slate-900 dark:bg-till-950 text-slate-100 font-sans antialiased min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
@@ -56,8 +58,8 @@
                 🏛️
             </div>
             <div>
-                <h1 class="text-3xl font-extrabold tracking-tight text-white">City Assessor Portal</h1>
-                <p class="text-emerald-400 text-xs font-mono font-bold uppercase tracking-widest mt-1">FAIRTRACK</p>
+                <h1 class="text-3xl font-extrabold tracking-tight text-white">FAIRTRACK</h1>
+                <p class="text-emerald-400 text-xs font-mono font-bold uppercase tracking-widest mt-1">City Assessor Portal</p>
                 <p class="text-slate-400 text-xs font-mono mt-0.5">Real Property Tax Assessment Management System</p>
             </div>
         </div>
@@ -69,7 +71,7 @@
                 <span>Account Authentication</span>
             </h2>
 
-            <form asp-action="Login" asp-route-returnUrl="@returnUrl" method="post" class="space-y-5">
+            <form id="loginForm" asp-action="Login" asp-route-returnUrl="@returnUrl" method="post" class="space-y-5">
                 <div asp-validation-summary="ModelOnly" class="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-mono"></div>
 
                 <div>
@@ -101,8 +103,12 @@
                     </label>
                 </div>
 
-                <button type="submit" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-bold text-xs font-mono uppercase tracking-wider shadow-lg shadow-emerald-500/25 transition-all">
-                    Sign In to Portal
+                <button type="submit" id="submitBtn" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-bold text-xs font-mono uppercase tracking-wider shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed">
+                    <svg id="btnSpinner" class="hidden animate-spin h-4 w-4 text-slate-950" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span id="btnText">Sign In to Portal</span>
                 </button>
             </form>
         </div>
@@ -115,6 +121,34 @@
 
     <script>
         lucide.createIcons();
+
+        const loginForm = document.getElementById('loginForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const btnSpinner = document.getElementById('btnSpinner');
+        const btnText = document.getElementById('btnText');
+        let isSubmitting = false;
+
+        if (loginForm && submitBtn) {
+            loginForm.addEventListener('submit', function (e) {
+                if (isSubmitting) {
+                    e.preventDefault();
+                    return false;
+                }
+
+                if (!loginForm.checkValidity()) {
+                    return;
+                }
+
+                isSubmitting = true;
+                if (btnSpinner) btnSpinner.classList.remove('hidden');
+                if (btnText) btnText.textContent = 'Signing in...';
+
+                submitBtn.classList.add('pointer-events-none');
+                setTimeout(function () {
+                    submitBtn.disabled = true;
+                }, 0);
+            });
+        }
     </script>
 </body>
 </html>

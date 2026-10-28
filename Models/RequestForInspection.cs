@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Validation;
 
 namespace PropertyAssessmentApp.Models;
@@ -50,8 +51,50 @@ public class RequestForInspection
     [Display(Name = "Tracking No.")]
     public string TrackingNumber { get; set; } = string.Empty;
 
+    public static readonly Dictionary<string, string> StandardTransactionCodes = new()
+    {
+        { "SD", "Subdivision" },
+        { "CS", "Consolidation" },
+        { "DC", "Discovery/New Declaration" },
+        { "PC", "Reassessment Due to Physical Change" },
+        { "RA", "Reassessment" },
+        { "DT", "Reassessment Due to partial Destruction of the property" },
+        { "TR", "Transfer" },
+        { "RC", "Reclassification" },
+        { "GR", "General Revision" },
+        { "SP", "Special Project" },
+        { "DEP", "Reassessment Due to depreciation" }
+    };
+
     [Display(Name = "Transaction Code")]
-    public string? TransactionCode { get; set; }
+    public string? TransactionCode { get; set; } = "DC";
+
+    [Display(Name = "Transaction Type Name")]
+    public string? TransactionTypeName { get; set; } = "Discovery/New Declaration";
+
+    [NotMapped]
+    [Display(Name = "Transaction Code")]
+    public string TransactionTypeCode
+    {
+        get => TransactionCode ?? "DC";
+        set => TransactionCode = value;
+    }
+
+    [NotMapped]
+    [Display(Name = "Transaction Type")]
+    public string TransactionTypeDisplayName
+    {
+        get
+        {
+            var code = TransactionCode ?? TransactionTypeCode;
+            if (!string.IsNullOrWhiteSpace(code) &&
+                StandardTransactionCodes.TryGetValue(code.Trim().ToUpperInvariant(), out var desc))
+            {
+                return $"{desc} - {code.Trim().ToUpperInvariant()}";
+            }
+            return !string.IsNullOrWhiteSpace(TransactionTypeName) ? TransactionTypeName : (code ?? string.Empty);
+        }
+    }
 
     [Display(Name = "Transaction No.")]
     public string? TransactionNo { get; set; }
@@ -75,6 +118,18 @@ public class RequestForInspection
     // * REFERENCE PROPERTY DETAILS
     [Display(Name = "Reference Tax Declaration")]
     public Guid? TaxDeclarationId { get; set; }
+
+    [Display(Name = "Registered Owner ID")]
+    public Guid? OwnerId { get; set; }
+
+    [Display(Name = "Partition Count (Lots/TDNs)")]
+    public int Partitions { get; set; } = 1;
+
+    [Display(Name = "Generated Partitions JSON")]
+    public string? GeneratedPartitionsJson { get; set; }
+
+    [Display(Name = "Selected Reference Property IDs JSON")]
+    public string? SelectedRefPropertyIdsJson { get; set; }
 
     [Required(ErrorMessage = "Tax Declaration No. (TDN/ARP) is required.")]
     [Display(Name = "Tax Declaration No. (TDN / ARP)")]
