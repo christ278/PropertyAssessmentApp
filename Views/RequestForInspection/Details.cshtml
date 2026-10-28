@@ -34,6 +34,10 @@
             <p class="text-slate-500 dark:text-stone-400 text-sm">Filed on @Model.RequestDate.ToString("MMMM dd, yyyy hh:mm tt")</p>
         </div>
         <div class="flex items-center gap-2">
+            <a asp-action="PrintPdf" asp-route-id="@Model.Id" target="_blank" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition-all flex items-center gap-1.5 shadow-sm shadow-emerald-600/20">
+                <i data-lucide="printer" class="w-4 h-4"></i>
+                <span>Print TD</span>
+            </a>
             <a asp-action="Edit" asp-route-id="@Model.Id" class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold transition-all flex items-center gap-1.5">
                 <i data-lucide="edit" class="w-4 h-4"></i>
                 <span>Edit Request</span>

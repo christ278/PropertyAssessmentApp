@@ -22,6 +22,7 @@ public class PropertyAssessmentRequestController : Controller
     private readonly IOwnerService _ownerService;
     private readonly ApplicationDbContext _context;
     private readonly IWebHostEnvironment _env;
+    private readonly ITaxDeclarationPdfService _tdPdfService;
 
     public PropertyAssessmentRequestController(
         IPropertyAssessmentRequestService rpaService,
@@ -29,7 +30,8 @@ public class PropertyAssessmentRequestController : Controller
         IOrderPaymentService orderPaymentService,
         IOwnerService ownerService,
         ApplicationDbContext context,
-        IWebHostEnvironment env)
+        IWebHostEnvironment env,
+        ITaxDeclarationPdfService tdPdfService)
     {
         _rpaService = rpaService;
         _assessmentService = assessmentService;
@@ -37,6 +39,153 @@ public class PropertyAssessmentRequestController : Controller
         _ownerService = ownerService;
         _context = context;
         _env = env;
+        _tdPdfService = tdPdfService;
+    }
+
+    // GET: /PropertyAssessmentRequest/PrintPdf/5
+    [HttpGet]
+    public IActionResult PrintPdf(Guid id, bool download = false)
+    {
+        var req = _rpaService.GetById(id);
+        if (req == null) return NotFound();
+
+        var declarations = BuildTaxDeclarationsForPrint(req);
+        var pdfBytes = _tdPdfService.GenerateRequestTdCertificatePdf(
+            declarations,
+            req.TrackingNumber,
+            $"[{req.TransactionTypeCode}] {req.TransactionTypeName}");
+
+        var safeTrack = string.IsNullOrWhiteSpace(req.TrackingNumber)
+            ? req.Id.ToString("N")[..8]
+            : string.Concat(req.TrackingNumber.Split(Path.GetInvalidFileNameChars()));
+        var fileName = $"TaxDeclaration_{safeTrack}.pdf";
+
+        if (download)
+        {
+            return File(pdfBytes, "application/pdf", fileName);
+        }
+
+        Response.Headers["Content-Disposition"] = $"inline; filename=\"{fileName}\"";
+        return File(pdfBytes, "application/pdf");
+    }
+
+    private List<TaxDeclaration> BuildTaxDeclarationsForPrint(PropertyAssessmentRequest request)
+    {
+        var list = new List<TaxDeclaration>();
+        var partitions = ParsePartitionList(request.GeneratedPartitionsJson);
+        var refTd = request.RefTaxDeclarationId.HasValue
+            ? _assessmentService.GetById(request.RefTaxDeclarationId.Value)
+            : (!string.IsNullOrWhiteSpace(request.PrevTDN) ? _assessmentService.GetByTdNumber(request.PrevTDN) : null);
+
+        if (partitions != null && partitions.Count > 0)
+        {
+            foreach (var p in partitions)
+            {
+                if (!string.IsNullOrWhiteSpace(p.SystemGeneratedTDN))
+                {
+                    var existing = _assessmentService.GetByTdNumber(p.SystemGeneratedTDN);
+                    if (existing != null)
+                    {
+                        list.Add(existing);
+                        continue;
+                    }
+                }
+
+                var pRef = p.BasePropertyId.HasValue ? _assessmentService.GetById(p.BasePropertyId.Value) : refTd;
+                var effBarangay = !string.IsNullOrWhiteSpace(p.DistrictOrBarangay) ? p.DistrictOrBarangay : (pRef?.DistrictOrBarangay ?? "Brgy. Central");
+                list.Add(new TaxDeclaration
+                {
+                    Id = Guid.NewGuid(),
+                    TaxDeclarationNumber = !string.IsNullOrWhiteSpace(p.SystemGeneratedTDN) ? p.SystemGeneratedTDN : (request.PrevTDN ?? request.TrackingNumber),
+                    PropertyIndexNumber = !string.IsNullOrWhiteSpace(p.PIN) ? p.PIN : (request.PrevPIN ?? pRef?.PropertyIndexNumber ?? "N/A"),
+                    TransactionCode = request.TransactionTypeCode,
+                    OwnerName = !string.IsNullOrWhiteSpace(p.NewOwnerName) ? p.NewOwnerName : request.NewOwnerName,
+                    OwnerAddress = !string.IsNullOrWhiteSpace(p.OwnerAddress) ? p.OwnerAddress : (request.Address ?? pRef?.OwnerAddress ?? string.Empty),
+                    OwnerTin = !string.IsNullOrWhiteSpace(p.OwnerTIN) ? p.OwnerTIN : (request.OwnerTIN ?? pRef?.OwnerTin ?? string.Empty),
+                    OwnerPhone = !string.IsNullOrWhiteSpace(p.OwnerContactNo) ? p.OwnerContactNo : (request.ContactNo ?? pRef?.OwnerPhone ?? string.Empty),
+                    AdministratorName = p.AdministratorName ?? pRef?.AdministratorName,
+                    AdministratorAddress = p.AdministratorAddress ?? pRef?.AdministratorAddress,
+                    AdministratorTin = p.AdministratorTin ?? pRef?.AdministratorTin,
+                    AdministratorContactNo = p.AdministratorContactNo ?? pRef?.AdministratorContactNo,
+                    DistrictOrBarangay = effBarangay,
+                    StreetNo = !string.IsNullOrWhiteSpace(p.StreetLocation) ? p.StreetLocation : (request.PropertyLocation ?? pRef?.StreetNo ?? string.Empty),
+                    Municipality = !string.IsNullOrWhiteSpace(p.CityMunicipality) ? p.CityMunicipality : (pRef?.Municipality ?? "General Santos City"),
+                    ProvinceCity = !string.IsNullOrWhiteSpace(p.Province) ? p.Province : (pRef?.ProvinceCity ?? "South Cotabato"),
+                    Kind = Enum.TryParse<PropertyKind>(p.Kind, true, out var pk) ? pk : (pRef?.Kind ?? PropertyKind.Land),
+                    Classification = Enum.TryParse<PropertyClassification>(p.Classification, true, out var pc) ? pc : (pRef?.Classification ?? PropertyClassification.Residential),
+                    ActualUse = pRef?.ActualUse ?? p.Classification,
+                    AreaSqMeters = p.AreaSqMeters > 0 ? p.AreaSqMeters : (pRef?.AreaSqMeters ?? 0m),
+                    UnitValue = p.UnitValue > 0 ? p.UnitValue : (pRef?.UnitValue ?? 0m),
+                    MarketValue = p.MarketValue > 0 ? p.MarketValue : (pRef?.MarketValue ?? 0m),
+                    AdjustedMarketValue = p.MarketValue > 0 ? p.MarketValue : (pRef?.AdjustedMarketValue ?? 0m),
+                    AssessmentLevelPercent = p.AssessmentLevelPercent > 0 ? p.AssessmentLevelPercent : (pRef?.AssessmentLevelPercent ?? 20m),
+                    Taxability = !string.IsNullOrWhiteSpace(p.Taxability) ? p.Taxability : "Taxable",
+                    EffectivityYear = p.EffectivityYear ?? DateTime.Now.Year,
+                    EffectivityQuarter = !string.IsNullOrWhiteSpace(p.EffectivityQuarter) ? p.EffectivityQuarter : "1st Quarter",
+                    TitleNo = !string.IsNullOrWhiteSpace(p.TitleNo) ? p.TitleNo : pRef?.TitleNo,
+                    SurveyNo = !string.IsNullOrWhiteSpace(p.SurveyNumber) ? p.SurveyNumber : (p.CadastralSurveyNo ?? pRef?.SurveyNo),
+                    LotNo = !string.IsNullOrWhiteSpace(p.LotNumber) ? p.LotNumber : pRef?.LotNo,
+                    BlockNo = !string.IsNullOrWhiteSpace(p.BlockNumber) ? p.BlockNumber : pRef?.BlockNo,
+                    BoundaryNorth = !string.IsNullOrWhiteSpace(p.BoundaryNorth) ? p.BoundaryNorth : pRef?.BoundaryNorth,
+                    BoundaryEast = !string.IsNullOrWhiteSpace(p.BoundaryEast) ? p.BoundaryEast : pRef?.BoundaryEast,
+                    BoundarySouth = !string.IsNullOrWhiteSpace(p.BoundarySouth) ? p.BoundarySouth : pRef?.BoundarySouth,
+                    BoundaryWest = !string.IsNullOrWhiteSpace(p.BoundaryWest) ? p.BoundaryWest : pRef?.BoundaryWest,
+                    NoOfStoreys = p.NoOfStoreys > 0 ? p.NoOfStoreys : (pRef?.NoOfStoreys ?? 0),
+                    TotalBuildingAreaSqm = p.TotalBuildingAreaSqm > 0 ? p.TotalBuildingAreaSqm : p.AreaSqMeters,
+                    StructuralType = p.StructuralType ?? pRef?.StructuralType,
+                    BuildingClassification = p.BuildingClassification ?? pRef?.BuildingClassification,
+                    PreviousTdNo = p.BaseTDN ?? request.PrevTDN ?? pRef?.TaxDeclarationNumber ?? string.Empty,
+                    PreviousPin = request.PrevPIN ?? pRef?.PropertyIndexNumber ?? string.Empty,
+                    PreviousOwner = request.PrevOwner ?? pRef?.OwnerName ?? string.Empty,
+                    PreviousAssessedValue = pRef?.AssessedValue ?? 0m,
+                    Memoranda = (!string.IsNullOrWhiteSpace(p.Memoranda) ? p.Memoranda : request.Remarks) ?? string.Empty,
+                    AppraisedByName = request.AssignedAppraiser ?? pRef?.AppraisedByName ?? string.Empty,
+                    DateAppraised = request.UpdatedDate != default ? request.UpdatedDate : request.RequestDate,
+                    DateAssessed = request.UpdatedDate != default ? request.UpdatedDate : request.RequestDate,
+                    ApprovedByName = pRef?.ApprovedByName ?? "ATTY.JESSIE P. DELA CRUZ, REA"
+                });
+            }
+        }
+
+        if (list.Count == 0)
+        {
+            if (refTd != null)
+            {
+                list.Add(refTd);
+            }
+            else
+            {
+                list.Add(new TaxDeclaration
+                {
+                    Id = request.Id,
+                    TaxDeclarationNumber = !string.IsNullOrWhiteSpace(request.PrevTDN) ? request.PrevTDN : request.TrackingNumber,
+                    PropertyIndexNumber = !string.IsNullOrWhiteSpace(request.PrevPIN) ? request.PrevPIN : "N/A",
+                    TransactionCode = request.TransactionTypeCode,
+                    OwnerName = request.NewOwnerName,
+                    OwnerAddress = request.Address ?? string.Empty,
+                    OwnerTin = request.OwnerTIN ?? string.Empty,
+                    OwnerPhone = request.ContactNo ?? string.Empty,
+                    DistrictOrBarangay = "Brgy. Central",
+                    StreetNo = request.PropertyLocation ?? string.Empty,
+                    Municipality = "General Santos City",
+                    ProvinceCity = "South Cotabato",
+                    Kind = Enum.TryParse<PropertyKind>(request.Kind, true, out var rk) ? rk : PropertyKind.Land,
+                    Classification = PropertyClassification.Residential,
+                    ActualUse = "Residential",
+                    EffectivityYear = DateTime.Now.Year,
+                    EffectivityQuarter = "1st Quarter",
+                    PreviousTdNo = request.PrevTDN ?? string.Empty,
+                    PreviousPin = request.PrevPIN ?? string.Empty,
+                    PreviousOwner = request.PrevOwner ?? string.Empty,
+                    Memoranda = request.Remarks ?? string.Empty,
+                    AppraisedByName = request.AssignedAppraiser ?? string.Empty,
+                    DateAppraised = request.RequestDate,
+                    DateAssessed = request.UpdatedDate != default ? request.UpdatedDate : request.RequestDate
+                });
+            }
+        }
+
+        return list;
     }
 
     // GET: /PropertyAssessmentRequest

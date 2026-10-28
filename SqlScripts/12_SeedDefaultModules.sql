@@ -52,7 +52,7 @@ BEGIN TRY
 
     INSERT INTO @SourceModules ([ModuleId], [ModuleCode], [ModuleName], [Category], [ControllerName], [ActionName], [Icon], [SortOrder], [IsActive])
     VALUES
-        (1,  'DASHBOARD',           'Executive Dashboard',                      'Main Menu',                   'Home',                     'Index',          'layout-dashboard', 1,  1),
+        (1,  'DASHBOARD',           'Executive Dashboard',                      'Main Menu',                   'Home',                     'Index',          'layout-dashboard', 1,  0),
         (17, 'POOL_TRANSACTIONS',   'Pool Transactions (Shared Queue)',         'Transaction Workflows',       'Workflow',                 'Pool',           'inbox',            1,  1),
         (2,  'ANALYTICS',           'Executive Analytics & Reports',            'Main Menu',                   'Analytics',                'Index',          'trending-up',      2,  1),
         (18, 'MY_TRANSACTIONS',     'My Transactions (Claimed Workspace)',      'Transaction Workflows',       'Workflow',                 'MyTransactions', 'user-check',       2,  1),
@@ -69,7 +69,11 @@ BEGIN TRY
         (13, 'USER_MANAGEMENT',     'User Staff Accounts',                      'System Administration',       'UserAccount',              'Index',          'shield-check',     40, 1),
         (14, 'USER_ROLES',          'User Roles Directory',                     'System Administration',       'UserRole',                 'Index',          'user-cog',         41, 1),
         (15, 'ROLE_PERMISSIONS',    'Dynamic Form Permissions',                 'System Administration',       'UserRole',                 'Permissions',    'shield-alert',     42, 1),
-        (16, 'DATA_TRANSFER',       'TD Data Transfer Utility',                 'File Maintenance',            'DataTransferUtility',      'Index',          'arrow-right-left', 50, 1);
+        (16, 'DATA_TRANSFER',       'TD Data Transfer Utility',                 'File Maintenance',            'DataTransferUtility',      'Index',          'arrow-right-left', 50, 1),
+        (19, 'DASHBOARD_USER',      'Staff Dashboard (Ordinary Users)',         'Dashboards',                  'Dashboard',                'Staff',          'layout-dashboard', 1,  1),
+        (20, 'DASHBOARD_HEAD',      'Assessor Head Dashboard',                  'Dashboards',                  'Dashboard',                'AssessorHead',   'gauge',            2,  1),
+        (21, 'DASHBOARD_ADMIN',     'System Owner Dashboard (Super Admin)',     'Dashboards',                  'Dashboard',                'SystemOwner',    'server-cog',       3,  1),
+        (22, 'ASSESSMENT_PRINT',    'Print Tax Declaration (Records Printout)', 'FAAS & Transaction Requests', 'Assessment',               'PrintPdf',       'printer',          13, 1);
 
     -- Enable IDENTITY_INSERT so predetermined ModuleId values are retained
     SET IDENTITY_INSERT [dbo].[SystemModule] ON;

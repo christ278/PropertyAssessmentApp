@@ -1,0 +1,40 @@
+﻿@model PropertyAssessmentApp.Models.DashboardViewModel
+@{ ViewData["Title"] = "System Owner Dashboard"; }
+<partial name="_Header" model="Model" />
+<div class="rounded-2xl bg-white/90 dark:bg-stone-900/80 border border-slate-200/90 dark:border-stone-800 shadow-sm mb-6 grid grid-cols-2 lg:grid-cols-5 divide-x divide-y lg:divide-y-0 divide-slate-100 dark:divide-stone-800">
+    <a asp-controller="UserAccount" asp-action="Index" class="p-5 hover:bg-slate-50 dark:hover:bg-stone-800/50"><div class="text-[10px] font-mono uppercase tracking-wider text-slate-400 dark:text-stone-500 font-bold">User Accounts</div><div class="mt-1 text-3xl font-extrabold">@Model.TotalUsers</div><div class="text-[11px] text-slate-400 mt-1">@Model.ActiveUsers active</div></a>
+    <a asp-controller="UserRole" asp-action="Index" class="p-5 hover:bg-slate-50 dark:hover:bg-stone-800/50"><div class="text-[10px] font-mono uppercase tracking-wider text-slate-400 dark:text-stone-500 font-bold">Workflow Roles</div><div class="mt-1 text-3xl font-extrabold">@Model.TotalRoles</div><div class="text-[11px] text-slate-400 mt-1">@Model.RolesWithAccess with access rights</div></a>
+    <a asp-controller="UserRole" asp-action="Permissions" class="p-5 hover:bg-slate-50 dark:hover:bg-stone-800/50"><div class="text-[10px] font-mono uppercase tracking-wider text-slate-400 dark:text-stone-500 font-bold">Active Modules</div><div class="mt-1 text-3xl font-extrabold">@Model.ActiveModules</div><div class="text-[11px] text-emerald-600 mt-1">Manage access →</div></a>
+    <a asp-controller="Owner" asp-action="Index" class="p-5 hover:bg-slate-50 dark:hover:bg-stone-800/50"><div class="text-[10px] font-mono uppercase tracking-wider text-slate-400 dark:text-stone-500 font-bold">Taxpayers</div><div class="mt-1 text-3xl font-extrabold">@Model.TotalOwners</div></a>
+    <a asp-controller="Assessment" asp-action="Index" class="p-5 col-span-2 lg:col-span-1 hover:bg-slate-50 dark:hover:bg-stone-800/50"><div class="text-[10px] font-mono uppercase tracking-wider text-slate-400 dark:text-stone-500 font-bold">Tax Declarations</div><div class="mt-1 text-3xl font-extrabold">@Model.TotalTaxDeclarations</div></a>
+</div>
+<partial name="_Overview" model="Model" />
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">
+    <div class="rounded-2xl bg-white/90 dark:bg-stone-900/80 border border-slate-200/90 dark:border-stone-800 shadow-sm p-5 xl:col-span-2"><h2 class="text-sm font-bold">System Activity</h2><p class="text-xs text-slate-400 mb-3">Workflow actions, last 14 days</p><div class="h-56"><canvas id="activityChart"></canvas></div></div>
+    <div class="rounded-2xl bg-white/90 dark:bg-stone-900/80 border border-slate-200/90 dark:border-stone-800 shadow-sm p-5"><h2 class="text-sm font-bold mb-3">Users by Position</h2><div class="h-56"><canvas id="usersChart"></canvas></div></div>
+</div>
+<div class="rounded-2xl bg-white/90 dark:bg-stone-900/80 border border-slate-200/90 dark:border-stone-800 shadow-sm mb-6">
+    <div class="p-5 grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div><h2 class="text-sm font-bold mb-3">Most Active Staff</h2><partial name="_Bars" model="Model.TopHandlers" /></div>
+        <div><h2 class="text-sm font-bold mb-3">By Division</h2><partial name="_Bars" model="Model.ByDivision" /></div>
+        <div><h2 class="text-sm font-bold mb-3">By Request Type</h2><partial name="_Bars" model="Model.ByRequestType" /></div>
+    </div>
+    <div class="border-t border-slate-100 dark:border-stone-800 p-5">
+        <h2 class="text-sm font-bold mb-3">Recent Workflow Activity</h2>
+        @if (!Model.RecentActivity.Any()) { <p class="text-sm text-slate-400">No activity yet.</p> }
+        else
+        {
+            <div class="overflow-x-auto"><table class="w-full text-xs"><thead><tr class="text-left text-[10px] uppercase font-mono text-slate-400"><th class="py-2 pr-3">When</th><th class="py-2 pr-3">Tracking No.</th><th class="py-2 pr-3">Action</th><th class="py-2 pr-3">By</th><th class="py-2">Remarks</th></tr></thead>
+            <tbody class="divide-y divide-slate-100 dark:divide-stone-800">
+            @foreach (var l in Model.RecentActivity)
+            {
+                <tr><td class="py-2 pr-3 font-mono">@l.Timestamp.ToString("MMM dd, HH:mm")</td><td class="py-2 pr-3 font-mono font-bold">@l.TrackingNumber</td><td class="py-2 pr-3">@l.ActionTaken</td><td class="py-2 pr-3">@l.ForwardedByName</td><td class="py-2">@l.Remarks</td></tr>
+            }
+            </tbody></table></div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ChartScripts" model="Model" />
+}

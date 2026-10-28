@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using PropertyAssessmentApp.Models;
 using PropertyAssessmentApp.Services;
 
@@ -77,7 +77,7 @@ public class TaxMappingController : Controller
     }
 
     // GET: /TaxMapping
-    public IActionResult Index(string? search, TaxMappingRequestStatus? status)
+    public IActionResult Index(string? search, RequestStatus? status)
     {
         ViewBag.Search = search;
         ViewBag.Status = status;
@@ -129,7 +129,7 @@ public class TaxMappingController : Controller
             ProvinceId = defaultProv?.Id,
             CityMunicipalityId = defaultCity?.Id,
             BarangayId = barangays.FirstOrDefault()?.Id,
-            Status = TaxMappingRequestStatus.Pending
+            Status = RequestStatus.Pending
         };
         PopulateGeographicEntities(model);
         return View(model);

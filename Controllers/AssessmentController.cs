@@ -10,12 +10,43 @@ public class AssessmentController : Controller
     private readonly IAssessmentService _assessmentService;
     private readonly IOwnerService _ownerService;
     private readonly ApplicationDbContext _context;
+    private readonly ITaxDeclarationPdfService _tdPdfService;
 
-    public AssessmentController(IAssessmentService assessmentService, IOwnerService ownerService, ApplicationDbContext context)
+    public AssessmentController(
+        IAssessmentService assessmentService,
+        IOwnerService ownerService,
+        ApplicationDbContext context,
+        ITaxDeclarationPdfService tdPdfService)
     {
         _assessmentService = assessmentService;
         _ownerService = ownerService;
         _context = context;
+        _tdPdfService = tdPdfService;
+    }
+
+    // GET: /Assessment/PrintPdf/5
+    [HttpGet]
+    public IActionResult PrintPdf(Guid id, bool download = false)
+    {
+        var record = _assessmentService.GetById(id);
+        if (record == null)
+        {
+            return NotFound();
+        }
+
+        var pdfBytes = _tdPdfService.GenerateCompleteRecordPdf(record);
+        var safeTdNo = string.IsNullOrWhiteSpace(record.TaxDeclarationNumber)
+            ? record.Id.ToString("N")[..8]
+            : string.Concat(record.TaxDeclarationNumber.Split(Path.GetInvalidFileNameChars()));
+        var fileName = $"FAAS_Record_{safeTdNo}.pdf";
+
+        if (download)
+        {
+            return File(pdfBytes, "application/pdf", fileName);
+        }
+
+        Response.Headers["Content-Disposition"] = $"inline; filename=\"{fileName}\"";
+        return File(pdfBytes, "application/pdf");
     }
 
     // GET: /Assessment
@@ -56,6 +87,83 @@ public class AssessmentController : Controller
         return View(record);
     }
 
+    // GET: /Assessment/Lineage/5  (Mother & Child Tax Declaration Lineage)
+    public IActionResult Lineage(Guid id)
+    {
+        var record = _assessmentService.GetById(id);
+        if (record == null)
+        {
+            return NotFound();
+        }
+
+        var allTds = _assessmentService.GetAll().ToList();
+        var currentTdNo = (record.TaxDeclarationNumber ?? string.Empty).Trim();
+        var currentPin = (record.PropertyIndexNumber ?? string.Empty).Trim();
+
+        static List<string> SplitTokens(string? raw) =>
+            string.IsNullOrWhiteSpace(raw)
+                ? new List<string>()
+                : raw.Split(new[] { ',', ';', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries)
+                     .Select(s => s.Trim())
+                     .Where(s => !string.IsNullOrWhiteSpace(s))
+                     .Distinct(StringComparer.OrdinalIgnoreCase)
+                     .ToList();
+
+        var prevTdTokens = SplitTokens(record.PreviousTdNo);
+        var prevPinTokens = SplitTokens(record.PreviousPin);
+        var landTdToken = record.LandTdNo?.Trim();
+        var bldgTdToken = record.BuildingTdNo?.Trim();
+
+        var mothers = allTds
+            .Where(t => t.Id != record.Id && (
+                prevTdTokens.Any(tok => string.Equals(t.TaxDeclarationNumber?.Trim(), tok, StringComparison.OrdinalIgnoreCase)) ||
+                prevPinTokens.Any(tok => string.Equals(t.PropertyIndexNumber?.Trim(), tok, StringComparison.OrdinalIgnoreCase)) ||
+                (!string.IsNullOrEmpty(currentTdNo) && SplitTokens(t.SupersededByTdns).Any(tok => string.Equals(tok, currentTdNo, StringComparison.OrdinalIgnoreCase))) ||
+                (prevTdTokens.Count == 0 && !string.IsNullOrEmpty(landTdToken) && string.Equals(t.TaxDeclarationNumber?.Trim(), landTdToken, StringComparison.OrdinalIgnoreCase)) ||
+                (prevTdTokens.Count == 0 && !string.IsNullOrEmpty(bldgTdToken) && string.Equals(t.TaxDeclarationNumber?.Trim(), bldgTdToken, StringComparison.OrdinalIgnoreCase))
+            ))
+            .OrderByDescending(t => t.DateAssessed)
+            .ToList();
+
+        var supersededTokens = SplitTokens(record.SupersededByTdns);
+
+        var children = allTds
+            .Where(t => t.Id != record.Id && (
+                supersededTokens.Any(tok => string.Equals(t.TaxDeclarationNumber?.Trim(), tok, StringComparison.OrdinalIgnoreCase)) ||
+                (!string.IsNullOrEmpty(currentTdNo) && SplitTokens(t.PreviousTdNo).Any(tok => string.Equals(tok, currentTdNo, StringComparison.OrdinalIgnoreCase))) ||
+                (!string.IsNullOrEmpty(currentPin) && SplitTokens(t.PreviousPin).Any(tok => string.Equals(tok, currentPin, StringComparison.OrdinalIgnoreCase)))
+            ))
+            .OrderBy(t => t.TaxDeclarationNumber)
+            .ToList();
+
+        var relatedImprovements = allTds
+            .Where(t => t.Id != record.Id && !mothers.Any(m => m.Id == t.Id) && !children.Any(c => c.Id == t.Id) && (
+                (!string.IsNullOrEmpty(currentTdNo) && string.Equals(t.LandTdNo?.Trim(), currentTdNo, StringComparison.OrdinalIgnoreCase)) ||
+                (!string.IsNullOrEmpty(currentPin) && string.Equals(t.LandPin?.Trim(), currentPin, StringComparison.OrdinalIgnoreCase)) ||
+                (!string.IsNullOrEmpty(currentTdNo) && string.Equals(t.BuildingTdNo?.Trim(), currentTdNo, StringComparison.OrdinalIgnoreCase))
+            ))
+            .OrderBy(t => t.Kind)
+            .ThenBy(t => t.TaxDeclarationNumber)
+            .ToList();
+
+        PropertyAssessmentRequest? cancellingReq = null;
+        if (record.CancelledByRequestId.HasValue)
+        {
+            cancellingReq = _context.PropertyAssessmentRequests
+                .FirstOrDefault(r => r.Id == record.CancelledByRequestId.Value);
+        }
+
+        var vm = new TdLineageViewModel
+        {
+            Selected = record,
+            MotherRecords = mothers,
+            ChildRecords = children,
+            RelatedImprovements = relatedImprovements,
+            CancellingRequest = cancellingReq
+        };
+
+        return View(vm);
+    }
     // GET: /Assessment/Create
     public IActionResult Create()
     {

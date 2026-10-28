@@ -108,6 +108,11 @@
     bool canTaxMapping = PermissionService.CanAccess(User, "TaxMapping");
     bool showRequestsGroup = canLandHolding || canTaxDeclaration || canTaxMapping;
 
+    bool canDashStaff = PermissionService.CanAccess(User, "Dashboard", "Staff");
+    bool canDashHead = PermissionService.CanAccess(User, "Dashboard", "AssessorHead");
+    bool canDashAdmin = PermissionService.CanAccess(User, "Dashboard", "SystemOwner");
+    bool showDashboardGroup = canDashStaff || canDashHead || canDashAdmin;
+
     bool canPool = PermissionService.CanAccess(User, "Workflow", "Pool");
     bool canMyTransactions = PermissionService.CanAccess(User, "Workflow", "MyTransactions") || canPool;
     bool showWorkflowGroup = canPool || canMyTransactions;
@@ -151,6 +156,23 @@
 
         <!-- Navigation Links -->
         <nav class="flex-1 p-4 space-y-1.5 overflow-y-auto">
+            @if (showDashboardGroup)
+            {
+                <div class="px-3 pb-2 text-[10px] font-mono text-slate-400 dark:text-stone-500 font-bold uppercase tracking-wider">Dashboards</div>
+                @if (canDashAdmin)
+                {
+                <a asp-controller="Dashboard" asp-action="SystemOwner" class="nav-item flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Dashboard" && currentAction == "SystemOwner" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300")"><i data-lucide="server-cog" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i><span>System Owner</span></a>
+                }
+                @if (canDashHead)
+                {
+                <a asp-controller="Dashboard" asp-action="AssessorHead" class="nav-item flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Dashboard" && currentAction == "AssessorHead" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300")"><i data-lucide="gauge" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i><span>Assessor Head</span></a>
+                }
+                @if (canDashStaff)
+                {
+                <a asp-controller="Dashboard" asp-action="Staff" class="nav-item flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Dashboard" && currentAction == "Staff" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300")"><i data-lucide="layout-dashboard" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i><span>My Dashboard</span></a>
+                }
+            }
+
             @if (showWorkflowGroup)
             {
                 <div class="px-3 pb-2 text-[10px] font-mono text-slate-400 dark:text-stone-500 font-bold uppercase tracking-wider">Transaction Workflows</div>
@@ -376,6 +398,18 @@
 
                 <!-- Horizontal Navigation Items (Appears ONLY in Horizontal Nav Mode) -->
                 <nav class="horizontal-nav-only items-center gap-1.5 ml-2">
+                    @if (canDashAdmin)
+                    {
+                        <a asp-controller="Dashboard" asp-action="SystemOwner" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold text-xs font-mono transition-all @(currentController == "Dashboard" && currentAction == "SystemOwner" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold ring-1 ring-emerald-500/30" : "text-slate-700 dark:text-stone-300 hover:bg-slate-100 dark:hover:bg-stone-800/60 hover:text-emerald-700 dark:hover:text-emerald-400")"><i data-lucide="server-cog" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i><span>Owner Dashboard</span></a>
+                    }
+                    @if (canDashHead)
+                    {
+                        <a asp-controller="Dashboard" asp-action="AssessorHead" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold text-xs font-mono transition-all @(currentController == "Dashboard" && currentAction == "AssessorHead" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold ring-1 ring-emerald-500/30" : "text-slate-700 dark:text-stone-300 hover:bg-slate-100 dark:hover:bg-stone-800/60 hover:text-emerald-700 dark:hover:text-emerald-400")"><i data-lucide="gauge" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i><span>Head Dashboard</span></a>
+                    }
+                    @if (canDashStaff)
+                    {
+                        <a asp-controller="Dashboard" asp-action="Staff" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold text-xs font-mono transition-all @(currentController == "Dashboard" && currentAction == "Staff" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold ring-1 ring-emerald-500/30" : "text-slate-700 dark:text-stone-300 hover:bg-slate-100 dark:hover:bg-stone-800/60 hover:text-emerald-700 dark:hover:text-emerald-400")"><i data-lucide="layout-dashboard" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i><span>Dashboard</span></a>
+                    }
                     @if (canPool)
                     {
                         <a asp-controller="Workflow" asp-action="Pool" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold text-xs font-mono transition-all @(currentController == "Workflow" && currentAction == "Pool" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold ring-1 ring-emerald-500/30" : "text-slate-700 dark:text-stone-300 hover:bg-slate-100 dark:hover:bg-stone-800/60 hover:text-emerald-700 dark:hover:text-emerald-400")">

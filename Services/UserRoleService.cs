@@ -64,6 +64,23 @@ public class UserRoleService : IUserRoleService
                 existing.Division = divType;
             }
         }
+
+        // Ensure Print Tax Declaration (ASSESSMENT_PRINT) module exists in SystemModules
+        if (!_context.SystemModules.Any(m => m.ModuleCode == "ASSESSMENT_PRINT"))
+        {
+            _context.SystemModules.Add(new SystemModule
+            {
+                ModuleCode = "ASSESSMENT_PRINT",
+                ModuleName = "Print Tax Declaration (Records Printout)",
+                Category = "FAAS & Transaction Requests",
+                ControllerName = "Assessment",
+                ActionName = "PrintPdf",
+                Icon = "printer",
+                SortOrder = 13,
+                IsActive = true
+            });
+        }
+
         _context.SaveChanges();
     }
 

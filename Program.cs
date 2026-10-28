@@ -48,6 +48,9 @@ builder.Services.AddScoped<IDocumentWorkflowService, DocumentWorkflowService>();
 builder.Services.AddScoped<IUserRoleService, UserRoleService>();
 builder.Services.AddScoped<IPermissionService, PermissionService>();
 builder.Services.AddScoped<IDataTransferService, DataTransferService>();
+builder.Services.AddScoped<ITaxDeclarationPdfService, TaxDeclarationPdfService>();
+
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
 var app = builder.Build();
 

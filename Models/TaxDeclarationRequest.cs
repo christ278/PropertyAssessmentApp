@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Validation;
 
 namespace PropertyAssessmentApp.Models;
@@ -118,7 +118,7 @@ public class TaxDeclarationRequest
     public decimal TotalFeesAmount { get; set; }
 
     [Display(Name = "Status")]
-    public TaxDeclarationRequestStatus Status { get; set; } = TaxDeclarationRequestStatus.Pending;
+    public RequestStatus Status { get; set; } = RequestStatus.Pending;
 
     // File Attachments
     [ValidateNever]

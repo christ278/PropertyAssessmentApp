@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using PropertyAssessmentApp.Models;
 using PropertyAssessmentApp.Services;
 
@@ -24,7 +24,7 @@ public class TaxDeclarationRequestController : Controller
     }
 
     // GET: /TaxDeclarationRequest
-    public IActionResult Index(string? search, TaxDeclarationRequestStatus? status)
+    public IActionResult Index(string? search, RequestStatus? status)
     {
         ViewBag.Search = search;
         ViewBag.Status = status;

@@ -234,6 +234,9 @@
                                             <a asp-action="Edit" asp-route-id="@item.Id" class="p-1.5 rounded-lg bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 hover:bg-slate-200" title="Edit">
                                                 <i data-lucide="edit" class="w-4 h-4"></i>
                                             </a>
+                                            <a asp-action="PrintPdf" asp-route-id="@item.Id" target="_blank" class="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100" title="Print Tax Declaration (PDF)">
+                                                <i data-lucide="printer" class="w-4 h-4"></i>
+                                            </a>
                                         </div>
                                     </td>
                                 </tr>

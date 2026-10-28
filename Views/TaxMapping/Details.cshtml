@@ -1,4 +1,4 @@
-@model PropertyAssessmentApp.Models.TaxMappingRequest
+﻿@model PropertyAssessmentApp.Models.TaxMappingRequest
 @using System.Text.Json
 
 @{
@@ -40,13 +40,13 @@
             </div>
             @switch (Model.Status)
             {
-                case TaxMappingRequestStatus.Approved:
+                case RequestStatus.Approved:
                     <span class="px-3 py-1 rounded-xl bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/40 text-xs font-bold uppercase">Approved & Map Updated</span>
                     break;
-                case TaxMappingRequestStatus.Pending:
+                case RequestStatus.Pending:
                     <span class="px-3 py-1 rounded-xl bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40 text-xs font-bold uppercase">Pending Verification</span>
                     break;
-                case TaxMappingRequestStatus.UnderReview:
+                case RequestStatus.UnderReview:
                     <span class="px-3 py-1 rounded-xl bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-500/40 text-xs font-bold uppercase">Under Review</span>
                     break;
                 default:

@@ -1,0 +1,284 @@
+@model PropertyAssessmentApp.Models.TdLineageViewModel
+@using PropertyAssessmentApp.Models
+@{
+    ViewData["Title"] = $"TD Lineage · {Model.Selected.TaxDeclarationNumber}";
+    var sel = Model.Selected;
+}
+
+<div class="space-y-6">
+    <!-- Top Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <div class="inline-flex items-center gap-2 text-xs font-mono text-violet-600 dark:text-violet-400 font-bold mb-1">
+                <i data-lucide="git-branch" class="w-4 h-4"></i>
+                <span>Property Mother &amp; Child TD Lineage</span>
+            </div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight font-mono">
+                @sel.TaxDeclarationNumber
+            </h1>
+            <p class="text-xs sm:text-sm text-slate-500 dark:text-stone-400">
+                PIN: <span class="font-mono font-bold text-slate-700 dark:text-stone-200">@sel.PropertyIndexNumber</span>
+                &bull; Owner: <span class="font-semibold text-slate-700 dark:text-stone-200">@sel.OwnerName</span>
+            </p>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <a asp-action="ViewRecord" asp-route-id="@sel.Id" class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs font-mono inline-flex items-center gap-2 shadow-sm transition">
+                <i data-lucide="eye" class="w-4 h-4"></i>
+                View Complete Data
+            </a>
+            <a asp-action="Index" class="px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 hover:bg-slate-50 dark:hover:bg-stone-800 border border-slate-200 dark:border-stone-800 text-slate-700 dark:text-stone-200 font-bold text-xs font-mono inline-flex items-center gap-2 transition">
+                <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                Back to Records
+            </a>
+        </div>
+    </div>
+
+    <!-- Lineage Tree Flow: Mother -> Selected -> Child -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+
+        <!-- 1. MOTHER / PARENT TD COLUMN -->
+        <div class="rounded-2xl bg-white/95 dark:bg-stone-900/90 border border-slate-200 dark:border-stone-800 shadow-sm overflow-hidden">
+            <div class="p-4 border-b border-slate-100 dark:border-stone-800 bg-amber-50/60 dark:bg-amber-950/20 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                    <h2 class="text-xs font-mono uppercase tracking-wider font-extrabold text-amber-800 dark:text-amber-300">
+                        Mother / Parent Property (@Model.MotherRecords.Count)
+                    </h2>
+                </div>
+                <span class="text-[10px] font-mono text-amber-700 dark:text-amber-400 font-bold">Origin / Previous TD</span>
+            </div>
+
+            <div class="p-4 space-y-3">
+                @if (Model.MotherRecords.Any())
+                {
+                    @foreach (var m in Model.MotherRecords)
+                    {
+                        <div class="p-4 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50/60 dark:bg-stone-950/50 space-y-2">
+                            <div class="flex items-center justify-between gap-2">
+                                <a asp-action="Lineage" asp-route-id="@m.Id" class="font-mono font-extrabold text-sm text-amber-700 dark:text-amber-400 hover:underline">
+                                    @m.TaxDeclarationNumber
+                                </a>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold @(m.IsCancelledAndSuperseded || m.Status == AssessmentStatus.Cancelled ? "bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300" : "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300")">
+                                    @(m.IsCancelledAndSuperseded || m.Status == AssessmentStatus.Cancelled ? "Cancelled & Superseded" : m.Status.ToString())
+                                </span>
+                            </div>
+                            <div class="text-xs text-slate-700 dark:text-stone-300 font-semibold">@m.OwnerName</div>
+                            <div class="text-[11px] font-mono text-slate-500 dark:text-stone-400">
+                                PIN: @m.PropertyIndexNumber &bull; @m.Kind (@m.Classification)
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200/70 dark:border-stone-800 text-[11px] font-mono">
+                                <div>
+                                    <span class="text-slate-400 block text-[10px]">AREA / FMV</span>
+                                    <span class="font-bold text-slate-800 dark:text-stone-200">@m.AreaSqMeters.ToString("N2") sqm &bull; ₱@m.MarketValue.ToString("N0")</span>
+                                </div>
+                                <div>
+                                    <span class="text-slate-400 block text-[10px]">ASSESSED VALUE</span>
+                                    <span class="font-bold text-emerald-700 dark:text-emerald-400">₱@m.AssessedValue.ToString("N2")</span>
+                                </div>
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(m.CancellationReason))
+                            {
+                                <div class="text-[11px] text-rose-600 dark:text-rose-400 font-mono pt-1">
+                                    Reason: @m.CancellationReason
+                                </div>
+                            }
+                            <div class="pt-2 flex items-center gap-2">
+                                <a asp-action="ViewRecord" asp-route-id="@m.Id" class="px-2.5 py-1 rounded-lg bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-700 text-[11px] font-mono font-bold text-slate-700 dark:text-stone-300 hover:text-emerald-600">
+                                    Open Record
+                                </a>
+                                <a asp-action="Lineage" asp-route-id="@m.Id" class="px-2.5 py-1 rounded-lg bg-amber-500/10 text-[11px] font-mono font-bold text-amber-700 dark:text-amber-300 hover:bg-amber-500/20">
+                                    Switch Focus
+                                </a>
+                            </div>
+                        </div>
+                    }
+                }
+                else if (!string.IsNullOrWhiteSpace(sel.PreviousTdNo) || !string.IsNullOrWhiteSpace(sel.PreviousPin))
+                {
+                    <!-- Historical snapshot stored on the TD when the Mother record itself is not in the active table -->
+                    <div class="p-4 rounded-xl border border-dashed border-amber-300 dark:border-amber-700/60 bg-amber-50/30 dark:bg-amber-950/10 space-y-1.5 font-mono text-xs">
+                        <div class="text-[10px] uppercase text-amber-700 dark:text-amber-400 font-bold">Historical Superseded Snapshot</div>
+                        <div class="font-extrabold text-sm text-slate-900 dark:text-white">Prev TD: @(sel.PreviousTdNo ?? "N/A")</div>
+                        <div class="text-slate-600 dark:text-stone-300">Prev PIN: @(sel.PreviousPin ?? "N/A")</div>
+                        <div class="text-slate-600 dark:text-stone-300">Prev Owner: @(sel.PreviousOwner ?? "N/A")</div>
+                        <div class="text-slate-600 dark:text-stone-300">Prev MV: ₱@sel.PreviousMarketValue.ToString("N2") &bull; Prev AV: ₱@sel.PreviousAssessedValue.ToString("N2")</div>
+                    </div>
+                }
+                else
+                {
+                    <div class="py-8 text-center text-xs font-mono text-slate-400 dark:text-stone-500">
+                        No Mother / Previous TD recorded.<br />
+                        <span class="text-[11px]">This property is an original / root declaration.</span>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- 2. SELECTED / CURRENT TD COLUMN -->
+        <div class="rounded-2xl bg-white dark:bg-stone-900 border-2 border-emerald-500/70 shadow-md overflow-hidden">
+            <div class="p-4 border-b border-slate-100 dark:border-stone-800 bg-emerald-50/70 dark:bg-emerald-950/30 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                    <h2 class="text-xs font-mono uppercase tracking-wider font-extrabold text-emerald-800 dark:text-emerald-300">
+                        Selected Property Record
+                    </h2>
+                </div>
+                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-600 text-white">
+                    @sel.TransactionCode
+                </span>
+            </div>
+
+            <div class="p-5 space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="font-mono font-black text-lg text-slate-900 dark:text-white">@sel.TaxDeclarationNumber</span>
+                    @if (sel.IsCancelledAndSuperseded || sel.Status == AssessmentStatus.Cancelled)
+                    {
+                        <span class="px-2.5 py-1 rounded-lg bg-rose-100 dark:bg-rose-500/20 text-rose-800 dark:text-rose-300 text-[10px] font-mono font-bold uppercase">
+                            Cancelled &amp; Superseded
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="px-2.5 py-1 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-[10px] font-mono font-bold uppercase">
+                            @sel.Status
+                        </span>
+                    }
+                </div>
+
+                <div class="text-xs font-mono text-slate-500 dark:text-stone-400">
+                    @sel.TransactionCodeDisplay
+                </div>
+
+                <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200/80 dark:border-stone-800 space-y-1.5 text-xs">
+                    <div><span class="text-slate-400 font-mono text-[10px] uppercase block">Owner</span><strong class="text-slate-900 dark:text-white">@sel.OwnerName</strong></div>
+                    <div><span class="text-slate-400 font-mono text-[10px] uppercase block">PIN / Location</span><span class="font-mono">@sel.PropertyIndexNumber</span> &bull; @sel.DistrictOrBarangay</div>
+                    <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200/60 dark:border-stone-800 font-mono">
+                        <div>
+                            <span class="text-slate-400 text-[10px] block">KIND / CLASS</span>
+                            <span class="font-bold">@sel.Kind &bull; @sel.Classification</span>
+                        </div>
+                        <div>
+                            <span class="text-slate-400 text-[10px] block">AREA</span>
+                            <span class="font-bold">@sel.AreaSqMeters.ToString("N2") sq.m.</span>
+                        </div>
+                        <div>
+                            <span class="text-slate-400 text-[10px] block">MARKET VALUE</span>
+                            <span class="font-bold">₱@sel.MarketValue.ToString("N2")</span>
+                        </div>
+                        <div>
+                            <span class="text-slate-400 text-[10px] block">ASSESSED VALUE</span>
+                            <span class="font-bold text-emerald-700 dark:text-emerald-400">₱@sel.AssessedValue.ToString("N2")</span>
+                        </div>
+                    </div>
+                </div>
+
+                @if (sel.IsCancelledAndSuperseded || !string.IsNullOrWhiteSpace(sel.SupersededByTdns))
+                {
+                    <div class="p-3.5 rounded-xl bg-rose-50/70 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/50 text-xs font-mono space-y-1">
+                        <div class="text-[10px] uppercase font-extrabold text-rose-700 dark:text-rose-300">Cancellation &amp; Superseding Info</div>
+                        @if (!string.IsNullOrWhiteSpace(sel.CancellationReason))
+                        {
+                            <div>Reason: <strong>@sel.CancellationReason</strong></div>
+                        }
+                        @if (sel.DateCancelled.HasValue)
+                        {
+                            <div>Date Cancelled: @sel.DateCancelled.Value.ToString("MMM dd, yyyy")</div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(sel.SupersededByTdns))
+                        {
+                            <div>Superseded By TD(s): <strong class="text-rose-700 dark:text-rose-300">@sel.SupersededByTdns</strong></div>
+                        }
+                        @if (Model.CancellingRequest != null)
+                        {
+                            <div>Request Tracking No.: <strong>@Model.CancellingRequest.TrackingNumber</strong></div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- 3. CHILD / SUBDIVIDED / SUPERSEDING TD COLUMN -->
+        <div class="rounded-2xl bg-white/95 dark:bg-stone-900/90 border border-slate-200 dark:border-stone-800 shadow-sm overflow-hidden">
+            <div class="p-4 border-b border-slate-100 dark:border-stone-800 bg-violet-50/60 dark:bg-violet-950/20 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-violet-500"></span>
+                    <h2 class="text-xs font-mono uppercase tracking-wider font-extrabold text-violet-800 dark:text-violet-300">
+                        Child / Resulting Property (@Model.ChildRecords.Count)
+                    </h2>
+                </div>
+                <span class="text-[10px] font-mono text-violet-700 dark:text-violet-400 font-bold">Derived / New TDs</span>
+            </div>
+
+            <div class="p-4 space-y-3">
+                @if (Model.ChildRecords.Any())
+                {
+                    @foreach (var c in Model.ChildRecords)
+                    {
+                        <div class="p-4 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50/60 dark:bg-stone-950/50 space-y-2">
+                            <div class="flex items-center justify-between gap-2">
+                                <a asp-action="Lineage" asp-route-id="@c.Id" class="font-mono font-extrabold text-sm text-violet-700 dark:text-violet-400 hover:underline">
+                                    @c.TaxDeclarationNumber
+                                </a>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
+                                    @c.TransactionCode &bull; @c.Status
+                                </span>
+                            </div>
+                            <div class="text-xs text-slate-700 dark:text-stone-300 font-semibold">@c.OwnerName</div>
+                            <div class="text-[11px] font-mono text-slate-500 dark:text-stone-400">
+                                PIN: @c.PropertyIndexNumber &bull; Lot: @(string.IsNullOrWhiteSpace(c.LotNo) ? "N/A" : c.LotNo)
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200/70 dark:border-stone-800 text-[11px] font-mono">
+                                <div>
+                                    <span class="text-slate-400 block text-[10px]">AREA / FMV</span>
+                                    <span class="font-bold text-slate-800 dark:text-stone-200">@c.AreaSqMeters.ToString("N2") sqm &bull; ₱@c.MarketValue.ToString("N0")</span>
+                                </div>
+                                <div>
+                                    <span class="text-slate-400 block text-[10px]">ASSESSED VALUE</span>
+                                    <span class="font-bold text-emerald-700 dark:text-emerald-400">₱@c.AssessedValue.ToString("N2")</span>
+                                </div>
+                            </div>
+                            <div class="pt-2 flex items-center gap-2">
+                                <a asp-action="ViewRecord" asp-route-id="@c.Id" class="px-2.5 py-1 rounded-lg bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-700 text-[11px] font-mono font-bold text-slate-700 dark:text-stone-300 hover:text-emerald-600">
+                                    Open Record
+                                </a>
+                                <a asp-action="Lineage" asp-route-id="@c.Id" class="px-2.5 py-1 rounded-lg bg-violet-500/10 text-[11px] font-mono font-bold text-violet-700 dark:text-violet-300 hover:bg-violet-500/20">
+                                    Switch Focus
+                                </a>
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="py-8 text-center text-xs font-mono text-slate-400 dark:text-stone-500">
+                        No Child / Subdivided TDs derived from this property yet.
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Related Improvements (Buildings / Machinery linked to this Land/Building TD) -->
+    @if (Model.RelatedImprovements.Any())
+    {
+        <div class="rounded-2xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm p-5">
+            <h2 class="text-xs font-mono uppercase tracking-wider font-extrabold text-slate-600 dark:text-stone-300 mb-3">
+                 Improvements / Structures Erected on this Property (@Model.RelatedImprovements.Count)
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                @foreach (var imp in Model.RelatedImprovements)
+                {
+                    <div class="p-4 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50/60 dark:bg-stone-950/50 space-y-1.5 text-xs font-mono">
+                        <div class="flex items-center justify-between">
+                            <a asp-action="Lineage" asp-route-id="@imp.Id" class="font-bold text-blue-600 dark:text-blue-400 hover:underline">@imp.TaxDeclarationNumber</a>
+                            <span class="px-2 py-0.5 rounded bg-blue-500/10 text-blue-700 dark:text-blue-300 text-[10px] font-bold">@imp.Kind</span>
+                        </div>
+                        <div class="font-sans font-semibold text-slate-800 dark:text-stone-200">@imp.OwnerName</div>
+                        <div class="text-[11px] text-slate-500">PIN: @imp.PropertyIndexNumber &bull; AV: ₱@imp.AssessedValue.ToString("N2")</div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>

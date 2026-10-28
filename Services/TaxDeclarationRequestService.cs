@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using PropertyAssessmentApp.Data;
 using PropertyAssessmentApp.Models;
@@ -21,7 +21,7 @@ public class TaxDeclarationRequestService : ITaxDeclarationRequestService
         return _fileStorage.GetPhysicalStorageDirectory(FileDefaultLocation.Attachment, webRootPath);
     }
 
-    public IEnumerable<TaxDeclarationRequest> GetAll(string? search = null, TaxDeclarationRequestStatus? status = null)
+    public IEnumerable<TaxDeclarationRequest> GetAll(string? search = null, RequestStatus? status = null)
     {
         var query = _context.TaxDeclarationRequests.AsQueryable();
 
@@ -154,6 +154,6 @@ public class TaxDeclarationRequestService : ITaxDeclarationRequestService
     }
 
     public int GetTotalCount() => _context.TaxDeclarationRequests.Count();
-    public int GetPendingCount() => _context.TaxDeclarationRequests.Count(r => r.Status == TaxDeclarationRequestStatus.Pending || r.Status == TaxDeclarationRequestStatus.Processing);
-    public int GetApprovedCount() => _context.TaxDeclarationRequests.Count(r => r.Status == TaxDeclarationRequestStatus.Approved);
+    public int GetPendingCount() => _context.TaxDeclarationRequests.Count(r => r.Status == RequestStatus.Pending || r.Status == RequestStatus.UnderReview);
+    public int GetApprovedCount() => _context.TaxDeclarationRequests.Count(r => r.Status == RequestStatus.Approved);
 }

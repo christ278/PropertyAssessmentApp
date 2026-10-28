@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using PropertyAssessmentApp.Data;
 using PropertyAssessmentApp.Models;
@@ -419,11 +419,11 @@ public class DocumentWorkflowService : IDocumentWorkflowService
                 if (!string.IsNullOrWhiteSpace(orNumber)) item.ORNumber = orNumber.Trim();
                 if (orDateIssued.HasValue) item.ORDateIssued = orDateIssued.Value;
                 if (isCompleted)
-                    item.Status = TaxDeclarationRequestStatus.Approved;
+                    item.Status = RequestStatus.Approved;
                 else if (isDeferred)
-                    item.Status = TaxDeclarationRequestStatus.Rejected;
+                    item.Status = RequestStatus.Rejected;
                 else
-                    item.Status = TaxDeclarationRequestStatus.Processing;
+                    item.Status = RequestStatus.UnderReview;
                 
                 _tdService.Update(item, null, "");
             }
@@ -457,11 +457,11 @@ public class DocumentWorkflowService : IDocumentWorkflowService
                 if (!string.IsNullOrWhiteSpace(orNumber)) item.ORNumber = orNumber.Trim();
                 if (orDateIssued.HasValue) item.ORDateIssued = orDateIssued.Value;
                 if (isCompleted)
-                    item.Status = TaxMappingRequestStatus.Approved;
+                    item.Status = RequestStatus.Approved;
                 else if (isDeferred)
-                    item.Status = TaxMappingRequestStatus.Rejected;
+                    item.Status = RequestStatus.Rejected;
                 else
-                    item.Status = TaxMappingRequestStatus.UnderReview;
+                    item.Status = RequestStatus.UnderReview;
 
                 _tmService.Update(item, null, "");
             }
@@ -1029,11 +1029,11 @@ public class DocumentWorkflowService : IDocumentWorkflowService
         {
             var logs = GetForwardingLogs(td.Id).ToList();
             var lastLog = logs.FirstOrDefault();
-            var currentStage = lastLog?.ToStage ?? (td.Status == TaxDeclarationRequestStatus.Approved ? WorkflowStage.Completed : (WorkflowStage)25);
+            var currentStage = lastLog?.ToStage ?? (td.Status == RequestStatus.Approved ? WorkflowStage.Completed : (WorkflowStage)25);
             int stageId = (int)currentStage;
             bool isClaimed = lastLog?.IsClaimed ?? false;
             bool isDeferred = lastLog?.IsDeferred ?? false;
-            bool isDone = lastLog?.ToStage == WorkflowStage.Completed || td.Status == TaxDeclarationRequestStatus.Approved;
+            bool isDone = lastLog?.ToStage == WorkflowStage.Completed || td.Status == RequestStatus.Approved;
 
             var (statusText, isApproval, isReleased) = ResolveTransactionStatus(
                 4,
@@ -1184,11 +1184,11 @@ public class DocumentWorkflowService : IDocumentWorkflowService
             {
                 var logs = GetForwardingLogs(tm.Id).ToList();
                 var lastLog = logs.FirstOrDefault();
-                var currentStage = lastLog?.ToStage ?? (tm.Status == TaxMappingRequestStatus.Approved ? WorkflowStage.Completed : (WorkflowStage)15);
+                var currentStage = lastLog?.ToStage ?? (tm.Status == RequestStatus.Approved ? WorkflowStage.Completed : (WorkflowStage)15);
                 int stageId = (int)currentStage;
                 bool isClaimed = lastLog?.IsClaimed ?? false;
                 bool isDeferred = lastLog?.IsDeferred ?? false;
-                bool isDone = lastLog?.ToStage == WorkflowStage.Completed || tm.Status == TaxMappingRequestStatus.Approved;
+                bool isDone = lastLog?.ToStage == WorkflowStage.Completed || tm.Status == RequestStatus.Approved;
 
                 var (statusText, isApproval, isReleased) = ResolveTransactionStatus(
                     3,

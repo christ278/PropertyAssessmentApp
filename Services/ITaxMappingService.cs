@@ -1,11 +1,11 @@
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 using PropertyAssessmentApp.Models;
 
 namespace PropertyAssessmentApp.Services;
 
 public interface ITaxMappingService
 {
-    IEnumerable<TaxMappingRequest> GetAll(string? search = null, TaxMappingRequestStatus? status = null);
+    IEnumerable<TaxMappingRequest> GetAll(string? search = null, RequestStatus? status = null);
     TaxMappingRequest? GetById(Guid id);
     TaxMappingRequest? GetByRequestNumber(string requestNo);
     void Add(TaxMappingRequest request, IFormFile? fileUpload, string? webRootPath = null);

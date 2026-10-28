@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Validation;
 
@@ -1011,6 +1011,15 @@ public class AssessmentCalculatorViewModel
     public decimal BasicRPT => Math.Round(AssessedValue * 0.02m, 2);
     public decimal SEFTax => Math.Round(AssessedValue * 0.01m, 2);
     public decimal TotalAnnualTax => BasicRPT + SEFTax;
+}
+
+public class TdLineageViewModel
+{
+    public TaxDeclaration Selected { get; set; } = null!;
+    public List<TaxDeclaration> MotherRecords { get; set; } = new();
+    public List<TaxDeclaration> ChildRecords { get; set; } = new();
+    public List<TaxDeclaration> RelatedImprovements { get; set; } = new();
+    public PropertyAssessmentRequest? CancellingRequest { get; set; }
 }
 
 public class BuildingFloorItem

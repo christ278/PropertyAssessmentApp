@@ -1,4 +1,4 @@
-@model PropertyAssessmentApp.Models.TaxDeclarationRequest
+﻿@model PropertyAssessmentApp.Models.TaxDeclarationRequest
 @using PropertyAssessmentApp.Models
 
 @{
@@ -132,7 +132,7 @@
 
                     <div>
                         <label class="block text-[11px] font-bold text-slate-700 dark:text-stone-300 mb-1 uppercase">STATUS</label>
-                        <select asp-for="Status" class="w-full px-4 py-2.5 rounded-xl bg-slate-50/80 dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold" asp-items="Html.GetEnumSelectList<TaxDeclarationRequestStatus>()"></select>
+                        <select asp-for="Status" class="w-full px-4 py-2.5 rounded-xl bg-slate-50/80 dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold" asp-items="Html.GetEnumSelectList<RequestStatus>()"></select>
                     </div>
                 </div>
 

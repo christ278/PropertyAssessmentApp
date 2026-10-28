@@ -1,0 +1,48 @@
+@model PropertyAssessmentApp.Models.DashboardViewModel
+@{
+    var segs = new[]
+    {
+        (Name: "Pending", N: Model.Pending, Bg: "bg-amber-500"),
+        (Name: "On Going", N: Model.OnGoing, Bg: "bg-blue-500"),
+        (Name: "For Approval", N: Model.ForApproval, Bg: "bg-violet-500"),
+        (Name: "Deferred", N: Model.Deferred, Bg: "bg-rose-500"),
+        (Name: "Released", N: Model.Released, Bg: "bg-emerald-500")
+    };
+    int totalSeg = Math.Max(1, Model.Total);
+    string rangeText = (Model.StartDate.HasValue || Model.EndDate.HasValue)
+        ? $"{(Model.StartDate?.ToString("MMM dd, yyyy") ?? "Start")} – {(Model.EndDate?.ToString("MMM dd, yyyy") ?? "Present")}"
+        : "Last 14 days";
+}
+<!-- Pipeline status card -->
+<div class="rounded-2xl bg-white/90 dark:bg-stone-900/80 border border-slate-200/90 dark:border-stone-800 shadow-sm mb-6 p-5">
+    <div class="flex items-center justify-between mb-2">
+        <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400 dark:text-stone-500 font-bold">Pipeline status (@Model.Total total)</span>
+        <span class="text-[11px] text-slate-400">Fees released ₱@Model.ReleasedFees.ToString("N2") of ₱@Model.TotalFees.ToString("N2")</span>
+    </div>
+    <div class="flex h-2.5 rounded-full overflow-hidden bg-slate-100 dark:bg-stone-800">
+        @foreach (var s in segs.Where(x => x.N > 0)) { <div class="@s.Bg" style="width:@(s.N * 100.0 / totalSeg)%" title="@s.Name: @s.N"></div> }
+    </div>
+    <div class="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs">
+        @foreach (var s in segs) { <span class="flex items-center gap-2 text-slate-600 dark:text-stone-300"><span class="w-2 h-2 rounded-full @s.Bg"></span>@s.Name <b class="font-mono">@s.N</b></span> }
+    </div>
+</div>
+
+<!-- Request Trend Graph + workload -->
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">
+    <div class="rounded-2xl bg-white/90 dark:bg-stone-900/80 border border-slate-200/90 dark:border-stone-800 shadow-sm p-5 xl:col-span-2">
+        <div class="flex items-center justify-between mb-1">
+            <h2 class="text-sm font-bold text-slate-800 dark:text-stone-100">Request Graph &amp; Workflow Trend</h2>
+            <span class="text-[11px] font-mono text-slate-400">@rangeText</span>
+        </div>
+        <p class="text-xs text-slate-400 mb-3">Tax Dec, Tax Mapping, Land Holding, Property Assessment, Property Inspection &amp; Released</p>
+        <div class="h-72"><canvas id="trendChart"></canvas></div>
+    </div>
+    <div class="rounded-2xl bg-white/90 dark:bg-stone-900/80 border border-slate-200/90 dark:border-stone-800 shadow-sm p-5">
+        <h2 class="text-sm font-bold text-slate-800 dark:text-stone-100 mb-4">Where work is waiting</h2>
+        <div class="text-[10px] font-mono uppercase tracking-wider text-slate-400 dark:text-stone-500 font-bold mb-2">Age of open items</div>
+        <partial name="_Bars" model="Model.AgingBuckets" />
+        <div class="border-t border-slate-100 dark:border-stone-800 my-5"></div>
+        <div class="text-[10px] font-mono uppercase tracking-wider text-slate-400 dark:text-stone-500 font-bold mb-2">Busiest stages</div>
+        <partial name="_Bars" model="Model.Bottlenecks" />
+    </div>
+</div>

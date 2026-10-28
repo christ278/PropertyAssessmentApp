@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using PropertyAssessmentApp.Data;
 using PropertyAssessmentApp.Models;
@@ -44,7 +44,7 @@ public class TaxMappingService : ITaxMappingService
                         CityMunicipalityName = "General Santos City",
                         BarangayName = "Brgy. Dadiangas East",
                         StreetAddress = "124 Maplewood Drive",
-                        Status = TaxMappingRequestStatus.UnderReview,
+                        Status = RequestStatus.UnderReview,
                         ParcelAreaSqm = 450.00m,
                         AssignedStaff = "Fernando K. Valdez (Tax Mapper)",
                         AttachmentFileName = "Subdivision_Plan_Lot12.pdf",
@@ -68,7 +68,7 @@ public class TaxMappingService : ITaxMappingService
                         CityMunicipalityName = "General Santos City",
                         BarangayName = "Brgy. Lagao",
                         StreetAddress = "Suite 500, City Center Tower",
-                        Status = TaxMappingRequestStatus.Approved,
+                        Status = RequestStatus.Approved,
                         ParcelAreaSqm = 1200.50m,
                         AssignedStaff = "Fernando K. Valdez (Tax Mapper)",
                         AttachmentFileName = "Consolidation_Approved_Map.pdf",
@@ -92,7 +92,7 @@ public class TaxMappingService : ITaxMappingService
                         CityMunicipalityName = "General Santos City",
                         BarangayName = "Brgy. Lagao",
                         StreetAddress = "Sitio Greenfields",
-                        Status = TaxMappingRequestStatus.Pending,
+                        Status = RequestStatus.Pending,
                         ParcelAreaSqm = 320.00m,
                         AssignedStaff = "Fernando K. Valdez (Tax Mapper)",
                         RequestDate = DateTime.Now.AddDays(-2),
@@ -112,7 +112,7 @@ public class TaxMappingService : ITaxMappingService
                         CityMunicipalityName = "General Santos City",
                         BarangayName = "Brgy. Dadiangas East",
                         StreetAddress = "General Santos City",
-                        Status = TaxMappingRequestStatus.UnderReview,
+                        Status = RequestStatus.UnderReview,
                         ParcelAreaSqm = 350.00m,
                         AssignedStaff = "Charisse B. Pagay",
                         RequestDate = DateTime.Now.AddHours(-1),
@@ -134,7 +134,7 @@ public class TaxMappingService : ITaxMappingService
         return _fileStorage.GetPhysicalStorageDirectory(FileDefaultLocation.Attachment, webRootPath);
     }
 
-    public IEnumerable<TaxMappingRequest> GetAll(string? search = null, TaxMappingRequestStatus? status = null)
+    public IEnumerable<TaxMappingRequest> GetAll(string? search = null, RequestStatus? status = null)
     {
         var query = _context.TaxMappingRequests.AsQueryable();
 
@@ -280,6 +280,6 @@ public class TaxMappingService : ITaxMappingService
     }
 
     public int GetTotalCount() => _context.TaxMappingRequests.Count();
-    public int GetPendingCount() => _context.TaxMappingRequests.Count(r => r.Status == TaxMappingRequestStatus.Pending || r.Status == TaxMappingRequestStatus.UnderReview);
-    public int GetApprovedCount() => _context.TaxMappingRequests.Count(r => r.Status == TaxMappingRequestStatus.Approved);
+    public int GetPendingCount() => _context.TaxMappingRequests.Count(r => r.Status == RequestStatus.Pending || r.Status == RequestStatus.UnderReview);
+    public int GetApprovedCount() => _context.TaxMappingRequests.Count(r => r.Status == RequestStatus.Approved);
 }

@@ -1,7 +1,9 @@
 @model PropertyAssessmentApp.Models.TaxDeclaration
+@inject PropertyAssessmentApp.Services.IPermissionService PermissionService
 
 @{
     ViewData["Title"] = $"Complete Assessment Record - {Model.TaxDeclarationNumber}";
+    bool canPrintTd = PermissionService.CanAccess(User, "Assessment", "PrintPdf");
 }
 
 <div class="space-y-6 font-mono text-xs pb-12">
@@ -17,14 +19,17 @@
             <span class="text-slate-500 dark:text-stone-400 hidden sm:inline text-[11px]">Full Master Record Viewer</span>
         </div>
         <div class="flex items-center gap-2">
-            <button onclick="window.print()" class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-slate-700 dark:text-stone-300 font-bold border border-slate-200 dark:border-stone-700 flex items-center gap-1.5 transition-all">
-                <i data-lucide="printer" class="w-4 h-4"></i>
-                <span>Print Page</span>
-            </button>
-            <a asp-action="Details" asp-route-id="@Model.Id" class="px-4 py-2.5 rounded-xl bg-sky-50 hover:bg-sky-100 dark:bg-sky-500/10 dark:hover:bg-sky-500/20 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-500/30 font-bold flex items-center gap-1.5 transition-all">
-                <i data-lucide="file-text" class="w-4 h-4"></i>
-                <span>Official Certificate</span>
-            </a>
+            @if (canPrintTd)
+            {
+                <button onclick="window.print()" class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-slate-700 dark:text-stone-300 font-bold border border-slate-200 dark:border-stone-700 flex items-center gap-1.5 transition-all">
+                    <i data-lucide="printer" class="w-4 h-4"></i>
+                    <span>Print Page</span>
+                </button>
+                <a asp-action="PrintPdf" asp-route-id="@Model.Id" target="_blank" class="px-4 py-2.5 rounded-xl bg-sky-50 hover:bg-sky-100 dark:bg-sky-500/10 dark:hover:bg-sky-500/20 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-500/30 font-bold flex items-center gap-1.5 transition-all">
+                    <i data-lucide="file-text" class="w-4 h-4"></i>
+                    <span>Official Certificate</span>
+                </a>
+            }
             <a asp-action="Edit" asp-route-id="@Model.Id" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center gap-1.5 shadow-sm transition-all">
                 <i data-lucide="edit-3" class="w-4 h-4"></i>
                 <span>Edit Record</span>

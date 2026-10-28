@@ -1,4 +1,4 @@
-@model IEnumerable<PropertyAssessmentApp.Models.TaxMappingRequest>
+﻿@model IEnumerable<PropertyAssessmentApp.Models.TaxMappingRequest>
 @using PropertyAssessmentApp.Models
 @inject PropertyAssessmentApp.Services.IPermissionService PermissionService
 
@@ -79,7 +79,7 @@
                 </select>
             </div>
 
-            <select name="status" asp-items="Html.GetEnumSelectList<TaxMappingRequestStatus>()" class="bg-slate-50 dark:bg-stone-950 text-slate-900 dark:text-white px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800">
+            <select name="status" asp-items="Html.GetEnumSelectList<RequestStatus>()" class="bg-slate-50 dark:bg-stone-950 text-slate-900 dark:text-white px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800">
                 <option value="">All Statuses</option>
             </select>
 
@@ -158,13 +158,13 @@
                                 <td class="px-2 sm:px-4 py-3.5 text-center">
                                     @switch (item.Status)
                                     {
-                                        case TaxMappingRequestStatus.Approved:
+                                        case RequestStatus.Approved:
                                             <span class="px-2.5 py-1 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/40 text-[10px] font-bold uppercase">Approved</span>
                                             break;
-                                        case TaxMappingRequestStatus.Pending:
+                                        case RequestStatus.Pending:
                                             <span class="px-2.5 py-1 rounded-lg bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40 text-[10px] font-bold uppercase">Pending</span>
                                             break;
-                                        case TaxMappingRequestStatus.UnderReview:
+                                        case RequestStatus.UnderReview:
                                             <span class="px-2.5 py-1 rounded-lg bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-500/40 text-[10px] font-bold uppercase">Under Review</span>
                                             break;
                                         default:

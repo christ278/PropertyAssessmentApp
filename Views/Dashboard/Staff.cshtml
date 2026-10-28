@@ -1,0 +1,16 @@
+﻿@model PropertyAssessmentApp.Models.DashboardViewModel
+@{ ViewData["Title"] = "My Dashboard"; var recentTuple = ("Recent in My Division", Model.RecentList); }
+<partial name="_Header" model="Model" />
+<div class="flex flex-wrap gap-3 mb-6">
+    <a asp-controller="Workflow" asp-action="Pool" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold">Pool <span class="px-2 rounded-lg bg-white/20 font-mono">@Model.PoolForMe</span></a>
+    <a asp-controller="Workflow" asp-action="MyTransactions" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 dark:border-stone-700 text-sm font-bold text-slate-700 dark:text-stone-200 hover:bg-slate-50 dark:hover:bg-stone-800">My Transactions <span class="px-2 rounded-lg bg-slate-100 dark:bg-stone-800 font-mono">@Model.MyClaimed</span></a>
+</div>
+<partial name="_Overview" model="Model" />
+<div class="rounded-2xl bg-white/90 dark:bg-stone-900/80 border border-slate-200/90 dark:border-stone-800 shadow-sm grid grid-cols-1 xl:grid-cols-2 xl:divide-x divide-slate-100 dark:divide-stone-800">
+    <partial name="_TxTable" model="(Model.PrimaryListTitle, Model.PrimaryList)" />
+    <partial name="_TxTable" model="recentTuple" />
+</div>
+
+@section Scripts {
+    <partial name="_ChartScripts" model="Model" />
+}

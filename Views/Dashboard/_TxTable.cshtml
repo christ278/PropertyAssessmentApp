@@ -1,0 +1,23 @@
+﻿@model (string Title, List<PropertyAssessmentApp.Services.WorkflowQueueItemDto> Items)
+<div class="p-5">
+    <h2 class="text-sm font-bold text-slate-800 dark:text-stone-100 mb-3">@Model.Title</h2>
+    @if (!Model.Items.Any())
+    {
+        <p class="text-sm text-slate-400 dark:text-stone-500">Nothing to show.</p>
+    }
+    else
+    {
+        <div class="overflow-x-auto">
+            <table class="w-full text-xs">
+                <thead><tr class="text-left text-[10px] uppercase font-mono text-slate-400 dark:text-stone-500">
+                    <th class="py-2 pr-3">Tracking No.</th><th class="py-2 pr-3">Type</th><th class="py-2 pr-3">Owner / Applicant</th><th class="py-2 pr-3">Stage</th><th class="py-2">Status</th></tr></thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-stone-800">
+                @foreach (var i in Model.Items)
+                {
+                    <tr><td class="py-2 pr-3 font-mono font-bold">@i.TrackingNumber</td><td class="py-2 pr-3">@i.DisplayType</td><td class="py-2 pr-3">@i.OwnerOrApplicant</td><td class="py-2 pr-3">@i.CurrentStageName</td><td class="py-2 font-bold">@i.StatusText</td></tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

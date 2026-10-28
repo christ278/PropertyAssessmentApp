@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Validation;
 
 namespace PropertyAssessmentApp.Models;
@@ -168,7 +168,7 @@ public class TaxMappingRequest
     public string StreetAddress { get; set; } = string.Empty;
 
     [Display(Name = "Request Status")]
-    public TaxMappingRequestStatus Status { get; set; } = TaxMappingRequestStatus.Pending;
+    public RequestStatus Status { get; set; } = RequestStatus.Pending;
 
     [Display(Name = "Survey / Parcel Area (sqm)")]
     public decimal ParcelAreaSqm { get; set; }

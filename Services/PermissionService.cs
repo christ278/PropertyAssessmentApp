@@ -168,6 +168,38 @@ public class PermissionService : IPermissionService
             return HasModuleRecordAccess(roleSetting.Id, roleMod.ModuleId);
         }
 
+        // Dashboards: each dashboard is its own module so the Super Admin can assign it per role
+        if (controllerName.Equals("Dashboard", StringComparison.OrdinalIgnoreCase))
+        {
+            string? dashCode = (actionName ?? "Index").ToLowerInvariant() switch
+            {
+                "staff" => "DASHBOARD_USER",
+                "assessorhead" => "DASHBOARD_HEAD",
+                "systemowner" => "DASHBOARD_ADMIN",
+                _ => null
+            };
+
+            // Dashboard/Index only routes the user to an assigned dashboard (or shows a "none assigned" page)
+            if (dashCode == null) return true;
+
+            var dashMod = _context.SystemModules.FirstOrDefault(m => m.ModuleCode == dashCode && m.IsActive);
+            return dashMod != null && HasModuleRecordAccess(roleSetting.Id, dashMod.ModuleId);
+        }
+
+        // Assessment / Records: separate Printout permission (ASSESSMENT_PRINT) from general FAAS Records access (ASSESSMENT_FAAS)
+        if (controllerName.Equals("Assessment", StringComparison.OrdinalIgnoreCase))
+        {
+            if (actionName != null &&
+                (actionName.Equals("PrintPdf", StringComparison.OrdinalIgnoreCase) ||
+                 actionName.Equals("Details", StringComparison.OrdinalIgnoreCase)))
+            {
+                var printMod = _context.SystemModules.FirstOrDefault(m => m.ModuleCode == "ASSESSMENT_PRINT" && m.IsActive);
+                return printMod != null && HasModuleRecordAccess(roleSetting.Id, printMod.ModuleId);
+            }
+
+            var faasMod = _context.SystemModules.FirstOrDefault(m => m.ModuleCode == "ASSESSMENT_FAAS" && m.IsActive);
+            return faasMod != null && HasModuleRecordAccess(roleSetting.Id, faasMod.ModuleId);
+        }
         var module = GetModuleForRequest(controllerName, actionName);
         if (module == null)
         {

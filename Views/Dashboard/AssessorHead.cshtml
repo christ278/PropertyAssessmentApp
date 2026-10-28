@@ -1,0 +1,252 @@
+@model PropertyAssessmentApp.Models.DashboardViewModel
+@{
+    ViewData["Title"] = "Assessor Head Dashboard";
+    var todayGroups = new[]
+    {
+        (Key: "pending", Title: "Pending Transaction", ShortStatus: "Pending", Desc: "Submitted today, unclaimed & not approved", Count: Model.TodayPendingList.Count, Color: "text-amber-600 dark:text-amber-400", Ring: "ring-amber-500/40 bg-amber-50/60 dark:bg-amber-950/20", Dot: "bg-amber-500", Badge: "bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/60", Items: Model.TodayPendingList),
+        (Key: "ongoing", Title: "On Going", ShortStatus: "On Going", Desc: "Claimed by staff & not yet approved", Count: Model.TodayOnGoingList.Count, Color: "text-blue-600 dark:text-blue-400", Ring: "ring-blue-500/40 bg-blue-50/60 dark:bg-blue-950/20", Dot: "bg-blue-500", Badge: "bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800/60", Items: Model.TodayOnGoingList),
+        (Key: "approved", Title: "Approved", ShortStatus: "Approved", Desc: "Approved, awaiting claim in releasing", Count: Model.TodayApprovedList.Count, Color: "text-violet-600 dark:text-violet-400", Ring: "ring-violet-500/40 bg-violet-50/60 dark:bg-violet-950/20", Dot: "bg-violet-500", Badge: "bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800/60", Items: Model.TodayApprovedList),
+        (Key: "released", Title: "Released", ShortStatus: "Released", Desc: "All transactions released today", Count: Model.TodayReleasedList.Count, Color: "text-emerald-600 dark:text-emerald-400", Ring: "ring-emerald-500/40 bg-emerald-50/60 dark:bg-emerald-950/20", Dot: "bg-emerald-500", Badge: "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60", Items: Model.TodayReleasedList)
+    };
+}
+<partial name="_Header" model="Model" />
+
+<!-- Property / Tax Declaration Summary Strip -->
+<div class="rounded-2xl bg-white/90 dark:bg-stone-900/80 border border-slate-200/90 dark:border-stone-800 shadow-sm mb-6 grid grid-cols-2 lg:grid-cols-5 divide-x divide-y lg:divide-y-0 divide-slate-100 dark:divide-stone-800">
+    <a asp-controller="Assessment" asp-action="Index" class="p-5 hover:bg-slate-50 dark:hover:bg-stone-800/50 transition">
+        <div class="text-[10px] font-mono uppercase tracking-wider text-slate-400 dark:text-stone-500 font-bold">Total Property / TD</div>
+        <div class="mt-1 text-3xl font-extrabold text-slate-900 dark:text-white">@Model.TotalTaxDeclarations</div>
+        <div class="text-[11px] text-slate-400 mt-1">All encoded tax declarations</div>
+    </a>
+    <div class="p-5">
+        <div class="text-[10px] font-mono uppercase tracking-wider text-slate-400 dark:text-stone-500 font-bold">Total Cancelled</div>
+        <div class="mt-1 text-3xl font-extrabold text-rose-600 dark:text-rose-400">@Model.TotalCancelledTD</div>
+        <div class="text-[11px] text-slate-400 mt-1">Cancelled &amp; superseded TDs</div>
+    </div>
+    <div class="p-5">
+        <div class="text-[10px] font-mono uppercase tracking-wider text-slate-400 dark:text-stone-500 font-bold">Total Land</div>
+        <div class="mt-1 text-3xl font-extrabold text-emerald-600 dark:text-emerald-400">@Model.TotalLandTD</div>
+        <div class="text-[11px] text-slate-400 mt-1">Land parcels assessed</div>
+    </div>
+    <div class="p-5">
+        <div class="text-[10px] font-mono uppercase tracking-wider text-slate-400 dark:text-stone-500 font-bold">Total Building</div>
+        <div class="mt-1 text-3xl font-extrabold text-blue-600 dark:text-blue-400">@Model.TotalBuildingTD</div>
+        <div class="text-[11px] text-slate-400 mt-1">Buildings &amp; structures</div>
+    </div>
+    <div class="p-5 col-span-2 lg:col-span-1">
+        <div class="text-[10px] font-mono uppercase tracking-wider text-slate-400 dark:text-stone-500 font-bold">Total Machinery</div>
+        <div class="mt-1 text-3xl font-extrabold text-amber-600 dark:text-amber-400">@Model.TotalMachineryTD</div>
+        <div class="text-[11px] text-slate-400 mt-1">Machinery &amp; equipment</div>
+    </div>
+</div>
+
+<partial name="_Overview" model="Model" />
+
+<!-- Today's Transactions Card (Interactive Status Cards + Forms-Styled Table) -->
+<div class="rounded-2xl bg-white/90 dark:bg-stone-900/80 border border-slate-200/90 dark:border-stone-800 shadow-sm mb-6 overflow-hidden">
+    <div class="p-5 border-b border-slate-100 dark:border-stone-800 flex flex-wrap items-center justify-between gap-2">
+        <div>
+            <h2 class="text-sm font-bold text-slate-800 dark:text-stone-100">Today's Transactions (@DateTime.Now.ToString("MMMM dd, yyyy"))</h2>
+            <p class="text-xs text-slate-400">Click a status card below to filter the transaction list</p>
+        </div>
+        <span class="px-2.5 py-1 rounded-xl text-[11px] font-mono font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300">
+            Today Only
+        </span>
+    </div>
+
+    <!-- 4 Clickable Status Cards -->
+    <div class="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 border-b border-slate-100 dark:border-stone-800">
+        @foreach (var g in todayGroups)
+        {
+            bool isInitial = g.Key == "pending";
+            <button type="button"
+                    data-today-card="@g.Key"
+                    data-active-classes="ring-2 @g.Ring"
+                    onclick="selectTodayStatus('@g.Key', '@g.Title')"
+                    class="today-status-card text-left rounded-2xl p-4 border border-slate-200/90 dark:border-stone-800 transition-all hover:shadow-md cursor-pointer @(isInitial ? $"ring-2 {g.Ring}" : "bg-slate-50/50 dark:bg-stone-950/40")">
+                <div class="flex items-center justify-between">
+                    <span class="inline-flex items-center gap-2 text-[11px] font-mono uppercase tracking-wider font-bold text-slate-600 dark:text-stone-300">
+                        <span class="w-2 h-2 rounded-full @g.Dot"></span>
+                        @g.Title
+                    </span>
+                    <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
+                </div>
+                <div class="mt-2 text-3xl font-extrabold @g.Color">@g.Count</div>
+                <div class="mt-1 text-[11px] text-slate-400 dark:text-stone-500">@g.Desc</div>
+            </button>
+        }
+    </div>
+
+    <!-- Filtered Transactions Table (Forms Table Design) -->
+    <div class="p-5">
+        <div class="flex items-center justify-between mb-3">
+            <h3 id="todayTableHeading" class="text-xs font-mono uppercase tracking-wider font-bold text-slate-500 dark:text-stone-400">
+                Showing: Pending Transaction
+            </h3>
+        </div>
+
+        @foreach (var g in todayGroups)
+        {
+            bool isInitial = g.Key == "pending";
+            <div data-today-panel="@g.Key" class="@(isInitial ? "" : "hidden")">
+                <div class="border border-slate-200 dark:border-stone-800 rounded-2xl overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs font-mono">
+                            <thead class="bg-slate-100 dark:bg-stone-950 text-slate-600 dark:text-stone-400 border-b border-slate-200 dark:border-stone-800 font-bold uppercase tracking-wider">
+                                <tr>
+                                    <th class="px-4 py-3.5">Tracking No.</th>
+                                    <th class="px-4 py-3.5">Transaction Type</th>
+                                    <th class="px-4 py-3.5">Owner / Applicant</th>
+                                    <th class="px-4 py-3.5">Status &amp; Current Location</th>
+                                    <th class="hidden md:table-cell px-4 py-3.5">Claimed By</th>
+                                    <th class="hidden sm:table-cell px-4 py-3.5">Submitted</th>
+                                    <th class="px-4 py-3.5 text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 dark:divide-stone-800">
+                                @if (!g.Items.Any())
+                                {
+                                    <tr>
+                                        <td colspan="7" class="px-4 py-12 text-center text-slate-400 dark:text-stone-500">
+                                            <div class="flex flex-col items-center gap-2">
+                                                <i data-lucide="inbox" class="w-8 h-8 text-slate-300 dark:text-stone-600"></i>
+                                                <p class="font-bold text-slate-600 dark:text-stone-400">No @g.Title.ToLowerInvariant() records for today</p>
+                                                <p class="text-[11px]">Transactions matching this status submitted today will appear here.</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                                else
+                                {
+                                    @foreach (var item in g.Items)
+                                    {
+                                        string cleanLocation = !string.IsNullOrWhiteSpace(item.CurrentStageName) && item.CurrentStageName.Contains(": ")
+                                            ? item.CurrentStageName.Split(": ", 2)[1]
+                                            : (string.IsNullOrWhiteSpace(item.CurrentStageName) ? "Receiving" : item.CurrentStageName);
+
+                                        string detailsUrl = item.RequestType switch
+                                        {
+                                            "TaxDeclarationRequest" => Url.Action("Details", "TaxDeclarationRequest", new { id = item.RequestId }) ?? "#",
+                                            "LandHoldingRequest" => Url.Action("Details", "LandHoldingRequest", new { id = item.RequestId }) ?? "#",
+                                            "TaxMappingRequest" => Url.Action("Details", "TaxMapping", new { id = item.RequestId }) ?? "#",
+                                            "PropertyAssessmentRequest" => Url.Action("Details", "PropertyAssessmentRequest", new { id = item.RequestId }) ?? "#",
+                                            "RequestForInspection" => Url.Action("Details", "RequestForInspection", new { id = item.RequestId }) ?? "#",
+                                            _ => "#"
+                                        };
+
+                                        <tr class="hover:bg-slate-50 dark:hover:bg-stone-950/60 transition-colors">
+                                            <!-- Tracking No. -->
+                                            <td class="px-4 py-3.5 font-extrabold text-emerald-700 dark:text-emerald-400">
+                                                <div class="flex items-center gap-1.5">
+                                                    <i data-lucide="file-text" class="w-3.5 h-3.5 shrink-0"></i>
+                                                    <span>@item.TrackingNumber</span>
+                                                </div>
+                                            </td>
+
+                                            <!-- Transaction Type & Division -->
+                                            <td class="px-4 py-3.5">
+                                                <div class="font-bold text-slate-800 dark:text-stone-200">@item.DisplayType</div>
+                                                <div class="mt-0.5">
+                                                    @if ((int)item.Division == 1)
+                                                    {
+                                                        <span class="px-2 py-0.5 rounded-md text-[9px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-950/70 dark:text-blue-300">DIV 1 · ASSESSMENT</span>
+                                                    }
+                                                    else if ((int)item.Division == 2)
+                                                    {
+                                                        <span class="px-2 py-0.5 rounded-md text-[9px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300">DIV 2 · GIS / MAPPING</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="px-2 py-0.5 rounded-md text-[9px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-950/70 dark:text-purple-300">DIV 3 · RECORDS</span>
+                                                    }
+                                                </div>
+                                            </td>
+
+                                            <!-- Owner / Applicant -->
+                                            <td class="px-4 py-3.5">
+                                                <div class="font-bold text-slate-900 dark:text-white">@item.OwnerOrApplicant</div>
+                                                @if (!string.IsNullOrWhiteSpace(item.ReferenceNumber))
+                                                {
+                                                    <div class="text-[10px] text-slate-500 dark:text-stone-400">Ref: @item.ReferenceNumber</div>
+                                                }
+                                            </td>
+
+                                            <!-- Status & Current Location Badge -->
+                                            <td class="px-4 py-3.5">
+                                                <span class="inline-flex flex-wrap items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-extrabold border @g.Badge">
+                                                    <span class="w-1.5 h-1.5 rounded-full @g.Dot"></span>
+                                                    <span>@g.ShortStatus</span>
+                                                    <span class="opacity-40">&bull;</span>
+                                                    <span>Current Location: @cleanLocation</span>
+                                                </span>
+                                            </td>
+
+                                            <!-- Claimed By -->
+                                            <td class="hidden md:table-cell px-4 py-3.5">
+                                                @if (string.IsNullOrWhiteSpace(item.AssignedUserName))
+                                                {
+                                                    <span class="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-stone-800 text-slate-500 dark:text-stone-400 text-[10px] font-bold">
+                                                        Unclaimed
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <div class="inline-flex items-center gap-1.5 text-slate-700 dark:text-stone-200 font-bold">
+                                                        <i data-lucide="user-check" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
+                                                        <span>@item.AssignedUserName</span>
+                                                    </div>
+                                                }
+                                            </td>
+
+                                            <!-- Submitted Time -->
+                                            <td class="hidden sm:table-cell px-4 py-3.5 text-slate-600 dark:text-stone-400">
+                                                <div>@item.DateSubmitted.ToString("MMM dd, yyyy")</div>
+                                                <div class="text-[10px] text-slate-400">@item.DateSubmitted.ToString("hh:mm tt")</div>
+                                            </td>
+
+                                            <!-- Actions -->
+                                            <td class="px-4 py-3.5 text-center">
+                                                <a href="@detailsUrl"
+                                                   class="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-slate-700 dark:text-stone-300 font-bold text-[10px] border border-slate-200 dark:border-stone-700 transition-colors"
+                                                   title="View Transaction Details">
+                                                    <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+                                                    <span>View</span>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ChartScripts" model="Model" />
+    <script>
+        function selectTodayStatus(key, title) {
+            const heading = document.getElementById('todayTableHeading');
+            if (heading) heading.textContent = 'Showing: ' + title;
+
+            document.querySelectorAll('[data-today-panel]').forEach(el => {
+                el.classList.toggle('hidden', el.getAttribute('data-today-panel') !== key);
+            });
+
+            document.querySelectorAll('[data-today-card]').forEach(btn => {
+                const activeClasses = (btn.getAttribute('data-active-classes') || '').split(' ').filter(Boolean);
+                const isSelected = btn.getAttribute('data-today-card') === key;
+                if (isSelected) {
+                    btn.classList.remove('bg-slate-50/50', 'dark:bg-stone-950/40');
+                    activeClasses.forEach(c => btn.classList.add(c));
+                } else {
+                    activeClasses.forEach(c => btn.classList.remove(c));
+                    btn.classList.add('bg-slate-50/50', 'dark:bg-stone-950/40');
+                }
+            });
+        }
+    </script>
+}

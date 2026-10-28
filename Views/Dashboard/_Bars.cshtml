@@ -1,0 +1,12 @@
+﻿@model List<PropertyAssessmentApp.Models.DashboardBreakdownItem>
+@{ var max = Math.Max(1, Model.Any() ? Model.Max(x => x.Count) : 1); }
+@if (!Model.Any()) { <p class="text-sm text-slate-400 dark:text-stone-500">No data.</p> }
+<div class="space-y-3">
+@foreach (var b in Model)
+{
+    <div>
+        <div class="flex justify-between text-xs mb-1"><span class="font-semibold text-slate-700 dark:text-stone-300">@b.Label</span><span class="font-mono font-bold">@b.Count</span></div>
+        <div class="h-2 rounded-full bg-slate-100 dark:bg-stone-800"><div class="h-2 rounded-full bg-emerald-500" style="width:@(b.Count * 100 / max)%"></div></div>
+    </div>
+}
+</div>
