@@ -20,14 +20,26 @@ public enum PropertyAssessmentStatus
     [Display(Name = "Check and Review")]
     Review = 4,
 
-    [Display(Name = "City Assessor Approval")]
-    Approval = 5,
+    [Display(Name = "Repinning")]
+    Repinning = 5,
 
-    [Display(Name = "Approved & TD Issued")]
-    Approved = 6,
+    [Display(Name = "Recommending Approval")]
+    RecApproved = 6,
+
+    [Display(Name = "Valuation & Examination")]
+    Examination = 7,
+
+    [Display(Name = "City Assessor Approval")]
+    Approved = 8,
+
+    [Display(Name = "Printing")]
+    Printing = 9,
+
+    [Display(Name = "Releasing")]
+    Releasing = 10,
 
     [Display(Name = "Deferred / Returned")]
-    Deferred = 7
+    Deferred = 0
 }
 
 public class PropertyAssessmentRequest

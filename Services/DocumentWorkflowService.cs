@@ -402,9 +402,11 @@ public class DocumentWorkflowService : IDocumentWorkflowService
         var roleSetting = _context.UserRoleSettings.FirstOrDefault(r => r.TransactionStatusId == targetStatusId);
 
         bool isCompleted = targetStage == WorkflowStage.Completed 
-            || targetStatusId == 5 
+            || targetStatusId == (int) RequestForInspectionStatus.Printing
             || targetStatus?.IsComplete == true 
-            || (actionTaken == "Released" && (targetStatusId == 10 || targetStatusId == 19 || targetStatusId == 30));
+            || (actionTaken == "Released" && (targetStatusId == (int) RequestForInspectionStatus.Releasing
+            || targetStatusId == (int) TaxMappingRequestStatus.Released
+            || targetStatusId == (int) TaxDeclarationRequestStatus.Released));
         bool isDeferred = (actionTaken == "Returned" || targetStage == WorkflowStage.Returned || actionTaken == "Deferred");
 
         if (requestType == "TaxDeclarationRequest")

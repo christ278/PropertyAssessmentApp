@@ -5,20 +5,20 @@ namespace PropertyAssessmentApp.Models;
 
 public enum TaxMappingRequestStatus
 {
-    [Display(Name = "Pending Verification")]
-    Pending,
+    [Display(Name = "Receiving (GIS)")]
+    Receiving = 15,
 
-    [Display(Name = "Under Technical Review")]
-    UnderReview,
+    [Display(Name = "Replotting (GIS)")]
+    Replotting = 16,
 
-    [Display(Name = "Field Survey In Progress")]
-    SurveyInProgress,
+    [Display(Name = "Preparation (GIS)")]
+    Preparation = 17,
 
-    [Display(Name = "Approved & Map Updated")]
-    Approved,
+    [Display(Name = "Approval (GIS)")]
+    Approved = 18,
 
-    [Display(Name = "Returned / Disapproved")]
-    Rejected
+    [Display(Name = "Releasing (GIS)")]
+    Released = 19
 }
 
 public class TaxMappingRequest

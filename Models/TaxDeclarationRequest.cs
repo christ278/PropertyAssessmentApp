@@ -5,17 +5,23 @@ namespace PropertyAssessmentApp.Models;
 
 public enum TaxDeclarationRequestStatus
 {
-    [Display(Name = "Pending Verification")]
-    Pending,
+    [Display(Name = "Receiving (Records)")]
+    Receiving= 25,
 
-    [Display(Name = "Processing Certificate")]
-    Processing,
+    [Display(Name = "Replotting (Records)")]
+    Replotting = 26,
 
-    [Display(Name = "Approved & Issued")]
-    Approved,
+    [Display(Name = "Preparation (Records)")]
+    Preparation = 27,
 
-    [Display(Name = "Returned / Disapproved")]
-    Rejected
+    [Display(Name = "Verification (Records)")]
+    Verification = 28,
+
+    [Display(Name = "Approval (Records)")]
+    Approved = 29,
+
+    [Display(Name = "Releasing (Records)")]
+    Released = 30
 }
 
 public class TaxDeclarationRequest
