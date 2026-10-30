@@ -68,10 +68,15 @@
 
     <!-- 2. BUILDING USE, STRUCTURAL TYPE & CONSTRUCTION TIMELINE -->
     <div class="p-5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
-        <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
-            <i data-lucide="building" class="w-4 h-4"></i>
-            Building Classification & Construction Timeline
-        </h4>
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-stone-800 pb-3">
+            <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+                <i data-lucide="building" class="w-4 h-4"></i>
+                Building Classification & Construction Timeline
+            </h4>
+            <button type="button" onclick="openDepreciationScheduleModal()" class="px-3 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-sm transition-all">
+                <i data-lucide="table-2" class="w-3.5 h-3.5"></i> View Depreciation Schedule (I – V-B)
+            </button>
+        </div>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
                 <label asp-for="BuildingUseType" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BUILDING USE TYPE</label>
@@ -91,18 +96,34 @@
                 </select>
             </div>
             <div>
-                <label asp-for="StructuralType" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">STRUCTURAL TYPE (BUCC CLASS)</label>
-                <select asp-for="StructuralType" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold">
-                    <option value="Type I">Type I (Reinforced Concrete Frame)</option>
-                    <option value="Type II">Type II (Reinforced Concrete & Hollow Blocks)</option>
-                    <option value="Type III">Type III (Structural Steel & Concrete)</option>
-                    <option value="Type IV">Type IV (Timber & Wood Frame)</option>
-                    <option value="Type V">Type V (Light Materials / Mixed)</option>
+                <label asp-for="StructuralType" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">STRUCTURAL TYPE (BUCC GROUP)</label>
+                <select asp-for="StructuralType" id="structuralTypeSelect" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold">
+                    <option value="Type I">Type I (Class I — Light / Wood Construction)</option>
+                    <option value="Type II">Type II (Class II-A / II-B — Mixed Wood & Concrete)</option>
+                    <option value="Type III">Type III (Class III-A / III-B — Masonry & RC Frame)</option>
+                    <option value="Type IV">Type IV (Class IV-A / IV-B — Steel & RC Structure)</option>
+                    <option value="Type V">Type V (Class V-A / V-B — Fire-Resistive RC / Steel)</option>
                 </select>
             </div>
             <div>
-                <label asp-for="BuildingClassification" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BUILDING CLASSIFICATION</label>
-                <input asp-for="BuildingClassification" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white" />
+                <label asp-for="BuildingClassification" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BUILDING CLASSIFICATION (DEPR. SCHEDULE)</label>
+                @{
+                    var normalizedBldgClass = PropertyAssessmentApp.Services.BuildingDepreciationSchedule.NormalizeClassificationCode(Model.BuildingClassification, Model.StructuralType);
+                }
+                <select asp-for="BuildingClassification" id="buildingClassificationSelect" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-emerald-300 dark:border-emerald-700 text-slate-900 dark:text-white font-mono font-bold">
+                    @foreach (var cls in PropertyAssessmentApp.Services.BuildingDepreciationSchedule.Classifications)
+                    {
+                        if (string.Equals(Model.BuildingClassification, cls.Code, StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(normalizedBldgClass, cls.Code, StringComparison.OrdinalIgnoreCase))
+                        {
+                            <option value="@cls.Code" selected data-struct="@cls.StructuralGroup" data-life="@cls.EconomicLifeYears" data-residual="@cls.ResidualValuePercent">@cls.Code — Econ. Life: @(cls.EconomicLifeYears)y | Residual: @(cls.ResidualValuePercent)%</option>
+                        }
+                        else
+                        {
+                            <option value="@cls.Code" data-struct="@cls.StructuralGroup" data-life="@cls.EconomicLifeYears" data-residual="@cls.ResidualValuePercent">@cls.Code — Econ. Life: @(cls.EconomicLifeYears)y | Residual: @(cls.ResidualValuePercent)%</option>
+                        }
+                    }
+                </select>
             </div>
             <div>
                 <label asp-for="BuildingPermitNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BUILDING PERMIT NO.</label>
@@ -114,19 +135,19 @@
             </div>
             <div>
                 <label asp-for="BuildingAgeYears" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BUILDING AGE (YEARS)</label>
-                <input asp-for="BuildingAgeYears" id="buildingAgeYearsInput" type="number" min="0" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-right" />
+                <input asp-for="BuildingAgeYears" id="buildingAgeYearsInput" type="number" min="0" max="100" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-emerald-300 dark:border-emerald-700 text-slate-900 dark:text-white font-mono text-right font-bold" />
             </div>
             <div>
                 <label asp-for="DateConstructed" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">DATE CONSTRUCTED / STARTED</label>
-                <input asp-for="DateConstructed" type="date" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" />
+                <input asp-for="DateConstructed" id="dateConstructedInput" type="date" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" />
             </div>
             <div>
                 <label asp-for="DateCompleted" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">DATE COMPLETED</label>
-                <input asp-for="DateCompleted" type="date" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" />
+                <input asp-for="DateCompleted" id="dateCompletedInput" type="date" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" />
             </div>
             <div>
                 <label asp-for="DateOccupied" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">DATE OCCUPIED</label>
-                <input asp-for="DateOccupied" type="date" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" />
+                <input asp-for="DateOccupied" id="dateOccupiedInput" type="date" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" />
             </div>
         </div>
     </div>
@@ -229,10 +250,54 @@
 
     <!-- 5. DEPRECIATION SCHEDULE & VALUATION SUMMARY (CAST REFERENCE) -->
     <div class="p-5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
-        <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
-            <i data-lucide="trending-down" class="w-4 h-4"></i>
-            Building Depreciation & Live Valuation Matrix
-        </h4>
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-stone-800 pb-3">
+            <div>
+                <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+                    <i data-lucide="trending-down" class="w-4 h-4"></i>
+                    Building Depreciation & Live Valuation Matrix
+                </h4>
+                <p class="text-[11px] text-slate-500 dark:text-stone-400">Automatically looks up physical depreciation from the official BLGF Building Classification Schedule (I to V-B).</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <label class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-[11px] font-bold text-slate-700 dark:text-stone-300 cursor-pointer">
+                    <input type="checkbox" id="autoApplyScheduleDeprSwitch" checked class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5" />
+                    <span>Auto-Apply Schedule</span>
+                </label>
+                <button type="button" onclick="applyDepreciationFromSchedule(true)" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-sm transition-all">
+                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Sync Schedule Rate
+                </button>
+                <button type="button" onclick="openDepreciationScheduleModal()" class="px-3 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-sm transition-all">
+                    <i data-lucide="table-2" class="w-3.5 h-3.5"></i> Open Schedule Table
+                </button>
+            </div>
+        </div>
+
+        <!-- Schedule of Building Depreciation Live Metadata Strip -->
+        <input type="hidden" asp-for="BuildingDepreciationScheduleId" id="buildingDeprScheduleIdInput" />
+        <input type="hidden" asp-for="GeneralRevisionCycle" id="generalRevisionCycleInput" />
+        <input type="hidden" asp-for="EstimatedEconomicLifeYears" id="estimatedEconLifeYearsInput" />
+        <input type="hidden" asp-for="EstimatedResidualValuePercent" id="estimatedResidualValuePercentInput" />
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 p-3.5 rounded-xl bg-teal-50/70 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-800/60">
+            <div>
+                <span class="text-[10px] font-bold uppercase text-teal-800 dark:text-teal-300 block mb-0.5">General Revision Cycle</span>
+                <span class="text-xs font-black font-mono text-slate-900 dark:text-white" id="schedGrCycleDisplay">--</span>
+            </div>
+            <div>
+                <span class="text-[10px] font-bold uppercase text-teal-800 dark:text-teal-300 block mb-0.5">Class &amp; Age Bracket</span>
+                <span class="text-xs font-black font-mono text-emerald-700 dark:text-emerald-400" id="schedClassAgeDisplay">Class III-A • 0y</span>
+            </div>
+            <div>
+                <span class="text-[10px] font-bold uppercase text-teal-800 dark:text-teal-300 block mb-0.5">Est. Economic Life</span>
+                <span class="text-xs font-black font-mono text-slate-900 dark:text-white" id="schedEconLifeDisplay">30y</span>
+            </div>
+            <div>
+                <span class="text-[10px] font-bold uppercase text-teal-800 dark:text-teal-300 block mb-0.5">Est. Residual Value (%)</span>
+                <div class="flex items-center gap-1.5">
+                    <span class="text-xs font-black font-mono text-amber-700 dark:text-amber-400" id="schedResidualDisplay">25% (Max Depr: 75%)</span>
+                    <span id="schedResidualCapBadge" class="hidden px-1.5 py-0.5 rounded bg-amber-200 dark:bg-amber-900/60 text-amber-900 dark:text-amber-200 text-[9px] font-bold uppercase">Residual Floor</span>
+                </div>
+            </div>
+        </div>
         
         <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
             <div class="p-3 bg-white dark:bg-stone-900 rounded-xl border border-slate-200 dark:border-stone-800">
@@ -256,7 +321,7 @@
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
             <div>
                 <label asp-for="BuildingDepreciationPercent" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">DEPRECIATION RATE (%)</label>
-                <input asp-for="BuildingDepreciationPercent" id="buildingDeprPercentInput" type="number" step="0.1" min="0" max="90" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-right font-bold" />
+                <input asp-for="BuildingDepreciationPercent" id="buildingDeprPercentInput" type="number" step="0.1" min="0" max="95" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-emerald-300 dark:border-emerald-700 text-slate-900 dark:text-white font-mono text-right font-bold" />
             </div>
             <div>
                 <label class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">ACCUMULATED DEPRECIATION (PHP)</label>
@@ -269,11 +334,11 @@
         </div>
     </div>
 
-    <!-- 6. 17 STRUCTURAL MATERIALS CHECKLIST (CAST REFERENCE) -->
+    <!-- 6. 16 STRUCTURAL MATERIALS CHECKLIST (LOCAL ASSESSMENT MANUAL - TABLE 3) -->
     <div class="p-5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
         <h4 class="text-xs font-bold uppercase text-slate-800 dark:text-stone-200 flex items-center gap-2">
             <i data-lucide="check-square" class="w-4 h-4 text-emerald-600"></i>
-            17 Structural Materials & Parts Assessment
+            16 Structural Materials &amp; Parts Assessment (Table 3 Codes)
         </h4>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
@@ -281,7 +346,6 @@
                 <select asp-for="StructuralFoundation" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs">
                     <option value="Reinforced Concrete (RC)">Reinforced Concrete (RC)</option>
                     <option value="Plain Concrete (PC)">Plain Concrete (PC)</option>
-                    <option value="Stone / Rubble Footing">Stone / Rubble Footing</option>
                 </select>
             </div>
             <div>
@@ -289,7 +353,7 @@
                 <select asp-for="StructuralColumns" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs">
                     <option value="Reinforced Concrete (RC)">Reinforced Concrete (RC)</option>
                     <option value="Steel (S)">Steel (S)</option>
-                    <option value="Wood / Timber (W)">Wood / Timber (W)</option>
+                    <option value="Wood (W)">Wood (W)</option>
                 </select>
             </div>
             <div>
@@ -297,26 +361,31 @@
                 <select asp-for="StructuralBeams" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs">
                     <option value="Reinforced Concrete (RC)">Reinforced Concrete (RC)</option>
                     <option value="Steel (S)">Steel (S)</option>
-                    <option value="Wood / Timber (W)">Wood / Timber (W)</option>
+                    <option value="Wood (W)">Wood (W)</option>
                 </select>
             </div>
             <div>
-                <label asp-for="StructuralTrussRoof" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">4. ROOF FRAMING / TRUSS</label>
+                <label asp-for="StructuralTrussRoof" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">4. ROOF FRAMING</label>
                 <select asp-for="StructuralTrussRoof" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs">
-                    <option value="Steel Truss (S)">Steel Truss (S)</option>
+                    <option value="Steel (S)">Steel (S)</option>
+                    <option value="Wood (W)">Wood (W)</option>
                     <option value="Reinforced Concrete (RC)">Reinforced Concrete (RC)</option>
-                    <option value="Wood / Timber (W)">Wood / Timber (W)</option>
                 </select>
             </div>
             <div>
                 <label asp-for="StructuralRoof" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">5. ROOFING</label>
                 <select asp-for="StructuralRoof" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs">
-                    <option value="Long Span G.I. Sheet (LGI)">Long Span G.I. Sheet (LGI)</option>
+                    <option value="Long Span G.I. Sheet-Pre painted (LGI)">Long Span G.I. Sheet-Pre painted (LGI)</option>
                     <option value="Corrugated G.I. Sheet (CGI)">Corrugated G.I. Sheet (CGI)</option>
+                    <option value="Solid Poly Carbonate (SPC)">Solid Poly Carbonate (SPC)</option>
+                    <option value="Asbestos (As)">Asbestos (As)</option>
+                    <option value="Ceramic Tiles (CT)">Ceramic Tiles (CT)</option>
                     <option value="Concrete Slab (CS)">Concrete Slab (CS)</option>
-                    <option value="Ceramic / Clay Tiles (CT)">Ceramic / Clay Tiles (CT)</option>
-                    <option value="Solid Polycarbonate (SPC)">Solid Polycarbonate (SPC)</option>
                     <option value="Aluminum (Al)">Aluminum (Al)</option>
+                    <option value="Nipa (N)">Nipa (N)</option>
+                    <option value="Anahaw (An)">Anahaw (An)</option>
+                    <option value="Cogon (C)">Cogon (C)</option>
+                    <option value="Plastic Rib (PR)">Plastic Rib (PR)</option>
                 </select>
             </div>
             <div>
@@ -324,102 +393,121 @@
                 <select asp-for="StructuralExteriorWalls" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs">
                     <option value="Concrete Hollow Block (CHB)">Concrete Hollow Block (CHB)</option>
                     <option value="Reinforced Concrete (RC)">Reinforced Concrete (RC)</option>
-                    <option value="Aluminum Composite (ALP)">Aluminum Composite (ALP)</option>
                     <option value="Plain Concrete (PC)">Plain Concrete (PC)</option>
-                    <option value="Wood / Timber (W)">Wood / Timber (W)</option>
+                    <option value="Aluminum Composite panel (ALP)">Aluminum Composite panel (ALP)</option>
+                    <option value="Wood (W)">Wood (W)</option>
+                    <option value="G.I. Sheets (GI)">G.I. Sheets (GI)</option>
+                    <option value="Build-a-wall (Pre-cast) (BW)">Build-a-wall (Pre-cast) (BW)</option>
+                    <option value="Bamboo (B)">Bamboo (B)</option>
+                    <option value="Sawali (Sa)">Sawali (Sa)</option>
                 </select>
             </div>
             <div>
                 <label asp-for="StructuralFlooring" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">7. FLOORING</label>
                 <select asp-for="StructuralFlooring" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs">
-                    <option value="Reinforced Concrete Slab (RC)">Reinforced Concrete Slab (RC)</option>
+                    <option value="Reinforced Concrete (RC)">Reinforced Concrete (RC)</option>
                     <option value="Plain Cement (PC)">Plain Cement (PC)</option>
-                    <option value="Wood Planks / T&G (W)">Wood Planks / T&G (W)</option>
+                    <option value="Wood (W)">Wood (W)</option>
+                    <option value="Marble (M)">Marble (M)</option>
+                    <option value="Tiles (T)">Tiles (T)</option>
+                    <option value="Tongue and Groove (T&amp;G)">Tongue and Groove (T&amp;G)</option>
                 </select>
             </div>
             <div>
                 <label asp-for="DoorMain" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">8. DOORS</label>
                 <select asp-for="DoorMain" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs">
                     <option value="Wood Panel (WP)">Wood Panel (WP)</option>
-                    <option value="Glass / Aluminum (G/Al)">Glass / Aluminum (G/Al)</option>
-                    <option value="Steel Door (S)">Steel Door (S)</option>
                     <option value="Flush Door (FD)">Flush Door (FD)</option>
+                    <option value="Steel (S)">Steel (S)</option>
+                    <option value="Aluminum (Al)">Aluminum (Al)</option>
+                    <option value="Glass (G)">Glass (G)</option>
+                    <option value="Grills (Gr)">Grills (Gr)</option>
+                    <option value="PVC door for indoor use (PVC)">PVC door for indoor use (PVC)</option>
+                    <option value="Formica (FO)">Formica (FO)</option>
                 </select>
             </div>
             <div>
                 <label asp-for="Ceiling" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">9. CEILING</label>
                 <select asp-for="Ceiling" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs">
-                    <option value="Hardiflex / Fiber Cement (Hx)">Hardiflex / Fiber Cement (Hx)</option>
-                    <option value="Gypsum Board / Duraflex (D)">Gypsum Board / Duraflex (D)</option>
+                    <option value="Hardiflex (Hx)">Hardiflex (Hx)</option>
+                    <option value="Duraflex (D)">Duraflex (D)</option>
                     <option value="Plywood (Pw)">Plywood (Pw)</option>
                     <option value="Aluminum Framing (AF)">Aluminum Framing (AF)</option>
+                    <option value="Lawanit (L)">Lawanit (L)</option>
+                    <option value="Asbestos (As)">Asbestos (As)</option>
+                    <option value="Steel Rib (SR)">Steel Rib (SR)</option>
+                    <option value="Sawali (Sw)">Sawali (Sw)</option>
+                    <option value="Bamboo (B)">Bamboo (B)</option>
                 </select>
             </div>
             <div>
                 <label asp-for="StructuralWindows" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">10. WINDOWS</label>
                 <select asp-for="StructuralWindows" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs">
-                    <option value="Aluminum Casement / Sliding (AC)">Aluminum Casement / Sliding (AC)</option>
+                    <option value="Aluminum Casement (AC)">Aluminum Casement (AC)</option>
+                    <option value="Aluminum Casement with Grills (ACG)">Aluminum Casement with Grills (ACG)</option>
+                    <option value="Steel Casement (SC)">Steel Casement (SC)</option>
                     <option value="Steel Casement with Grills (SCG)">Steel Casement with Grills (SCG)</option>
-                    <option value="Glass Jalousie / Fixed (G)">Glass Jalousie / Fixed (G)</option>
                     <option value="Wood Casement (WC)">Wood Casement (WC)</option>
+                    <option value="Wood Casement with Grills (WCG)">Wood Casement with Grills (WCG)</option>
+                    <option value="Glass (G)">Glass (G)</option>
                 </select>
             </div>
             <div>
                 <label asp-for="StructuralStairs" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">11. STAIRS</label>
                 <select asp-for="StructuralStairs" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs">
-                    <option value="Reinforced Concrete (RC)">Reinforced Concrete (RC)</option>
+                    <option value="Reinforced concrete (RC)">Reinforced concrete (RC)</option>
                     <option value="Steel (S)">Steel (S)</option>
                     <option value="Wood (W)">Wood (W)</option>
+                    <option value="Stainless (Sn)">Stainless (Sn)</option>
                 </select>
             </div>
             <div>
                 <label asp-for="StructuralPartitionWalls" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">12. PARTITION</label>
                 <select asp-for="StructuralPartitionWalls" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs">
-                    <option value="Drywall Hardiflex (Hx)">Drywall Hardiflex (Hx)</option>
-                    <option value="Concrete Hollow Block (CHB)">Concrete Hollow Block (CHB)</option>
-                    <option value="Plywood / Plyboard (Pw)">Plywood / Plyboard (Pw)</option>
-                    <option value="Aluminum Glass Panel (AIF)">Aluminum Glass Panel (AIF)</option>
+                    <option value="Hardiflex / Dry wall (Hx)">Hardiflex / Dry wall (Hx)</option>
+                    <option value="Concrete Hollow Blocks (CHB)">Concrete Hollow Blocks (CHB)</option>
+                    <option value="Reinforced Concrete (RC)">Reinforced Concrete (RC)</option>
+                    <option value="Plywood (Pw)">Plywood (Pw)</option>
+                    <option value="Plyboard (Pb)">Plyboard (Pb)</option>
+                    <option value="Aluminum frame with glass paneling (AIF)">Aluminum frame with glass paneling (AIF)</option>
+                    <option value="G.I. Sheets (GI)">G.I. Sheets (GI)</option>
+                    <option value="Lawanit (W)">Lawanit (W)</option>
                 </select>
             </div>
             <div>
-                <label asp-for="StructuralFloorFinish" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">13. FLOOR FINISH</label>
-                <select asp-for="StructuralFloorFinish" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs">
-                    <option value="Ceramic / Granite Tiles (T)">Ceramic / Granite Tiles (T)</option>
-                    <option value="Marble Slabs / Tiles (M)">Marble Slabs / Tiles (M)</option>
-                    <option value="Plain Cement Plaster (PC)">Plain Cement Plaster (PC)</option>
-                    <option value="Wood Vinyl / Parquet (W)">Wood Vinyl / Parquet (W)</option>
-                </select>
-            </div>
-            <div>
-                <label asp-for="StructuralFinishFront" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">14. WALL FINISH</label>
+                <label asp-for="StructuralFinishFront" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">13. WALL FINISH</label>
                 <select asp-for="StructuralFinishFront" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs">
-                    <option value="Cement Plaster Paint Finish (CP)">Cement Plaster Paint Finish (CP)</option>
-                    <option value="Decorative Tiles / Stones (T)">Decorative Tiles / Stones (T)</option>
-                    <option value="Washout Pebbles (WOP)">Washout Pebbles (WOP)</option>
+                    <option value="Cement Plaster (CP)">Cement Plaster (CP)</option>
+                    <option value="Tiles (T)">Tiles (T)</option>
+                    <option value="Wash out Pebbles (WOP)">Wash out Pebbles (WOP)</option>
+                    <option value="Wooden panels (WP)">Wooden panels (WP)</option>
+                    <option value="Adobe Rubbles (AR)">Adobe Rubbles (AR)</option>
                 </select>
             </div>
             <div>
-                <label asp-for="ElectricalSystem" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">15. ELECTRICAL CONDUIT</label>
+                <label asp-for="ElectricalSystem" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">14. ELECTRICAL CONDUIT</label>
                 <select asp-for="ElectricalSystem" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs">
                     <option value="Poly Vinyl Carbonate Conduit (EPVC)">Poly Vinyl Carbonate Conduit (EPVC)</option>
-                    <option value="Metal Conduit / Molding (MM)">Metal Conduit / Molding (MM)</option>
-                    <option value="Concealed Knob & Tube">Concealed Knob & Tube</option>
+                    <option value="Metal Molding (MM)">Metal Molding (MM)</option>
+                    <option value="Wood Molding (WM)">Wood Molding (WM)</option>
                 </select>
             </div>
             <div>
-                <label asp-for="ToiletAndBathroom" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">16. TOILET & BATH</label>
+                <label asp-for="ToiletAndBathroom" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">15. TOILET AND BATH</label>
                 <select asp-for="ToiletAndBathroom" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs">
-                    <option value="Ceramic Tiled with Fixtures (CT)">Ceramic Tiled with Fixtures (CT)</option>
-                    <option value="Marble with Premium Fixtures (M)">Marble with Premium Fixtures (M)</option>
-                    <option value="Plain Cement with Basic Fixtures (PC)">Plain Cement with Basic Fixtures (PC)</option>
+                    <option value="Cement Tiles (CT)">Cement Tiles (CT)</option>
+                    <option value="Marbles (M)">Marbles (M)</option>
+                    <option value="Plain Cement (PC)">Plain Cement (PC)</option>
                 </select>
             </div>
             <div>
-                <label asp-for="PlumbingSewer" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">17. PLUMBING & SERVICES</label>
+                <label asp-for="PlumbingSewer" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">16. PLUMBING AND SERVICES</label>
                 <select asp-for="PlumbingSewer" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs">
-                    <option value="PVC Pipes to Septic Tank (PVCP)">PVC Pipes to Septic Tank (PVCP)</option>
-                    <option value="Galvanized Iron Pipes (GIP)">Galvanized Iron Pipes (GIP)</option>
-                    <option value="Cast Iron / Concrete Pipes (CP)">Cast Iron / Concrete Pipes (CP)</option>
+                    <option value="Poly Vinyl Carbonate Pipe (PVCP)">Poly Vinyl Carbonate Pipe (PVCP)</option>
+                    <option value="Galvanized Iron Pipe (GIP)">Galvanized Iron Pipe (GIP)</option>
+                    <option value="Concrete Pipes (CP)">Concrete Pipes (CP)</option>
+                    <option value="Steel Pipes (SP)">Steel Pipes (SP)</option>
+                    <option value="Asbestos Pipes (AP)">Asbestos Pipes (AP)</option>
                 </select>
             </div>
         </div>
@@ -550,4 +638,410 @@
             </div>
         </div>
     </div>
+
+    <!-- MODAL: OFFICIAL SCHEDULE OF BUILDING DEPRECIATION (BLGF / MRPAAO I - V-B) -->
+    <div id="depreciationScheduleModal" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-900/70 backdrop-blur-sm hidden">
+        <div class="bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 rounded-2xl w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-5 py-3.5 bg-teal-900 text-white border-b border-teal-800">
+                <div>
+                    <h3 class="text-sm font-extrabold uppercase tracking-wide flex items-center gap-2">
+                        <i data-lucide="table-2" class="w-4 h-4 text-teal-300"></i>
+                        Schedule of Building Physical Depreciation (% Depreciation)
+                    </h3>
+                    <p class="text-[11px] text-teal-200">Click any cell in the schedule below to apply that Building Classification, Age, and Depreciation Rate (%).</p>
+                </div>
+                <button type="button" onclick="closeDepreciationScheduleModal()" class="p-1.5 rounded-lg bg-teal-800/80 hover:bg-teal-700 text-teal-100 transition-colors">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <div class="p-4 overflow-auto flex-1">
+                <table class="w-full border-collapse text-center font-mono text-xs border border-slate-300 dark:border-stone-700" id="officialDeprScheduleTable">
+                    <thead>
+                        <tr class="bg-teal-900 text-white font-bold uppercase text-[11px]">
+                            <th rowspan="2" class="border border-teal-700 px-3 py-2 w-36">General Revision<br />Cycle</th>
+                            <th rowspan="2" class="border border-teal-700 px-2.5 py-2 w-20">Bldg.<br />Age</th>
+                            <th colspan="9" class="border border-teal-700 px-3 py-1.5 tracking-wider">Building Classification (% Depreciation)</th>
+                        </tr>
+                        <tr class="bg-teal-600 text-white font-extrabold text-xs">
+                            @foreach (var cls in PropertyAssessmentApp.Services.BuildingDepreciationSchedule.Classifications)
+                            {
+                                <th class="border border-teal-700 px-2.5 py-1.5 sched-col-header" data-col-class="@cls.Code">@cls.Code</th>
+                            }
+                        </tr>
+                        <tr class="bg-teal-100 dark:bg-teal-950/70 text-teal-950 dark:text-teal-200 font-bold text-[11px]">
+                            <td colspan="2" class="border border-slate-300 dark:border-stone-700 px-3 py-1.5 text-right font-extrabold">Estimated Economic Life:</td>
+                            @foreach (var cls in PropertyAssessmentApp.Services.BuildingDepreciationSchedule.Classifications)
+                            {
+                                <td class="border border-slate-300 dark:border-stone-700 px-2 py-1.5 sched-col-meta" data-col-class="@cls.Code">@(cls.EconomicLifeYears)y</td>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200 dark:divide-stone-800">
+                        @{
+                            var rows = PropertyAssessmentApp.Services.BuildingDepreciationSchedule.Rows;
+                            for (int rIdx = 0; rIdx < rows.Count; rIdx++)
+                            {
+                                var r = rows[rIdx];
+                                bool isFirstInCycle = (rIdx == 0) || !string.Equals(rows[rIdx - 1].GeneralRevisionCycle, r.GeneralRevisionCycle, StringComparison.Ordinal);
+                                int cycleRowSpan = 1;
+                                if (isFirstInCycle)
+                                {
+                                    cycleRowSpan = rows.Count(x => string.Equals(x.GeneralRevisionCycle, r.GeneralRevisionCycle, StringComparison.Ordinal));
+                                }
+                                <tr class="sched-age-row hover:bg-slate-50 dark:hover:bg-stone-800/50 transition-colors" data-min-age="@r.MinAge" data-max-age="@r.MaxAge" data-age-label="@r.AgeLabel">
+                                    @if (isFirstInCycle)
+                                    {
+                                        <td rowspan="@cycleRowSpan" class="border border-slate-300 dark:border-stone-700 px-3 py-2 text-left font-bold bg-slate-100 dark:bg-stone-800 text-slate-800 dark:text-stone-200 align-middle">
+                                            @r.GeneralRevisionCycle
+                                        </td>
+                                    }
+                                    <td class="border border-slate-300 dark:border-stone-700 px-2 py-1.5 font-bold bg-slate-50 dark:bg-stone-900 text-slate-800 dark:text-stone-200">
+                                        @r.AgeLabel
+                                    </td>
+                                    @foreach (var cls in PropertyAssessmentApp.Services.BuildingDepreciationSchedule.Classifications)
+                                    {
+                                        var explicitRate = r.RatesByClass.TryGetValue(cls.Code, out var rVal) ? rVal : null;
+                                        var effectiveRate = explicitRate ?? cls.MaxDepreciationFromResidualPercent;
+                                        var isCapped = !explicitRate.HasValue;
+                                        <td class="border border-slate-300 dark:border-stone-700 px-2 py-1.5 cursor-pointer transition-all hover:bg-emerald-100 dark:hover:bg-emerald-900/50 sched-rate-cell @(isCapped ? "text-slate-400 dark:text-stone-500" : "text-slate-800 dark:text-stone-200 font-semibold")"
+                                            data-class="@cls.Code"
+                                            data-min-age="@r.MinAge"
+                                            data-max-age="@r.MaxAge"
+                                            data-rate="@effectiveRate.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)"
+                                            data-capped="@(isCapped ? "true" : "false")"
+                                            title="Click to apply Class @cls.Code (Age @r.AgeLabel): @(explicitRate.HasValue ? $"{explicitRate.Value:0.0}% Depreciation" : $"Residual Cap {effectiveRate:0.0}% ({cls.ResidualValuePercent}% Residual Value)")"
+                                            onclick="selectScheduleCell('@cls.Code', @r.MinAge, @r.MaxAge, @effectiveRate.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture), @(isCapped ? "true" : "false"))">
+                                            @(explicitRate.HasValue ? explicitRate.Value.ToString("0.0") : "—")
+                                        </td>
+                                    }
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr class="bg-teal-100 dark:bg-teal-950/70 text-teal-950 dark:text-teal-200 font-extrabold text-xs">
+                            <td colspan="2" class="border border-slate-300 dark:border-stone-700 px-3 py-2 text-right">Estimated Residual Value (%):</td>
+                            @foreach (var cls in PropertyAssessmentApp.Services.BuildingDepreciationSchedule.Classifications)
+                            {
+                                <td class="border border-slate-300 dark:border-stone-700 px-2 py-2 sched-col-residual" data-col-class="@cls.Code">@(cls.ResidualValuePercent)%</td>
+                            }
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <div class="px-5 py-3 bg-slate-50 dark:bg-stone-950 border-t border-slate-200 dark:border-stone-800 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div class="text-slate-500 dark:text-stone-400">
+                    <span class="font-bold text-slate-700 dark:text-stone-200">Note:</span> Cells marked <span class="font-mono font-bold">—</span> indicate that the building has reached its <span class="font-bold text-teal-700 dark:text-teal-400">Estimated Residual Value (%)</span> floor (Max Depreciation = 100% − Residual Value %).
+                </div>
+                <button type="button" onclick="closeDepreciationScheduleModal()" class="px-4 py-1.5 rounded-xl bg-slate-200 dark:bg-stone-800 hover:bg-slate-300 dark:hover:bg-stone-700 text-slate-800 dark:text-stone-200 font-bold">
+                    Close Schedule
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var BUILDING_DEPR_SCHEDULE = {
+            classes: {
+                "I":     { struct: "Type I",   life: 15, residual: 10 },
+                "II-A":  { struct: "Type II",  life: 20, residual: 15 },
+                "II-B":  { struct: "Type II",  life: 18, residual: 12 },
+                "III-A": { struct: "Type III", life: 30, residual: 25 },
+                "III-B": { struct: "Type III", life: 25, residual: 20 },
+                "IV-A":  { struct: "Type IV",  life: 40, residual: 35 },
+                "IV-B":  { struct: "Type IV",  life: 38, residual: 33 },
+                "V-A":   { struct: "Type V",   life: 50, residual: 40 },
+                "V-B":   { struct: "Type V",   life: 45, residual: 37 }
+            },
+            rows: [
+                { cycle: "1st 3 yrs of GR", label: "1",     min: 1,  max: 1,  rates: { "I": 6.7,  "II-A": 5.0,  "II-B": 5.0,  "III-A": 3.3,  "III-B": 4.0,  "IV-A": 2.5,  "IV-B": 2.6,  "V-A": 2.0,  "V-B": 2.2 } },
+                { cycle: "1st 3 yrs of GR", label: "2",     min: 2,  max: 2,  rates: { "I": 13.3, "II-A": 10.0, "II-B": 11.1, "III-A": 6.7,  "III-B": 8.0,  "IV-A": 5.0,  "IV-B": 5.3,  "V-A": 4.0,  "V-B": 4.4 } },
+                { cycle: "1st 3 yrs of GR", label: "3",     min: 3,  max: 3,  rates: { "I": 20.0, "II-A": 15.0, "II-B": 16.7, "III-A": 10.0, "III-B": 12.0, "IV-A": 7.5,  "IV-B": 7.9,  "V-A": 6.0,  "V-B": 6.7 } },
+                { cycle: "2nd 3 yrs of GR", label: "4",     min: 4,  max: 4,  rates: { "I": 26.7, "II-A": 20.0, "II-B": 22.2, "III-A": 13.3, "III-B": 16.0, "IV-A": 10.0, "IV-B": 10.5, "V-A": 8.0,  "V-B": 8.9 } },
+                { cycle: "2nd 3 yrs of GR", label: "5",     min: 5,  max: 5,  rates: { "I": 33.3, "II-A": 25.0, "II-B": 27.8, "III-A": 16.7, "III-B": 20.0, "IV-A": 12.5, "IV-B": 13.2, "V-A": 10.0, "V-B": 11.1 } },
+                { cycle: "2nd 3 yrs of GR", label: "6",     min: 6,  max: 6,  rates: { "I": 40.0, "II-A": 30.0, "II-B": 33.3, "III-A": 20.0, "III-B": 24.0, "IV-A": 15.0, "IV-B": 15.8, "V-A": 12.0, "V-B": 13.3 } },
+                { cycle: "3rd 3 yrs of GR", label: "7",     min: 7,  max: 7,  rates: { "I": 46.7, "II-A": 35.0, "II-B": 38.9, "III-A": 23.3, "III-B": 28.0, "IV-A": 17.5, "IV-B": 18.4, "V-A": 14.0, "V-B": 15.6 } },
+                { cycle: "3rd 3 yrs of GR", label: "8",     min: 8,  max: 8,  rates: { "I": 53.3, "II-A": 40.0, "II-B": 44.4, "III-A": 26.7, "III-B": 32.0, "IV-A": 20.0, "IV-B": 21.1, "V-A": 16.0, "V-B": 17.8 } },
+                { cycle: "3rd 3 yrs of GR", label: "9",     min: 9,  max: 9,  rates: { "I": 60.0, "II-A": 45.0, "II-B": 50.0, "III-A": 30.0, "III-B": 36.0, "IV-A": 22.5, "IV-B": 23.7, "V-A": 18.0, "V-B": 20.0 } },
+                { cycle: "4th 3 yrs of GR", label: "10",    min: 10, max: 10, rates: { "I": 66.7, "II-A": 50.0, "II-B": 55.6, "III-A": 33.3, "III-B": 40.0, "IV-A": 25.0, "IV-B": 26.3, "V-A": 20.0, "V-B": 22.2 } },
+                { cycle: "4th 3 yrs of GR", label: "11",    min: 11, max: 11, rates: { "I": 73.3, "II-A": 55.0, "II-B": 61.1, "III-A": 36.7, "III-B": 44.0, "IV-A": 27.5, "IV-B": 28.9, "V-A": 22.0, "V-B": 24.4 } },
+                { cycle: "4th 3 yrs of GR", label: "12",    min: 12, max: 12, rates: { "I": 80.0, "II-A": 60.0, "II-B": 66.7, "III-A": 40.0, "III-B": 48.0, "IV-A": 30.0, "IV-B": 31.6, "V-A": 24.0, "V-B": 26.7 } },
+                { cycle: "5th 3 yrs of GR", label: "13",    min: 13, max: 13, rates: { "I": 86.7, "II-A": 65.0, "II-B": 72.2, "III-A": 43.3, "III-B": 52.0, "IV-A": 32.5, "IV-B": 34.2, "V-A": 26.0, "V-B": 28.9 } },
+                { cycle: "5th 3 yrs of GR", label: "14",    min: 14, max: 14, rates: { "I": 93.3, "II-A": 70.0, "II-B": 77.8, "III-A": 46.7, "III-B": 56.0, "IV-A": 35.0, "IV-B": 36.8, "V-A": 28.0, "V-B": 31.1 } },
+                { cycle: "5th 3 yrs of GR", label: "15",    min: 15, max: 15, rates: { "I": null, "II-A": 75.0, "II-B": 83.3, "III-A": 50.0, "III-B": 60.0, "IV-A": 37.5, "IV-B": 39.5, "V-A": 30.0, "V-B": 33.3 } },
+                { cycle: "6th 3 yrs of GR", label: "16",    min: 16, max: 16, rates: { "I": null, "II-A": 80.0, "II-B": 88.9, "III-A": 53.3, "III-B": 64.0, "IV-A": 40.0, "IV-B": 42.1, "V-A": 32.0, "V-B": 35.6 } },
+                { cycle: "6th 3 yrs of GR", label: "17",    min: 17, max: 17, rates: { "I": null, "II-A": 85.0, "II-B": null, "III-A": 56.7, "III-B": 68.0, "IV-A": 42.5, "IV-B": 44.7, "V-A": 34.0, "V-B": 37.8 } },
+                { cycle: "6th 3 yrs of GR", label: "18–20", min: 18, max: 20, rates: { "I": null, "II-A": null, "II-B": null, "III-A": 66.7, "III-B": 80.0, "IV-A": 50.0, "IV-B": 52.6, "V-A": 40.0, "V-B": 44.4 } },
+                { cycle: "After 20 yrs GR", label: "21–23", min: 21, max: 23, rates: { "I": null, "II-A": null, "II-B": null, "III-A": 76.7, "III-B": 76.5, "IV-A": 57.5, "IV-B": 60.5, "V-A": 46.0, "V-B": 51.1 } },
+                { cycle: "After 20 yrs GR", label: "24–26", min: 24, max: 26, rates: { "I": null, "II-A": null, "II-B": null, "III-A": null, "III-B": 80.0, "IV-A": 65.0, "IV-B": 68.4, "V-A": 52.0, "V-B": 57.8 } },
+                { cycle: "After 20 yrs GR", label: "27–30", min: 27, max: 30, rates: { "I": null, "II-A": null, "II-B": null, "III-A": null, "III-B": null, "IV-A": null, "IV-B": null, "V-A": 60.0, "V-B": 64.4 } }
+            ]
+        };
+
+        function lookupBuildingDepreciationSchedule(classCode, ageYears) {
+            var code = (classCode && BUILDING_DEPR_SCHEDULE.classes[classCode]) ? classCode : "III-A";
+            var meta = BUILDING_DEPR_SCHEDULE.classes[code];
+            var maxDepr = 100 - meta.residual;
+            var age = parseInt(ageYears, 10) || 0;
+            var classOrder = ["I", "II-A", "II-B", "III-A", "III-B", "IV-A", "IV-B", "V-A", "V-B"];
+            var classIndex = Math.max(0, classOrder.indexOf(code));
+
+            if (age <= 0) {
+                return {
+                    scheduleId: "",
+                    classCode: code,
+                    cycle: "New / < 1 yr",
+                    ageLabel: "0",
+                    life: meta.life,
+                    residual: meta.residual,
+                    maxDepr: maxDepr,
+                    rate: 0.0,
+                    isResidualCap: false
+                };
+            }
+
+            for (var i = 0; i < BUILDING_DEPR_SCHEDULE.rows.length; i++) {
+                var r = BUILDING_DEPR_SCHEDULE.rows[i];
+                if (age >= r.min && age <= r.max) {
+                    var scheduleId = (i * classOrder.length) + classIndex + 1;
+                    var cellRate = r.rates[code];
+                    if (cellRate !== null && cellRate !== undefined) {
+                        return {
+                            scheduleId: scheduleId,
+                            classCode: code,
+                            cycle: r.cycle,
+                            ageLabel: r.label,
+                            life: meta.life,
+                            residual: meta.residual,
+                            maxDepr: maxDepr,
+                            rate: cellRate,
+                            isResidualCap: false
+                        };
+                    } else {
+                        return {
+                            scheduleId: scheduleId,
+                            classCode: code,
+                            cycle: r.cycle,
+                            ageLabel: r.label,
+                            life: meta.life,
+                            residual: meta.residual,
+                            maxDepr: maxDepr,
+                            rate: maxDepr,
+                            isResidualCap: true
+                        };
+                    }
+                }
+            }
+
+            // Age > 30
+            var fallbackScheduleId = ((BUILDING_DEPR_SCHEDULE.rows.length - 1) * classOrder.length) + classIndex + 1;
+            return {
+                scheduleId: fallbackScheduleId,
+                classCode: code,
+                cycle: "After 20 yrs GR",
+                ageLabel: "> 30",
+                life: meta.life,
+                residual: meta.residual,
+                maxDepr: maxDepr,
+                rate: maxDepr,
+                isResidualCap: true
+            };
+        }
+
+        function highlightScheduleTableSelection(classCode, ageYears) {
+            var age = parseInt(ageYears, 10) || 0;
+            var table = document.getElementById('officialDeprScheduleTable');
+            if (!table) return;
+
+            table.querySelectorAll('.sched-col-header').forEach(function (el) {
+                if (el.getAttribute('data-col-class') === classCode) {
+                    el.classList.add('ring-2', 'ring-amber-300', 'bg-emerald-700');
+                } else {
+                    el.classList.remove('ring-2', 'ring-amber-300', 'bg-emerald-700');
+                }
+            });
+
+            table.querySelectorAll('.sched-rate-cell').forEach(function (td) {
+                var tdClass = td.getAttribute('data-class');
+                var minA = parseInt(td.getAttribute('data-min-age'), 10);
+                var maxA = parseInt(td.getAttribute('data-max-age'), 10);
+                td.classList.remove('bg-emerald-500', 'text-white', 'font-black', 'ring-2', 'ring-emerald-600', 'bg-emerald-50/70', 'dark:bg-emerald-950/30');
+
+                if (tdClass === classCode && age >= minA && age <= maxA) {
+                    td.classList.add('bg-emerald-500', 'text-white', 'font-black', 'ring-2', 'ring-emerald-600');
+                } else if (tdClass === classCode || (age >= minA && age <= maxA)) {
+                    td.classList.add('bg-emerald-50/70', 'dark:bg-emerald-950/30');
+                }
+            });
+        }
+
+        function applyDepreciationFromSchedule(forceApplyRate) {
+            var clsEl = document.getElementById('buildingClassificationSelect');
+            var ageEl = document.getElementById('buildingAgeYearsInput');
+            var deprEl = document.getElementById('buildingDeprPercentInput');
+            var autoEl = document.getElementById('autoApplyScheduleDeprSwitch');
+            if (!clsEl || !ageEl || !deprEl) return;
+
+            var classCode = clsEl.value || 'III-A';
+            var ageYears = parseInt(ageEl.value, 10) || 0;
+            var res = lookupBuildingDepreciationSchedule(classCode, ageYears);
+
+            var grEl = document.getElementById('schedGrCycleDisplay');
+            var caEl = document.getElementById('schedClassAgeDisplay');
+            var lifeEl = document.getElementById('schedEconLifeDisplay');
+            var resEl = document.getElementById('schedResidualDisplay');
+            var capBadge = document.getElementById('schedResidualCapBadge');
+
+            if (grEl) grEl.textContent = res.cycle;
+            if (caEl) caEl.textContent = 'Class ' + res.classCode + ' • ' + ageYears + 'y (Row ' + res.ageLabel + ')';
+            if (lifeEl) lifeEl.textContent = res.life + ' Years';
+            if (resEl) resEl.textContent = res.residual + '% (Max Depr: ' + res.maxDepr + '%)';
+
+            var schedIdInput = document.getElementById('buildingDeprScheduleIdInput');
+            var grCycleInput = document.getElementById('generalRevisionCycleInput');
+            var econLifeInput = document.getElementById('estimatedEconLifeYearsInput');
+            var residualInput = document.getElementById('estimatedResidualValuePercentInput');
+            if (schedIdInput) schedIdInput.value = res.scheduleId || '';
+            if (grCycleInput) grCycleInput.value = res.cycle;
+            if (econLifeInput) econLifeInput.value = res.life;
+            if (residualInput) residualInput.value = res.residual;
+            if (capBadge) {
+                if (res.isResidualCap) {
+                    capBadge.classList.remove('hidden');
+                } else {
+                    capBadge.classList.add('hidden');
+                }
+            }
+
+            highlightScheduleTableSelection(classCode, ageYears);
+
+            var shouldUpdateInput = forceApplyRate || (autoEl && autoEl.checked);
+            if (shouldUpdateInput) {
+                deprEl.value = res.rate.toFixed(1);
+                if (typeof recalculateBuildingValuation === 'function') {
+                    recalculateBuildingValuation();
+                }
+            }
+        }
+
+        function openDepreciationScheduleModal() {
+            var modal = document.getElementById('depreciationScheduleModal');
+            if (modal) {
+                modal.classList.remove('hidden');
+                var clsEl = document.getElementById('buildingClassificationSelect');
+                var ageEl = document.getElementById('buildingAgeYearsInput');
+                highlightScheduleTableSelection(clsEl ? clsEl.value : 'III-A', ageEl ? ageEl.value : 0);
+            }
+        }
+
+        function closeDepreciationScheduleModal() {
+            var modal = document.getElementById('depreciationScheduleModal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function selectScheduleCell(classCode, minAge, maxAge, rateVal, isCapped) {
+            var clsEl = document.getElementById('buildingClassificationSelect');
+            var structEl = document.getElementById('structuralTypeSelect');
+            var ageEl = document.getElementById('buildingAgeYearsInput');
+            var deprEl = document.getElementById('buildingDeprPercentInput');
+
+            if (clsEl) clsEl.value = classCode;
+            if (structEl && BUILDING_DEPR_SCHEDULE.classes[classCode]) {
+                structEl.value = BUILDING_DEPR_SCHEDULE.classes[classCode].struct;
+            }
+            if (ageEl) {
+                var curAge = parseInt(ageEl.value, 10) || 0;
+                if (curAge < minAge || curAge > maxAge) {
+                    ageEl.value = minAge;
+                }
+            }
+            if (deprEl) {
+                deprEl.value = parseFloat(rateVal).toFixed(1);
+            }
+
+            applyDepreciationFromSchedule(false);
+            if (typeof recalculateBuildingValuation === 'function') {
+                recalculateBuildingValuation();
+            }
+            closeDepreciationScheduleModal();
+
+            if (window.toastr) {
+                var msg = isCapped
+                    ? 'Applied Class ' + classCode + ' Residual Floor Cap (' + rateVal.toFixed(1) + '% Max Depreciation).'
+                    : 'Applied Class ' + classCode + ' (Age ' + (ageEl ? ageEl.value : minAge) + 'y) -> ' + rateVal.toFixed(1) + '% Depreciation.';
+                toastr.success(msg, 'Schedule Rate Applied');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            var structEl = document.getElementById('structuralTypeSelect');
+            var clsEl = document.getElementById('buildingClassificationSelect');
+            var ageEl = document.getElementById('buildingAgeYearsInput');
+            var dateConstEl = document.getElementById('dateConstructedInput');
+            var dateCompEl = document.getElementById('dateCompletedInput');
+            var dateOccEl = document.getElementById('dateOccupiedInput');
+
+            if (structEl && clsEl) {
+                structEl.addEventListener('change', function () {
+                    var st = structEl.value;
+                    var defaultMap = {
+                        "Type I": "I",
+                        "Type II": "II-A",
+                        "Type III": "III-A",
+                        "Type IV": "IV-A",
+                        "Type V": "V-A"
+                    };
+                    var currentClass = clsEl.value;
+                    var currentMeta = BUILDING_DEPR_SCHEDULE.classes[currentClass];
+                    if (!currentMeta || currentMeta.struct !== st) {
+                        if (defaultMap[st]) {
+                            clsEl.value = defaultMap[st];
+                        }
+                    }
+                    applyDepreciationFromSchedule(false);
+                });
+
+                clsEl.addEventListener('change', function () {
+                    var selectedCode = clsEl.value;
+                    var meta = BUILDING_DEPR_SCHEDULE.classes[selectedCode];
+                    if (meta && structEl.value !== meta.struct) {
+                        structEl.value = meta.struct;
+                    }
+                    applyDepreciationFromSchedule(false);
+                });
+            }
+
+            if (ageEl) {
+                ageEl.addEventListener('input', function () {
+                    applyDepreciationFromSchedule(false);
+                });
+                ageEl.addEventListener('change', function () {
+                    applyDepreciationFromSchedule(false);
+                });
+            }
+
+            function syncAgeFromDates() {
+                var refDateStr = (dateCompEl && dateCompEl.value) || (dateOccEl && dateOccEl.value) || (dateConstEl && dateConstEl.value);
+                if (!refDateStr || !ageEl) return;
+                var builtYear = new Date(refDateStr).getFullYear();
+                if (isNaN(builtYear) || builtYear < 1900) return;
+                var effYearInput = document.querySelector('input[name="EffectivityYear"]');
+                var effYear = effYearInput ? (parseInt(effYearInput.value, 10) || new Date().getFullYear()) : new Date().getFullYear();
+                var computedAge = Math.max(0, effYear - builtYear);
+                ageEl.value = computedAge;
+                applyDepreciationFromSchedule(false);
+            }
+
+            if (dateConstEl) dateConstEl.addEventListener('change', syncAgeFromDates);
+            if (dateCompEl) dateCompEl.addEventListener('change', syncAgeFromDates);
+            if (dateOccEl) dateOccEl.addEventListener('change', syncAgeFromDates);
+
+            // Initial sync on page load (do not overwrite existing non-zero saved rate on Edit unless age > 0 and rate is 0)
+            var deprEl = document.getElementById('buildingDeprPercentInput');
+            var hasExistingRate = deprEl && parseFloat(deprEl.value) > 0;
+            applyDepreciationFromSchedule(!hasExistingRate);
+        });
+    </script>
 </div>

@@ -52,6 +52,8 @@ public class AssessmentService : IAssessmentService
     {
         return _context.TaxDeclarations
             .Include(t => t.BuildingDetails)
+                .ThenInclude(b => b!.DepreciationSchedule)
+            .Include(t => t.BuildingDetails)
                 .ThenInclude(b => b!.FloorLevels)
             .Include(t => t.BuildingDetails)
                 .ThenInclude(b => b!.AdditionalItems)
@@ -77,6 +79,8 @@ public class AssessmentService : IAssessmentService
         if (string.IsNullOrWhiteSpace(tdNumber)) return null;
         var clean = tdNumber.Trim();
         return _context.TaxDeclarations
+            .Include(t => t.BuildingDetails)
+                .ThenInclude(b => b!.DepreciationSchedule)
             .Include(t => t.BuildingDetails)
                 .ThenInclude(b => b!.FloorLevels)
             .Include(t => t.BuildingDetails)
@@ -146,10 +150,12 @@ public class AssessmentService : IAssessmentService
         int year = targetYear > 1900 ? targetYear : DateTime.Now.Year;
         string revYearLastTwo = (year % 100).ToString("D2");
         var yearPrefix = $"{revYearLastTwo}-";
+        var legacyPrefix = $"TD-{year}-";
 
         int countForYear = _context.TaxDeclarations
             .AsNoTracking()
-            .Count(t => t.EffectivityYear == year || t.TaxDeclarationNumber.StartsWith(yearPrefix));
+            .Count(t => t.TaxDeclarationNumber != null && 
+                       (t.TaxDeclarationNumber.StartsWith(yearPrefix) || t.TaxDeclarationNumber.StartsWith(legacyPrefix)));
 
         int nextSeq = countForYear + 1;
         string candidate = CastTdGenerator.FormatOfficialTdNumber(year, barangay, nextSeq);
@@ -290,6 +296,85 @@ public class AssessmentService : IAssessmentService
             var bldg = declaration.EnsureBuildingDetails();
             bldg.TaxDeclarationId = declaration.Id;
 
+            var existingBldg = _context.TDNBuildings
+                .Include(b => b.FloorLevels)
+                .Include(b => b.AdditionalItems)
+                .Include(b => b.StructuralMaterials)
+                .FirstOrDefault(b => b.TaxDeclarationId == declaration.Id);
+
+            if (existingBldg != null)
+            {
+                bldg.Id = existingBldg.Id;
+            }
+
+            // Resolve Building Depreciation Schedule entry from SQL table (with static schedule fallback)
+            var normalizedClassCode = BuildingDepreciationSchedule.NormalizeClassificationCode(bldg.BuildingClassification, bldg.StructuralType);
+            bldg.BuildingClassification = normalizedClassCode;
+            var staticLookup = BuildingDepreciationSchedule.Lookup(normalizedClassCode, bldg.BuildingAgeYears, bldg.StructuralType);
+
+            BuildingDepreciationScheduleItem? dbScheduleItem = null;
+            try
+            {
+                if (bldg.BuildingDepreciationScheduleId.HasValue && bldg.BuildingDepreciationScheduleId.Value > 0)
+                {
+                    dbScheduleItem = _context.BuildingDepreciationSchedules
+                        .AsNoTracking()
+                        .FirstOrDefault(s => s.Id == bldg.BuildingDepreciationScheduleId.Value && s.IsActive);
+                }
+
+                if (dbScheduleItem == null && bldg.BuildingAgeYears > 0)
+                {
+                    dbScheduleItem = _context.BuildingDepreciationSchedules
+                        .AsNoTracking()
+                        .FirstOrDefault(s => s.IsActive
+                                          && s.ClassificationCode == normalizedClassCode
+                                          && bldg.BuildingAgeYears >= s.AgeLowerBound
+                                          && bldg.BuildingAgeYears <= s.AgeUpperBound);
+
+                    if (dbScheduleItem == null && bldg.BuildingAgeYears > 30)
+                    {
+                        dbScheduleItem = _context.BuildingDepreciationSchedules
+                            .AsNoTracking()
+                            .Where(s => s.IsActive && s.ClassificationCode == normalizedClassCode)
+                            .OrderByDescending(s => s.AgeUpperBound)
+                            .FirstOrDefault();
+                    }
+                }
+            }
+            catch
+            {
+                // Fallback gracefully if BuildingDepreciationSchedules SQL table has not been migrated yet
+                dbScheduleItem = null;
+            }
+
+            if (dbScheduleItem != null)
+            {
+                bldg.BuildingDepreciationScheduleId = dbScheduleItem.Id;
+                bldg.GeneralRevisionCycle = dbScheduleItem.GeneralRevisionCycle;
+                bldg.EstimatedEconomicLifeYears = dbScheduleItem.EstimatedEconomicLifeYears;
+                bldg.EstimatedResidualValuePercent = dbScheduleItem.EstimatedResidualValuePercent;
+                if (bldg.BuildingDepreciationPercent <= 0m && bldg.BuildingAgeYears > 0)
+                {
+                    bldg.BuildingDepreciationPercent = dbScheduleItem.EffectiveDepreciationPercent;
+                }
+            }
+            else
+            {
+                bldg.GeneralRevisionCycle = staticLookup.GeneralRevisionCycle;
+                bldg.EstimatedEconomicLifeYears = staticLookup.EconomicLifeYears;
+                bldg.EstimatedResidualValuePercent = staticLookup.ResidualValuePercent;
+                if (bldg.BuildingDepreciationPercent <= 0m && bldg.BuildingAgeYears > 0)
+                {
+                    bldg.BuildingDepreciationPercent = staticLookup.DepreciationPercent;
+                }
+            }
+
+            if (bldg.BaseRcnValue > 0m && bldg.BuildingDepreciationPercent > 0m && bldg.BuildingDepreciationAccumulated <= 0m)
+            {
+                bldg.BuildingDepreciationAccumulated = Math.Round(bldg.BaseRcnValue * (bldg.BuildingDepreciationPercent / 100m), 2);
+                bldg.DepreciatedMarketValue = Math.Max(0m, bldg.BaseRcnValue - bldg.BuildingDepreciationAccumulated);
+            }
+
             // Sync multi-floor breakdown json if present to FloorLevels lines
             if (!string.IsNullOrWhiteSpace(bldg.FloorBreakdownJson))
             {
@@ -351,17 +436,14 @@ public class AssessmentService : IAssessmentService
                 catch { }
             }
 
-            // Sync 17 Structural Materials if empty
-            if (!bldg.StructuralMaterials.Any())
+            // Sync 16 Structural Materials (Local Assessment Manual - Table 3)
+            var materials = GetDefaultStructuralMaterials(declaration, bldg.Id);
+            bldg.StructuralMaterials.Clear();
+            foreach (var m in materials)
             {
-                var materials = GetDefaultStructuralMaterials(declaration, bldg.Id);
-                foreach (var m in materials)
-                {
-                    bldg.StructuralMaterials.Add(m);
-                }
+                bldg.StructuralMaterials.Add(m);
             }
 
-            var existingBldg = _context.TDNBuildings.FirstOrDefault(b => b.TaxDeclarationId == declaration.Id);
             if (existingBldg == null)
             {
                 _context.TDNBuildings.Add(bldg);
@@ -369,6 +451,21 @@ public class AssessmentService : IAssessmentService
             else
             {
                 _context.Entry(existingBldg).CurrentValues.SetValues(bldg);
+                if (bldg.FloorLevels.Any())
+                {
+                    existingBldg.FloorLevels.Clear();
+                    foreach (var fl in bldg.FloorLevels) existingBldg.FloorLevels.Add(fl);
+                }
+                if (bldg.AdditionalItems.Any())
+                {
+                    existingBldg.AdditionalItems.Clear();
+                    foreach (var ai in bldg.AdditionalItems) existingBldg.AdditionalItems.Add(ai);
+                }
+                if (bldg.StructuralMaterials.Any())
+                {
+                    existingBldg.StructuralMaterials.Clear();
+                    foreach (var sm in bldg.StructuralMaterials) existingBldg.StructuralMaterials.Add(sm);
+                }
             }
         }
         else if (declaration.Kind == PropertyKind.Land)
@@ -738,27 +835,38 @@ public class AssessmentService : IAssessmentService
         }
     }
 
+    private static string ExtractMaterialCode(string? material)
+    {
+        if (string.IsNullOrWhiteSpace(material)) return string.Empty;
+        int lastOpen = material.LastIndexOf('(');
+        int lastClose = material.LastIndexOf(')');
+        if (lastOpen >= 0 && lastClose > lastOpen + 1)
+        {
+            return material.Substring(lastOpen + 1, lastClose - lastOpen - 1).Trim();
+        }
+        return string.Empty;
+    }
+
     private List<TDNBuildingStructuralMaterial> GetDefaultStructuralMaterials(TaxDeclaration td, Guid buildingId)
     {
         return new List<TDNBuildingStructuralMaterial>
         {
-            new() { TDNBuildingId = buildingId, PartNumber = 1, PartName = "Foundation", MaterialSelected = td.StructuralFoundation },
-            new() { TDNBuildingId = buildingId, PartNumber = 2, PartName = "Columns", MaterialSelected = td.StructuralColumns },
-            new() { TDNBuildingId = buildingId, PartNumber = 3, PartName = "Beams", MaterialSelected = td.StructuralBeams },
-            new() { TDNBuildingId = buildingId, PartNumber = 4, PartName = "Truss / Roof Framing", MaterialSelected = td.StructuralTrussRoof },
-            new() { TDNBuildingId = buildingId, PartNumber = 5, PartName = "Roof", MaterialSelected = td.StructuralRoof },
-            new() { TDNBuildingId = buildingId, PartNumber = 6, PartName = "Exterior Walls", MaterialSelected = td.StructuralExteriorWalls },
-            new() { TDNBuildingId = buildingId, PartNumber = 7, PartName = "Exterior Finish (Front Elevation)", MaterialSelected = td.StructuralFinishFront },
-            new() { TDNBuildingId = buildingId, PartNumber = 8, PartName = "Exterior Finish (Rear Elevation)", MaterialSelected = td.StructuralFinishRear },
-            new() { TDNBuildingId = buildingId, PartNumber = 9, PartName = "Exterior Finish (Left Side)", MaterialSelected = td.StructuralFinishLeft },
-            new() { TDNBuildingId = buildingId, PartNumber = 10, PartName = "Exterior Finish (Right Side)", MaterialSelected = td.StructuralFinishRight },
-            new() { TDNBuildingId = buildingId, PartNumber = 11, PartName = "Inside Finish", MaterialSelected = td.StructuralInsideFinish },
-            new() { TDNBuildingId = buildingId, PartNumber = 12, PartName = "Partition Walls", MaterialSelected = td.StructuralPartitionWalls },
-            new() { TDNBuildingId = buildingId, PartNumber = 13, PartName = "Flooring", MaterialSelected = td.StructuralFlooring },
-            new() { TDNBuildingId = buildingId, PartNumber = 14, PartName = "Floor Finish", MaterialSelected = td.StructuralFloorFinish },
-            new() { TDNBuildingId = buildingId, PartNumber = 15, PartName = "Stairs", MaterialSelected = td.StructuralStairs },
-            new() { TDNBuildingId = buildingId, PartNumber = 16, PartName = "Windows", MaterialSelected = td.StructuralWindows },
-            new() { TDNBuildingId = buildingId, PartNumber = 17, PartName = "Doors", MaterialSelected = $"{td.DoorMain}; {td.DoorRoom}; {td.DoorOthers}" }
+            new() { TDNBuildingId = buildingId, PartNumber = 1,  PartName = "1. Foundation",             MaterialSelected = td.StructuralFoundation,      SpecificDescription = ExtractMaterialCode(td.StructuralFoundation) },
+            new() { TDNBuildingId = buildingId, PartNumber = 2,  PartName = "2. Columns",                MaterialSelected = td.StructuralColumns,         SpecificDescription = ExtractMaterialCode(td.StructuralColumns) },
+            new() { TDNBuildingId = buildingId, PartNumber = 3,  PartName = "3. Beams",                  MaterialSelected = td.StructuralBeams,           SpecificDescription = ExtractMaterialCode(td.StructuralBeams) },
+            new() { TDNBuildingId = buildingId, PartNumber = 4,  PartName = "4. Roof Framing",           MaterialSelected = td.StructuralTrussRoof,       SpecificDescription = ExtractMaterialCode(td.StructuralTrussRoof) },
+            new() { TDNBuildingId = buildingId, PartNumber = 5,  PartName = "5. Roofing",                MaterialSelected = td.StructuralRoof,            SpecificDescription = ExtractMaterialCode(td.StructuralRoof) },
+            new() { TDNBuildingId = buildingId, PartNumber = 6,  PartName = "6. Exterior Walls",         MaterialSelected = td.StructuralExteriorWalls,   SpecificDescription = ExtractMaterialCode(td.StructuralExteriorWalls) },
+            new() { TDNBuildingId = buildingId, PartNumber = 7,  PartName = "7. Flooring",               MaterialSelected = td.StructuralFlooring,        SpecificDescription = ExtractMaterialCode(td.StructuralFlooring) },
+            new() { TDNBuildingId = buildingId, PartNumber = 8,  PartName = "8. Doors",                  MaterialSelected = td.DoorMain,                  SpecificDescription = ExtractMaterialCode(td.DoorMain) },
+            new() { TDNBuildingId = buildingId, PartNumber = 9,  PartName = "9. Ceiling",                MaterialSelected = td.Ceiling,                   SpecificDescription = ExtractMaterialCode(td.Ceiling) },
+            new() { TDNBuildingId = buildingId, PartNumber = 10, PartName = "10. Windows",               MaterialSelected = td.StructuralWindows,         SpecificDescription = ExtractMaterialCode(td.StructuralWindows) },
+            new() { TDNBuildingId = buildingId, PartNumber = 11, PartName = "11. Stairs",                MaterialSelected = td.StructuralStairs,          SpecificDescription = ExtractMaterialCode(td.StructuralStairs) },
+            new() { TDNBuildingId = buildingId, PartNumber = 12, PartName = "12. Partition",             MaterialSelected = td.StructuralPartitionWalls,  SpecificDescription = ExtractMaterialCode(td.StructuralPartitionWalls) },
+            new() { TDNBuildingId = buildingId, PartNumber = 13, PartName = "13. Wall Finish",           MaterialSelected = td.StructuralFinishFront,     SpecificDescription = ExtractMaterialCode(td.StructuralFinishFront) },
+            new() { TDNBuildingId = buildingId, PartNumber = 14, PartName = "14. Electrical Conduit",    MaterialSelected = td.ElectricalSystem,          SpecificDescription = ExtractMaterialCode(td.ElectricalSystem) },
+            new() { TDNBuildingId = buildingId, PartNumber = 15, PartName = "15. Toilet and Bath",       MaterialSelected = td.ToiletAndBathroom,         SpecificDescription = ExtractMaterialCode(td.ToiletAndBathroom) },
+            new() { TDNBuildingId = buildingId, PartNumber = 16, PartName = "16. Plumbing and Services", MaterialSelected = td.PlumbingSewer,             SpecificDescription = ExtractMaterialCode(td.PlumbingSewer) }
         };
     }
 

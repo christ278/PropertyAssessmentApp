@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using PropertyAssessmentApp.Models;
 using PropertyAssessmentApp.Services;
 
@@ -10,17 +10,20 @@ public class TaxDeclarationRequestController : Controller
     private readonly IAssessmentService _assessmentService;
     private readonly IOrderPaymentService _orderPaymentService;
     private readonly IWebHostEnvironment _env;
+    private readonly IWorkflowNotifier _workflowNotifier;
 
     public TaxDeclarationRequestController(
         ITaxDeclarationRequestService tdRequestService,
         IAssessmentService assessmentService,
         IOrderPaymentService orderPaymentService,
-        IWebHostEnvironment env)
+        IWebHostEnvironment env,
+        IWorkflowNotifier workflowNotifier)
     {
         _tdRequestService = tdRequestService;
         _assessmentService = assessmentService;
         _orderPaymentService = orderPaymentService;
         _env = env;
+        _workflowNotifier = workflowNotifier;
     }
 
     // GET: /TaxDeclarationRequest
@@ -57,7 +60,7 @@ public class TaxDeclarationRequestController : Controller
     // POST: /TaxDeclarationRequest/Create
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult Create(TaxDeclarationRequest request, IFormFile? fileUpload)
+    public async Task<IActionResult> Create(TaxDeclarationRequest request, IFormFile? fileUpload)
     {
         if (ModelState.IsValid)
         {
@@ -65,6 +68,7 @@ public class TaxDeclarationRequestController : Controller
             {
                 var webRoot = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath ?? Directory.GetCurrentDirectory(), "wwwroot");
                 _tdRequestService.Add(request, fileUpload, webRoot);
+                await _workflowNotifier.NotifyTransactionCreatedAsync(request.Id, "TaxDeclarationRequest", request.TrackingNumber, 1, request.OwnerName);
                 TempData["SuccessMessage"] = $"Tax Declaration Request {request.TrackingNumber} successfully filed.";
                 return RedirectToAction(nameof(Index));
             }

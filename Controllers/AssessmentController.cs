@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using PropertyAssessmentApp.Data;
 using PropertyAssessmentApp.Models;
 using PropertyAssessmentApp.Services;
@@ -165,18 +166,38 @@ public class AssessmentController : Controller
         return View(vm);
     }
     // GET: /Assessment/Create
-    public IActionResult Create()
+    public IActionResult Create(string? kind = "Land")
     {
         ViewBag.Owners = _ownerService.GetAll();
         PopulateLandPrerequisites();
+
+        PropertyKind parsedKind = PropertyKind.Land;
+        if (!string.IsNullOrWhiteSpace(kind) && Enum.TryParse<PropertyKind>(kind, true, out var k))
+        {
+            parsedKind = k;
+        }
+
+        ViewBag.SelectedKind = parsedKind.ToString();
+
         var model = new TaxDeclaration
         {
+            Kind = parsedKind,
             TaxDeclarationNumber = _assessmentService.GenerateCastTdNumber(DateTime.Now.Year, "0001"),
             ARPNo = CastTdGenerator.DefaultArpNumber,
             TransactionCode = "DC",
             PropertyIndexNumber = $"187-00-0001-001-{new Random().Next(1, 999):D3}",
             EffectivityYear = DateTime.Now.Year,
-            AssessmentLevelPercent = 20m
+            AssessmentLevelPercent = parsedKind switch
+            {
+                PropertyKind.Building => 30m,
+                PropertyKind.Machinery => 80m,
+                _ => 20m
+            },
+            DateEncoded = DateTime.Now,
+            DateAppraised = DateTime.Now,
+            DateAssessed = DateTime.Now,
+            DateRecommended = DateTime.Now,
+            DateApproved = DateTime.Now
         };
         return View(model);
     }
@@ -264,6 +285,42 @@ public class AssessmentController : Controller
         ViewBag.LandAdjustments = _context.LandAdjustmentFactors.Where(j => j.IsActive).ToList();
         ViewBag.LandImprovementTypes = _context.LandImprovementTypes.Where(i => i.IsActive).OrderBy(i => i.TypeDescription).ToList();
         ViewBag.Barangays = _context.Barangays.OrderBy(b => b.Name).ToList();
+
+        try
+        {
+            var dbSchedules = _context.BuildingDepreciationSchedules
+                .AsNoTracking()
+                .Where(s => s.IsActive)
+                .OrderBy(s => s.SortOrder)
+                .ToList();
+            ViewBag.BuildingDepreciationSchedules = dbSchedules.Any()
+                ? dbSchedules
+                : BuildingDepreciationSchedule.GetSeedEntities().ToList();
+        }
+        catch
+        {
+            ViewBag.BuildingDepreciationSchedules = BuildingDepreciationSchedule.GetSeedEntities().ToList();
+        }
+    }
+
+    [HttpGet]
+    public IActionResult GetBuildingDepreciationSchedule()
+    {
+        try
+        {
+            var dbSchedules = _context.BuildingDepreciationSchedules
+                .AsNoTracking()
+                .Where(s => s.IsActive)
+                .OrderBy(s => s.SortOrder)
+                .ToList();
+            if (dbSchedules.Any())
+            {
+                return Json(dbSchedules);
+            }
+        }
+        catch { }
+
+        return Json(BuildingDepreciationSchedule.GetSeedEntities());
     }
 
     // GET: /Assessment/Calculator

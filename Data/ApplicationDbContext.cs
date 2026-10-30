@@ -38,6 +38,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<BuildingType> BuildingTypes { get; set; } = null!;
     public DbSet<BuildingStructureRate> BuildingStructureRates { get; set; } = null!;
     public DbSet<BuildingDepreciation> BuildingDepreciations { get; set; } = null!;
+    public DbSet<BuildingDepreciationScheduleItem> BuildingDepreciationSchedules { get; set; } = null!;
     public DbSet<BuildingAssessmentLevel> BuildingAssessmentLevels { get; set; } = null!;
     public DbSet<BuildingPropertyTypeAccordUse> BuildingPropertyTypeAccordUses { get; set; } = null!;
     public DbSet<TDNBuilding> TDNBuildings { get; set; } = null!;
@@ -227,7 +228,13 @@ public class ApplicationDbContext : DbContext
             entity.Property(b => b.BaseRcnValue).HasPrecision(18, 2);
             entity.Property(b => b.ReplacementCostNew).HasPrecision(18, 2);
             entity.Property(b => b.BuildingDepreciationPercent).HasPrecision(18, 4);
+            entity.Property(b => b.EstimatedResidualValuePercent).HasPrecision(18, 2);
             entity.Property(b => b.BuildingDepreciationAccumulated).HasPrecision(18, 2);
+
+            entity.HasOne(b => b.DepreciationSchedule)
+                  .WithMany(d => d.TDNBuildings)
+                  .HasForeignKey(b => b.BuildingDepreciationScheduleId)
+                  .OnDelete(DeleteBehavior.SetNull);
             entity.Property(b => b.DepreciatedMarketValue).HasPrecision(18, 2);
             entity.Property(b => b.TotalAdditionalItemsValue).HasPrecision(18, 2);
             entity.Property(b => b.MarketValue).HasPrecision(18, 2);
@@ -615,6 +622,20 @@ public class ApplicationDbContext : DbContext
                 new MachineryAssessmentLevel { Id = 20, ActualUseId = 73, ActualUseName = "SPECIAL-LOCAL WATER DISTRICT", AssessmentLevel = 10.00m, RevisionYear = 2011, IsActive = true },
                 new MachineryAssessmentLevel { Id = 21, ActualUseId = 48, ActualUseName = "AGRICULTURAL", AssessmentLevel = 35.00m, RevisionYear = 2011, IsActive = true }
             );
+        });
+
+        // -------------------------------------------------------------
+        // BUILDING PHYSICAL DEPRECIATION SCHEDULE (I to V-B across GR Cycles)
+        // -------------------------------------------------------------
+        modelBuilder.Entity<BuildingDepreciationScheduleItem>(entity =>
+        {
+            entity.ToTable("BuildingDepreciationSchedules");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.EstimatedResidualValuePercent).HasPrecision(18, 2);
+            entity.Property(e => e.DepreciationPercent).HasPrecision(18, 2);
+            entity.Property(e => e.EffectiveDepreciationPercent).HasPrecision(18, 2);
+            entity.HasIndex(e => new { e.ClassificationCode, e.AgeLowerBound, e.AgeUpperBound });
+            entity.HasData(PropertyAssessmentApp.Services.BuildingDepreciationSchedule.GetSeedEntities());
         });
     }
 }

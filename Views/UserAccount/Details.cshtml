@@ -55,7 +55,7 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
             <div>
                 <span class="text-slate-500 dark:text-stone-400 block text-[10px] font-bold uppercase">User Position:</span>
                 <span class="text-slate-900 dark:text-white font-bold font-mono text-sm">@Model.Role</span>
@@ -69,6 +69,23 @@
                 <span class="text-emerald-700 dark:text-emerald-400 font-bold font-mono text-sm">
                     @(string.IsNullOrEmpty(Model.WorkflowRoleName) ? (Model.WorkflowRoleId.HasValue ? $"Step {Model.WorkflowRoleId}" : "Unassigned") : $"Step {Model.WorkflowRoleId}: {Model.WorkflowRoleName}")
                 </span>
+            </div>
+            <div>
+                <span class="text-slate-500 dark:text-stone-400 block text-[10px] font-bold uppercase">Employment Status:</span>
+                @if (Model.IsRegularEmployee)
+                {
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-bold text-xs">
+                        <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i>
+                        Regular Employee
+                    </span>
+                }
+                else
+                {
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 font-bold text-xs border border-amber-300">
+                        <i data-lucide="stamp" class="w-3.5 h-3.5"></i>
+                        Non-Regular (Tags For Approval)
+                    </span>
+                }
             </div>
         </div>
 

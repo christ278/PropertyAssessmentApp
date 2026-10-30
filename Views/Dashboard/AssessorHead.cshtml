@@ -1,12 +1,38 @@
 @model PropertyAssessmentApp.Models.DashboardViewModel
 @{
     ViewData["Title"] = "Assessor Head Dashboard";
+    bool hasDateFilter = Model.StartDate.HasValue || Model.EndDate.HasValue;
+    string dateRangeTitle;
+    if (Model.StartDate.HasValue && Model.EndDate.HasValue)
+    {
+        dateRangeTitle = Model.StartDate.Value.Date == Model.EndDate.Value.Date
+            ? Model.StartDate.Value.ToString("MMMM dd, yyyy")
+            : $"{Model.StartDate.Value:MMM dd, yyyy} - {Model.EndDate.Value:MMM dd, yyyy}";
+    }
+    else if (Model.StartDate.HasValue)
+    {
+        dateRangeTitle = $"From {Model.StartDate.Value:MMMM dd, yyyy}";
+    }
+    else if (Model.EndDate.HasValue)
+    {
+        dateRangeTitle = $"Up to {Model.EndDate.Value:MMMM dd, yyyy}";
+    }
+    else
+    {
+        dateRangeTitle = DateTime.Now.ToString("MMMM dd, yyyy");
+    }
+
+    string sectionHeader = hasDateFilter ? $"Transactions ({dateRangeTitle})" : $"Today's Transactions ({dateRangeTitle})";
+    string badgeLabel = hasDateFilter ? (Model.StartDate.HasValue && Model.EndDate.HasValue && Model.StartDate.Value.Date == Model.EndDate.Value.Date ? "Selected Date" : "Date Filtered") : "Today Only";
+    string badgeClass = hasDateFilter ? "bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60" : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300";
+    string descSuffix = hasDateFilter ? "in selected range" : "today";
+
     var todayGroups = new[]
     {
-        (Key: "pending", Title: "Pending Transaction", ShortStatus: "Pending", Desc: "Submitted today, unclaimed & not approved", Count: Model.TodayPendingList.Count, Color: "text-amber-600 dark:text-amber-400", Ring: "ring-amber-500/40 bg-amber-50/60 dark:bg-amber-950/20", Dot: "bg-amber-500", Badge: "bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/60", Items: Model.TodayPendingList),
+        (Key: "pending", Title: "Pending Transaction", ShortStatus: "Pending", Desc: $"Submitted {descSuffix}, unclaimed & not approved", Count: Model.TodayPendingList.Count, Color: "text-amber-600 dark:text-amber-400", Ring: "ring-amber-500/40 bg-amber-50/60 dark:bg-amber-950/20", Dot: "bg-amber-500", Badge: "bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/60", Items: Model.TodayPendingList),
         (Key: "ongoing", Title: "On Going", ShortStatus: "On Going", Desc: "Claimed by staff & not yet approved", Count: Model.TodayOnGoingList.Count, Color: "text-blue-600 dark:text-blue-400", Ring: "ring-blue-500/40 bg-blue-50/60 dark:bg-blue-950/20", Dot: "bg-blue-500", Badge: "bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800/60", Items: Model.TodayOnGoingList),
         (Key: "approved", Title: "Approved", ShortStatus: "Approved", Desc: "Approved, awaiting claim in releasing", Count: Model.TodayApprovedList.Count, Color: "text-violet-600 dark:text-violet-400", Ring: "ring-violet-500/40 bg-violet-50/60 dark:bg-violet-950/20", Dot: "bg-violet-500", Badge: "bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800/60", Items: Model.TodayApprovedList),
-        (Key: "released", Title: "Released", ShortStatus: "Released", Desc: "All transactions released today", Count: Model.TodayReleasedList.Count, Color: "text-emerald-600 dark:text-emerald-400", Ring: "ring-emerald-500/40 bg-emerald-50/60 dark:bg-emerald-950/20", Dot: "bg-emerald-500", Badge: "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60", Items: Model.TodayReleasedList)
+        (Key: "released", Title: "Released", ShortStatus: "Released", Desc: $"All transactions released {descSuffix}", Count: Model.TodayReleasedList.Count, Color: "text-emerald-600 dark:text-emerald-400", Ring: "ring-emerald-500/40 bg-emerald-50/60 dark:bg-emerald-950/20", Dot: "bg-emerald-500", Badge: "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60", Items: Model.TodayReleasedList)
     };
 }
 <partial name="_Header" model="Model" />
@@ -46,11 +72,11 @@
 <div class="rounded-2xl bg-white/90 dark:bg-stone-900/80 border border-slate-200/90 dark:border-stone-800 shadow-sm mb-6 overflow-hidden">
     <div class="p-5 border-b border-slate-100 dark:border-stone-800 flex flex-wrap items-center justify-between gap-2">
         <div>
-            <h2 class="text-sm font-bold text-slate-800 dark:text-stone-100">Today's Transactions (@DateTime.Now.ToString("MMMM dd, yyyy"))</h2>
+            <h2 class="text-sm font-bold text-slate-800 dark:text-stone-100">@sectionHeader</h2>
             <p class="text-xs text-slate-400">Click a status card below to filter the transaction list</p>
         </div>
-        <span class="px-2.5 py-1 rounded-xl text-[11px] font-mono font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300">
-            Today Only
+        <span class="px-2.5 py-1 rounded-xl text-[11px] font-mono font-bold @badgeClass">
+            @badgeLabel
         </span>
     </div>
 
@@ -110,8 +136,8 @@
                                         <td colspan="7" class="px-4 py-12 text-center text-slate-400 dark:text-stone-500">
                                             <div class="flex flex-col items-center gap-2">
                                                 <i data-lucide="inbox" class="w-8 h-8 text-slate-300 dark:text-stone-600"></i>
-                                                <p class="font-bold text-slate-600 dark:text-stone-400">No @g.Title.ToLowerInvariant() records for today</p>
-                                                <p class="text-[11px]">Transactions matching this status submitted today will appear here.</p>
+                                                <p class="font-bold text-slate-600 dark:text-stone-400">No @g.Title.ToLowerInvariant() records @(hasDateFilter ? "for the selected date range" : "for today")</p>
+                                                <p class="text-[11px]">Transactions matching this status @(hasDateFilter ? "within the selected dates" : "submitted or updated today") will appear here.</p>
                                             </div>
                                         </td>
                                     </tr>

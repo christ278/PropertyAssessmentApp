@@ -92,6 +92,28 @@
                     </div>
                 </div>
 
+                <!-- Manual Paper FAAS Encoding Callout Banner -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 shadow-xs">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                            <i data-lucide="file-signature" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <span class="text-xs font-black text-emerald-950 dark:text-emerald-200 uppercase tracking-wide flex items-center gap-2">
+                                Manual Paper FAAS Encoding: <span class="underline decoration-emerald-500">@Model.Kind</span>
+                            </span>
+                            <p class="text-[11px] text-slate-600 dark:text-stone-400 mt-0.5">
+                                Encoding paper-processed Field Appraisal and Assessment record into the master digital registry.
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <span class="px-3 py-1 rounded-full bg-emerald-200/80 dark:bg-emerald-900/60 text-emerald-950 dark:text-emerald-200 text-[10px] font-mono font-extrabold uppercase">
+                            <span id="activeKindBadge">@Model.Kind</span> Form Active
+                        </span>
+                    </div>
+                </div>
+
                 <!-- Transaction Information Inputs -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
@@ -406,29 +428,135 @@
                     </div>
                 </div>
 
-                <!-- Signatories -->
-                <div class="p-5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
-                    <h4 class="text-xs font-bold uppercase text-slate-800 dark:text-stone-200">Signatories & Approval Audit</h4>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Sequential Signatories & Approval Workflow Chain -->
+                <div class="p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-5">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 dark:border-stone-800 pb-3">
                         <div>
-                            <label asp-for="AppraisedByName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">APPRAISED BY (APPRAISER)</label>
-                            <input asp-for="AppraisedByName" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white" />
+                            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-2">
+                                <i data-lucide="users" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                                Manual Assessment Signatories &amp; Approval Pipeline
+                            </h4>
+                            <p class="text-[11px] text-slate-500 dark:text-stone-400">Chronological verification and sign-off audit trail from paper appraisal encoding to executive approval.</p>
                         </div>
-                        <div>
-                            <label asp-for="AssessedByName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">ASSESSED BY (ASSESSMENT OFFICER)</label>
-                            <input asp-for="AssessedByName" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white" />
+                        <span class="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-[10px] font-bold font-mono">
+                            R.A. 7160 Compliant
+                        </span>
+                    </div>
+
+                    <!-- Flow Stepper Banner (Encoded -> Appraised -> Assessed / Recommended -> Approved) -->
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-2 text-[11px] font-mono font-bold">
+                        <div class="flex items-center gap-2 p-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-800 dark:text-stone-200 shadow-xs">
+                            <span class="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-[10px] flex items-center justify-center font-bold">1</span>
+                            <span>1. Encoded</span>
                         </div>
-                        <div>
-                            <label asp-for="ApprovedByName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">APPROVED BY (CITY ASSESSOR)</label>
-                            <input asp-for="ApprovedByName" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold text-emerald-700 dark:text-emerald-400" />
+                        <div class="flex items-center gap-2 p-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-800 dark:text-stone-200 shadow-xs">
+                            <span class="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-[10px] flex items-center justify-center font-bold">2</span>
+                            <span>2. Appraised</span>
                         </div>
-                        <div>
-                            <label asp-for="EncodedByName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">ENCODED BY</label>
-                            <input asp-for="EncodedByName" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white" />
+                        <div class="flex items-center gap-2 p-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-800 dark:text-stone-200 shadow-xs">
+                            <span class="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-[10px] flex items-center justify-center font-bold">3</span>
+                            <span>3. Assessed</span>
                         </div>
+                        <div class="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 shadow-xs">
+                            <span class="w-5 h-5 rounded-full bg-emerald-600 text-white text-[10px] flex items-center justify-center font-bold">4</span>
+                            <span>4. Approved</span>
+                        </div>
+                    </div>
+
+                    <!-- 4 Signatory Stages -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                        <!-- Stage 1: Encoded By -->
+                        <div class="p-4 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 space-y-3">
+                            <div class="flex items-center justify-between border-b border-slate-100 dark:border-stone-800/80 pb-2">
+                                <span class="text-xs font-bold text-slate-800 dark:text-stone-200 uppercase flex items-center gap-1.5">
+                                    <span class="w-5 h-5 rounded-full bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-300 text-[10px] font-bold flex items-center justify-center">1</span>
+                                    1. Encoded By
+                                </span>
+                                <span class="text-[10px] text-slate-400 font-mono">Assessment Clerk</span>
+                            </div>
+                            <div>
+                                <label asp-for="EncodedByName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-[11px]">ENCODER NAME <span class="text-rose-500">*</span></label>
+                                <input asp-for="EncodedByName" required class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-semibold text-xs focus:outline-none focus:border-emerald-600" placeholder="Full name of encoder" />
+                            </div>
+                            <div>
+                                <label asp-for="DateEncoded" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-[11px]">DATE ENCODED</label>
+                                <input asp-for="DateEncoded" type="date" value="@(Model.DateEncoded?.ToString("yyyy-MM-dd") ?? DateTime.Now.ToString("yyyy-MM-dd"))" class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs focus:outline-none focus:border-emerald-600" />
+                            </div>
+                        </div>
+
+                        <!-- Stage 2: Appraised By -->
+                        <div class="p-4 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 space-y-3">
+                            <div class="flex items-center justify-between border-b border-slate-100 dark:border-stone-800/80 pb-2">
+                                <span class="text-xs font-bold text-slate-800 dark:text-stone-200 uppercase flex items-center gap-1.5">
+                                    <span class="w-5 h-5 rounded-full bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-300 text-[10px] font-bold flex items-center justify-center">2</span>
+                                    2. Appraised By
+                                </span>
+                                <span class="text-[10px] text-slate-400 font-mono">Field Appraiser</span>
+                            </div>
+                            <div>
+                                <label asp-for="AppraisedByName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-[11px]">APPRAISER NAME <span class="text-rose-500">*</span></label>
+                                <input asp-for="AppraisedByName" required class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-semibold text-xs focus:outline-none focus:border-emerald-600" placeholder="e.g. Elena G. Reyes (Property Appraiser)" />
+                            </div>
+                            <div>
+                                <label asp-for="DateAppraised" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-[11px]">DATE APPRAISED</label>
+                                <input asp-for="DateAppraised" type="date" value="@(Model.DateAppraised?.ToString("yyyy-MM-dd") ?? DateTime.Now.ToString("yyyy-MM-dd"))" class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs focus:outline-none focus:border-emerald-600" />
+                            </div>
+                        </div>
+
+                        <!-- Stage 3: Assessed By / Recommending Approval -->
+                        <div class="p-4 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 space-y-3">
+                            <div class="flex items-center justify-between border-b border-slate-100 dark:border-stone-800/80 pb-2">
+                                <span class="text-xs font-bold text-slate-800 dark:text-stone-200 uppercase flex items-center gap-1.5">
+                                    <span class="w-5 h-5 rounded-full bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-300 text-[10px] font-bold flex items-center justify-center">3</span>
+                                    3. Assessed / Recommending Approval
+                                </span>
+                                <span class="text-[10px] text-slate-400 font-mono">Assessment Operations</span>
+                            </div>
+                            <div class="space-y-3">
+                                <div>
+                                    <label asp-for="AssessedByName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-[11px]">ASSESSMENT OFFICER <span class="text-rose-500">*</span></label>
+                                    <input asp-for="AssessedByName" required class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-semibold text-xs focus:outline-none focus:border-emerald-600" placeholder="e.g. Marcus Aurelius Santos" />
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label asp-for="DateAssessed" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-[11px]">DATE ASSESSED</label>
+                                        <input asp-for="DateAssessed" type="date" value="@(Model.DateAssessed.ToString("yyyy-MM-dd"))" class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs focus:outline-none focus:border-emerald-600" />
+                                    </div>
+                                    <div>
+                                        <label asp-for="DateRecommended" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-[11px]">DATE RECOMMENDED</label>
+                                        <input asp-for="DateRecommended" type="date" value="@(Model.DateRecommended?.ToString("yyyy-MM-dd") ?? DateTime.Now.ToString("yyyy-MM-dd"))" class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs focus:outline-none focus:border-emerald-600" />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label asp-for="RecommendingApprovalName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-[11px]">RECOMMENDING APPROVAL (ASST. ASSESSOR)</label>
+                                    <input asp-for="RecommendingApprovalName" class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-semibold text-xs focus:outline-none focus:border-emerald-600" placeholder="e.g. Engr. Roberto M. Dela Rosa" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Stage 4: Approved By -->
+                        <div class="p-4 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-300 dark:border-emerald-800/80 space-y-3">
+                            <div class="flex items-center justify-between border-b border-emerald-200 dark:border-emerald-800/60 pb-2">
+                                <span class="text-xs font-bold text-emerald-900 dark:text-emerald-300 uppercase flex items-center gap-1.5">
+                                    <span class="w-5 h-5 rounded-full bg-emerald-600 text-white text-[10px] font-bold flex items-center justify-center">4</span>
+                                    4. Approved By
+                                </span>
+                                <span class="text-[10px] text-emerald-700 dark:text-emerald-400 font-mono font-bold">Executive Assessor</span>
+                            </div>
+                            <div>
+                                <label asp-for="ApprovedByName" class="block text-emerald-900 dark:text-emerald-300 mb-1 font-bold text-[11px]">CITY / MUNICIPAL ASSESSOR <span class="text-rose-500">*</span></label>
+                                <input asp-for="ApprovedByName" required class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-emerald-300 dark:border-emerald-700 text-slate-900 dark:text-white font-bold text-xs focus:outline-none focus:border-emerald-600" placeholder="e.g. Atty. Clarissa V. Mendoza" />
+                            </div>
+                            <div>
+                                <label asp-for="DateApproved" class="block text-emerald-900 dark:text-emerald-300 mb-1 font-bold text-[11px]">DATE APPROVED</label>
+                                <input asp-for="DateApproved" type="date" value="@(Model.DateApproved?.ToString("yyyy-MM-dd") ?? DateTime.Now.ToString("yyyy-MM-dd"))" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-emerald-300 dark:border-emerald-700 text-slate-900 dark:text-white font-mono text-xs focus:outline-none focus:border-emerald-600" />
+                            </div>
+                        </div>
+
+                        <!-- Memoranda / Special Notes -->
                         <div class="md:col-span-2">
-                            <label asp-for="Memoranda" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">MEMORANDA / SPECIAL NOTES</label>
-                            <textarea asp-for="Memoranda" rows="2" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white"></textarea>
+                            <label asp-for="Memoranda" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-[11px]">MEMORANDA / SPECIAL REMARKS / PAPER FAAS AUDIT NOTES</label>
+                            <textarea asp-for="Memoranda" rows="2" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-emerald-600" placeholder="Notes, paper batch reference number, or local tax board resolutions..."></textarea>
                         </div>
                     </div>
                 </div>
@@ -484,6 +612,7 @@
         function onKindChanged(kind) {
             selectedKind = kind;
             $('#specTitleKind').text(kind);
+            $('#activeKindBadge').text(kind);
 
             // Toggle kind specific forms / panels
             if (kind === 'Machinery') {

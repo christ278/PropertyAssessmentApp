@@ -184,7 +184,7 @@
                             <i data-lucide="inbox" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
                             <span>Pool Transactions</span>
                         </div>
-                        <span class="px-2 py-0.5 rounded-lg text-[9px] bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-bold uppercase">Pool</span>
+                        <span class="px-2 py-0.5 rounded-lg text-[10px] bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-black transition-all duration-300" data-signalr-pool-count>0</span>
                     </a>
                 }
 
@@ -415,6 +415,7 @@
                         <a asp-controller="Workflow" asp-action="Pool" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold text-xs font-mono transition-all @(currentController == "Workflow" && currentAction == "Pool" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold ring-1 ring-emerald-500/30" : "text-slate-700 dark:text-stone-300 hover:bg-slate-100 dark:hover:bg-stone-800/60 hover:text-emerald-700 dark:hover:text-emerald-400")">
                             <i data-lucide="inbox" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
                             <span>Pool</span>
+                            <span class="px-1.5 py-0.5 rounded-md text-[9px] bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-black transition-all duration-300" data-signalr-pool-count>0</span>
                         </a>
                     }
 
@@ -851,6 +852,62 @@
             "hideMethod": "fadeOut"
         };
 
+        // Global Real-Time SignalR Pool Counts Syncer
+        window.refreshWorkflowPoolCounts = function (preferredDivisionId) {
+            var divId = preferredDivisionId !== undefined ? preferredDivisionId : (window.currentActiveDivisionId || null);
+            var url = '/Workflow/GetPoolCounts' + (divId ? ('?divisionId=' + encodeURIComponent(divId)) : '');
+
+            fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(function (res) { return res.json(); })
+                .then(function (data) {
+                    if (!data || !data.success) return;
+
+                    // 1. Update navigation sidebar and horizontal bar badges
+                    document.querySelectorAll('[data-signalr-pool-count]').forEach(function (badge) {
+                        var prev = parseInt(badge.textContent.trim(), 10) || 0;
+                        badge.textContent = data.userPoolCount;
+                        if (prev !== data.userPoolCount) {
+                            badge.classList.add('scale-125', 'ring-2', 'ring-emerald-400');
+                            setTimeout(function () {
+                                badge.classList.remove('scale-125', 'ring-2', 'ring-emerald-400');
+                            }, 800);
+                        }
+                    });
+
+                    // 2. Update Pool.cshtml main available badge if present
+                    var poolNumEl = document.getElementById('poolAvailableCountNumber');
+                    if (poolNumEl) {
+                        var prevPool = parseInt(poolNumEl.textContent.trim(), 10) || 0;
+                        poolNumEl.textContent = data.totalPool;
+                        var poolBadge = document.getElementById('poolAvailableCountBadge');
+                        if (poolBadge && prevPool !== data.totalPool) {
+                            poolBadge.classList.add('scale-110', 'ring-2', 'ring-emerald-500', 'bg-emerald-200');
+                            setTimeout(function () {
+                                poolBadge.classList.remove('scale-110', 'ring-2', 'ring-emerald-500', 'bg-emerald-200');
+                            }, 800);
+                        }
+                    }
+
+                    // 3. Update My Transactions link badge on Pool.cshtml
+                    var poolMyBadge = document.getElementById('poolMyTransactionsCountBadge');
+                    if (poolMyBadge) {
+                        poolMyBadge.textContent = data.totalMy;
+                    }
+
+                    // 4. Update Department Pool link badge on MyTransactions.cshtml
+                    var myTransPoolBadge = document.getElementById('myTransPoolCountBadge');
+                    if (myTransPoolBadge) {
+                        myTransPoolBadge.textContent = data.totalPool;
+                    }
+
+                    // 5. Fire custom event for any view-specific listeners
+                    window.dispatchEvent(new CustomEvent('workflow:countsRefreshed', { detail: data }));
+                })
+                .catch(function (err) {
+                    console.debug('Failed to refresh pool counts:', err);
+                });
+        };
+
         // Initialize Global Real-Time SignalR Hub Connection
         if (typeof signalR !== 'undefined') {
             const workflowHubConnection = new signalR.HubConnectionBuilder()
@@ -897,23 +954,44 @@
 
                 // Dispatch global event for page-level handlers (Pool, MyTransactions, Queues)
                 window.dispatchEvent(new CustomEvent('workflow:transactionForwarded', { detail: data }));
+                if (typeof window.refreshWorkflowPoolCounts === 'function') window.refreshWorkflowPoolCounts();
             });
 
             workflowHubConnection.on("TransactionClaimed", function (data) {
                 window.dispatchEvent(new CustomEvent('workflow:transactionClaimed', { detail: data }));
+                if (typeof window.refreshWorkflowPoolCounts === 'function') window.refreshWorkflowPoolCounts();
             });
 
             workflowHubConnection.on("TransactionReleased", function (data) {
                 window.dispatchEvent(new CustomEvent('workflow:transactionReleased', { detail: data }));
+                if (typeof window.refreshWorkflowPoolCounts === 'function') window.refreshWorkflowPoolCounts();
             });
 
             workflowHubConnection.on("TransactionDeferred", function (data) {
                 window.dispatchEvent(new CustomEvent('workflow:transactionDeferred', { detail: data }));
+                if (typeof window.refreshWorkflowPoolCounts === 'function') window.refreshWorkflowPoolCounts();
+            });
+
+            workflowHubConnection.on("TransactionCreated", function (data) {
+                window.dispatchEvent(new CustomEvent('workflow:transactionCreated', { detail: data }));
+                if (typeof window.refreshWorkflowPoolCounts === 'function') window.refreshWorkflowPoolCounts();
+            });
+
+            workflowHubConnection.on("TransactionTaggedForApproval", function (data) {
+                window.dispatchEvent(new CustomEvent('workflow:transactionTaggedForApproval', { detail: data }));
+                if (typeof window.refreshWorkflowPoolCounts === 'function') window.refreshWorkflowPoolCounts();
+            });
+
+            workflowHubConnection.on("PoolCountsChanged", function (data) {
+                if (typeof window.refreshWorkflowPoolCounts === 'function') window.refreshWorkflowPoolCounts();
             });
 
             workflowHubConnection.start()
                 .then(function () {
                     console.log("⚡ SignalR connected to /hubs/workflow successfully.");
+                    if (typeof window.refreshWorkflowPoolCounts === 'function') {
+                        window.refreshWorkflowPoolCounts();
+                    }
                 })
                 .catch(function (err) {
                     console.warn("SignalR connection attempt failed:", err.toString());

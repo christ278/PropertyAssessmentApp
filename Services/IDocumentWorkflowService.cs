@@ -19,6 +19,7 @@ public class WorkflowQueueItemDto
     public bool IsClaimed { get; set; }
     public bool IsDeferred { get; set; }
     public bool IsApprovalStage { get; set; }
+    public bool IsForApproval { get; set; }
     public string StatusText { get; set; } = string.Empty;
     public decimal TotalAmount { get; set; }
     public DateTime DateSubmitted { get; set; }
@@ -107,6 +108,7 @@ public class TransactionTimelineDto
     public bool IsDeferred { get; set; }
     public bool IsCompleted { get; set; }
     public bool IsApprovalStage { get; set; }
+    public bool IsForApproval { get; set; }
     public string OverallStatus { get; set; } = string.Empty;
     public string ElapsedTimeText { get; set; } = string.Empty;
     public List<TimelineStepDto> WorkflowSteps { get; set; } = new();
@@ -127,9 +129,11 @@ public interface IDocumentWorkflowService
     bool ClaimDocument(Guid requestId, string requestType, Guid userId, string userName);
     bool ReleaseDocumentToPool(Guid requestId, string requestType);
     bool DeferDocument(Guid requestId, string requestType, DivisionType division, Guid userId, string userName, string userRole, string remarks);
+    bool TagDocumentForApproval(Guid requestId, string requestType, DivisionType division, Guid userId, string userName, string userRole, string remarks);
     
     IEnumerable<WorkflowQueueItemDto> GetQueueForDivision(DivisionType division, WorkflowStage? stageFilter = null, string? search = null);
     IEnumerable<WorkflowQueueItemDto> GetPoolQueueForDivision(DivisionType division, WorkflowStage? stageFilter = null, string? search = null);
+    int GetUserPendingPoolCount(System.Security.Claims.ClaimsPrincipal? user);
     IEnumerable<WorkflowQueueItemDto> GetPersonalQueueForUser(Guid userId, DivisionType? divisionFilter = null, string? search = null);
     IEnumerable<WorkflowQueueItemDto> GetUnifiedQueue(
         int? divisionId = null, 

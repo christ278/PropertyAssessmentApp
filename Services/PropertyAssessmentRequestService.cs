@@ -201,7 +201,7 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                                             : (string.Equals(request.TransactionTypeCode, "PC", StringComparison.OrdinalIgnoreCase)
                                                 ? $"Reassessed due to Physical Change (PC) · Renovation / Expansion under Assessment Request #{request.TrackingNumber}. Supersedes prior TD #{refTd?.TaxDeclarationNumber ?? request.PrevTDN} (PIN: #{refTd?.PropertyIndexNumber ?? request.PrevPIN}) with upward adjustment in Fair Market Value and Assessed Value following structural renovation/expansion."
                                                 : $"Created from Assessment Partition Request {request.TrackingNumber} (Partition {p.PartitionIndex}, Duplicated from {p.BaseTDN}).")))),
-                            Status = request.Status == PropertyAssessmentStatus.Approved ? AssessmentStatus.Active : AssessmentStatus.Pending,
+                            Status = (request.Status >= PropertyAssessmentStatus.Approved && request.Status != PropertyAssessmentStatus.Deferred) ? AssessmentStatus.Active : AssessmentStatus.Pending,
                             DateEncoded = DateTime.Now,
                             EncodedByName = request.Requestor ?? "System Appraiser",
 
@@ -559,7 +559,7 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
 
                 // 2. CAST Combination #2 (Post-Approval / Official TDN1: {RevYearLastTwo:D2}-{BarangayCode:D4}-{DeclarationNo:D5})
                 var currentTd = td.TaxDeclarationNumber?.Trim() ?? string.Empty;
-                if (!CastTdGenerator.IsOfficialCastTdFormat(currentTd) || request.Status == PropertyAssessmentStatus.Approved)
+                if (!CastTdGenerator.IsOfficialCastTdFormat(currentTd) || (request.Status >= PropertyAssessmentStatus.Approved && request.Status != PropertyAssessmentStatus.Deferred))
                 {
                     if (!CastTdGenerator.IsOfficialCastTdFormat(currentTd))
                     {
@@ -623,7 +623,7 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                 {
                     td.ARPNo = CastTdGenerator.FormatArpNumber(td.DistrictOrBarangay, td.SectionNo, lotOrParcel);
                 }
-                if (request.Status == PropertyAssessmentStatus.Approved && !CastTdGenerator.IsOfficialCastTdFormat(td.TaxDeclarationNumber))
+                if (request.Status >= PropertyAssessmentStatus.Approved && request.Status != PropertyAssessmentStatus.Deferred && !CastTdGenerator.IsOfficialCastTdFormat(td.TaxDeclarationNumber))
                 {
                     td.TaxDeclarationNumber = _assessmentService.GenerateCastTdNumber(td.EffectivityYear, td.DistrictOrBarangay);
                 }
@@ -688,7 +688,7 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                 .ToList();
         }
 
-        if (request.Status == PropertyAssessmentStatus.Approved)
+        if (request.Status >= PropertyAssessmentStatus.Approved && request.Status != PropertyAssessmentStatus.Deferred)
         {
             var newLotTdns = tds.Select(t => t.TaxDeclarationNumber).Where(s => !string.IsNullOrWhiteSpace(s)).Distinct().ToList();
             var newLotsDisplay = newLotTdns.Count > 0 ? string.Join(", ", newLotTdns) : (isConsolidation ? "Consolidated Lot TD" : (isPhysicalChange ? "Renovated/Expanded Property TD" : (isTransfer ? "Transferred Property TD" : (isReclassification ? "Reclassified Property TD" : "Segregated Lot TDs"))));
@@ -955,7 +955,7 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                                             ? $"Reclassified due to Actual Ground Use Conversion (RC) pursuant to field inspection under Sec. 217 of R.A. 7160 under Assessment Request #{request.TrackingNumber}. Converted statutory assessment level ({refTd?.AssessmentLevelPercent ?? 20:0.#}% to {assessLevel:0.#}%) altering annual property tax dues without title re-titling. Prior TD #{refTd?.TaxDeclarationNumber ?? request.PrevTDN} cancelled and superseded."
                                             : $"Created from Partition Request {request.TrackingNumber} (Partition {letterSuffix} of {partitionCount}). Previous TD: {request.PrevTDN}")))))),
                 TransactionCode = request.TransactionTypeCode,
-                Status = request.Status == PropertyAssessmentStatus.Approved ? AssessmentStatus.Active : AssessmentStatus.Pending,
+                Status = (request.Status >= PropertyAssessmentStatus.Approved && request.Status != PropertyAssessmentStatus.Deferred) ? AssessmentStatus.Active : AssessmentStatus.Pending,
                 DateEncoded = DateTime.Now,
                 EncodedByName = request.Requestor ?? "System Appraiser",
 
@@ -1027,7 +1027,7 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
             result.Add(newTd);
         }
 
-        if (request.Status != PropertyAssessmentStatus.Approved)
+        if (request.Status < PropertyAssessmentStatus.Approved || request.Status == PropertyAssessmentStatus.Deferred)
         {
             request.Remarks = $"Partitioned into {partitionCount} Pending Tax Declarations awaiting approval.";
         }
@@ -1064,8 +1064,8 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
     }
 
     public int GetTotalCount() => _context.PropertyAssessmentRequests.Count();
-    public int GetPendingCount() => _context.PropertyAssessmentRequests.Count(r => r.Status != PropertyAssessmentStatus.Approved && r.Status != PropertyAssessmentStatus.Deferred);
-    public int GetApprovedCount() => _context.PropertyAssessmentRequests.Count(r => r.Status == PropertyAssessmentStatus.Approved);
+    public int GetPendingCount() => _context.PropertyAssessmentRequests.Count(r => r.Status < PropertyAssessmentStatus.Approved && r.Status != PropertyAssessmentStatus.Deferred);
+    public int GetApprovedCount() => _context.PropertyAssessmentRequests.Count(r => r.Status >= PropertyAssessmentStatus.Approved && r.Status != PropertyAssessmentStatus.Deferred);
 
     public List<BuildingClassification> GetBuildingClassifications()
     {

@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using PropertyAssessmentApp.Data;
 using PropertyAssessmentApp.Models;
@@ -493,9 +493,11 @@ public class DocumentWorkflowService : IDocumentWorkflowService
                 trackingNo = item.TrackingNumber;
                 item.UpdatedDate = DateTime.Now;
                 if (isCompleted)
-                    item.Status = PropertyAssessmentStatus.Approved;
+                    item.Status = PropertyAssessmentStatus.Releasing;
                 else if (isDeferred)
                     item.Status = PropertyAssessmentStatus.Deferred;
+                else if (Enum.IsDefined(typeof(PropertyAssessmentStatus), targetStatusId))
+                    item.Status = (PropertyAssessmentStatus)targetStatusId;
 
                 SyncPropertyAssessmentPartitionTaxDeclarations(item);
                 _context.SaveChanges();
@@ -721,6 +723,95 @@ public class DocumentWorkflowService : IDocumentWorkflowService
         return true;
     }
 
+    public bool TagDocumentForApproval(Guid requestId, string requestType, DivisionType division, Guid userId, string userName, string userRole, string remarks)
+    {
+        var logs = GetForwardingLogs(requestId).ToList();
+        var currentStage = logs.FirstOrDefault()?.ToStage ?? WorkflowStage.ClerkReceiving;
+        var trackingNo = "TRK-" + requestId.ToString().Substring(0, 8);
+
+        if (requestType == "TaxDeclarationRequest")
+        {
+            var item = _tdService.GetById(requestId);
+            if (item != null)
+            {
+                trackingNo = item.TrackingNumber;
+                item.UpdatedDate = DateTime.Now;
+                _tdService.Update(item, null, "");
+            }
+        }
+        else if (requestType == "LandHoldingRequest")
+        {
+            var item = _lhService.GetById(requestId);
+            if (item != null)
+            {
+                trackingNo = item.TrackingNumber;
+                item.UpdatedDate = DateTime.Now;
+                _lhService.Update(item, null, "");
+            }
+        }
+        else if (requestType == "TaxMappingRequest")
+        {
+            var item = _tmService.GetById(requestId);
+            if (item != null)
+            {
+                trackingNo = item.RequestNumber;
+                item.UpdatedDate = DateTime.Now;
+                _tmService.Update(item, null, "");
+            }
+        }
+        else if (requestType == "PropertyAssessmentRequest")
+        {
+            var item = _context.PropertyAssessmentRequests.FirstOrDefault(r => r.Id == requestId);
+            if (item != null)
+            {
+                trackingNo = item.TrackingNumber;
+            }
+        }
+        else if (requestType == "RequestForInspection")
+        {
+            var item = _context.RequestForInspections.FirstOrDefault(r => r.Id == requestId);
+            if (item != null)
+            {
+                trackingNo = item.TrackingNumber;
+            }
+        }
+
+        // Release claim on previous logs so document returns to shared pool
+        var existingLogs = _context.DocumentForwardingLogs.Where(l => l.RequestId == requestId).ToList();
+        foreach (var el in existingLogs)
+        {
+            el.IsClaimed = false;
+            el.AssignedUserId = null;
+            el.AssignedUserName = null;
+        }
+
+        var log = new DocumentForwardingLog
+        {
+            RequestId = requestId,
+            RequestType = requestType,
+            TrackingNumber = trackingNo,
+            Division = division,
+            FromStage = currentStage,
+            ToStage = currentStage,
+            ForwardedByName = string.IsNullOrWhiteSpace(userName) ? "Staff" : userName,
+            ForwardedByRole = string.IsNullOrWhiteSpace(userRole) ? "Staff" : userRole,
+            AssignedToRole = "For Approval Review",
+            ActionTaken = "For Approval",
+            Remarks = string.IsNullOrWhiteSpace(remarks) ? "Flagged For Approval by Non-Regular staff" : remarks,
+            AssignedUserId = null,
+            AssignedUserName = null,
+            IsClaimed = false, // Back to pool!
+            IsDeferred = false,
+            IsForApproval = true,
+            Timestamp = DateTime.Now
+        };
+
+        _context.DocumentForwardingLogs.Add(log);
+        _context.SaveChanges();
+
+        return true;
+    }
+
     public IEnumerable<WorkflowQueueItemDto> GetQueueForDivision(DivisionType division, WorkflowStage? stageFilter = null, string? search = null)
     {
         var items = BuildQueueItems(division);
@@ -764,6 +855,69 @@ public class DocumentWorkflowService : IDocumentWorkflowService
         }
 
         return query.OrderByDescending(i => i.DateSubmitted);
+    }
+
+    public int GetUserPendingPoolCount(System.Security.Claims.ClaimsPrincipal? user)
+    {
+        if (user == null || user.Identity?.IsAuthenticated != true)
+            return 0;
+
+        var idStr = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        Guid.TryParse(idStr, out var uId);
+
+        var userAccount = _context.UserAccounts.FirstOrDefault(u => u.Id == uId);
+        int? divisionId = null;
+        int? userStepId = null;
+        string? userRoleName = null;
+        bool isSuperAdminOrHead = false;
+
+        if (userAccount != null)
+        {
+            isSuperAdminOrHead = userAccount.Role == UserRole.SystemAdmin || userAccount.Role == UserRole.CityAssessor;
+            divisionId = userAccount.DivisionId;
+            userStepId = userAccount.WorkflowRoleId;
+            userRoleName = userAccount.WorkflowRoleName;
+        }
+        else
+        {
+            var uRole = user.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "";
+            isSuperAdminOrHead = uRole.Contains("Admin", StringComparison.OrdinalIgnoreCase)
+                || uRole.Contains("CityAssessor", StringComparison.OrdinalIgnoreCase)
+                || uRole.Contains("Head", StringComparison.OrdinalIgnoreCase);
+
+            var divClaim = user.FindFirst("DivisionId")?.Value;
+            if (int.TryParse(divClaim, out var parsedDiv)) divisionId = parsedDiv;
+
+            var wfClaim = user.FindFirst("WorkflowRoleId")?.Value;
+            if (int.TryParse(wfClaim, out var parsedWf)) userStepId = parsedWf;
+
+            userRoleName = user.FindFirst("WorkflowRoleName")?.Value;
+        }
+
+        if ((!userStepId.HasValue || userStepId.Value <= 0) && !isSuperAdminOrHead)
+        {
+            var uRoleStr = userAccount?.Role.ToString() ?? user.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "";
+            var matchedRole = _context.UserRoleSettings.FirstOrDefault(r => 
+                r.RoleName.Equals(uRoleStr, StringComparison.OrdinalIgnoreCase) || 
+                (!string.IsNullOrEmpty(userRoleName) && r.RoleName.Equals(userRoleName, StringComparison.OrdinalIgnoreCase)));
+            if (matchedRole?.TransactionStatusId.HasValue == true)
+            {
+                userStepId = matchedRole.TransactionStatusId.Value;
+            }
+        }
+
+        bool isReleasingOfficer = (userStepId.HasValue && (userStepId.Value == 10 || userStepId.Value == 19 || userStepId.Value == 30))
+            || (!string.IsNullOrEmpty(userRoleName) && userRoleName.Contains("Releas", StringComparison.OrdinalIgnoreCase));
+
+        int? divFilter = (isSuperAdminOrHead || isReleasingOfficer) ? null : (divisionId ?? 1);
+
+        return GetUnifiedQueue(
+            divisionId: divFilter,
+            mode: "pool",
+            userWorkflowRoleId: isSuperAdminOrHead ? null : userStepId,
+            userWorkflowRoleName: isSuperAdminOrHead ? null : userRoleName,
+            isSuperAdminOrHead: isSuperAdminOrHead
+        ).Count();
     }
 
     public IEnumerable<WorkflowQueueItemDto> GetPersonalQueueForUser(Guid userId, DivisionType? divisionFilter = null, string? search = null)
@@ -939,7 +1093,7 @@ public class DocumentWorkflowService : IDocumentWorkflowService
             || currentStageId == (int)WorkflowStage.Completed
             || currentStageId == 999
             || (latestLog != null && latestLog.ActionTaken == "Released" && (currentStageId == 10 || currentStageId == 19 || currentStageId == 30))
-            || (baseStatus != null && (baseStatus.Equals("Approved", StringComparison.OrdinalIgnoreCase) || baseStatus.Equals("Released", StringComparison.OrdinalIgnoreCase) || baseStatus.Equals("Completed", StringComparison.OrdinalIgnoreCase)));
+            || (baseStatus != null && (baseStatus.Equals("Released", StringComparison.OrdinalIgnoreCase) || baseStatus.Equals("Completed", StringComparison.OrdinalIgnoreCase)));
 
         // 3. User Rule Hierarchy:
         // - Released: if the transaction is now released
@@ -956,7 +1110,7 @@ public class DocumentWorkflowService : IDocumentWorkflowService
         {
             status = "Deferred";
         }
-        else if (isApprovalStep)
+        else if (isApprovalStep || (latestLog != null && (latestLog.IsForApproval || latestLog.ActionTaken == "For Approval")))
         {
             status = "For Approval";
         }
@@ -969,7 +1123,7 @@ public class DocumentWorkflowService : IDocumentWorkflowService
             status = "Pending";
         }
 
-        return (status, isApprovalStep, isReleased);
+        return (status, isApprovalStep || (latestLog != null && (latestLog.IsForApproval || latestLog.ActionTaken == "For Approval")), isReleased);
     }
 
     private List<WorkflowQueueItemDto> BuildDivision3Items()
@@ -1013,6 +1167,7 @@ public class DocumentWorkflowService : IDocumentWorkflowService
                 IsClaimed = isClaimed,
                 IsDeferred = isDeferred,
                 IsApprovalStage = isApproval,
+                IsForApproval = isApproval || statusText == "For Approval" || (lastLog != null && (lastLog.IsForApproval || lastLog.ActionTaken == "For Approval")),
                 StatusText = statusText,
                 TotalAmount = lh.TotalFeesAmount,
                 DateSubmitted = lh.RequestDate,
@@ -1062,6 +1217,7 @@ public class DocumentWorkflowService : IDocumentWorkflowService
                 IsClaimed = isClaimed,
                 IsDeferred = isDeferred,
                 IsApprovalStage = isApproval,
+                IsForApproval = isApproval || statusText == "For Approval" || (lastLog != null && (lastLog.IsForApproval || lastLog.ActionTaken == "For Approval")),
                 StatusText = statusText,
                 TotalAmount = td.TotalFeesAmount,
                 DateSubmitted = td.RequestDate,
@@ -1119,6 +1275,7 @@ public class DocumentWorkflowService : IDocumentWorkflowService
                     IsClaimed = isClaimed,
                     IsDeferred = isDeferred,
                     IsApprovalStage = isApproval,
+                IsForApproval = isApproval || statusText == "For Approval" || (lastLog != null && (lastLog.IsForApproval || lastLog.ActionTaken == "For Approval")),
                     StatusText = statusText,
                     TotalAmount = 0,
                     DateSubmitted = rfi.RequestDate,
@@ -1133,11 +1290,11 @@ public class DocumentWorkflowService : IDocumentWorkflowService
             {
                 var logs = GetForwardingLogs(rpa.Id).ToList();
                 var lastLog = logs.FirstOrDefault();
-                var currentStage = lastLog?.ToStage ?? (rpa.Status == PropertyAssessmentStatus.Approved ? WorkflowStage.Completed : (WorkflowStage)1);
+                var currentStage = lastLog?.ToStage ?? ((int)rpa.Status >= 10 ? WorkflowStage.Completed : (WorkflowStage)(int)rpa.Status);
                 int stageId = (int)currentStage;
                 bool isClaimed = lastLog?.IsClaimed ?? false;
                 bool isDeferred = lastLog?.IsDeferred ?? (rpa.Status == PropertyAssessmentStatus.Deferred);
-                bool isDone = lastLog?.ToStage == WorkflowStage.Completed || rpa.Status == PropertyAssessmentStatus.Approved;
+                bool isDone = lastLog?.ToStage == WorkflowStage.Completed || (lastLog != null && lastLog.ActionTaken == "Released" && (int)currentStage == 10);
 
                 var (statusText, isApproval, isReleased) = ResolveTransactionStatus(
                     2,
@@ -1166,6 +1323,7 @@ public class DocumentWorkflowService : IDocumentWorkflowService
                     IsClaimed = isClaimed,
                     IsDeferred = isDeferred,
                     IsApprovalStage = isApproval,
+                IsForApproval = isApproval || statusText == "For Approval" || (lastLog != null && (lastLog.IsForApproval || lastLog.ActionTaken == "For Approval")),
                     StatusText = statusText,
                     TotalAmount = rpa.TotalFeesAmount,
                     DateSubmitted = rpa.RequestDate,
@@ -1217,6 +1375,7 @@ public class DocumentWorkflowService : IDocumentWorkflowService
                     IsClaimed = isClaimed,
                     IsDeferred = isDeferred,
                     IsApprovalStage = isApproval,
+                IsForApproval = isApproval || statusText == "For Approval" || (lastLog != null && (lastLog.IsForApproval || lastLog.ActionTaken == "For Approval")),
                     StatusText = statusText,
                     TotalAmount = tm.TotalFeesAmount,
                     DateSubmitted = tm.RequestDate,
@@ -1678,7 +1837,7 @@ public class DocumentWorkflowService : IDocumentWorkflowService
             catch { }
         }
 
-        var targetStatus = request.Status == PropertyAssessmentStatus.Approved 
+        var targetStatus = (request.Status >= PropertyAssessmentStatus.Approved && request.Status != PropertyAssessmentStatus.Deferred) 
             ? AssessmentStatus.Active 
             : AssessmentStatus.Pending;
 
@@ -1753,7 +1912,7 @@ public class DocumentWorkflowService : IDocumentWorkflowService
                 .ToList();
         }
 
-        if (request.Status == PropertyAssessmentStatus.Approved)
+        if (request.Status >= PropertyAssessmentStatus.Approved && request.Status != PropertyAssessmentStatus.Deferred)
         {
             var newLotTdns = tds.Select(t => t.TaxDeclarationNumber).Where(s => !string.IsNullOrWhiteSpace(s)).Distinct().ToList();
             var newLotsDisplay = newLotTdns.Count > 0 ? string.Join(", ", newLotTdns) : (isConsolidation ? "Consolidated Lot TD" : (isPhysicalChange ? "Renovated/Expanded Property TD" : (isTransfer ? "Transferred Property TD" : (isReclassification ? "Reclassified Property TD" : "Segregated Lot TDs"))));

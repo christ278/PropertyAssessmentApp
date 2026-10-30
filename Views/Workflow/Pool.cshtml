@@ -4,7 +4,7 @@
 @inject PropertyAssessmentApp.Services.IPermissionService PermissionService
 
 @{
-    ViewData["Title"] = "Department Pool (Unassigned Queue)";
+    ViewData["Title"] = "Department Pool";
     var divisionId = ViewBag.DivisionId as int?;
     var search = ViewBag.Search as string ?? "";
     var typeFilter = ViewBag.TypeFilter as string ?? "";
@@ -43,9 +43,10 @@
                 <span>Local Government Unit Assessor Transaction Pool</span>
             </div>
             <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-3">
-                <span>Department Pool (Unassigned Queue)</span>
-                <span class="px-3 py-1 rounded-full text-xs font-black bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300">
-                    @totalPool Available
+                <span>Department Pool</span>
+                <span id="poolAvailableCountBadge" class="px-3 py-1 rounded-full text-xs font-black bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 transition-all duration-300 inline-flex items-center gap-1.5 shadow-xs">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span id="poolAvailableCountNumber">@totalPool</span> Available
                 </span>
             </h1>
             <p class="text-slate-500 dark:text-stone-400 text-xs">
@@ -90,7 +91,7 @@
             <a asp-action="MyTransactions" asp-route-divisionId="@(canChangeDivision ? divisionId : null)" class="px-4 py-2.5 rounded-2xl font-bold bg-blue-50 hover:bg-blue-100 dark:bg-blue-500/10 dark:hover:bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60 flex items-center gap-2 shadow-xs transition-all">
                 <i data-lucide="user-check" class="w-4 h-4 text-blue-600 dark:text-blue-400"></i>
                 <span>My Transactions</span>
-                <span class="px-2 py-0.5 rounded-full text-[10px] bg-blue-600 text-white font-black">@totalMy</span>
+                <span id="poolMyTransactionsCountBadge" class="px-2 py-0.5 rounded-full text-[10px] bg-blue-600 text-white font-black transition-all duration-300">@totalMy</span>
             </a>
 
             @if (isSuperAdminOrHead)
@@ -222,7 +223,7 @@
                                 _ => "ALL DIV"
                             };
 
-                            <tr class="hover:bg-slate-50/80 dark:hover:bg-stone-800/40 transition-colors">
+                            <tr id="row-pool-@item.RequestId" data-request-id="@item.RequestId" data-tracking-number="@item.TrackingNumber" class="hover:bg-slate-50/80 dark:hover:bg-stone-800/40 transition-colors @(item.StatusText == "For Approval" || item.IsForApproval ? "bg-amber-50/40 dark:bg-amber-950/20" : "")">
                                 <!-- Tracking & Request Type -->
                                 <td class="px-4 py-3.5 space-y-1">
                                     <div class="flex items-center gap-2 flex-wrap">
@@ -232,6 +233,13 @@
                                         <span class="font-extrabold text-slate-900 dark:text-white text-xs">
                                             @item.TrackingNumber
                                         </span>
+                                        @if (item.StatusText == "For Approval" || item.IsForApproval)
+                                        {
+                                            <span class="px-2 py-0.5 rounded-lg text-[10px] font-extrabold bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 border border-amber-300 dark:border-amber-700 flex items-center gap-1">
+                                                <i data-lucide="stamp" class="w-3 h-3 text-amber-600"></i>
+                                                FOR APPROVAL
+                                            </span>
+                                        }
                                     </div>
                                     <div class="text-[11px] text-slate-500 dark:text-stone-400 font-bold">
                                         @item.DisplayType
@@ -266,11 +274,24 @@
                                 </td>
 
                                 <!-- Status & Workspace -->
-                                <td class="hidden lg:table-cell px-4 py-3.5">
-                                    <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800/60 text-[10px]">
-                                        <i data-lucide="inbox" class="w-3.5 h-3.5"></i>
-                                        <span>Unassigned / Shared Pool</span>
-                                    </div>
+                                <td class="hidden lg:table-cell px-4 py-3.5 space-y-1">
+                                    @if (item.StatusText == "For Approval" || item.IsForApproval)
+                                    {
+                                        <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 font-extrabold border border-amber-300 dark:border-amber-700 text-[10px] shadow-xs">
+                                            <i data-lucide="stamp" class="w-3.5 h-3.5 text-amber-600 dark:text-amber-400"></i>
+                                            <span>FOR APPROVAL</span>
+                                        </div>
+                                        <div class="text-[9px] text-amber-700 dark:text-amber-400 font-bold">
+                                            Awaiting regular officer review
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800/60 text-[10px]">
+                                            <i data-lucide="inbox" class="w-3.5 h-3.5"></i>
+                                            <span>Unassigned / Shared Pool</span>
+                                        </div>
+                                    }
                                 </td>
 
                                 <!-- Last Routing & Notes -->
@@ -360,6 +381,8 @@
 
 @section Scripts {
     <script>
+        window.currentActiveDivisionId = '@(ViewBag.DivisionId ?? 0)';
+
         function onDivisionFilterChange(val) {
             var url = new URL(window.location.href);
             if (val) {
@@ -370,8 +393,12 @@
             window.location.href = url.toString();
         }
 
-        // Real-Time SignalR Auto-Update for Department Pool
+        // Real-Time SignalR Auto-Update for Department Pool Counts & Rows
         window.addEventListener('workflow:transactionForwarded', function(e) {
+            if (typeof window.refreshWorkflowPoolCounts === 'function') {
+                window.refreshWorkflowPoolCounts(window.currentActiveDivisionId);
+            }
+
             var currentDiv = '@(ViewBag.DivisionId ?? 0)';
             var userStageId = '@(ViewBag.UserStepId ?? 0)';
             var isSuper = @(ViewBag.IsSuperAdminOrHead == true ? "true" : "false");
@@ -381,34 +408,56 @@
 
             if (matchesDiv && matchesStage) {
                 if (typeof toastr !== 'undefined') {
-                    toastr.success(`Transaction ${e.detail.trackingNumber} arrived in your station's pool! Refreshing queue...`);
+                    toastr.info(`Transaction ${e.detail.trackingNumber || ''} routed into department pool.`, 'Queue Updated');
                 }
-                setTimeout(function() {
-                    window.location.reload();
-                }, 1500);
-            } else if (matchesDiv && !isSuper) {
-                // If a transaction was forwarded away from current pool, reload to remove it
-                setTimeout(function() {
-                    window.location.reload();
-                }, 1500);
             }
         });
 
         window.addEventListener('workflow:transactionClaimed', function(e) {
-            var currentDiv = '@(ViewBag.DivisionId ?? 0)';
-            if (!currentDiv || currentDiv === '0' || currentDiv == e.detail.divisionId) {
-                setTimeout(function() {
-                    window.location.reload();
-                }, 1200);
+            // Instantly refresh pool counts via SignalR
+            if (typeof window.refreshWorkflowPoolCounts === 'function') {
+                window.refreshWorkflowPoolCounts(window.currentActiveDivisionId);
+            }
+
+            var claimedId = e.detail && e.detail.requestId;
+            if (claimedId) {
+                var row = document.getElementById('row-pool-' + claimedId);
+                if (row) {
+                    row.classList.add('bg-rose-50', 'dark:bg-rose-950/30', 'opacity-60', 'transition-all');
+                    var actionCell = row.querySelector('td:last-child');
+                    if (actionCell) {
+                        actionCell.innerHTML = '<span class="text-[10px] font-bold text-rose-600 dark:text-rose-400 italic">Claimed by ' + (e.detail.claimedBy || 'Staff') + '</span>';
+                    }
+                    setTimeout(function() {
+                        row.style.transition = 'all 0.5s ease';
+                        row.style.opacity = '0';
+                        setTimeout(function() { row.remove(); }, 500);
+                    }, 2200);
+                }
+            }
+        });
+
+        window.addEventListener('workflow:transactionCreated', function(e) {
+            if (typeof window.refreshWorkflowPoolCounts === 'function') {
+                window.refreshWorkflowPoolCounts(window.currentActiveDivisionId);
+            }
+            if (typeof toastr !== 'undefined') {
+                toastr.success(`New request ${e.detail.trackingNumber || ''} filed into assessment pool!`, 'New Transaction Filed');
+            }
+        });
+
+        window.addEventListener('workflow:transactionTaggedForApproval', function(e) {
+            if (typeof window.refreshWorkflowPoolCounts === 'function') {
+                window.refreshWorkflowPoolCounts(window.currentActiveDivisionId);
+            }
+            if (typeof toastr !== 'undefined') {
+                toastr.warning(`Transaction tagged 'For Approval' returned to pool by ${e.detail.taggedBy || 'staff'}.`, 'For Approval');
             }
         });
 
         window.addEventListener('workflow:transactionReleased', function(e) {
-            var currentDiv = '@(ViewBag.DivisionId ?? 0)';
-            if (!currentDiv || currentDiv === '0' || currentDiv == e.detail.divisionId) {
-                setTimeout(function() {
-                    window.location.reload();
-                }, 1200);
+            if (typeof window.refreshWorkflowPoolCounts === 'function') {
+                window.refreshWorkflowPoolCounts(window.currentActiveDivisionId);
             }
         });
     </script>

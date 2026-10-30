@@ -115,10 +115,10 @@ public class TDNBuilding
     // STRUCTURAL TYPE, PERMITS & TIMELINE
     // -------------------------------------------------------------
     [Display(Name = "Structural Type")]
-    public string? StructuralType { get; set; } = "Type I";
+    public string? StructuralType { get; set; } = "Type III";
 
     [Display(Name = "Building Classification")]
-    public string? BuildingClassification { get; set; } = "Class A - Reinforced Concrete";
+    public string? BuildingClassification { get; set; } = "III-A";
 
     [Display(Name = "Building Use Type")]
     public string? BuildingUseType { get; set; } = "Residential Condominium";
@@ -164,6 +164,22 @@ public class TDNBuilding
 
     [Display(Name = "Accumulated Depr. (%)")]
     public decimal BuildingDepreciationPercent { get; set; }
+
+    [Display(Name = "Depreciation Schedule Entry ID")]
+    public int? BuildingDepreciationScheduleId { get; set; }
+
+    [ForeignKey(nameof(BuildingDepreciationScheduleId))]
+    public virtual BuildingDepreciationScheduleItem? DepreciationSchedule { get; set; }
+
+    [Display(Name = "General Revision Cycle")]
+    [MaxLength(50)]
+    public string? GeneralRevisionCycle { get; set; }
+
+    [Display(Name = "Estimated Economic Life (Years)")]
+    public int EstimatedEconomicLifeYears { get; set; } = 30;
+
+    [Display(Name = "Estimated Residual Value (%)")]
+    public decimal EstimatedResidualValuePercent { get; set; } = 25m;
 
     [Display(Name = "Accumulated Depr. (Php)")]
     public decimal BuildingDepreciationAccumulated { get; set; }

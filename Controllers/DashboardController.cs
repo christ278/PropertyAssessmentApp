@@ -65,7 +65,7 @@ public class DashboardController : Controller
         var model = BuildBase("Assessor Head Dashboard", "Office-wide property assessment summary, request trends and today's transactions", nameof(AssessorHead), startDate, endDate);
         Fill(model, items, startDate, endDate);
         FillPropertyCounts(model, startDate, endDate);
-        FillTodayTransactions(model, allItems);
+        FillTodayTransactions(model, allItems, startDate, endDate);
 
         return View(model);
     }
@@ -135,16 +135,38 @@ public class DashboardController : Controller
         return items;
     }
 
-    private static void FillTodayTransactions(DashboardViewModel m, List<WorkflowQueueItemDto> allItems)
+    private static void FillTodayTransactions(DashboardViewModel m, List<WorkflowQueueItemDto> allItems, DateTime? startDate = null, DateTime? endDate = null)
     {
-        var today = DateTime.Now.Date;
-        // Filter transactions submitted today or updated today
-        var todayItems = allItems
-            .Where(i => i.DateSubmitted.Date == today || (i.LastForwardedDate.HasValue && i.LastForwardedDate.Value.Date == today))
+        bool hasFilter = startDate.HasValue || endDate.HasValue;
+        DateTime start;
+        DateTime end;
+
+        if (hasFilter)
+        {
+            start = (startDate ?? DateTime.MinValue).Date;
+            end = (endDate ?? DateTime.MaxValue).Date;
+            if (start > end) (start, end) = (end, start);
+        }
+        else
+        {
+            start = DateTime.Now.Date;
+            end = DateTime.Now.Date;
+        }
+
+        // Filter transactions submitted within date range or updated/forwarded within date range
+        var matchedItems = allItems
+            .Where(i =>
+            {
+                var submitted = i.DateSubmitted.Date;
+                var forwarded = i.LastForwardedDate?.Date;
+                bool matchSubmitted = submitted >= start && submitted <= end;
+                bool matchForwarded = forwarded.HasValue && forwarded.Value >= start && forwarded.Value <= end;
+                return matchSubmitted || matchForwarded;
+            })
             .OrderByDescending(i => i.LastForwardedDate ?? i.DateSubmitted)
             .ToList();
 
-        foreach (var item in todayItems)
+        foreach (var item in matchedItems)
         {
             int stageId = (int)item.CurrentStage;
             bool isReleasingOrPrintingStage = stageId is 9 or 10 or 19 or 30;

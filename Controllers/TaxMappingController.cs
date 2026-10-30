@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using PropertyAssessmentApp.Models;
 using PropertyAssessmentApp.Services;
 
@@ -12,6 +12,7 @@ public class TaxMappingController : Controller
     private readonly IAssessmentService _assessmentService;
     private readonly IOrderPaymentService _orderPaymentService;
     private readonly IWebHostEnvironment _env;
+    private readonly IWorkflowNotifier _workflowNotifier;
 
     public TaxMappingController(
         ITaxMappingService taxMapService,
@@ -19,7 +20,8 @@ public class TaxMappingController : Controller
         IOwnerService ownerService,
         IAssessmentService assessmentService,
         IOrderPaymentService orderPaymentService,
-        IWebHostEnvironment env)
+        IWebHostEnvironment env,
+        IWorkflowNotifier workflowNotifier)
     {
         _taxMapService = taxMapService;
         _geoService = geoService;
@@ -27,6 +29,7 @@ public class TaxMappingController : Controller
         _assessmentService = assessmentService;
         _orderPaymentService = orderPaymentService;
         _env = env;
+        _workflowNotifier = workflowNotifier;
     }
 
     private void PopulateGeographicEntities(TaxMappingRequest model)
@@ -138,7 +141,7 @@ public class TaxMappingController : Controller
     // POST: /TaxMapping/Create
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult Create(TaxMappingRequest model, IFormFile? fileUpload)
+    public async Task<IActionResult> Create(TaxMappingRequest model, IFormFile? fileUpload)
     {
         ModelState.Remove(nameof(TaxMappingRequest.Province));
         ModelState.Remove(nameof(TaxMappingRequest.CityMunicipality));
@@ -152,6 +155,7 @@ public class TaxMappingController : Controller
             {
                 var webRoot = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath ?? Directory.GetCurrentDirectory(), "wwwroot");
                 _taxMapService.Add(model, fileUpload, webRoot);
+                await _workflowNotifier.NotifyTransactionCreatedAsync(model.Id, "TaxMappingRequest", model.RequestNumber, 2, model.ApplicantName);
                 TempData["SuccessMessage"] = $"Tax Mapping Request '{model.RequestNumber}' for '{model.ApplicantName}' created successfully!";
                 return RedirectToAction(nameof(Index));
             }

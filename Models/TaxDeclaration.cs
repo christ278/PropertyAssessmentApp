@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Validation;
 
@@ -255,6 +255,27 @@ public class TaxDeclaration
             BuildingDetails = new TDNBuilding
             {
                 TaxDeclarationId = Id,
+                StreetNo = _streetNo,
+                Municipality = _municipality ?? "General Santos City",
+                DistrictOrBarangay = _districtOrBarangay ?? "Brgy. Central",
+                ProvinceCity = _provinceCity ?? "South Cotabato",
+                LandOwnerName = _landOwnerName,
+                LandOwnerTin = _landOwnerTin,
+                LandOwnerPhone = _landOwnerPhone,
+                LandOwnerEmail = _landOwnerEmail,
+                LandOwnerAddress = _landOwnerAddress,
+                LandOwnerSex = _landOwnerSex,
+                LandTdNo = _landTdNo,
+                LandPin = _landPin,
+                LandTitleNo = _landTitleNo,
+                LandSurveyNo = _landSurveyNo,
+                LandLotNo = _landLotNo,
+                LandBlockNo = _landBlockNo,
+                LandAreaSqm = _landAreaSqm,
+                IsCct = _isCct,
+                CctTitleNo = _cctTitleNo,
+                CctDateRegistered = _cctDateRegistered,
+                OwnerNameReflectedInCct = _ownerReflectedCct,
                 IsAdministrator = _isAdministrator,
                 AdministratorName = _administratorName ?? AdminPossessorName,
                 AdministratorAddress = _administratorAddress ?? AdminPossessorAddress,
@@ -262,7 +283,43 @@ public class TaxDeclaration
                 AdministratorTin = _administratorTin ?? AdminPossessorTin,
                 AdministratorGender = _administratorGender ?? AdminPossessorSex ?? "Male",
                 AdministratorCivilStatus = _administratorCivilStatus ?? "Single",
-                AdministratorEmail = _administratorEmail ?? AdminPossessorEmail
+                AdministratorEmail = _administratorEmail ?? AdminPossessorEmail,
+                StructuralType = _structuralType ?? "Type III",
+                BuildingClassification = _buildingClassification ?? "III-A",
+                BuildingUseType = _buildingUseType ?? "Residential Condominium",
+                NoOfStoreys = _noOfStoreys,
+                FloorLevel = _floorLevel ?? "Ground Floor",
+                BuildingPermitNo = _buildingPermitNo,
+                BuildingAgeYears = _buildingAgeYears,
+                DateConstructed = _dateConstructed,
+                DateCompleted = _dateCompleted,
+                OccupancyPermitNo = _occupancyPermitNo,
+                DateOccupied = _dateOccupied,
+                TotalFloorArea = _totalBuildingAreaSqm > 0 ? _totalBuildingAreaSqm : _areaSqMeters,
+                BaseRcnValue = _baseRcnValue,
+                ReplacementCostNew = _baseRcnValue,
+                BuildingDepreciationPercent = _bldgDeprPercent,
+                BuildingDepreciationScheduleId = _bldgDeprScheduleId,
+                GeneralRevisionCycle = _generalRevisionCycle,
+                EstimatedEconomicLifeYears = _estimatedEconomicLifeYears > 0 ? _estimatedEconomicLifeYears : 30,
+                EstimatedResidualValuePercent = _estimatedResidualValuePercent > 0 ? _estimatedResidualValuePercent : 25m,
+                BuildingDepreciationAccumulated = _bldgDeprAcc,
+                DepreciatedMarketValue = _bldgDeprMv,
+                TotalAdditionalItemsValue = _bldgTotalAdditionsValue,
+                MarketValue = _marketValue,
+                AssessmentLevelPercent = _assLevel,
+                AssessedValue = Math.Round(_marketValue * (_assLevel / 100m), 2),
+                BasicTaxRate = _basicRate,
+                SefTaxRate = _sefRate,
+                AnnualTaxDue = Math.Round(Math.Round(_marketValue * (_assLevel / 100m), 2) * ((_basicRate + _sefRate) / 100m), 2),
+                EffectivityYear = _effYear,
+                EffectivityQuarter = _effQtr ?? "1st Quarter",
+                Taxability = _taxability ?? "Taxable",
+                AssessmentBasis = _assessmentBasis ?? _taxBasis ?? "Sec. 217 RA 7160",
+                BackTaxesYearFrom = _backTaxesFrom,
+                BackTaxesYearTo = _backTaxesTo,
+                FloorBreakdownJson = _bldgFloorJson,
+                AdditionalItemsJson = _bldgAddlJson
             };
         }
         return BuildingDetails;
@@ -726,11 +783,11 @@ public class TaxDeclaration
     private string? _machineryPropertyAssessmentsJson;
 
     // Building Structural Characteristics
-    [NotMapped] public string StructuralType { get => BuildingDetails?.StructuralType ?? _structuralType ?? "Type I"; set { _structuralType = value; if (BuildingDetails != null) BuildingDetails.StructuralType = value; } }
+    [NotMapped] public string StructuralType { get => BuildingDetails?.StructuralType ?? _structuralType ?? "Type III"; set { _structuralType = value; if (BuildingDetails != null) BuildingDetails.StructuralType = value; } }
     private string? _structuralType;
     [NotMapped] public int NoOfStoreys { get => BuildingDetails?.NoOfStoreys ?? _noOfStoreys; set { _noOfStoreys = value; if (BuildingDetails != null) BuildingDetails.NoOfStoreys = value; } }
     private int _noOfStoreys = 1;
-    [NotMapped] public string BuildingClassification { get => BuildingDetails?.BuildingClassification ?? _buildingClassification ?? "Class A - Reinforced Concrete"; set { _buildingClassification = value; if (BuildingDetails != null) BuildingDetails.BuildingClassification = value; } }
+    [NotMapped] public string BuildingClassification { get => BuildingDetails?.BuildingClassification ?? _buildingClassification ?? "III-A"; set { _buildingClassification = value; if (BuildingDetails != null) BuildingDetails.BuildingClassification = value; } }
     private string? _buildingClassification;
     [NotMapped] public string BuildingPermitNo { get => BuildingDetails?.BuildingPermitNo ?? _buildingPermitNo ?? string.Empty; set { _buildingPermitNo = value; if (BuildingDetails != null) BuildingDetails.BuildingPermitNo = value; } }
     private string? _buildingPermitNo;
@@ -785,6 +842,14 @@ public class TaxDeclaration
     private decimal _bldgTotalAdditionsValue;
     [NotMapped] public decimal BuildingDepreciationPercent { get => BuildingDetails?.BuildingDepreciationPercent ?? _bldgDeprPercent; set { _bldgDeprPercent = value; if (BuildingDetails != null) BuildingDetails.BuildingDepreciationPercent = value; } }
     private decimal _bldgDeprPercent;
+    [NotMapped] public int? BuildingDepreciationScheduleId { get => BuildingDetails?.BuildingDepreciationScheduleId ?? _bldgDeprScheduleId; set { _bldgDeprScheduleId = value; if (BuildingDetails != null) BuildingDetails.BuildingDepreciationScheduleId = value; } }
+    private int? _bldgDeprScheduleId;
+    [NotMapped] public string? GeneralRevisionCycle { get => BuildingDetails?.GeneralRevisionCycle ?? _generalRevisionCycle; set { _generalRevisionCycle = value; if (BuildingDetails != null) BuildingDetails.GeneralRevisionCycle = value; } }
+    private string? _generalRevisionCycle;
+    [NotMapped] public int EstimatedEconomicLifeYears { get => BuildingDetails?.EstimatedEconomicLifeYears ?? (_estimatedEconomicLifeYears > 0 ? _estimatedEconomicLifeYears : 30); set { _estimatedEconomicLifeYears = value; if (BuildingDetails != null) BuildingDetails.EstimatedEconomicLifeYears = value; } }
+    private int _estimatedEconomicLifeYears = 30;
+    [NotMapped] public decimal EstimatedResidualValuePercent { get => BuildingDetails?.EstimatedResidualValuePercent ?? (_estimatedResidualValuePercent > 0 ? _estimatedResidualValuePercent : 25m); set { _estimatedResidualValuePercent = value; if (BuildingDetails != null) BuildingDetails.EstimatedResidualValuePercent = value; } }
+    private decimal _estimatedResidualValuePercent = 25m;
     [NotMapped] public decimal BuildingDepreciationAccumulated { get => BuildingDetails?.BuildingDepreciationAccumulated ?? _bldgDeprAcc; set { _bldgDeprAcc = value; if (BuildingDetails != null) BuildingDetails.BuildingDepreciationAccumulated = value; } }
     private decimal _bldgDeprAcc;
     [NotMapped] public decimal BuildingDepreciatedMarketValue { get => BuildingDetails?.DepreciatedMarketValue ?? _bldgDeprMv; set { _bldgDeprMv = value; if (BuildingDetails != null) BuildingDetails.DepreciatedMarketValue = value; } }
@@ -798,31 +863,72 @@ public class TaxDeclaration
     [NotMapped] public string? AssessmentBasis { get => BuildingDetails?.AssessmentBasis ?? LandDetails?.TaxabilityBasis ?? MachineryDetails?.TaxabilityBasis ?? _assessmentBasis ?? "Sec. 217 RA 7160"; set { _assessmentBasis = value; if (BuildingDetails != null) BuildingDetails.AssessmentBasis = value; if (LandDetails != null) LandDetails.TaxabilityBasis = value; if (MachineryDetails != null) MachineryDetails.TaxabilityBasis = value; } }
     private string? _assessmentBasis;
 
-    // 17 Structural Materials
-    [NotMapped] public string StructuralFoundation { get; set; } = "Reinforced Concrete Footing";
-    [NotMapped] public string StructuralColumns { get; set; } = "Reinforced Concrete";
-    [NotMapped] public string StructuralBeams { get; set; } = "Reinforced Concrete";
-    [NotMapped] public string StructuralTrussRoof { get; set; } = "Steel Truss";
-    [NotMapped] public string StructuralRoof { get; set; } = "Long Span Colorbond G.I. Sheets";
-    [NotMapped] public string StructuralExteriorWalls { get; set; } = "Concrete Hollow Blocks";
-    [NotMapped] public string StructuralFinishFront { get; set; } = "Cement Plaster Paint Finish";
-    [NotMapped] public string StructuralFinishRear { get; set; } = "Cement Plaster Paint Finish";
-    [NotMapped] public string StructuralFinishLeft { get; set; } = "Cement Plaster Paint Finish";
-    [NotMapped] public string StructuralFinishRight { get; set; } = "Cement Plaster Paint Finish";
-    [NotMapped] public string StructuralInsideFinish { get; set; } = "Painted Plaster";
-    [NotMapped] public string StructuralPartitionWalls { get; set; } = "Drywall / CHB";
-    [NotMapped] public string StructuralFlooring { get; set; } = "Concrete Slab";
-    [NotMapped] public string StructuralFloorFinish { get; set; } = "Granite Tiles";
-    [NotMapped] public string StructuralStairs { get; set; } = "Reinforced Concrete";
-    [NotMapped] public string StructuralWindows { get; set; } = "Sliding Glass Windows";
-    [NotMapped] public string DoorMain { get; set; } = "Solid Wood Panel";
-    [NotMapped] public string DoorRoom { get; set; } = "Flush Door";
-    [NotMapped] public string DoorOthers { get; set; } = "PVC Door";
-    [NotMapped] public string ElectricalSystem { get; set; } = "Concealed Conduit Wiring";
-    [NotMapped] public string ToiletAndBathroom { get; set; } = "Complete Fixtures & Tiled";
-    [NotMapped] public string PlumbingSewer { get; set; } = "PVC Piping to Septic Vault";
+    // 16 Structural Materials (Local Assessment Manual - Table 3. List of Structural Materials Codes)
+    private string? GetStructuralMaterial(int partNumber, string partKeyword, string? localBacking, string defaultValue)
+    {
+        if (!string.IsNullOrWhiteSpace(localBacking)) return localBacking;
+        var item = BuildingDetails?.StructuralMaterials?.FirstOrDefault(m =>
+            m.PartNumber == partNumber ||
+            (!string.IsNullOrWhiteSpace(m.PartName) && m.PartName.Contains(partKeyword, StringComparison.OrdinalIgnoreCase)));
+        return !string.IsNullOrWhiteSpace(item?.MaterialSelected) ? item!.MaterialSelected : defaultValue;
+    }
+
+    private string? _structuralFoundation;
+    [NotMapped] public string StructuralFoundation { get => GetStructuralMaterial(1, "Foundation", _structuralFoundation, "Reinforced Concrete (RC)")!; set => _structuralFoundation = value; }
+
+    private string? _structuralColumns;
+    [NotMapped] public string StructuralColumns { get => GetStructuralMaterial(2, "Column", _structuralColumns, "Reinforced Concrete (RC)")!; set => _structuralColumns = value; }
+
+    private string? _structuralBeams;
+    [NotMapped] public string StructuralBeams { get => GetStructuralMaterial(3, "Beam", _structuralBeams, "Reinforced Concrete (RC)")!; set => _structuralBeams = value; }
+
+    private string? _structuralTrussRoof;
+    [NotMapped] public string StructuralTrussRoof { get => GetStructuralMaterial(4, "Roof Framing", _structuralTrussRoof, "Steel (S)")!; set => _structuralTrussRoof = value; }
+
+    private string? _structuralRoof;
+    [NotMapped] public string StructuralRoof { get => GetStructuralMaterial(5, "Roofing", _structuralRoof, "Long Span G.I. Sheet-Pre painted (LGI)")!; set => _structuralRoof = value; }
+
+    private string? _structuralExteriorWalls;
+    [NotMapped] public string StructuralExteriorWalls { get => GetStructuralMaterial(6, "Exterior Wall", _structuralExteriorWalls, "Concrete Hollow Block (CHB)")!; set => _structuralExteriorWalls = value; }
+
+    private string? _structuralFlooring;
+    [NotMapped] public string StructuralFlooring { get => GetStructuralMaterial(7, "Flooring", _structuralFlooring, "Reinforced Concrete (RC)")!; set => _structuralFlooring = value; }
+
+    private string? _doorMain;
+    [NotMapped] public string DoorMain { get => GetStructuralMaterial(8, "Door", _doorMain, "Wood Panel (WP)")!; set => _doorMain = value; }
+
+    private string? _ceiling;
+    [NotMapped] public string Ceiling { get => GetStructuralMaterial(9, "Ceiling", _ceiling, "Hardiflex (Hx)")!; set => _ceiling = value; }
+
+    private string? _structuralWindows;
+    [NotMapped] public string StructuralWindows { get => GetStructuralMaterial(10, "Window", _structuralWindows, "Aluminum Casement (AC)")!; set => _structuralWindows = value; }
+
+    private string? _structuralStairs;
+    [NotMapped] public string StructuralStairs { get => GetStructuralMaterial(11, "Stair", _structuralStairs, "Reinforced concrete (RC)")!; set => _structuralStairs = value; }
+
+    private string? _structuralPartitionWalls;
+    [NotMapped] public string StructuralPartitionWalls { get => GetStructuralMaterial(12, "Partition", _structuralPartitionWalls, "Hardiflex / Dry wall (Hx)")!; set => _structuralPartitionWalls = value; }
+
+    private string? _structuralFinishFront;
+    [NotMapped] public string StructuralFinishFront { get => GetStructuralMaterial(13, "Wall Finish", _structuralFinishFront, "Cement Plaster (CP)")!; set => _structuralFinishFront = value; }
+
+    private string? _electricalSystem;
+    [NotMapped] public string ElectricalSystem { get => GetStructuralMaterial(14, "Electrical", _electricalSystem, "Poly Vinyl Carbonate Conduit (EPVC)")!; set => _electricalSystem = value; }
+
+    private string? _toiletAndBathroom;
+    [NotMapped] public string ToiletAndBathroom { get => GetStructuralMaterial(15, "Toilet", _toiletAndBathroom, "Cement Tiles (CT)")!; set => _toiletAndBathroom = value; }
+
+    private string? _plumbingSewer;
+    [NotMapped] public string PlumbingSewer { get => GetStructuralMaterial(16, "Plumbing", _plumbingSewer, "Poly Vinyl Carbonate Pipe (PVCP)")!; set => _plumbingSewer = value; }
+
+    [NotMapped] public string StructuralFinishRear { get; set; } = "Cement Plaster (CP)";
+    [NotMapped] public string StructuralFinishLeft { get; set; } = "Cement Plaster (CP)";
+    [NotMapped] public string StructuralFinishRight { get; set; } = "Cement Plaster (CP)";
+    [NotMapped] public string StructuralInsideFinish { get; set; } = "Cement Plaster (CP)";
+    [NotMapped] public string StructuralFloorFinish { get; set; } = "Tiles (T)";
+    [NotMapped] public string DoorRoom { get; set; } = "Flush Door (FD)";
+    [NotMapped] public string DoorOthers { get; set; } = "PVC door for indoor use (PVC)";
     [NotMapped] public string Paintings { get; set; } = "Acrytex Paint";
-    [NotMapped] public string Ceiling { get; set; } = "Gypsum Board on Metal Framing";
     [NotMapped] public string MaterialsOrCode { get; set; } = "MAT-2026-A1";
 
     // Machinery Specs

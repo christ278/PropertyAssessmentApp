@@ -1,4 +1,4 @@
-﻿-- =========================================================================================
+-- =========================================================================================
 -- City Assessor Real Property Tax & Assessment System
 -- Seed Script: Sample Tax Declarations (Land, Building, Machinery) & Default Registered Owner
 -- Target Database: FairTrackDB / MS SQL Server
@@ -496,26 +496,25 @@ VALUES
 (NEWID(), @BldgDetailsId, 'Attached Carport & Concrete Garage', 25.00, 4800.00, 100.00, 'FixedCost', 120000.00, 0, 1, 'Ground Floor'),
 (NEWID(), @BldgDetailsId, 'Second Floor Covered Balcony & Terrace', 20.00, 5000.00, 100.00, 'FixedCost', 100000.00, 0, 1, 'Second Floor');
 
--- Insert 17 Structural Materials (CAST Standard)
+-- Insert 16 Structural Materials (Local Assessment Manual - Table 3. List of Structural Materials Codes)
 INSERT INTO TDNBuildingStructuralMaterials (Id, TDNBuildingId, PartNumber, PartName, MaterialSelected, SpecificDescription)
 VALUES
-(NEWID(), @BldgDetailsId, 1, '1. Foundation', 'Reinforced Concrete (RC)', 'Standard reinforced concrete footing & tie beams'),
-(NEWID(), @BldgDetailsId, 2, '2. Columns', 'Reinforced Concrete (RC)', 'Reinforced concrete post & structural column system'),
-(NEWID(), @BldgDetailsId, 3, '3. Beams', 'Reinforced Concrete (RC)', 'Cast-in-place RC structural beams'),
-(NEWID(), @BldgDetailsId, 4, '4. Roof Framing / Truss', 'Steel Truss (S)', 'Engineered c-purlin and angle bar steel truss'),
-(NEWID(), @BldgDetailsId, 5, '5. Roofing', 'Long Span G.I. Sheet (LGI)', 'Rib-type pre-painted 0.50mm long-span roofing'),
-(NEWID(), @BldgDetailsId, 6, '6. Exterior Walls', 'Concrete Hollow Blocks (CHB)', '150mm CHB plastered both sides with latex paint'),
-(NEWID(), @BldgDetailsId, 7, '7. Flooring', 'Reinforced Concrete Slab', 'RC suspended slab with porcelain vitrified tiles'),
-(NEWID(), @BldgDetailsId, 8, '8. Main Door', 'Solid Hardwood (Panel)', 'Solid Narra/Yakal main double door with brass hardware'),
-(NEWID(), @BldgDetailsId, 9, '9. Ceiling', 'Gypsum Board on Metal Furring', 'Moisture-resistant gypsum ceiling with recessed lights'),
-(NEWID(), @BldgDetailsId, 10, '10. Windows', 'Glass on Aluminum Frame', 'Sliding 6mm tinted glass windows on powder-coated frame'),
-(NEWID(), @BldgDetailsId, 11, '11. Stairs', 'Reinforced Concrete with Railings', 'RC stairs with wrought iron balustrade & solid wood tread'),
-(NEWID(), @BldgDetailsId, 12, '12. Partition Walls', 'Drywall / CHB Mixed', '100mm CHB and insulated drywall bedroom partitions'),
-(NEWID(), @BldgDetailsId, 13, '13. Floor Finish', 'Ceramic / Granite Tiles', '60x60 polished granite floor tiles throughout'),
-(NEWID(), @BldgDetailsId, 14, '14. Front Exterior Finish', 'Textured Paint with Stone Cladding', 'Accent natural quartz stone wall cladding and stucco'),
-(NEWID(), @BldgDetailsId, 15, '15. Electrical System', 'Concealed Conduit & Panelboard', 'THHN copper wiring in PVC conduits with circuit breakers'),
-(NEWID(), @BldgDetailsId, 16, '16. Toilet & Bath', 'Fully Tiled with Fixtures', '3 T&B with HCG/American Standard ceramic water closets'),
-(NEWID(), @BldgDetailsId, 17, '17. Plumbing / Sewer', 'PVC Piping & Septic Tank', 'Heavy duty Neltex PVC drainage lines and 3-chamber septic tank');
+(NEWID(), @BldgDetailsId, 1,  '1. Foundation',            'Reinforced Concrete (RC)',                 'RC'),
+(NEWID(), @BldgDetailsId, 2,  '2. Columns',               'Reinforced Concrete (RC)',                 'RC'),
+(NEWID(), @BldgDetailsId, 3,  '3. Beams',                 'Reinforced Concrete (RC)',                 'RC'),
+(NEWID(), @BldgDetailsId, 4,  '4. Roof Framing',          'Steel (S)',                                'S'),
+(NEWID(), @BldgDetailsId, 5,  '5. Roofing',               'Long Span G.I. Sheet-Pre painted (LGI)',   'LGI'),
+(NEWID(), @BldgDetailsId, 6,  '6. Exterior Walls',        'Concrete Hollow Block (CHB)',              'CHB'),
+(NEWID(), @BldgDetailsId, 7,  '7. Flooring',              'Reinforced Concrete (RC)',                 'RC'),
+(NEWID(), @BldgDetailsId, 8,  '8. Doors',                 'Wood Panel (WP)',                          'WP'),
+(NEWID(), @BldgDetailsId, 9,  '9. Ceiling',               'Hardiflex (Hx)',                           'Hx'),
+(NEWID(), @BldgDetailsId, 10, '10. Windows',              'Aluminum Casement (AC)',                   'AC'),
+(NEWID(), @BldgDetailsId, 11, '11. Stairs',               'Reinforced concrete (RC)',                 'RC'),
+(NEWID(), @BldgDetailsId, 12, '12. Partition',            'Hardiflex / Dry wall (Hx)',                'Hx'),
+(NEWID(), @BldgDetailsId, 13, '13. Wall Finish',          'Cement Plaster (CP)',                      'CP'),
+(NEWID(), @BldgDetailsId, 14, '14. Electrical Conduit',   'Poly Vinyl Carbonate Conduit (EPVC)',      'EPVC'),
+(NEWID(), @BldgDetailsId, 15, '15. Toilet and Bath',      'Cement Tiles (CT)',                        'CT'),
+(NEWID(), @BldgDetailsId, 16, '16. Plumbing and Services','Poly Vinyl Carbonate Pipe (PVCP)',         'PVCP');
 
 -- =========================================================================================
 -- 5. INSERT SAMPLE 3: MACHINERY & EQUIPMENT TAX DECLARATION (Kind = 2 - Machinery)

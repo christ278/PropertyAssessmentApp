@@ -132,6 +132,1555 @@
         </div>
     </div>
 
+    @if (Model.Kind == PropertyAssessmentApp.Models.PropertyKind.Building)
+    {
+        var bldg = Model.BuildingDetails;
+        var floors = bldg?.FloorLevels?.OrderBy(f => f.FloorOrder).ToList() ?? new List<PropertyAssessmentApp.Models.TDNBuildingFloor>();
+        var additions = bldg?.AdditionalItems?.ToList() ?? new List<PropertyAssessmentApp.Models.TDNBuildingAdditionalItem>();
+        var normClass = PropertyAssessmentApp.Services.BuildingDepreciationSchedule.NormalizeClassificationCode(Model.BuildingClassification, Model.StructuralType);
+        string stRaw = (Model.StructuralType ?? "").ToUpperInvariant();
+        bool isTypeI = (stRaw.Contains("TYPE I") && !stRaw.Contains("TYPE II") && !stRaw.Contains("TYPE III") && !stRaw.Contains("TYPE IV")) || normClass == "I";
+        bool isTypeII = (stRaw.Contains("TYPE II") && !stRaw.Contains("TYPE III")) || normClass.StartsWith("II-");
+        bool isTypeIII = stRaw.Contains("TYPE III") || normClass.StartsWith("III-");
+        bool isTypeIV = stRaw.Contains("TYPE IV") || normClass.StartsWith("IV-");
+        bool isTypeV = stRaw.Contains("TYPE V") || normClass.StartsWith("V-");
+
+        bool isCct = Model.IsCct || string.Equals(Model.TitleType, "CCT", StringComparison.OrdinalIgnoreCase);
+        bool isTct = !isCct && (string.Equals(Model.TitleType, "TCT", StringComparison.OrdinalIgnoreCase) || !string.IsNullOrWhiteSpace(Model.TitleNo) || !string.IsNullOrWhiteSpace(Model.LandTitleNo));
+        string regTitleNo = isCct ? (!string.IsNullOrWhiteSpace(Model.CctTitleNo) ? Model.CctTitleNo : (Model.TitleNo ?? "")) : (!string.IsNullOrWhiteSpace(Model.TitleNo) ? Model.TitleNo : (Model.LandTitleNo ?? ""));
+        string regDateStr = (isCct ? (Model.CctDateRegistered ?? Model.DateRegistered) : Model.DateRegistered)?.ToString("MMM dd, yyyy") ?? "";
+
+        bool ownerMale = string.Equals(Model.OwnerSex, "Male", StringComparison.OrdinalIgnoreCase);
+        bool ownerFemale = string.Equals(Model.OwnerSex, "Female", StringComparison.OrdinalIgnoreCase);
+        string ownerOtherSex = (!ownerMale && !ownerFemale && !string.IsNullOrWhiteSpace(Model.OwnerSex)) ? Model.OwnerSex : "";
+
+        bool hasAdminOrPossessor = Model.IsAdministrator || Model.IsPossessor || !string.IsNullOrWhiteSpace(Model.AdministratorName);
+        bool adminMale = hasAdminOrPossessor && string.Equals(Model.AdministratorGender, "Male", StringComparison.OrdinalIgnoreCase);
+        bool adminFemale = hasAdminOrPossessor && string.Equals(Model.AdministratorGender, "Female", StringComparison.OrdinalIgnoreCase);
+
+        string useType = (Model.BuildingUseType ?? "").Trim();
+        bool isTownhouse = useType.Contains("Townhouse", StringComparison.OrdinalIgnoreCase);
+        bool isResCondo = useType.Contains("Residential Condominium", StringComparison.OrdinalIgnoreCase);
+        bool isComCondo = useType.Contains("Commercial Condominium", StringComparison.OrdinalIgnoreCase);
+        bool isIndCondo = useType.Contains("Industrial Condominium", StringComparison.OrdinalIgnoreCase);
+        bool isOtherUse = !isTownhouse && !isResCondo && !isComCondo && !isIndCondo && !string.IsNullOrWhiteSpace(useType);
+        string otherUseText = isOtherUse ? useType : "";
+
+        string landOwnerSex = !string.IsNullOrWhiteSpace(Model.LandOwnerSex) ? Model.LandOwnerSex : (Model.OwnerSex ?? "");
+        bool landOwnerMale = string.Equals(landOwnerSex, "Male", StringComparison.OrdinalIgnoreCase);
+        bool landOwnerFemale = string.Equals(landOwnerSex, "Female", StringComparison.OrdinalIgnoreCase);
+
+        decimal GetFloorArea(int floorIdx)
+        {
+            string ordinal = floorIdx switch { 1 => "1st", 2 => "2nd", 3 => "3rd", _ => $"{floorIdx}th" };
+            var match = floors.FirstOrDefault(f => !string.IsNullOrWhiteSpace(f.FloorNumber) && f.FloorNumber.Contains(ordinal, StringComparison.OrdinalIgnoreCase));
+            if (match != null) return match.FloorAreaSqm;
+            if (floorIdx - 1 < floors.Count) return floors[floorIdx - 1].FloorAreaSqm;
+            return 0m;
+        }
+
+        decimal first8Sum = 0m;
+        for (int fi = 1; fi <= 8; fi++) first8Sum += GetFloorArea(fi);
+        decimal totalBldgArea = Model.TotalBuildingAreaSqm > 0 ? Model.TotalBuildingAreaSqm : floors.Sum(f => f.FloorAreaSqm);
+        decimal otherFloorsSub = Math.Max(0m, totalBldgArea - first8Sum);
+
+        var materialList = new List<(string Part, string Material)>
+        {
+            ("1. Foundation", Model.StructuralFoundation),
+            ("2. Columns", Model.StructuralColumns),
+            ("3. Beams", Model.StructuralBeams),
+            ("4. Roof Framing", Model.StructuralTrussRoof),
+            ("5. Roofing", Model.StructuralRoof),
+            ("6. Exterior Walls", Model.StructuralExteriorWalls),
+            ("7. Flooring", Model.StructuralFlooring),
+            ("8. Doors", Model.DoorMain),
+            ("9. Ceiling", Model.Ceiling),
+            ("10. Windows", Model.StructuralWindows),
+            ("11. Stairs", Model.StructuralStairs),
+            ("12. Partition", Model.StructuralPartitionWalls),
+            ("13. Wall Finish", Model.StructuralFinishFront),
+            ("14. Electrical Conduit", Model.ElectricalSystem),
+            ("15. Toilet and Bath", Model.ToiletAndBathroom),
+            ("16. Plumbing and Services", Model.PlumbingSewer)
+        };
+
+        decimal baseRcnVal = Model.BaseRcnValue > 0 ? Model.BaseRcnValue : floors.Sum(f => f.MarketValue);
+        decimal addlTotalVal = Model.BuildingTotalAdditionsValue > 0 ? Model.BuildingTotalAdditionsValue : additions.Sum(a => a.TotalValue);
+        decimal totalBeforeDepr = baseRcnVal + addlTotalVal;
+        decimal deprRatePct = Model.BuildingDepreciationPercent;
+        decimal deprValPhp = Model.BuildingDepreciationAccumulated > 0 ? Model.BuildingDepreciationAccumulated : Math.Round(baseRcnVal * (deprRatePct / 100m), 2);
+        decimal adjustedMvPhp = Model.MarketValue;
+
+        string qtr = (Model.EffectivityQuarter ?? "1st").ToUpperInvariant();
+        bool q1 = qtr.Contains("1");
+        bool q2 = qtr.Contains("2");
+        bool q3 = qtr.Contains("3");
+        bool q4 = qtr.Contains("4");
+        bool isTaxable = !string.Equals(Model.Taxability, "Exempt", StringComparison.OrdinalIgnoreCase);
+
+        <!-- ========================================================================= -->
+        <!-- ANNEX I-F: FIELD APPRAISAL AND ASSESSMENT SHEET – BUILDING & STRUCTURES   -->
+        <!-- ========================================================================= -->
+        <div class="p-6 sm:p-8 rounded-3xl bg-white dark:bg-stone-900 border-2 border-slate-300 dark:border-stone-700 shadow-sm space-y-5 text-slate-900 dark:text-stone-100 font-sans">
+            <div class="text-right text-[11px] text-slate-500 dark:text-stone-400">Local Assessment Manual</div>
+            <div class="text-center font-bold text-sm sm:text-base tracking-tight">
+                Annex I-F. Field Appraisal and Assessment Sheet – Building and Other Structures
+            </div>
+            <p class="text-[11px] text-slate-600 dark:text-stone-400 leading-relaxed">
+                <span class="italic font-semibold">Data Privacy Notice:</span> By submitting/providing your property information (including but not limited to name, contact details, property address, title number, and property documents), you acknowledge and authorize the government to collect, process, and store your personal data.
+            </p>
+
+            <!-- 1. TRANSACTION INFORMATION -->
+            <div class="space-y-1.5">
+                <h3 class="text-xs font-bold uppercase tracking-wide">TRANSACTION INFORMATION</h3>
+                <div class="border border-slate-400 dark:border-stone-600 p-3.5 grid grid-cols-1 sm:grid-cols-12 gap-3 text-xs">
+                    <div class="sm:col-span-7 flex items-baseline gap-2">
+                        <span class="whitespace-nowrap">Tax Declaration (TD) No.:</span>
+                        <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-mono font-bold px-1">@Model.TaxDeclarationNumber</span>
+                    </div>
+                    <div class="sm:col-span-5 flex items-baseline gap-2">
+                        <span class="whitespace-nowrap">Transaction Code:</span>
+                        <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-mono font-bold px-1">@Model.TransactionCodeDisplay</span>
+                    </div>
+                    <div class="sm:col-span-7 flex items-baseline gap-2">
+                        <span class="whitespace-nowrap">Property Identification No. (PIN):</span>
+                        <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-mono font-bold px-1">@Model.PropertyIndexNumber</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. PROPERTY REGISTRATION DETAILS -->
+            <div class="space-y-1.5">
+                <h3 class="text-xs font-bold uppercase tracking-wide">PROPERTY REGISTRATION DETAILS</h3>
+                <div class="border border-slate-400 dark:border-stone-600 grid grid-cols-1 sm:grid-cols-12 text-xs">
+                    <div class="sm:col-span-7 p-3.5 sm:border-r border-slate-400 dark:border-stone-600 space-y-2.5">
+                        <div class="flex items-center gap-6">
+                            <span>Title Type:</span>
+                            <span class="inline-flex items-center gap-1.5 font-bold">
+                                <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(isCct ? "✓" : "")</span> CCT
+                            </span>
+                            <span class="inline-flex items-center gap-1.5 font-bold">
+                                <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(isTct ? "✓" : "")</span> TCT
+                            </span>
+                        </div>
+                        <div class="flex items-baseline gap-2">
+                            <span class="whitespace-nowrap">Title No.:</span>
+                            <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-mono font-bold px-1">@(string.IsNullOrWhiteSpace(regTitleNo) ? "\u00A0" : regTitleNo)</span>
+                        </div>
+                        <div class="flex items-baseline gap-2">
+                            <span class="whitespace-nowrap">Date Registered:</span>
+                            <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(string.IsNullOrWhiteSpace(regDateStr) ? "\u00A0" : regDateStr)</span>
+                        </div>
+                    </div>
+                    <div class="sm:col-span-5 p-3.5"></div>
+                </div>
+            </div>
+
+            <!-- 3. OWNER INFORMATION -->
+            <div class="space-y-1.5">
+                <h3 class="text-xs font-bold uppercase tracking-wide">OWNER INFORMATION</h3>
+                <div class="border border-slate-400 dark:border-stone-600 text-xs">
+                    <div class="grid grid-cols-1 sm:grid-cols-12 border-b border-slate-400 dark:border-stone-600">
+                        <div class="sm:col-span-7 p-3.5 sm:border-r border-slate-400 dark:border-stone-600 space-y-2.5">
+                            <div>
+                                <span class="font-bold">Owner/s Name</span> <span class="italic text-[11px]">(as reflected in the CCT/OCT/TCT/CLOA):</span>
+                                <div class="border-b border-slate-400 dark:border-stone-600 font-bold pt-1 px-1">@(!string.IsNullOrWhiteSpace(Model.OwnerNameReflectedInCct) ? Model.OwnerNameReflectedInCct : Model.OwnerName)</div>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-4 pt-1">
+                                <span>Sex:</span>
+                                <span class="inline-flex items-center gap-1.5 font-bold">
+                                    <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(ownerMale ? "✓" : "")</span> Male
+                                </span>
+                                <span class="inline-flex items-center gap-1.5 font-bold">
+                                    <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(ownerFemale ? "✓" : "")</span> Female
+                                </span>
+                                <span class="flex-1 inline-flex items-baseline gap-1.5">
+                                    <span>Others:</span>
+                                    <span class="flex-1 border-b border-slate-400 dark:border-stone-600 px-1">@(string.IsNullOrWhiteSpace(ownerOtherSex) ? "\u00A0" : ownerOtherSex)</span>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="sm:col-span-5 p-3.5 space-y-2.5">
+                            <div class="flex items-baseline gap-2">
+                                <span class="whitespace-nowrap">TIN:</span>
+                                <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-mono font-bold px-1">@(string.IsNullOrWhiteSpace(Model.OwnerTin) ? "\u00A0" : Model.OwnerTin)</span>
+                            </div>
+                            <div class="flex items-baseline gap-2">
+                                <span class="whitespace-nowrap">Phone/Mobile No.:</span>
+                                <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(string.IsNullOrWhiteSpace(Model.OwnerPhone) ? "\u00A0" : Model.OwnerPhone)</span>
+                            </div>
+                            <div class="flex items-baseline gap-2">
+                                <span class="whitespace-nowrap">Email Address:</span>
+                                <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(string.IsNullOrWhiteSpace(Model.OwnerEmail) ? "\u00A0" : Model.OwnerEmail)</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-3.5 flex items-baseline gap-2">
+                        <span class="whitespace-nowrap">Mailing Address:</span>
+                        <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(string.IsNullOrWhiteSpace(Model.OwnerAddress) ? "\u00A0" : Model.OwnerAddress)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. ADMINISTRATOR / POSSESSOR -->
+            <div class="border border-slate-400 dark:border-stone-600 text-xs">
+                <div class="grid grid-cols-1 sm:grid-cols-12 border-b border-slate-400 dark:border-stone-600">
+                    <div class="sm:col-span-7 p-3.5 sm:border-r border-slate-400 dark:border-stone-600 space-y-2.5">
+                        <div class="flex items-center gap-6">
+                            <span class="inline-flex items-center gap-1.5 font-bold">
+                                <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(Model.IsAdministrator ? "✓" : "")</span> Administrator
+                            </span>
+                            <span class="inline-flex items-center gap-1.5 font-bold">
+                                <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(Model.IsPossessor ? "✓" : "")</span> Possessor
+                            </span>
+                        </div>
+                        <div class="flex items-baseline gap-2">
+                            <span class="whitespace-nowrap">Name/s:</span>
+                            <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(string.IsNullOrWhiteSpace(Model.AdministratorName) ? "\u00A0" : Model.AdministratorName)</span>
+                        </div>
+                        <div class="flex items-center gap-6">
+                            <span>Sex:</span>
+                            <span class="inline-flex items-center gap-1.5 font-bold">
+                                <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(adminMale ? "✓" : "")</span> Male
+                            </span>
+                            <span class="inline-flex items-center gap-1.5 font-bold">
+                                <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(adminFemale ? "✓" : "")</span> Female
+                            </span>
+                        </div>
+                    </div>
+                    <div class="sm:col-span-5 p-3.5 space-y-2.5">
+                        <div class="flex items-baseline gap-2">
+                            <span class="whitespace-nowrap">TIN:</span>
+                            <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-mono font-bold px-1">@(string.IsNullOrWhiteSpace(Model.AdministratorTin) ? "\u00A0" : Model.AdministratorTin)</span>
+                        </div>
+                        <div class="flex items-baseline gap-2">
+                            <span class="whitespace-nowrap">Phone/Mobile No.:</span>
+                            <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(string.IsNullOrWhiteSpace(Model.AdministratorContactNo) ? "\u00A0" : Model.AdministratorContactNo)</span>
+                        </div>
+                        <div class="flex items-baseline gap-2">
+                            <span class="whitespace-nowrap">Email Address:</span>
+                            <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(string.IsNullOrWhiteSpace(Model.AdministratorEmail) ? "\u00A0" : Model.AdministratorEmail)</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-3.5 flex items-baseline gap-2">
+                    <span class="whitespace-nowrap">Mailing Address:</span>
+                    <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(string.IsNullOrWhiteSpace(Model.AdministratorAddress) ? "\u00A0" : Model.AdministratorAddress)</span>
+                </div>
+            </div>
+
+            <!-- 5. PROPERTY TYPE ACCORDING TO USE -->
+            <div class="space-y-1.5">
+                <h3 class="text-xs font-bold uppercase tracking-wide">PROPERTY TYPE ACCORDING TO USE</h3>
+                <div class="border border-slate-400 dark:border-stone-600 p-3.5 space-y-2.5 text-xs">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <span class="inline-flex items-center gap-1.5 font-bold">
+                            <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(isTownhouse ? "✓" : "")</span> Townhouse
+                        </span>
+                        <span class="inline-flex items-center gap-1.5 font-bold">
+                            <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(isResCondo ? "✓" : "")</span> Residential Condominium
+                        </span>
+                        <span class="inline-flex items-center gap-1.5 font-bold">
+                            <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(isComCondo ? "✓" : "")</span> Commercial Condominium
+                        </span>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 items-baseline">
+                        <span class="inline-flex items-center gap-1.5 font-bold">
+                            <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(isIndCondo ? "✓" : "")</span> Industrial Condominium
+                        </span>
+                        <div class="sm:col-span-2 flex items-baseline gap-2">
+                            <span class="inline-flex items-center gap-1.5 font-bold whitespace-nowrap">
+                                <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(isOtherUse ? "✓" : "")</span> Other Type of Buildings and/or Structure:
+                            </span>
+                            <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(string.IsNullOrWhiteSpace(otherUseText) ? "\u00A0" : otherUseText)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 6. PROPERTY LOCATION -->
+            <div class="space-y-1.5">
+                <h3 class="text-xs font-bold uppercase tracking-wide">PROPERTY LOCATION</h3>
+                <div class="border border-slate-400 dark:border-stone-600 p-3.5 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div class="flex items-baseline gap-2">
+                        <span class="whitespace-nowrap">No./Street:</span>
+                        <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(string.IsNullOrWhiteSpace(Model.StreetNo) ? "\u00A0" : Model.StreetNo)</span>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <span class="whitespace-nowrap">Barangay/District:</span>
+                        <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(string.IsNullOrWhiteSpace(Model.DistrictOrBarangay) ? "\u00A0" : Model.DistrictOrBarangay)</span>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <span class="whitespace-nowrap">Municipality:</span>
+                        <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(string.IsNullOrWhiteSpace(Model.Municipality) ? "General Santos City" : Model.Municipality)</span>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <span class="whitespace-nowrap">Province/City:</span>
+                        <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(string.IsNullOrWhiteSpace(Model.ProvinceCity) ? "South Cotabato" : Model.ProvinceCity)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 7. LAND REFERENCE -->
+            <div class="space-y-1.5">
+                <h3 class="text-xs font-bold uppercase tracking-wide">LAND REFERENCE</h3>
+                <div class="border border-slate-400 dark:border-stone-600 text-xs">
+                    <div class="grid grid-cols-1 sm:grid-cols-12 border-b border-slate-400 dark:border-stone-600">
+                        <div class="sm:col-span-7 p-3.5 sm:border-r border-slate-400 dark:border-stone-600 space-y-2.5">
+                            <div class="flex items-baseline gap-2">
+                                <span class="whitespace-nowrap font-bold">Owner/s Name:</span>
+                                <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(!string.IsNullOrWhiteSpace(Model.LandOwnerName) ? Model.LandOwnerName : Model.OwnerName)</span>
+                            </div>
+                            <div class="flex items-center gap-6">
+                                <span>Sex:</span>
+                                <span class="inline-flex items-center gap-1.5 font-bold">
+                                    <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(landOwnerMale ? "✓" : "")</span> Male
+                                </span>
+                                <span class="inline-flex items-center gap-1.5 font-bold">
+                                    <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(landOwnerFemale ? "✓" : "")</span> Female
+                                </span>
+                            </div>
+                        </div>
+                        <div class="sm:col-span-5 p-3.5 space-y-2.5">
+                            <div class="flex items-baseline gap-2">
+                                <span class="whitespace-nowrap">TIN:</span>
+                                <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-mono font-bold px-1">@(!string.IsNullOrWhiteSpace(Model.LandOwnerTin) ? Model.LandOwnerTin : (Model.OwnerTin ?? "\u00A0"))</span>
+                            </div>
+                            <div class="flex items-baseline gap-2">
+                                <span class="whitespace-nowrap">Phone/Mobile No.:</span>
+                                <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(!string.IsNullOrWhiteSpace(Model.LandOwnerPhone) ? Model.LandOwnerPhone : (Model.OwnerPhone ?? "\u00A0"))</span>
+                            </div>
+                            <div class="flex items-baseline gap-2">
+                                <span class="whitespace-nowrap">Email Address:</span>
+                                <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(!string.IsNullOrWhiteSpace(Model.LandOwnerEmail) ? Model.LandOwnerEmail : (Model.OwnerEmail ?? "\u00A0"))</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-3.5 border-b border-slate-400 dark:border-stone-600 flex items-baseline gap-2">
+                        <span class="whitespace-nowrap">Mailing Address:</span>
+                        <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(!string.IsNullOrWhiteSpace(Model.LandOwnerAddress) ? Model.LandOwnerAddress : (Model.OwnerAddress ?? "\u00A0"))</span>
+                    </div>
+                    <div class="p-3.5 space-y-2.5">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div class="flex items-baseline gap-2">
+                                <span class="whitespace-nowrap">TD No.:</span>
+                                <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-mono font-bold px-1">@(string.IsNullOrWhiteSpace(Model.LandTdNo) ? "\u00A0" : Model.LandTdNo)</span>
+                            </div>
+                            <div class="flex items-baseline gap-2">
+                                <span class="whitespace-nowrap">PIN:</span>
+                                <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-mono font-bold px-1">@(string.IsNullOrWhiteSpace(Model.LandPin) ? "\u00A0" : Model.LandPin)</span>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div class="flex items-baseline gap-2">
+                                <span class="whitespace-nowrap">Survey No.:</span>
+                                <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-mono font-bold px-1">@(string.IsNullOrWhiteSpace(Model.LandSurveyNo) ? "\u00A0" : Model.LandSurveyNo)</span>
+                            </div>
+                            <div class="flex items-baseline gap-2">
+                                <span class="whitespace-nowrap">Lot No.:</span>
+                                <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-mono font-bold px-1">@(string.IsNullOrWhiteSpace(Model.LandLotNo) ? "\u00A0" : Model.LandLotNo)</span>
+                            </div>
+                            <div class="flex items-baseline gap-2">
+                                <span class="whitespace-nowrap">Block No.:</span>
+                                <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-mono font-bold px-1">@(string.IsNullOrWhiteSpace(Model.LandBlockNo) ? "\u00A0" : Model.LandBlockNo)</span>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div class="flex items-baseline gap-2">
+                                <span class="whitespace-nowrap">Title No.:</span>
+                                <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-mono font-bold px-1">@(string.IsNullOrWhiteSpace(Model.LandTitleNo) ? "\u00A0" : Model.LandTitleNo)</span>
+                            </div>
+                            <div class="flex items-baseline gap-2">
+                                <span class="whitespace-nowrap">Area (sq.m.):</span>
+                                <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-mono font-bold px-1">@(Model.LandAreaSqm > 0 ? Model.LandAreaSqm.ToString("N2") : "\u00A0")</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 8. GENERAL INFORMATION -->
+            <div class="space-y-2 text-xs">
+                <h3 class="text-xs font-bold uppercase tracking-wide">GENERAL INFORMATION</h3>
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex flex-wrap items-center gap-4">
+                        <span class="font-bold">Structural Type:</span>
+                        <span class="inline-flex items-center gap-1.5 font-bold">
+                            <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(isTypeI ? "✓" : "")</span> Type I
+                        </span>
+                        <span class="inline-flex items-center gap-1.5 font-bold">
+                            <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(isTypeII ? "✓" : "")</span> Type II
+                        </span>
+                        <span class="inline-flex items-center gap-1.5 font-bold">
+                            <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(isTypeIII ? "✓" : "")</span> Type III
+                        </span>
+                        <span class="inline-flex items-center gap-1.5 font-bold">
+                            <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(isTypeIV ? "✓" : "")</span> Type IV
+                        </span>
+                        <span class="inline-flex items-center gap-1.5 font-bold">
+                            <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(isTypeV ? "✓" : "")</span> Type V
+                        </span>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <span>No. of Storey/s:</span>
+                        <span class="border-b border-slate-400 dark:border-stone-600 font-mono font-bold px-4">@Model.NoOfStoreys</span>
+                    </div>
+                </div>
+
+                <div class="border border-slate-400 dark:border-stone-600 overflow-x-auto">
+                    <table class="w-full text-xs border-collapse">
+                        <tbody>
+                            <tr class="border-b border-slate-400 dark:border-stone-600">
+                                <td class="p-2 border-r border-slate-400 dark:border-stone-600 w-1/4">Building Classification:</td>
+                                <td class="p-2 border-r border-slate-400 dark:border-stone-600 w-1/4 font-bold">Class @normClass (@Model.BuildingClassification)</td>
+                                <td class="p-2 border-r border-slate-400 dark:border-stone-600 w-1/4 text-center font-bold bg-slate-100 dark:bg-stone-800">Floor Level</td>
+                                <td class="p-2 w-1/4 text-center font-bold bg-slate-100 dark:bg-stone-800">Area (sq.m.)</td>
+                            </tr>
+                            <tr class="border-b border-slate-400 dark:border-stone-600">
+                                <td class="p-2 border-r border-slate-400 dark:border-stone-600">Building Permit No.:</td>
+                                <td class="p-2 border-r border-slate-400 dark:border-stone-600 font-mono font-bold">@Model.BuildingPermitNo</td>
+                                <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">1<sup>st</sup> Floor</td>
+                                <td class="p-2 text-right font-mono">@(GetFloorArea(1) > 0 ? GetFloorArea(1).ToString("N2") : "")</td>
+                            </tr>
+                            <tr class="border-b border-slate-400 dark:border-stone-600">
+                                <td class="p-2 border-r border-slate-400 dark:border-stone-600">Building Age:</td>
+                                <td class="p-2 border-r border-slate-400 dark:border-stone-600 font-bold">@Model.BuildingAgeYears yr(s)</td>
+                                <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">2<sup>nd</sup> Floor</td>
+                                <td class="p-2 text-right font-mono">@(GetFloorArea(2) > 0 ? GetFloorArea(2).ToString("N2") : "")</td>
+                            </tr>
+                            <tr class="border-b border-slate-400 dark:border-stone-600">
+                                <td class="p-2 border-r border-slate-400 dark:border-stone-600">Date Completed:</td>
+                                <td class="p-2 border-r border-slate-400 dark:border-stone-600 font-bold">@(Model.DateCompleted?.ToString("MMM dd, yyyy") ?? "")</td>
+                                <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">3<sup>rd</sup> Floor</td>
+                                <td class="p-2 text-right font-mono">@(GetFloorArea(3) > 0 ? GetFloorArea(3).ToString("N2") : "")</td>
+                            </tr>
+                            <tr class="border-b border-slate-400 dark:border-stone-600">
+                                <td class="p-2 border-r border-slate-400 dark:border-stone-600">Occupancy Permit No.:</td>
+                                <td class="p-2 border-r border-slate-400 dark:border-stone-600 font-mono font-bold">@Model.OccupancyPermitNo</td>
+                                <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">4<sup>th</sup> Floor</td>
+                                <td class="p-2 text-right font-mono">@(GetFloorArea(4) > 0 ? GetFloorArea(4).ToString("N2") : "")</td>
+                            </tr>
+                            <tr class="border-b border-slate-400 dark:border-stone-600">
+                                <td class="p-2 border-r border-slate-400 dark:border-stone-600">Date Occupied:</td>
+                                <td class="p-2 border-r border-slate-400 dark:border-stone-600 font-bold">@(Model.DateOccupied?.ToString("MMM dd, yyyy") ?? "")</td>
+                                <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">5<sup>th</sup> Floor</td>
+                                <td class="p-2 text-right font-mono">@(GetFloorArea(5) > 0 ? GetFloorArea(5).ToString("N2") : "")</td>
+                            </tr>
+                            <tr class="border-b border-slate-400 dark:border-stone-600">
+                                <td colspan="2" rowspan="5" class="p-2.5 border-r border-slate-400 dark:border-stone-600 align-top">
+                                    <div>Other Structure <span class="italic text-[11px]">(Indicate Structure and Floor area):</span></div>
+                                    @if (additions.Any())
+                                    {
+                                        <div class="pt-1.5 font-bold text-slate-700 dark:text-stone-300">
+                                            @string.Join("; ", additions.Select(a => $"{a.ItemDescription} ({a.Quantity:N2} sq.m.)"))
+                                        </div>
+                                    }
+                                </td>
+                                <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">6<sup>th</sup> Floor</td>
+                                <td class="p-2 text-right font-mono">@(GetFloorArea(6) > 0 ? GetFloorArea(6).ToString("N2") : "")</td>
+                            </tr>
+                            <tr class="border-b border-slate-400 dark:border-stone-600">
+                                <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">7<sup>th</sup> Floor</td>
+                                <td class="p-2 text-right font-mono">@(GetFloorArea(7) > 0 ? GetFloorArea(7).ToString("N2") : "")</td>
+                            </tr>
+                            <tr class="border-b border-slate-400 dark:border-stone-600">
+                                <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">8<sup>th</sup> Floor</td>
+                                <td class="p-2 text-right font-mono">@(GetFloorArea(8) > 0 ? GetFloorArea(8).ToString("N2") : "")</td>
+                            </tr>
+                            <tr class="border-b border-slate-400 dark:border-stone-600">
+                                <td class="p-2 border-r border-slate-400 dark:border-stone-600">
+                                    <div class="font-bold">Other Floors Subtotal</div>
+                                    <div class="text-[10px] italic text-slate-500">(Attach additional sheet/s in case of additional floors)</div>
+                                </td>
+                                <td class="p-2 text-right font-mono">@(otherFloorsSub > 0 ? otherFloorsSub.ToString("N2") : "")</td>
+                            </tr>
+                            <tr>
+                                <td class="p-2 border-r border-slate-400 dark:border-stone-600 font-bold">Total Building Area</td>
+                                <td class="p-2 text-right font-mono font-black">@totalBldgArea.ToString("N2") sq.m.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 9. FLOOR PLAN -->
+            <div class="border border-slate-400 dark:border-stone-600 p-3.5 space-y-2 text-xs">
+                <div><span class="font-bold">Floor Plan:</span> <span class="italic text-[11px]">(Photograph of the Structure may also be attached)</span></div>
+                <div class="min-h-[60px] flex flex-wrap items-center justify-between gap-2 text-slate-600 dark:text-stone-400">
+                    <div>
+                        <div class="italic">Apply Depreciation: Market Val = (Total Area × Unit Cost) × (1 − Depreciation Rate)</div>
+                        <div class="font-bold text-slate-800 dark:text-stone-200">Base RCN: ₱@baseRcnVal.ToString("N2") &bull; Depreciation Rate: @deprRatePct.ToString("N1")% &bull; Depreciated Core MV: ₱@Model.BuildingDepreciatedMarketValue.ToString("N2")</div>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(Model.FloorPlanSketchPath))
+                    {
+                        <span class="font-mono text-emerald-700 dark:text-emerald-400">@Model.FloorPlanSketchPath</span>
+                    }
+                </div>
+            </div>
+
+            <!-- 10. STRUCTURAL MATERIALS -->
+            <div class="border border-slate-400 dark:border-stone-600 overflow-x-auto text-xs">
+                <div class="p-2 bg-slate-100 dark:bg-stone-800 border-b border-slate-400 dark:border-stone-600 font-bold uppercase">STRUCTURAL MATERIALS</div>
+                <table class="w-full text-xs border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50 dark:bg-stone-950 border-b border-slate-400 dark:border-stone-600">
+                            <th class="p-2 border-r border-slate-400 dark:border-stone-600 text-center w-1/4">Structural Parts</th>
+                            <th class="p-2 border-r border-slate-400 dark:border-stone-600 text-center w-1/4">Materials or Code</th>
+                            <th class="p-2 border-r border-slate-400 dark:border-stone-600 text-center w-1/4">Structural Parts</th>
+                            <th class="p-2 text-center w-1/4">Materials or Code</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @{
+                            int halfMat = (materialList.Count + 1) / 2;
+                            for (int mi = 0; mi < halfMat; mi++)
+                            {
+                                var leftM = materialList[mi];
+                                var rightM = (mi + halfMat < materialList.Count) ? materialList[mi + halfMat] : (Part: "", Material: "");
+                                <tr class="border-b border-slate-300 dark:border-stone-700 last:border-b-0">
+                                    <td class="p-2 border-r border-slate-400 dark:border-stone-600">@leftM.Part</td>
+                                    <td class="p-2 border-r border-slate-400 dark:border-stone-600 font-bold">@leftM.Material</td>
+                                    <td class="p-2 border-r border-slate-400 dark:border-stone-600">@rightM.Part</td>
+                                    <td class="p-2 font-bold">@rightM.Material</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 11. BUILDING CORE -->
+            <div class="space-y-1.5 text-xs">
+                <h3 class="text-xs font-bold uppercase tracking-wide">BUILDING CORE</h3>
+                <div class="border border-slate-400 dark:border-stone-600 overflow-x-auto">
+                    <table class="w-full text-xs border-collapse">
+                        <thead>
+                            <tr class="bg-slate-100 dark:bg-stone-800 border-b border-slate-400 dark:border-stone-600">
+                                <th class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">Bldg. Classification</th>
+                                <th class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">Actual Use</th>
+                                <th class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">Total Area</th>
+                                <th class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">Unit Const. Cost (Php)</th>
+                                <th class="p-2 text-center">Market Value (Php)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (floors.Any())
+                            {
+                                foreach (var f in floors)
+                                {
+                                    <tr class="border-b border-slate-300 dark:border-stone-700 last:border-b-0">
+                                        <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-center font-bold">Class @normClass</td>
+                                        <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">@(!string.IsNullOrWhiteSpace(Model.BuildingUseType) ? Model.BuildingUseType : Model.ActualUse)</td>
+                                        <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-right font-mono">@f.FloorAreaSqm.ToString("N2") sq.m.</td>
+                                        <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-right font-mono">₱@f.BaseUnitCost.ToString("N2")</td>
+                                        <td class="p-2 text-right font-mono font-bold">₱@f.MarketValue.ToString("N2")</td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-center font-bold">Class @normClass</td>
+                                    <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">@(!string.IsNullOrWhiteSpace(Model.BuildingUseType) ? Model.BuildingUseType : Model.ActualUse)</td>
+                                    <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-right font-mono">@totalBldgArea.ToString("N2") sq.m.</td>
+                                    <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-right font-mono">₱@Model.UnitValue.ToString("N2")</td>
+                                    <td class="p-2 text-right font-mono font-bold">₱@baseRcnVal.ToString("N2")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 12. ADDITIONAL ITEM/S -->
+            <div class="space-y-1.5 text-xs">
+                <h3 class="text-xs font-bold uppercase tracking-wide">ADDITIONAL ITEM/S</h3>
+                <div class="border border-slate-400 dark:border-stone-600 overflow-x-auto">
+                    <table class="w-full text-xs border-collapse">
+                        <thead>
+                            <tr class="bg-slate-100 dark:bg-stone-800 border-b border-slate-400 dark:border-stone-600">
+                                <th class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">Particular Item</th>
+                                <th class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">Area</th>
+                                <th class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">Unit Const. Cost (Php)</th>
+                                <th class="p-2 text-center">Market Value (Php)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (additions.Any())
+                            {
+                                foreach (var a in additions)
+                                {
+                                    <tr class="border-b border-slate-300 dark:border-stone-700 last:border-b-0">
+                                        <td class="p-2 border-r border-slate-400 dark:border-stone-600 font-bold">@a.ItemDescription</td>
+                                        <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-right font-mono">@a.Quantity.ToString("N2")</td>
+                                        <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-right font-mono">₱@a.UnitRate.ToString("N2")</td>
+                                        <td class="p-2 text-right font-mono font-bold">₱@a.TotalValue.ToString("N2")</td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-center text-slate-400">-</td>
+                                    <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-center text-slate-400">-</td>
+                                    <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-center text-slate-400">-</td>
+                                    <td class="p-2 text-right font-mono">₱0.00</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 13. DEPRECIATION -->
+            <div class="space-y-1.5 text-xs">
+                <h3 class="text-xs font-bold uppercase tracking-wide">DEPRECIATION</h3>
+                <div class="border border-slate-400 dark:border-stone-600 overflow-x-auto">
+                    <table class="w-full text-xs border-collapse">
+                        <thead>
+                            <tr class="bg-slate-100 dark:bg-stone-800 border-b border-slate-400 dark:border-stone-600">
+                                <th class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">
+                                    <div>Total Market Value (Php)</div>
+                                    <div class="text-[10px] italic font-normal">(Building + Additional Items)</div>
+                                </th>
+                                <th class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">Depreciation Rate (%)</th>
+                                <th class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">Depreciated Value (Php)</th>
+                                <th class="p-2 text-center">Adjusted Market Value (Php)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="border-b border-slate-400 dark:border-stone-600">
+                                <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-right font-mono">₱@totalBeforeDepr.ToString("N2")</td>
+                                <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-center font-mono">@deprRatePct.ToString("N1")%</td>
+                                <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-right font-mono">₱@deprValPhp.ToString("N2")</td>
+                                <td class="p-2 text-right font-mono font-bold">₱@adjustedMvPhp.ToString("N2")</td>
+                            </tr>
+                        </tbody>
+                        <tfoot>
+                            <tr class="bg-slate-50 dark:bg-stone-950 font-bold">
+                                <td colspan="3" class="p-2 border-r border-slate-400 dark:border-stone-600 text-right">Total:</td>
+                                <td class="p-2 text-right font-mono font-black">₱ @adjustedMvPhp.ToString("N2")</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 14. PROPERTY ASSESSMENT -->
+            <div class="space-y-1.5 text-xs">
+                <h3 class="text-xs font-bold uppercase tracking-wide">PROPERTY ASSESSMENT</h3>
+                <div class="border border-slate-400 dark:border-stone-600 overflow-x-auto">
+                    <table class="w-full text-xs border-collapse">
+                        <thead>
+                            <tr class="bg-slate-100 dark:bg-stone-800 border-b border-slate-400 dark:border-stone-600">
+                                <th class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">
+                                    <div>Adjusted Market Value</div>
+                                    <div class="text-[10px] italic font-normal">(Land + Improvement) (Php)</div>
+                                </th>
+                                <th class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">Assessment Level (%)</th>
+                                <th class="p-2 text-center">Assessed Value (Php)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="border-b border-slate-400 dark:border-stone-600">
+                                <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-right font-mono">₱@adjustedMvPhp.ToString("N2")</td>
+                                <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-center font-mono">@Model.AssessmentLevelPercent.ToString("N0")%</td>
+                                <td class="p-2 text-right font-mono font-bold">₱@Model.AssessedValue.ToString("N2")</td>
+                            </tr>
+                        </tbody>
+                        <tfoot>
+                            <tr class="bg-slate-50 dark:bg-stone-950 font-bold">
+                                <td colspan="2" class="p-2 border-r border-slate-400 dark:border-stone-600 text-right">Total</td>
+                                <td class="p-2 text-right font-mono font-black text-emerald-700 dark:text-emerald-400">₱ @Model.AssessedValue.ToString("N2")</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 15. EFFECTIVITY OF ASSESSMENT/REASSESSMENT -->
+            <div class="space-y-2 text-xs">
+                <h3 class="text-xs font-bold uppercase tracking-wide">EFFECTIVITY OF ASSESSMENT/REASSESSMENT</h3>
+                <div class="border border-slate-400 dark:border-stone-600 p-3.5 space-y-3">
+                    <div class="flex flex-wrap items-center gap-6">
+                        <div class="flex items-baseline gap-2 w-40">
+                            <span>Year:</span>
+                            <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-mono font-bold text-center">@Model.EffectivityYear</span>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-4">
+                            <span>Quarter:</span>
+                            <span class="inline-flex items-center gap-1.5 font-bold">
+                                <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(q1 ? "✓" : "")</span> 1<sup>st</sup>
+                            </span>
+                            <span class="inline-flex items-center gap-1.5 font-bold">
+                                <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(q2 ? "✓" : "")</span> 2<sup>nd</sup>
+                            </span>
+                            <span class="inline-flex items-center gap-1.5 font-bold">
+                                <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(q3 ? "✓" : "")</span> 3<sup>rd</sup>
+                            </span>
+                            <span class="inline-flex items-center gap-1.5 font-bold">
+                                <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(q4 ? "✓" : "")</span> 4<sup>th</sup>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-6">
+                        <span>Taxability:</span>
+                        <span class="inline-flex items-center gap-1.5 font-bold">
+                            <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(isTaxable ? "✓" : "")</span> Taxable
+                        </span>
+                        <span class="inline-flex items-center gap-1.5 font-bold">
+                            <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(!isTaxable ? "✓" : "")</span> Exempt
+                        </span>
+                        <div class="flex-1 flex items-baseline gap-2 min-w-[200px]">
+                            <span>Basis:</span>
+                            <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(!string.IsNullOrWhiteSpace(Model.AssessmentBasis) ? Model.AssessmentBasis : Model.TaxabilityBasis)</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex flex-wrap items-baseline gap-4 px-2">
+                    <span>Period Covered by Back Taxes (if any):</span>
+                    <div class="flex items-baseline gap-2 w-36">
+                        <span>Year:</span>
+                        <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-mono font-bold text-center">@(Model.BackTaxesYearFrom?.ToString() ?? "\u00A0")</span>
+                    </div>
+                    <div class="flex items-baseline gap-2 w-36">
+                        <span>to Year:</span>
+                        <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-mono font-bold text-center">@(Model.BackTaxesYearTo?.ToString() ?? "\u00A0")</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 16. RECORD OF SUPERSEDED ASSESSMENT -->
+            <div class="space-y-1.5 text-xs">
+                <h3 class="text-xs font-bold uppercase tracking-wide">RECORD OF SUPERSEDED ASSESSMENT</h3>
+                <div class="border border-slate-400 dark:border-stone-600 p-3.5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div class="flex items-baseline gap-2">
+                        <span class="whitespace-nowrap">Previous TD No.:</span>
+                        <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-mono font-bold px-1">@(string.IsNullOrWhiteSpace(Model.PreviousTdNo) ? "\u00A0" : Model.PreviousTdNo)</span>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <span class="whitespace-nowrap">PIN:</span>
+                        <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-mono font-bold px-1">@(string.IsNullOrWhiteSpace(Model.PreviousPin) ? "\u00A0" : Model.PreviousPin)</span>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <span class="whitespace-nowrap">Market Value:</span>
+                        <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-mono font-bold px-1">@(Model.PreviousMarketValue > 0 ? $"₱{Model.PreviousMarketValue:N2}" : "\u00A0")</span>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <span class="whitespace-nowrap">Assessed Value:</span>
+                        <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-mono font-bold px-1">@(Model.PreviousAssessedValue > 0 ? $"₱{Model.PreviousAssessedValue:N2}" : "\u00A0")</span>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <span class="whitespace-nowrap">Previous Owner:</span>
+                        <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(string.IsNullOrWhiteSpace(Model.PreviousOwner) ? "\u00A0" : Model.PreviousOwner)</span>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <span class="whitespace-nowrap">Effectivity of Assessment:</span>
+                        <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">&nbsp;</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 17. SIGNATORIES: APPRAISED BY, ASSESSED BY, RECOMMENDING APPROVAL BY -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-4 text-xs">
+                <div>
+                    <div class="font-bold uppercase mb-5">APPRAISED BY:</div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div class="col-span-2 text-center">
+                            <div class="border-b border-slate-600 dark:border-stone-400 font-bold pb-0.5">@(string.IsNullOrWhiteSpace(Model.AppraisedByName) ? "\u00A0" : Model.AppraisedByName)</div>
+                            <div class="text-[10px] italic text-slate-500 pt-0.5">Name and Position</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="border-b border-slate-600 dark:border-stone-400 pb-0.5">@((Model.DateAppraised ?? Model.DateAssessed).ToString("MM/dd/yyyy"))</div>
+                            <div class="text-[10px] italic text-slate-500 pt-0.5">Date</div>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <div class="font-bold uppercase mb-5">ASSESSED BY:</div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div class="col-span-2 text-center">
+                            <div class="border-b border-slate-600 dark:border-stone-400 font-bold pb-0.5">@(string.IsNullOrWhiteSpace(Model.AssessedByName) ? "\u00A0" : Model.AssessedByName)</div>
+                            <div class="text-[10px] italic text-slate-500 pt-0.5">Name and Position</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="border-b border-slate-600 dark:border-stone-400 pb-0.5">@Model.DateAssessed.ToString("MM/dd/yyyy")</div>
+                            <div class="text-[10px] italic text-slate-500 pt-0.5">Date</div>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <div class="font-bold uppercase mb-5">RECOMMENDING APPROVAL BY:</div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div class="col-span-2 text-center">
+                            <div class="border-b border-slate-600 dark:border-stone-400 font-bold pb-0.5">@(string.IsNullOrWhiteSpace(Model.RecommendingApprovalName) ? "\u00A0" : Model.RecommendingApprovalName)</div>
+                            <div class="text-[10px] italic text-slate-500 pt-0.5">Name and Position</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="border-b border-slate-600 dark:border-stone-400 pb-0.5">@((Model.DateRecommended ?? Model.DateAssessed).ToString("MM/dd/yyyy"))</div>
+                            <div class="text-[10px] italic text-slate-500 pt-0.5">Date</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 18. MEMORANDA -->
+            <div class="pt-3 space-y-2 text-xs">
+                <div class="font-bold uppercase">MEMORANDA:</div>
+                <div class="border-b border-slate-400 dark:border-stone-600 pb-1 min-h-[20px]">@(string.IsNullOrWhiteSpace(Model.Memoranda) ? "\u00A0" : Model.Memoranda)</div>
+                <div class="border-b border-slate-400 dark:border-stone-600 h-4"></div>
+                <div class="border-b border-slate-400 dark:border-stone-600 h-4"></div>
+            </div>
+        </div>
+    }
+    else
+    {
+    if (Model.Kind == PropertyAssessmentApp.Models.PropertyKind.Land)
+    {
+        var jsonOpts = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        var land = Model.LandDetails;
+
+        var appraisalRows = new List<PropertyAssessmentApp.Models.LandClassificationItemDto>();
+        if (land?.TDNLandDetails != null && land.TDNLandDetails.Count > 0)
+        {
+            appraisalRows = land.TDNLandDetails.OrderBy(d => d.OrderNo).Select(d => new PropertyAssessmentApp.Models.LandClassificationItemDto
+            {
+                ClassificationName = d.ClassificationName,
+                SubClassName = d.SubClassName,
+                ActualUseName = d.ActualUseName,
+                AreaSQM = d.AreaSQM,
+                UnitValue = d.UnitValue,
+                IsTaxable = d.IsTaxable
+            }).ToList();
+        }
+        else if (!string.IsNullOrWhiteSpace(Model.LandAppraisalDetailsJson))
+        {
+            try { appraisalRows = System.Text.Json.JsonSerializer.Deserialize<List<PropertyAssessmentApp.Models.LandClassificationItemDto>>(Model.LandAppraisalDetailsJson, jsonOpts) ?? new(); } catch { }
+        }
+        if (appraisalRows.Count == 0)
+        {
+            appraisalRows.Add(new PropertyAssessmentApp.Models.LandClassificationItemDto
+            {
+                ClassificationName = Model.Classification.ToString().ToUpperInvariant(),
+                SubClassName = string.IsNullOrWhiteSpace(Model.SubClassification) ? "1st Class" : Model.SubClassification,
+                ActualUseName = string.IsNullOrWhiteSpace(Model.ActualUse) ? Model.Classification.ToString().ToUpperInvariant() : Model.ActualUse,
+                AreaSQM = Model.AreaSqMeters,
+                UnitValue = Model.UnitValue,
+                IsTaxable = !string.Equals(Model.Taxability, "Exempt", StringComparison.OrdinalIgnoreCase)
+            });
+        }
+
+        var impRows = new List<PropertyAssessmentApp.Models.LandImprovementItemDto>();
+        if (land?.TDNLandImprovements != null && land.TDNLandImprovements.Count > 0)
+        {
+            impRows = land.TDNLandImprovements.OrderBy(i => i.OrderNo).Select(i => new PropertyAssessmentApp.Models.LandImprovementItemDto
+            {
+                ProductClass = i.ProductClass,
+                AreaPlanted = i.AreaPlanted,
+                IsFruitBearing = i.IsFruitBearing,
+                Quantity = i.Quantity,
+                AgeYears = i.AgeYears,
+                UnitValue = i.UnitValue,
+                AssessmentLevel = i.AssessmentLevel,
+                IsTaxable = i.IsTaxable
+            }).ToList();
+        }
+        else if (!string.IsNullOrWhiteSpace(Model.LandImprovementsJson))
+        {
+            try { impRows = System.Text.Json.JsonSerializer.Deserialize<List<PropertyAssessmentApp.Models.LandImprovementItemDto>>(Model.LandImprovementsJson, jsonOpts) ?? new(); } catch { }
+        }
+        else if (Model.ImprovementQty > 0 || Model.ImprovementMarketValue > 0)
+        {
+            impRows.Add(new PropertyAssessmentApp.Models.LandImprovementItemDto
+            {
+                ProductClass = string.IsNullOrWhiteSpace(Model.ImprovementType) ? "Improvement" : Model.ImprovementType,
+                Quantity = Model.ImprovementQty,
+                UnitValue = Model.ImprovementUnitValue,
+                AssessmentLevel = Model.AssessmentLevelPercent
+            });
+        }
+
+        var adjRows = new List<PropertyAssessmentApp.Models.LandAdjustmentItemDto>();
+        if (land?.TDNLandBaseMarkets != null && land.TDNLandBaseMarkets.Count > 0)
+        {
+            adjRows = land.TDNLandBaseMarkets.OrderBy(b => b.OrderNo).Select(b => new PropertyAssessmentApp.Models.LandAdjustmentItemDto
+            {
+                ClassificationName = b.ClassificationName,
+                BaseMarketValue = b.BaseMarketValue,
+                AdjustmentFactor = b.AdjustmentFactor,
+                PercentAdjustment = b.PercentAdjustment
+            }).ToList();
+        }
+        else if (!string.IsNullOrWhiteSpace(Model.LandAdjustmentsJson))
+        {
+            try { adjRows = System.Text.Json.JsonSerializer.Deserialize<List<PropertyAssessmentApp.Models.LandAdjustmentItemDto>>(Model.LandAdjustmentsJson, jsonOpts) ?? new(); } catch { }
+        }
+
+        var assRows = new List<(decimal AreaSqm, string ActualUse, decimal AdjustedMv, decimal AssLevel, decimal AssessedVal)>();
+        if (land?.TDNLandPropertyAssessments != null && land.TDNLandPropertyAssessments.Count > 0)
+        {
+            foreach (var i in land.TDNLandPropertyAssessments.OrderBy(x => x.OrderNo))
+            {
+                assRows.Add((
+                    Model.AreaSqMeters,
+                    string.IsNullOrWhiteSpace(i.ActualUseName) ? (Model.ActualUse ?? Model.Classification.ToString()) : i.ActualUseName,
+                    i.MarketValue,
+                    i.AssessmentLevelPercent,
+                    i.AssessmentValue));
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(Model.LandPropertyAssessmentsJson))
+        {
+            try
+            {
+                var parsedAss = System.Text.Json.JsonSerializer.Deserialize<List<PropertyAssessmentApp.Models.LandPropertyAssessmentItemDto>>(Model.LandPropertyAssessmentsJson, jsonOpts);
+                if (parsedAss != null && parsedAss.Count > 0)
+                {
+                    foreach (var i in parsedAss)
+                    {
+                        assRows.Add((
+                            Model.AreaSqMeters,
+                            string.IsNullOrWhiteSpace(i.ActualUseName) ? (Model.ActualUse ?? Model.Classification.ToString()) : i.ActualUseName,
+                            i.MarketValue,
+                            i.AssessmentLevelPercent,
+                            i.AssessmentValue));
+                    }
+                }
+            }
+            catch { }
+        }
+        if (assRows.Count == 0)
+        {
+            assRows.Add((
+                Model.AreaSqMeters,
+                string.IsNullOrWhiteSpace(Model.ActualUse) ? Model.Classification.ToString() : Model.ActualUse,
+                Model.AdjustedMarketValue > 0 ? Model.AdjustedMarketValue : Model.MarketValue,
+                Model.AssessmentLevelPercent,
+                Model.AssessedValue));
+        }
+
+        string regStatus = string.IsNullOrWhiteSpace(Model.RegistrationStatus) ? "Titled" : Model.RegistrationStatus.Trim();
+        bool isUntitled = string.Equals(regStatus, "Untitled", StringComparison.OrdinalIgnoreCase);
+        bool isTitled = !isUntitled;
+
+        string titleType = (Model.TitleType ?? "OCT").Trim().ToUpperInvariant();
+        bool isOct = isTitled && titleType == "OCT";
+        bool isTct = isTitled && titleType == "TCT";
+        bool isCloa = isTitled && titleType == "CLOA";
+
+        bool ownerMale = string.Equals(Model.OwnerSex, "Male", StringComparison.OrdinalIgnoreCase);
+        bool ownerFemale = string.Equals(Model.OwnerSex, "Female", StringComparison.OrdinalIgnoreCase);
+        string ownerOtherSex = (!ownerMale && !ownerFemale && !string.IsNullOrWhiteSpace(Model.OwnerSex)) ? Model.OwnerSex : "";
+
+        bool hasAdminOrPossessor = Model.IsAdministrator || Model.IsBeneficialUser || Model.IsPossessor || !string.IsNullOrWhiteSpace(Model.AdministratorName);
+        bool adminMale = hasAdminOrPossessor && string.Equals(Model.AdministratorGender, "Male", StringComparison.OrdinalIgnoreCase);
+        bool adminFemale = hasAdminOrPossessor && string.Equals(Model.AdministratorGender, "Female", StringComparison.OrdinalIgnoreCase);
+
+        decimal totalLandMv = appraisalRows.Sum(r => r.MarketValue);
+        if (totalLandMv <= 0) totalLandMv = Model.MarketValue;
+        decimal totalImpMv = impRows.Sum(r => r.MarketValue);
+        decimal totalAdjMv = adjRows.Count > 0
+            ? adjRows.Sum(r => r.AdjustedMarketValue)
+            : (Model.AdjustedMarketValue > 0 ? Model.AdjustedMarketValue : (totalLandMv + totalImpMv));
+        decimal totalAssessedVal = assRows.Sum(r => r.AssessedVal);
+
+        string qtr = (Model.EffectivityQuarter ?? "1st").ToUpperInvariant();
+        bool q1 = qtr.Contains("1");
+        bool q2 = qtr.Contains("2");
+        bool q3 = qtr.Contains("3");
+        bool q4 = qtr.Contains("4");
+        bool isTaxable = !string.Equals(Model.Taxability, "Exempt", StringComparison.OrdinalIgnoreCase);
+
+        <!-- =========================================================================
+             ANNEX I-E: FIELD APPRAISAL AND ASSESSMENT SHEET – LAND/OTHER IMPROVEMENTS
+             Exact Sequence Matching Local Assessment Manual (Pages 1 to 3)
+             ========================================================================= -->
+        <div class="p-6 sm:p-8 rounded-3xl bg-white dark:bg-stone-900 border border-slate-300 dark:border-stone-700 shadow-sm space-y-5 text-slate-900 dark:text-stone-100">
+
+            <!-- Header & Data Privacy Notice -->
+            <div class="space-y-2">
+                <div class="text-right text-[11px] text-slate-500 dark:text-stone-400">Local Assessment Manual</div>
+                <h2 class="text-center text-base sm:text-lg font-extrabold tracking-tight text-slate-900 dark:text-white">
+                    Annex I-E. Field Appraisal and Assessment Sheet – Land/Other Improvements
+                </h2>
+                <p class="text-[11px] leading-relaxed text-slate-600 dark:text-stone-400">
+                    <span class="italic font-semibold">Data Privacy Notice:</span> By submitting/providing your property information (including but not limited to name, contact details, property address, title number, and property documents), you acknowledge and authorize the government to collect, process, and store your personal data.
+                </p>
+            </div>
+
+            <!-- 1. TRANSACTION INFORMATION -->
+            <div class="space-y-1.5">
+                <h3 class="text-xs font-bold uppercase tracking-wide">TRANSACTION INFORMATION</h3>
+                <div class="border border-slate-400 dark:border-stone-600 p-3.5 space-y-2.5 text-xs">
+                    <div class="grid grid-cols-1 sm:grid-cols-12 gap-4">
+                        <div class="sm:col-span-7 flex items-baseline gap-2">
+                            <span class="whitespace-nowrap">Tax Declaration (TD) No.:</span>
+                            <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-mono font-bold px-1">@Model.TaxDeclarationNumber</span>
+                        </div>
+                        <div class="sm:col-span-5 flex items-baseline gap-2">
+                            <span class="whitespace-nowrap">Transaction Code:</span>
+                            <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@Model.TransactionCodeDisplay</span>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-12 gap-4">
+                        <div class="sm:col-span-7 flex items-baseline gap-2">
+                            <span class="whitespace-nowrap">Property Identification No. (PIN):</span>
+                            <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-mono font-bold px-1">@Model.PropertyIndexNumber</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. PROPERTY REGISTRATION DETAILS -->
+            <div class="space-y-1.5">
+                <h3 class="text-xs font-bold uppercase tracking-wide">PROPERTY REGISTRATION DETAILS</h3>
+                <div class="border border-slate-400 dark:border-stone-600 p-3.5 space-y-3 text-xs">
+                    <div class="flex flex-wrap items-center gap-6">
+                        <span>Registration Status:</span>
+                        <span class="inline-flex items-center gap-1.5 font-bold">
+                            <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(isTitled ? "✓" : "")</span> Titled
+                        </span>
+                        <span class="inline-flex items-center gap-1.5 font-bold">
+                            <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(isUntitled ? "✓" : "")</span> Untitled
+                        </span>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-6">
+                        <span>Title Type:</span>
+                        <span class="inline-flex items-center gap-1.5 font-bold">
+                            <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(isOct ? "✓" : "")</span> OCT
+                        </span>
+                        <span class="inline-flex items-center gap-1.5 font-bold">
+                            <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(isTct ? "✓" : "")</span> TCT
+                        </span>
+                        <span class="inline-flex items-center gap-1.5 font-bold">
+                            <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(isCloa ? "✓" : "")</span> CLOA
+                        </span>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="flex items-baseline gap-2">
+                            <span class="whitespace-nowrap">Title No.:</span>
+                            <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-mono font-bold px-1">@(string.IsNullOrWhiteSpace(Model.TitleNo) ? "\u00A0" : Model.TitleNo)</span>
+                        </div>
+                        <div class="flex items-baseline gap-2">
+                            <span class="whitespace-nowrap">Date Registered:</span>
+                            <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(Model.DateRegistered?.ToString("MMM dd, yyyy") ?? "\u00A0")</span>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-12 gap-4">
+                        <div class="sm:col-span-5 flex items-baseline gap-2">
+                            <span class="whitespace-nowrap">Survey No.:</span>
+                            <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-mono font-bold px-1">@(string.IsNullOrWhiteSpace(Model.SurveyNo) ? (Model.CadastralSurveyNo ?? "\u00A0") : Model.SurveyNo)</span>
+                        </div>
+                        <div class="sm:col-span-4 flex items-baseline gap-2">
+                            <span class="whitespace-nowrap">Lot No.:</span>
+                            <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-mono font-bold px-1">@(string.IsNullOrWhiteSpace(Model.LotNo) ? "\u00A0" : Model.LotNo)</span>
+                        </div>
+                        <div class="sm:col-span-3 flex items-baseline gap-2">
+                            <span class="whitespace-nowrap">Block No.:</span>
+                            <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-mono font-bold px-1">@(string.IsNullOrWhiteSpace(Model.BlockNo) ? "\u00A0" : Model.BlockNo)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. OWNER INFORMATION -->
+            <div class="space-y-1.5">
+                <h3 class="text-xs font-bold uppercase tracking-wide">OWNER INFORMATION</h3>
+                <div class="border border-slate-400 dark:border-stone-600 text-xs">
+                    <div class="grid grid-cols-1 sm:grid-cols-12 border-b border-slate-400 dark:border-stone-600">
+                        <div class="sm:col-span-7 p-3.5 border-b sm:border-b-0 sm:border-r border-slate-400 dark:border-stone-600 space-y-2.5">
+                            <div>
+                                <div class="mb-1">
+                                    <span class="font-bold">Owner/s Name</span>
+                                    <span class="italic text-[11px] text-slate-600 dark:text-stone-400">(as reflected in the OCT/TCT/CLOA):</span>
+                                </div>
+                                <div class="border-b border-slate-400 dark:border-stone-600 font-bold text-sm pb-0.5">@Model.OwnerName</div>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-4 pt-1">
+                                <span>Sex:</span>
+                                <span class="inline-flex items-center gap-1.5 font-bold">
+                                    <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(ownerMale ? "✓" : "")</span> Male
+                                </span>
+                                <span class="inline-flex items-center gap-1.5 font-bold">
+                                    <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(ownerFemale ? "✓" : "")</span> Female
+                                </span>
+                                <div class="flex items-baseline gap-1.5 flex-1 min-w-[120px]">
+                                    <span>Others:</span>
+                                    <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(string.IsNullOrWhiteSpace(ownerOtherSex) ? "\u00A0" : ownerOtherSex)</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="sm:col-span-5 p-3.5 space-y-2.5">
+                            <div class="flex items-baseline gap-2">
+                                <span class="whitespace-nowrap">TIN:</span>
+                                <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-mono font-bold px-1">@(string.IsNullOrWhiteSpace(Model.OwnerTin) ? "\u00A0" : Model.OwnerTin)</span>
+                            </div>
+                            <div class="flex items-baseline gap-2">
+                                <span class="whitespace-nowrap">Phone/Mobile No.:</span>
+                                <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(string.IsNullOrWhiteSpace(Model.OwnerPhone) ? "\u00A0" : Model.OwnerPhone)</span>
+                            </div>
+                            <div class="flex items-baseline gap-2">
+                                <span class="whitespace-nowrap">Email Address:</span>
+                                <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(string.IsNullOrWhiteSpace(Model.OwnerEmail) ? "\u00A0" : Model.OwnerEmail)</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-3.5 flex items-baseline gap-2">
+                        <span class="whitespace-nowrap">Mailing Address:</span>
+                        <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(string.IsNullOrWhiteSpace(Model.OwnerAddress) ? "\u00A0" : Model.OwnerAddress)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. ADMINISTRATOR / BENEFICIAL USER / POSSESSOR -->
+            <div class="border border-slate-400 dark:border-stone-600 text-xs">
+                <div class="grid grid-cols-1 sm:grid-cols-12 border-b border-slate-400 dark:border-stone-600">
+                    <div class="sm:col-span-7 p-3.5 border-b sm:border-b-0 sm:border-r border-slate-400 dark:border-stone-600 space-y-2.5">
+                        <div class="flex flex-wrap items-center gap-6">
+                            <span class="inline-flex items-center gap-1.5 font-bold">
+                                <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(Model.IsAdministrator ? "✓" : "")</span> Administrator
+                            </span>
+                            <span class="inline-flex items-center gap-1.5 font-bold">
+                                <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(Model.IsBeneficialUser ? "✓" : "")</span> Beneficial User
+                            </span>
+                            <span class="inline-flex items-center gap-1.5 font-bold">
+                                <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(Model.IsPossessor ? "✓" : "")</span> Possessor
+                            </span>
+                        </div>
+                        <div class="flex items-baseline gap-2">
+                            <span class="whitespace-nowrap">Name/s:</span>
+                            <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(string.IsNullOrWhiteSpace(Model.AdministratorName) ? "\u00A0" : Model.AdministratorName)</span>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <span>Sex:</span>
+                            <span class="inline-flex items-center gap-1.5 font-bold">
+                                <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(adminMale ? "✓" : "")</span> Male
+                            </span>
+                            <span class="inline-flex items-center gap-1.5 font-bold">
+                                <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(adminFemale ? "✓" : "")</span> Female
+                            </span>
+                        </div>
+                    </div>
+                    <div class="sm:col-span-5 p-3.5 space-y-2.5">
+                        <div class="flex items-baseline gap-2">
+                            <span class="whitespace-nowrap">TIN:</span>
+                            <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-mono font-bold px-1">@(string.IsNullOrWhiteSpace(Model.AdministratorTin) ? "\u00A0" : Model.AdministratorTin)</span>
+                        </div>
+                        <div class="flex items-baseline gap-2">
+                            <span class="whitespace-nowrap">Phone/Mobile No.:</span>
+                            <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(string.IsNullOrWhiteSpace(Model.AdministratorContactNo) ? "\u00A0" : Model.AdministratorContactNo)</span>
+                        </div>
+                        <div class="flex items-baseline gap-2">
+                            <span class="whitespace-nowrap">Email Address:</span>
+                            <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(string.IsNullOrWhiteSpace(Model.AdministratorEmail) ? "\u00A0" : Model.AdministratorEmail)</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-3.5 flex items-baseline gap-2">
+                    <span class="whitespace-nowrap">Mailing Address:</span>
+                    <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(string.IsNullOrWhiteSpace(Model.AdministratorAddress) ? "\u00A0" : Model.AdministratorAddress)</span>
+                </div>
+            </div>
+
+            <!-- 5. PROPERTY LOCATION -->
+            <div class="space-y-1.5">
+                <h3 class="text-xs font-bold uppercase tracking-wide">PROPERTY LOCATION</h3>
+                <div class="border border-slate-400 dark:border-stone-600 p-3.5 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div class="flex items-baseline gap-2">
+                        <span class="whitespace-nowrap">No./Street:</span>
+                        <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(string.IsNullOrWhiteSpace(Model.StreetNo) ? "\u00A0" : Model.StreetNo)</span>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <span class="whitespace-nowrap">Barangay/District:</span>
+                        <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(string.IsNullOrWhiteSpace(Model.DistrictOrBarangay) ? "\u00A0" : Model.DistrictOrBarangay)</span>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <span class="whitespace-nowrap">Municipality:</span>
+                        <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(string.IsNullOrWhiteSpace(Model.Municipality) ? "General Santos City" : Model.Municipality)</span>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <span class="whitespace-nowrap">Province/City:</span>
+                        <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(string.IsNullOrWhiteSpace(Model.ProvinceCity) ? "South Cotabato" : Model.ProvinceCity)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 6. PROPERTY BOUNDARIES & LAND SKETCH -->
+            <div class="space-y-1.5">
+                <h3 class="text-xs font-bold uppercase tracking-wide">PROPERTY BOUNDARIES</h3>
+                <div class="border border-slate-400 dark:border-stone-600 grid grid-cols-1 sm:grid-cols-12 text-xs">
+                    <div class="sm:col-span-6 p-3.5 border-b sm:border-b-0 sm:border-r border-slate-400 dark:border-stone-600 space-y-2.5">
+                        <div class="flex items-baseline gap-2">
+                            <span class="w-14">North:</span>
+                            <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(string.IsNullOrWhiteSpace(Model.BoundaryNorth) ? "\u00A0" : (string.IsNullOrWhiteSpace(Model.Nremarks) ? Model.BoundaryNorth : $"{Model.BoundaryNorth} ({Model.Nremarks})"))</span>
+                        </div>
+                        <div class="flex items-baseline gap-2">
+                            <span class="w-14">East:</span>
+                            <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(string.IsNullOrWhiteSpace(Model.BoundaryEast) ? "\u00A0" : (string.IsNullOrWhiteSpace(Model.Eremarks) ? Model.BoundaryEast : $"{Model.BoundaryEast} ({Model.Eremarks})"))</span>
+                        </div>
+                        <div class="flex items-baseline gap-2">
+                            <span class="w-14">West:</span>
+                            <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(string.IsNullOrWhiteSpace(Model.BoundaryWest) ? "\u00A0" : (string.IsNullOrWhiteSpace(Model.Wremarks) ? Model.BoundaryWest : $"{Model.BoundaryWest} ({Model.Wremarks})"))</span>
+                        </div>
+                        <div class="flex items-baseline gap-2">
+                            <span class="w-14">South:</span>
+                            <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(string.IsNullOrWhiteSpace(Model.BoundarySouth) ? "\u00A0" : (string.IsNullOrWhiteSpace(Model.Sremarks) ? Model.BoundarySouth : $"{Model.BoundarySouth} ({Model.Sremarks})"))</span>
+                        </div>
+                    </div>
+                    <div class="sm:col-span-6 p-3.5 flex flex-col justify-between min-h-[110px]">
+                        <div>
+                            <span class="font-bold">LAND SKETCH:</span>
+                            <span class="italic text-[11px] text-slate-500 dark:text-stone-400">(Not necessarily drawn to scale)</span>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(Model.FloorPlanSketchPath))
+                        {
+                            <div class="font-mono text-emerald-700 dark:text-emerald-400 pt-2">Attached Sketch: @Model.FloorPlanSketchPath</div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- 7. LAND APPRAISAL -->
+            <div class="space-y-1.5 text-xs">
+                <h3 class="text-xs font-bold uppercase tracking-wide">LAND APPRAISAL</h3>
+                <div class="border border-slate-400 dark:border-stone-600 overflow-x-auto">
+                    <table class="w-full text-xs border-collapse">
+                        <thead>
+                            <tr class="bg-slate-100 dark:bg-stone-800 border-b border-slate-400 dark:border-stone-600">
+                                <th class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">Classification</th>
+                                <th class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">Sub-classification</th>
+                                <th class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">Area</th>
+                                <th class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">Unit Value (Php)</th>
+                                <th class="p-2 text-center">Market Value (Php)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var r in appraisalRows)
+                            {
+                                <tr class="border-b border-slate-300 dark:border-stone-700 last:border-b-0">
+                                    <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-center font-bold">@r.ClassificationName</td>
+                                    <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">@r.SubClassName</td>
+                                    <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-right font-mono">@r.AreaSQM.ToString("N2") sq.m.</td>
+                                    <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-right font-mono">₱@r.UnitValue.ToString("N2")</td>
+                                    <td class="p-2 text-right font-mono font-bold">₱@r.MarketValue.ToString("N2")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="flex justify-end items-baseline gap-3 pt-1">
+                    <span class="font-bold">Total &nbsp; ₱</span>
+                    <span class="w-44 border-b border-slate-600 dark:border-stone-400 text-right font-mono font-extrabold text-sm px-1">@totalLandMv.ToString("N2")</span>
+                </div>
+            </div>
+
+            <!-- 8. OTHER IMPROVEMENTS -->
+            <div class="space-y-1.5 text-xs">
+                <h3 class="text-xs font-bold uppercase tracking-wide">OTHER IMPROVEMENTS</h3>
+                <div class="border border-slate-400 dark:border-stone-600 overflow-x-auto">
+                    <table class="w-full text-xs border-collapse">
+                        <thead>
+                            <tr class="bg-slate-100 dark:bg-stone-800 border-b border-slate-400 dark:border-stone-600">
+                                <th class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">Type of Improvements</th>
+                                <th class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">Quantity</th>
+                                <th class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">Unit of Measure</th>
+                                <th class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">Unit Value (Php)</th>
+                                <th class="p-2 text-center">Market Value (Php)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (impRows.Count == 0)
+                            {
+                                <tr>
+                                    <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-center text-slate-400">-</td>
+                                    <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-center text-slate-400">-</td>
+                                    <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-center text-slate-400">-</td>
+                                    <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-right font-mono text-slate-400">₱0.00</td>
+                                    <td class="p-2 text-right font-mono text-slate-400">₱0.00</td>
+                                </tr>
+                            }
+                            else
+                            {
+                                foreach (var r in impRows)
+                                {
+                                    <tr class="border-b border-slate-300 dark:border-stone-700 last:border-b-0">
+                                        <td class="p-2 border-r border-slate-400 dark:border-stone-600 font-bold">@r.ProductClass</td>
+                                        <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-right font-mono">@r.Quantity.ToString("N2")</td>
+                                        <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">@(string.IsNullOrWhiteSpace(land?.ImprovementUnitOfMeasure) ? "pcs / sq.m." : land.ImprovementUnitOfMeasure)</td>
+                                        <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-right font-mono">₱@r.UnitValue.ToString("N2")</td>
+                                        <td class="p-2 text-right font-mono font-bold">₱@r.MarketValue.ToString("N2")</td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="flex justify-end items-baseline gap-3 pt-1">
+                    <span class="font-bold">Total &nbsp; ₱</span>
+                    <span class="w-44 border-b border-slate-600 dark:border-stone-400 text-right font-mono font-extrabold text-sm px-1">@totalImpMv.ToString("N2")</span>
+                </div>
+            </div>
+
+            <!-- 9. MARKET VALUE ADJUSTMENT -->
+            <div class="space-y-1.5 text-xs">
+                <h3 class="text-xs font-bold uppercase tracking-wide">MARKET VALUE ADJUSTMENT</h3>
+                <div class="border border-slate-400 dark:border-stone-600 overflow-x-auto">
+                    <table class="w-full text-xs border-collapse">
+                        <thead>
+                            <tr class="bg-slate-100 dark:bg-stone-800 border-b border-slate-400 dark:border-stone-600">
+                                <th class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">
+                                    Market Value<br /><span class="font-normal italic text-[10px]">(Land + Improvement) (Php)</span>
+                                </th>
+                                <th class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">Adjustment Factor</th>
+                                <th class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">Percent (%) Adjustment</th>
+                                <th class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">Value Adjustment (Php)</th>
+                                <th class="p-2 text-center">Adjusted Market Value (Php)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (adjRows.Count == 0)
+                            {
+                                <tr>
+                                    <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-right font-mono">₱@((totalLandMv + totalImpMv).ToString("N2"))</td>
+                                    <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">@(string.IsNullOrWhiteSpace(Model.AdjustmentFactor) ? "None (100%)" : Model.AdjustmentFactor)</td>
+                                    <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-center font-mono">@Model.PercentAdjustment.ToString("N2")%</td>
+                                    <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-right font-mono">₱@Model.ValueAdjustment.ToString("N2")</td>
+                                    <td class="p-2 text-right font-mono font-bold">₱@totalAdjMv.ToString("N2")</td>
+                                </tr>
+                            }
+                            else
+                            {
+                                foreach (var r in adjRows)
+                                {
+                                    <tr class="border-b border-slate-300 dark:border-stone-700 last:border-b-0">
+                                        <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-right font-mono">₱@r.BaseMarketValue.ToString("N2")</td>
+                                        <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">@r.AdjustmentFactor</td>
+                                        <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-center font-mono">@r.PercentAdjustment.ToString("N2")%</td>
+                                        <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-right font-mono">₱@r.ValueAdjustment.ToString("N2")</td>
+                                        <td class="p-2 text-right font-mono font-bold">₱@r.AdjustedMarketValue.ToString("N2")</td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="flex justify-end items-baseline gap-3 pt-1">
+                    <span class="font-bold">Total &nbsp; ₱</span>
+                    <span class="w-44 border-b border-slate-600 dark:border-stone-400 text-right font-mono font-extrabold text-sm px-1">@totalAdjMv.ToString("N2")</span>
+                </div>
+            </div>
+
+            <!-- 10. PROPERTY ASSESSMENT -->
+            <div class="space-y-1.5 text-xs">
+                <h3 class="text-xs font-bold uppercase tracking-wide">PROPERTY ASSESSMENT</h3>
+                <div class="border border-slate-400 dark:border-stone-600 overflow-x-auto">
+                    <table class="w-full text-xs border-collapse">
+                        <thead>
+                            <tr class="bg-slate-100 dark:bg-stone-800 border-b border-slate-400 dark:border-stone-600">
+                                <th class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">Area</th>
+                                <th class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">Actual Use</th>
+                                <th class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">Adjusted Market Value</th>
+                                <th class="p-2 border-r border-slate-400 dark:border-stone-600 text-center">Assessment Level (%)</th>
+                                <th class="p-2 text-center">Assessed Value (Php)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var r in assRows)
+                            {
+                                <tr class="border-b border-slate-300 dark:border-stone-700 last:border-b-0">
+                                    <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-right font-mono">@r.AreaSqm.ToString("N2") sq.m.</td>
+                                    <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-center font-bold">@r.ActualUse</td>
+                                    <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-right font-mono">₱@r.AdjustedMv.ToString("N2")</td>
+                                    <td class="p-2 border-r border-slate-400 dark:border-stone-600 text-center font-mono font-bold">@r.AssLevel.ToString("N0")%</td>
+                                    <td class="p-2 text-right font-mono font-bold">₱@r.AssessedVal.ToString("N2")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="flex justify-end items-baseline gap-3 pt-1">
+                    <span class="font-bold">Total &nbsp; ₱</span>
+                    <span class="w-44 border-b border-slate-600 dark:border-stone-400 text-right font-mono font-extrabold text-sm text-emerald-700 dark:text-emerald-400 px-1">@totalAssessedVal.ToString("N2")</span>
+                </div>
+            </div>
+
+            <!-- 11. EFFECTIVITY OF ASSESSMENT/REASSESSMENT -->
+            <div class="space-y-2 text-xs">
+                <h3 class="text-xs font-bold uppercase tracking-wide">EFFECTIVITY OF ASSESSMENT/REASSESSMENT</h3>
+                <div class="border border-slate-400 dark:border-stone-600 p-3.5 space-y-3">
+                    <div class="flex flex-wrap items-center justify-between gap-4">
+                        <div class="flex items-baseline gap-2 w-48">
+                            <span>Year:</span>
+                            <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-mono font-bold text-center">@Model.EffectivityYear</span>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-4">
+                            <span>Quarter:</span>
+                            <span class="inline-flex items-center gap-1.5 font-bold">
+                                <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(q1 ? "✓" : "")</span> 1<sup>st</sup>
+                            </span>
+                            <span class="inline-flex items-center gap-1.5 font-bold">
+                                <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(q2 ? "✓" : "")</span> 2<sup>nd</sup>
+                            </span>
+                            <span class="inline-flex items-center gap-1.5 font-bold">
+                                <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(q3 ? "✓" : "")</span> 3<sup>rd</sup>
+                            </span>
+                            <span class="inline-flex items-center gap-1.5 font-bold">
+                                <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(q4 ? "✓" : "")</span> 4<sup>th</sup>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-6">
+                        <span>Taxability:</span>
+                        <span class="inline-flex items-center gap-1.5 font-bold">
+                            <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(isTaxable ? "✓" : "")</span> Taxable
+                        </span>
+                        <span class="inline-flex items-center gap-1.5 font-bold">
+                            <span class="w-4 h-4 inline-flex items-center justify-center border border-slate-600 dark:border-stone-400 text-[10px]">@(!isTaxable ? "✓" : "")</span> Exempt
+                        </span>
+                        <div class="flex-1 flex items-baseline gap-2 min-w-[200px]">
+                            <span>Basis:</span>
+                            <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(!string.IsNullOrWhiteSpace(Model.TaxabilityBasis) ? Model.TaxabilityBasis : Model.AssessmentBasis)</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex flex-wrap items-baseline gap-4 px-2">
+                    <span>Period Covered by Back Taxes (if any):</span>
+                    <div class="flex items-baseline gap-2 w-36">
+                        <span>Year:</span>
+                        <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-mono font-bold text-center">@(Model.BackTaxesYearFrom?.ToString() ?? "\u00A0")</span>
+                    </div>
+                    <div class="flex items-baseline gap-2 w-36">
+                        <span>to Year:</span>
+                        <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-mono font-bold text-center">@(Model.BackTaxesYearTo?.ToString() ?? "\u00A0")</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 12. RECORD OF SUPERSEDED ASSESSMENT -->
+            <div class="space-y-1.5 text-xs">
+                <h3 class="text-xs font-bold uppercase tracking-wide">RECORD OF SUPERSEDED ASSESSMENT</h3>
+                <div class="border border-slate-400 dark:border-stone-600 p-3.5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div class="flex items-baseline gap-2">
+                        <span class="whitespace-nowrap">Previous TD No.:</span>
+                        <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-mono font-bold px-1">@(string.IsNullOrWhiteSpace(Model.PreviousTdNo) ? "\u00A0" : Model.PreviousTdNo)</span>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <span class="whitespace-nowrap">PIN:</span>
+                        <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-mono font-bold px-1">@(string.IsNullOrWhiteSpace(Model.PreviousPin) ? "\u00A0" : Model.PreviousPin)</span>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <span class="whitespace-nowrap">Market Value:</span>
+                        <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-mono font-bold px-1">@(Model.PreviousMarketValue > 0 ? $"₱{Model.PreviousMarketValue:N2}" : "\u00A0")</span>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <span class="whitespace-nowrap">Assessed Value:</span>
+                        <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-mono font-bold px-1">@(Model.PreviousAssessedValue > 0 ? $"₱{Model.PreviousAssessedValue:N2}" : "\u00A0")</span>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <span class="whitespace-nowrap">Previous Owner:</span>
+                        <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">@(string.IsNullOrWhiteSpace(Model.PreviousOwner) ? "\u00A0" : Model.PreviousOwner)</span>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <span class="whitespace-nowrap">Effectivity of Assessment:</span>
+                        <span class="flex-1 border-b border-slate-400 dark:border-stone-600 font-bold px-1">&nbsp;</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 13. SIGNATORIES: APPRAISED BY, ASSESSED BY, RECOMMENDING APPROVAL BY -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-4 text-xs">
+                <div>
+                    <div class="font-bold uppercase mb-5">APPRAISED BY:</div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div class="col-span-2 text-center">
+                            <div class="border-b border-slate-600 dark:border-stone-400 font-bold pb-0.5">@(string.IsNullOrWhiteSpace(Model.AppraisedByName) ? "\u00A0" : Model.AppraisedByName)</div>
+                            <div class="text-[10px] italic text-slate-500 pt-0.5">Name and Position</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="border-b border-slate-600 dark:border-stone-400 pb-0.5">@((Model.DateAppraised ?? Model.DateAssessed).ToString("MM/dd/yyyy"))</div>
+                            <div class="text-[10px] italic text-slate-500 pt-0.5">Date</div>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <div class="font-bold uppercase mb-5">ASSESSED BY:</div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div class="col-span-2 text-center">
+                            <div class="border-b border-slate-600 dark:border-stone-400 font-bold pb-0.5">@(string.IsNullOrWhiteSpace(Model.AssessedByName) ? "\u00A0" : Model.AssessedByName)</div>
+                            <div class="text-[10px] italic text-slate-500 pt-0.5">Name and Position</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="border-b border-slate-600 dark:border-stone-400 pb-0.5">@Model.DateAssessed.ToString("MM/dd/yyyy")</div>
+                            <div class="text-[10px] italic text-slate-500 pt-0.5">Date</div>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <div class="font-bold uppercase mb-5">RECOMMENDING APPROVAL BY:</div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div class="col-span-2 text-center">
+                            <div class="border-b border-slate-600 dark:border-stone-400 font-bold pb-0.5">@(string.IsNullOrWhiteSpace(Model.RecommendingApprovalName) ? "\u00A0" : Model.RecommendingApprovalName)</div>
+                            <div class="text-[10px] italic text-slate-500 pt-0.5">Name and Position</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="border-b border-slate-600 dark:border-stone-400 pb-0.5">@((Model.DateRecommended ?? Model.DateAssessed).ToString("MM/dd/yyyy"))</div>
+                            <div class="text-[10px] italic text-slate-500 pt-0.5">Date</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 14. MEMORANDA -->
+            <div class="pt-3 space-y-2 text-xs">
+                <div class="font-bold uppercase">MEMORANDA:</div>
+                <div class="border-b border-slate-400 dark:border-stone-600 pb-1 min-h-[20px]">@(string.IsNullOrWhiteSpace(Model.Memoranda) ? "\u00A0" : Model.Memoranda)</div>
+                <div class="border-b border-slate-400 dark:border-stone-600 h-4"></div>
+                <div class="border-b border-slate-400 dark:border-stone-600 h-4"></div>
+            </div>
+
+            <!-- 15. APPROVED BY, ENTRY IN ASSESSMENT ROLL BY, ENCODED BY -->
+            <div class="pt-4 space-y-4 text-xs">
+                <div class="grid grid-cols-1 sm:grid-cols-12 items-end gap-4">
+                    <div class="sm:col-span-3 font-bold uppercase">APPROVED BY:</div>
+                    <div class="sm:col-span-6 text-center">
+                        <div class="border-b border-slate-600 dark:border-stone-400 font-bold pb-0.5">@(string.IsNullOrWhiteSpace(Model.ApprovedByName) ? "\u00A0" : Model.ApprovedByName)</div>
+                        <div class="text-[10px] italic text-slate-500 pt-0.5">Provincial/City/Municipal Assessor</div>
+                    </div>
+                    <div class="sm:col-span-3 text-center">
+                        <div class="border-b border-slate-600 dark:border-stone-400 pb-0.5">@((Model.DateApproved ?? Model.DateAssessed).ToString("MM/dd/yyyy"))</div>
+                        <div class="text-[10px] italic text-slate-500 pt-0.5">Date</div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-12 items-end gap-4">
+                    <div class="sm:col-span-3 font-semibold">Entry in the Assessment Roll by:</div>
+                    <div class="sm:col-span-6 text-center">
+                        <div class="border-b border-slate-600 dark:border-stone-400 font-bold pb-0.5">
+                            @(string.IsNullOrWhiteSpace(Model.EntryInRollName) ? "\u00A0" : (string.IsNullOrWhiteSpace(Model.EntryInRollPosition) ? Model.EntryInRollName : $"{Model.EntryInRollName} ({Model.EntryInRollPosition})"))
+                        </div>
+                        <div class="text-[10px] italic text-slate-500 pt-0.5">Name and Position</div>
+                    </div>
+                    <div class="sm:col-span-3 text-center">
+                        <div class="border-b border-slate-600 dark:border-stone-400 pb-0.5">@((Model.EntryInRollDate ?? Model.DateAssessed).ToString("MM/dd/yyyy"))</div>
+                        <div class="text-[10px] italic text-slate-500 pt-0.5">Date</div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-12 items-end gap-4">
+                    <div class="sm:col-span-3 font-semibold">Encoded by:</div>
+                    <div class="sm:col-span-6 text-center">
+                        <div class="border-b border-slate-600 dark:border-stone-400 font-bold pb-0.5">@(string.IsNullOrWhiteSpace(Model.EncodedByName) ? "\u00A0" : Model.EncodedByName)</div>
+                        <div class="text-[10px] italic text-slate-500 pt-0.5">Name and Position</div>
+                    </div>
+                    <div class="sm:col-span-3 text-center">
+                        <div class="border-b border-slate-600 dark:border-stone-400 pb-0.5">@((Model.DateEncoded ?? Model.DateAssessed).ToString("MM/dd/yyyy"))</div>
+                        <div class="text-[10px] italic text-slate-500 pt-0.5">Date</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    }
+    @if (Model.Kind != PropertyAssessmentApp.Models.PropertyKind.Building && Model.Kind != PropertyAssessmentApp.Models.PropertyKind.Land)
+    {
     <!-- 2-COLUMN GRID: ALL RECORD DATA -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
@@ -385,18 +1934,21 @@
                         </div>
                     }
 
+                    @{
+                        var bldgScheduleInfo = PropertyAssessmentApp.Services.BuildingDepreciationSchedule.Lookup(Model.BuildingClassification, Model.BuildingAgeYears, Model.StructuralType);
+                    }
                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                         <div>
                             <span class="text-[10px] text-slate-400 block font-bold">STRUCTURAL TYPE</span>
                             <span class="font-bold text-slate-800 dark:text-stone-200">@(string.IsNullOrWhiteSpace(Model.StructuralType) ? "--" : Model.StructuralType)</span>
                         </div>
                         <div>
-                            <span class="text-[10px] text-slate-400 block font-bold">STOREYS</span>
-                            <span class="text-slate-800 dark:text-stone-200 font-bold">@Model.NoOfStoreys</span>
+                            <span class="text-[10px] text-slate-400 block font-bold">BLDG. CLASSIFICATION</span>
+                            <span class="font-mono font-bold text-emerald-700 dark:text-emerald-400">Class @bldgScheduleInfo.ClassificationCode (@(bldgScheduleInfo.EconomicLifeYears)y Life | @(bldgScheduleInfo.ResidualValuePercent)% Residual)</span>
                         </div>
                         <div>
-                            <span class="text-[10px] text-slate-400 block font-bold">BUILDING AREA</span>
-                            <span class="text-slate-800 dark:text-stone-200 font-bold">@Model.TotalBuildingAreaSqm.ToString("N2") sq.m.</span>
+                            <span class="text-[10px] text-slate-400 block font-bold">STOREYS / AREA</span>
+                            <span class="text-slate-800 dark:text-stone-200 font-bold">@Model.NoOfStoreys (@Model.TotalBuildingAreaSqm.ToString("N2") sq.m.)</span>
                         </div>
                         <div>
                             <span class="text-[10px] text-slate-400 block font-bold">BUILDING PERMIT NO.</span>
@@ -415,8 +1967,8 @@
                             <span class="text-slate-700 dark:text-stone-300">@(Model.DateOccupied?.ToString("MMM dd, yyyy") ?? "--")</span>
                         </div>
                         <div>
-                            <span class="text-[10px] text-slate-400 block font-bold">BUILDING AGE</span>
-                            <span class="text-slate-800 dark:text-stone-200 font-bold">@Model.BuildingAgeYears years</span>
+                            <span class="text-[10px] text-slate-400 block font-bold">BLDG. AGE &amp; GR CYCLE</span>
+                            <span class="text-slate-800 dark:text-stone-200 font-bold">@Model.BuildingAgeYears yrs (@bldgScheduleInfo.GeneralRevisionCycle)</span>
                         </div>
                     </div>
 
@@ -599,5 +2151,6 @@
         </div>
 
     </div>
+    }
 
 </div>

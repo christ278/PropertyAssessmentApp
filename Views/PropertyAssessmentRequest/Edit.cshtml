@@ -37,7 +37,16 @@
             <input type="hidden" asp-for="TransactionTypeName" id="txNameInput" />
             <input type="hidden" asp-for="GeneratedPartitionsJson" id="GeneratedPartitionsJson" />
             <input type="hidden" asp-for="SelectedRefPropertyIdsJson" id="SelectedRefPropertyIdsJson" />
-            <div asp-validation-summary="ModelOnly" class="hidden"></div>
+            @if (!ViewData.ModelState.IsValid)
+            {
+                <div class="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-200 shadow-sm space-y-1">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="alert-triangle" class="w-5 h-5 text-rose-600 shrink-0"></i>
+                        <h4 class="font-bold text-sm">Please correct the following errors before saving:</h4>
+                    </div>
+                    <div asp-validation-summary="All" class="text-xs list-disc list-inside text-rose-700 dark:text-rose-300 font-medium ml-7"></div>
+                </div>
+            }
 
             <!-- Transaction & Partitioning -->
             <div class="space-y-4 p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
@@ -629,9 +638,9 @@
             if (document.getElementById('registeredOwnerSelect')) {
                 new TomSelect('#registeredOwnerSelect', {
                     create: false,
-                    valueField: 'id',
-                    labelField: 'display',
-                    searchField: ['name', 'tin', 'text', 'display'],
+                    valueField: 'value',
+                    labelField: 'text',
+                    searchField: ['value', 'text', 'name', 'tin', 'display'],
                     loadThrottle: 300,
                     placeholder: 'Search active registered owner by name, TIN, or RPTIN...',
                     load: function(query, callback) {
@@ -1284,6 +1293,15 @@
 
                     if (!isValid) {
                         e.preventDefault();
+                        if (window.RptSpinner) window.RptSpinner.hide();
+                        var submitBtns = form.querySelectorAll('.btn-is-processing, button[type="submit"]');
+                        submitBtns.forEach(function (btn) {
+                            btn.classList.remove('btn-is-processing');
+                            if (btn.dataset.originalHtml) btn.innerHTML = btn.dataset.originalHtml;
+                        });
+                        if (typeof toastr !== 'undefined') {
+                            toastr.warning('Please review and complete all required fields highlighted in red.', 'Required Fields Missing');
+                        }
                         if (firstInvalid) {
                             firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
                             if (typeof firstInvalid.focus === 'function') firstInvalid.focus();

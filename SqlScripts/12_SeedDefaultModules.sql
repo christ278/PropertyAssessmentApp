@@ -55,7 +55,7 @@ BEGIN TRY
         (1,  'DASHBOARD',           'Executive Dashboard',                      'Main Menu',                   'Home',                     'Index',          'layout-dashboard', 1,  0),
         (17, 'POOL_TRANSACTIONS',   'Pool Transactions (Shared Queue)',         'Transaction Workflows',       'Workflow',                 'Pool',           'inbox',            1,  1),
         (2,  'ANALYTICS',           'Executive Analytics & Reports',            'Main Menu',                   'Analytics',                'Index',          'trending-up',      2,  1),
-        (18, 'MY_TRANSACTIONS',     'My Transactions (Claimed Workspace)',      'Transaction Workflows',       'Workflow',                 'MyTransactions', 'user-check',       2,  1),
+        (18, 'MY_TRANSACTIONS',     'My Transactions',                          'Transaction Workflows',       'Workflow',                 'MyTransactions', 'user-check',       2,  1),
         (3,  'INSPECTION',          'Field Inspection Requests',                'FAAS & Transaction Requests', 'RequestForInspection',     'Index',          'clipboard-check',  10, 1),
         (4,  'PROPERTY_ASSESSMENT', 'Property Assessment Requests',             'FAAS & Transaction Requests', 'PropertyAssessmentRequest', 'Index',          'building',         11, 1),
         (5,  'ASSESSMENT_FAAS',     'Real Property Appraisal & Tax Dec (FAAS)', 'FAAS & Transaction Requests', 'Assessment',                'Index',          'file-spreadsheet', 12, 1),

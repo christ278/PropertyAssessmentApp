@@ -87,6 +87,7 @@ public class UserAccountService : IUserAccountService
             existing.Department = user.Department;
             existing.ContactNo = user.ContactNo;
             existing.IsActive = user.IsActive;
+            existing.IsRegularEmployee = user.IsRegularEmployee;
             existing.DivisionId = user.DivisionId;
             existing.WorkflowRoleId = user.WorkflowRoleId;
             existing.WorkflowRoleName = user.WorkflowRoleName;

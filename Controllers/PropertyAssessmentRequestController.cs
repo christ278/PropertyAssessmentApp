@@ -23,6 +23,7 @@ public class PropertyAssessmentRequestController : Controller
     private readonly ApplicationDbContext _context;
     private readonly IWebHostEnvironment _env;
     private readonly ITaxDeclarationPdfService _tdPdfService;
+    private readonly IWorkflowNotifier _workflowNotifier;
 
     public PropertyAssessmentRequestController(
         IPropertyAssessmentRequestService rpaService,
@@ -31,7 +32,8 @@ public class PropertyAssessmentRequestController : Controller
         IOwnerService ownerService,
         ApplicationDbContext context,
         IWebHostEnvironment env,
-        ITaxDeclarationPdfService tdPdfService)
+        ITaxDeclarationPdfService tdPdfService,
+        IWorkflowNotifier workflowNotifier)
     {
         _rpaService = rpaService;
         _assessmentService = assessmentService;
@@ -40,6 +42,7 @@ public class PropertyAssessmentRequestController : Controller
         _context = context;
         _env = env;
         _tdPdfService = tdPdfService;
+        _workflowNotifier = workflowNotifier;
     }
 
     // GET: /PropertyAssessmentRequest/PrintPdf/5
@@ -246,7 +249,7 @@ public class PropertyAssessmentRequestController : Controller
     // POST: /PropertyAssessmentRequest/Create
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult Create(PropertyAssessmentRequest request, IFormFile? fileUpload)
+    public async Task<IActionResult> Create(PropertyAssessmentRequest request, IFormFile? fileUpload)
     {
         if (!string.IsNullOrWhiteSpace(request.TransactionTypeCode) &&
             PropertyAssessmentRequest.StandardTransactionCodes.TryGetValue(request.TransactionTypeCode.Trim().ToUpperInvariant(), out var stdName))
@@ -268,6 +271,7 @@ public class PropertyAssessmentRequestController : Controller
             {
                 var webRoot = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath ?? Directory.GetCurrentDirectory(), "wwwroot");
                 _rpaService.Add(request, fileUpload, webRoot);
+                await _workflowNotifier.NotifyTransactionCreatedAsync(request.Id, "PropertyAssessmentRequest", request.TrackingNumber, 1, request.NewOwnerName);
                 TempData["SuccessMessage"] = $"Property Assessment Request '{request.TrackingNumber}' successfully filed. You can now claim it in the Assessment Workflow Pool.";
                 return RedirectToAction("Pool", "Workflow", new { divisionId = 1 });
             }
@@ -276,6 +280,8 @@ public class PropertyAssessmentRequestController : Controller
                 ModelState.AddModelError(string.Empty, $"Error saving assessment request: {ex.Message}");
             }
         }
+
+        TempData["ErrorMessage"] = "Validation failed. Please review the highlighted fields and errors before saving.";
 
         ViewBag.Properties = _context.TaxDeclarations
             .Include(t => t.BuildingDetails)
@@ -392,6 +398,8 @@ public class PropertyAssessmentRequestController : Controller
         {
             selectedIds.Add(request.RefTaxDeclarationId.Value);
         }
+
+        TempData["ErrorMessage"] = "Validation failed. Please review the highlighted fields and errors before saving.";
 
         ViewBag.Properties = _context.TaxDeclarations
             .Include(t => t.BuildingDetails)
@@ -943,6 +951,7 @@ public class PropertyAssessmentRequestController : Controller
             .Select(t => new
             {
                 id = t.Id.ToString(),
+                value = t.Id.ToString(),
                 tdn = t.TaxDeclarationNumber,
                 pin = t.PropertyIndexNumber,
                 owner = t.OwnerName,
@@ -955,7 +964,8 @@ public class PropertyAssessmentRequestController : Controller
                 assessLevel = t.AssessmentLevelPercent,
                 assessedVal = t.AssessedValue,
                 barangay = t.DistrictOrBarangay,
-                display = $"{t.TaxDeclarationNumber} - {t.OwnerName} ({t.PropertyIndexNumber}) [{t.Kind} • {t.Classification} • {t.AreaSqMeters:N0} sqm]"
+                display = $"{t.TaxDeclarationNumber} - {t.OwnerName} ({t.PropertyIndexNumber}) [{t.Kind} • {t.Classification} • {t.AreaSqMeters:N0} sqm]",
+                text = $"{t.TaxDeclarationNumber} - {t.OwnerName} ({t.PropertyIndexNumber}) [{t.Kind} • {t.Classification} • {t.AreaSqMeters:N0} sqm]"
             })
             .ToList();
 
@@ -990,6 +1000,7 @@ public class PropertyAssessmentRequestController : Controller
             .Select(o => new
             {
                 id = o.Id.ToString(),
+                value = o.Id.ToString(),
                 name = o.DisplayName,
                 ownerType = o.OwnerType.ToString(),
                 tin = o.TaxIdentNo,
@@ -1001,7 +1012,8 @@ public class PropertyAssessmentRequestController : Controller
                 barangay = o.BarangayName,
                 city = o.CityMunicipalityName,
                 province = o.ProvinceName,
-                display = $"{o.DisplayName} (TIN: {o.TaxIdentNo} | {o.BarangayName})"
+                display = $"{o.DisplayName} (TIN: {o.TaxIdentNo} | {o.BarangayName})",
+                text = $"{o.DisplayName} (TIN: {o.TaxIdentNo} | {o.BarangayName})"
             })
             .ToList();
 

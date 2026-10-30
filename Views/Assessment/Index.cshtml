@@ -29,10 +29,10 @@
             </a>
             @if (canAccess)
             {
-                <a asp-action="Create" class="px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-till-950 font-bold text-xs font-mono flex items-center gap-2 shadow-md shadow-emerald-600/20 transition-all">
+                <button type="button" onclick="openFaasKindModal()" class="px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white font-bold text-xs font-mono flex items-center gap-2 shadow-md shadow-emerald-600/20 transition-all cursor-pointer">
                     <i data-lucide="plus" class="w-4 h-4"></i>
                     Encode New FAAS
-                </a>
+                </button>
             }
         </div>
     </div>
@@ -270,3 +270,137 @@
         </div>
     </div>
 </div>
+
+<!-- Modal: Select FAAS Classification for Manual Encoding -->
+<div id="encodeFaasModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="relative w-full max-w-2xl bg-white dark:bg-stone-900 rounded-3xl border border-slate-200 dark:border-stone-800 shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200" onclick="event.stopPropagation()">
+        <!-- Header -->
+        <div class="p-6 border-b border-slate-100 dark:border-stone-800/80 bg-slate-50/70 dark:bg-stone-950/60 flex items-start justify-between">
+            <div class="space-y-1">
+                <div class="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 text-[10px] font-mono font-extrabold uppercase">
+                    <i data-lucide="file-signature" class="w-3.5 h-3.5"></i>
+                    Manual Paper FAAS Encoding
+                </div>
+                <h3 class="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                    What FAAS do you want to encode?
+                </h3>
+                <p class="text-xs text-slate-500 dark:text-stone-400">
+                    Digitize paper-processed Field Appraisal and Assessment Sheets (FAAS) by selecting the property classification.
+                </p>
+            </div>
+            <button type="button" onclick="closeFaasKindModal()" class="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-stone-200 hover:bg-slate-100 dark:hover:bg-stone-800 transition-colors">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+
+        <!-- 3 Classification Choices -->
+        <div class="p-6 space-y-4">
+            <!-- Option 1: Land -->
+            <a asp-action="Create" asp-route-kind="Land" class="group flex items-start gap-4 p-4 rounded-2xl border-2 border-slate-200 dark:border-stone-800 hover:border-emerald-500 dark:hover:border-emerald-500 bg-white dark:bg-stone-900/50 hover:bg-emerald-50/30 dark:hover:bg-emerald-950/20 transition-all cursor-pointer">
+                <div class="w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                    <i data-lucide="map-pin" class="w-6 h-6"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between">
+                        <h4 class="text-sm font-extrabold text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                            Land Property FAAS
+                        </h4>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
+                            Cadastral / Lots
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-500 dark:text-stone-400 mt-1 leading-relaxed">
+                        For mother parcels, subdivisions, cadastral lots, and parcels. Encodes boundary descriptions, base unit market value per sqm, and actual land use classifications.
+                    </p>
+                </div>
+                <i data-lucide="chevron-right" class="w-5 h-5 text-slate-300 group-hover:text-emerald-600 transition-colors shrink-0 mt-3"></i>
+            </a>
+
+            <!-- Option 2: Building -->
+            <a asp-action="Create" asp-route-kind="Building" class="group flex items-start gap-4 p-4 rounded-2xl border-2 border-slate-200 dark:border-stone-800 hover:border-emerald-500 dark:hover:border-emerald-500 bg-white dark:bg-stone-900/50 hover:bg-emerald-50/30 dark:hover:bg-emerald-950/20 transition-all cursor-pointer">
+                <div class="w-12 h-12 rounded-xl bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                    <i data-lucide="building-2" class="w-6 h-6"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between">
+                        <h4 class="text-sm font-extrabold text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                            Building &amp; Improvements FAAS
+                        </h4>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-sky-100 dark:bg-sky-950 text-sky-700 dark:text-sky-300">
+                            Structures / Houses
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-500 dark:text-stone-400 mt-1 leading-relaxed">
+                        For residential, commercial, and industrial structures. Encodes structural framing (Type I-V), BUCC schedules, building permit, floor areas, and physical depreciation.
+                    </p>
+                </div>
+                <i data-lucide="chevron-right" class="w-5 h-5 text-slate-300 group-hover:text-emerald-600 transition-colors shrink-0 mt-3"></i>
+            </a>
+
+            <!-- Option 3: Machinery -->
+            <a asp-action="Create" asp-route-kind="Machinery" class="group flex items-start gap-4 p-4 rounded-2xl border-2 border-slate-200 dark:border-stone-800 hover:border-emerald-500 dark:hover:border-emerald-500 bg-white dark:bg-stone-900/50 hover:bg-emerald-50/30 dark:hover:bg-emerald-950/20 transition-all cursor-pointer">
+                <div class="w-12 h-12 rounded-xl bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                    <i data-lucide="cog" class="w-6 h-6"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between">
+                        <h4 class="text-sm font-extrabold text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                            Machinery &amp; Equipment FAAS
+                        </h4>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300">
+                            Industrial / Plants
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-500 dark:text-stone-400 mt-1 leading-relaxed">
+                        For commercial, industrial, or agricultural machinery. Encodes acquisition cost, freight/installation, economic life, and annual depreciation schedule.
+                    </p>
+                </div>
+                <i data-lucide="chevron-right" class="w-5 h-5 text-slate-300 group-hover:text-emerald-600 transition-colors shrink-0 mt-3"></i>
+            </a>
+        </div>
+
+        <!-- Footer -->
+        <div class="p-4 bg-slate-50 dark:bg-stone-950/80 border-t border-slate-100 dark:border-stone-800/80 flex items-center justify-between">
+            <span class="text-[11px] text-slate-400">Signatories and audit trail will be logged upon submission</span>
+            <button type="button" onclick="closeFaasKindModal()" class="px-4 py-2 rounded-xl text-slate-600 dark:text-stone-300 font-bold text-xs hover:bg-slate-200 dark:hover:bg-stone-800 transition-colors cursor-pointer">
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    function openFaasKindModal() {
+        const modal = document.getElementById('encodeFaasModal');
+        if (modal) {
+            modal.classList.remove('hidden');
+            if (window.lucide) {
+                lucide.createIcons();
+            }
+        }
+    }
+
+    function closeFaasKindModal() {
+        const modal = document.getElementById('encodeFaasModal');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+    }
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeFaasKindModal();
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const modal = document.getElementById('encodeFaasModal');
+        if (modal) {
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    closeFaasKindModal();
+                }
+            });
+        }
+    });
+</script>

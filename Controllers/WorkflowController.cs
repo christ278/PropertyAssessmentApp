@@ -12,17 +12,20 @@ public class WorkflowController : Controller
     private readonly PropertyAssessmentApp.Data.ApplicationDbContext _context;
     private readonly IPermissionService _permissionService;
     private readonly IHubContext<WorkflowHub> _hubContext;
+    private readonly IWorkflowNotifier _workflowNotifier;
 
     public WorkflowController(
         IDocumentWorkflowService workflowService,
         PropertyAssessmentApp.Data.ApplicationDbContext context,
         IPermissionService permissionService,
-        IHubContext<WorkflowHub> hubContext)
+        IHubContext<WorkflowHub> hubContext,
+        IWorkflowNotifier workflowNotifier)
     {
         _workflowService = workflowService;
         _context = context;
         _permissionService = permissionService;
         _hubContext = hubContext;
+        _workflowNotifier = workflowNotifier;
     }
 
     private static string GetTargetController(string requestType) => requestType switch
@@ -42,7 +45,7 @@ public class WorkflowController : Controller
             || (!string.IsNullOrEmpty(userRole) && userRole.Contains("Releas", StringComparison.OrdinalIgnoreCase));
     }
 
-    private (Guid userId, string userName, string userRole, int? divisionId, int? workflowRoleId, string? workflowRoleName, bool isSuperAdminOrHead) GetCurrentUserInfo()
+    private (Guid userId, string userName, string userRole, int? divisionId, int? workflowRoleId, string? workflowRoleName, bool isSuperAdminOrHead, bool isRegularEmployee) GetCurrentUserInfo()
     {
         if (User.Identity?.IsAuthenticated == true)
         {
@@ -60,7 +63,8 @@ public class WorkflowController : Controller
                     userAccount.DivisionId,
                     userAccount.WorkflowRoleId,
                     userAccount.WorkflowRoleName,
-                    isSuper
+                    isSuper,
+                    userAccount.IsRegularEmployee
                 );
             }
 
@@ -85,17 +89,21 @@ public class WorkflowController : Controller
 
             var wfRoleName = User.FindFirst("WorkflowRoleName")?.Value;
 
-            return (uId == Guid.Empty ? Guid.Parse("70000000-0000-0000-0000-000000000000") : uId, uName, uRole, divId, wfRoleId, wfRoleName, isHead);
+            bool isRegular = true;
+            var regClaim = User.FindFirst("IsRegularEmployee")?.Value;
+            if (bool.TryParse(regClaim, out var parsedReg)) isRegular = parsedReg;
+
+            return (uId == Guid.Empty ? Guid.Parse("70000000-0000-0000-0000-000000000000") : uId, uName, uRole, divId, wfRoleId, wfRoleName, isHead, isRegular);
         }
 
         // Local dev fallback
         var adminAcc = _context.UserAccounts.FirstOrDefault(u => u.Role == UserRole.SystemAdmin);
         if (adminAcc != null)
         {
-            return (adminAcc.Id, adminAcc.FullName, adminAcc.Role.ToString(), adminAcc.DivisionId, adminAcc.WorkflowRoleId, adminAcc.WorkflowRoleName, true);
+            return (adminAcc.Id, adminAcc.FullName, adminAcc.Role.ToString(), adminAcc.DivisionId, adminAcc.WorkflowRoleId, adminAcc.WorkflowRoleName, true, adminAcc.IsRegularEmployee);
         }
 
-        return (Guid.Parse("70000000-0000-0000-0000-000000000000"), "System Administrator", "SystemAdmin", null, null, null, true);
+        return (Guid.Parse("70000000-0000-0000-0000-000000000000"), "System Administrator", "SystemAdmin", null, null, null, true, true);
     }
 
     // GET: /Workflow
@@ -210,6 +218,7 @@ public class WorkflowController : Controller
         ViewBag.UserStepId = userStepId;
         ViewBag.IsSuperAdminOrHead = userInfo.isSuperAdminOrHead;
         ViewBag.CanChangeDivision = userInfo.isSuperAdminOrHead || isReleasingRole;
+        ViewBag.IsRegularEmployee = userInfo.isRegularEmployee;
 
         ViewBag.TotalPool = totalPool;
         ViewBag.TotalMy = totalMy;
@@ -224,6 +233,80 @@ public class WorkflowController : Controller
             .ToList();
 
         return View(queue);
+    }
+
+    // GET: /Workflow/GetPoolCounts
+    [HttpGet]
+    public IActionResult GetPoolCounts(int? divisionId)
+    {
+        var userInfo = GetCurrentUserInfo();
+
+        int? userStepId = userInfo.workflowRoleId;
+        if ((!userStepId.HasValue || userStepId.Value <= 0) && !userInfo.isSuperAdminOrHead)
+        {
+            var matchedRole = _context.UserRoleSettings.FirstOrDefault(r =>
+                r.RoleName.Equals(userInfo.userRole, StringComparison.OrdinalIgnoreCase) ||
+                (!string.IsNullOrEmpty(userInfo.workflowRoleName) && r.RoleName.Equals(userInfo.workflowRoleName, StringComparison.OrdinalIgnoreCase)));
+            if (matchedRole?.TransactionStatusId.HasValue == true)
+            {
+                userStepId = matchedRole.TransactionStatusId.Value;
+            }
+        }
+
+        bool isReleasingRole = (userStepId.HasValue && (userStepId.Value == 10 || userStepId.Value == 19 || userStepId.Value == 30))
+            || (!string.IsNullOrEmpty(userInfo.workflowRoleName) && userInfo.workflowRoleName.Contains("Releas", StringComparison.OrdinalIgnoreCase));
+
+        var allItems = _workflowService.GetUnifiedQueue(
+            divisionId: null,
+            mode: "all",
+            userWorkflowRoleId: null,
+            userWorkflowRoleName: null,
+            isSuperAdminOrHead: true
+        ).ToList();
+
+        // Calculate pool count matching current division / user station
+        var poolItems = allItems.Where(i => !i.IsClaimed && i.CurrentStage != WorkflowStage.Completed);
+        if (divisionId.HasValue && divisionId.Value > 0)
+        {
+            poolItems = poolItems.Where(i => (int)i.Division == divisionId.Value);
+        }
+        else if (!userInfo.isSuperAdminOrHead && !isReleasingRole)
+        {
+            int effectiveDiv = userInfo.divisionId ?? 1;
+            poolItems = poolItems.Where(i => (int)i.Division == effectiveDiv);
+        }
+
+        if (!userInfo.isSuperAdminOrHead)
+        {
+            if (isReleasingRole)
+            {
+                poolItems = poolItems.Where(i => (int)i.CurrentStage == 10 || (int)i.CurrentStage == 19 || (int)i.CurrentStage == 30
+                    || (i.CurrentStageName != null && i.CurrentStageName.Contains("Releas", StringComparison.OrdinalIgnoreCase)));
+            }
+            else if (userStepId.HasValue)
+            {
+                poolItems = poolItems.Where(i => (int)i.CurrentStage == userStepId.Value);
+            }
+        }
+
+        int totalPool = poolItems.Count();
+        int totalMy = allItems.Count(i => i.IsClaimed && i.AssignedUserId == userInfo.userId && i.CurrentStage != WorkflowStage.Completed);
+        int userNavPoolCount = _workflowService.GetUserPendingPoolCount(User);
+
+        int div1Pool = allItems.Count(i => !i.IsClaimed && i.Division == DivisionType.Division1_TaxAssessmentAndLandHolding && i.CurrentStage != WorkflowStage.Completed);
+        int div2Pool = allItems.Count(i => !i.IsClaimed && i.Division == DivisionType.Division2_GIS_TaxMapping && i.CurrentStage != WorkflowStage.Completed);
+        int div3Pool = allItems.Count(i => !i.IsClaimed && i.Division == DivisionType.Division3_RecordsAndCertification && i.CurrentStage != WorkflowStage.Completed);
+
+        return Json(new
+        {
+            success = true,
+            totalPool = totalPool,
+            totalMy = totalMy,
+            userPoolCount = userNavPoolCount,
+            div1Pool = div1Pool,
+            div2Pool = div2Pool,
+            div3Pool = div3Pool
+        });
     }
 
     // GET: /Workflow/MyTransactions
@@ -335,6 +418,7 @@ public class WorkflowController : Controller
         ViewBag.UserWorkflowRoleName = userInfo.workflowRoleName;
         ViewBag.IsSuperAdminOrHead = userInfo.isSuperAdminOrHead;
         ViewBag.CanChangeDivision = userInfo.isSuperAdminOrHead || isReleasingRole;
+        ViewBag.IsRegularEmployee = userInfo.isRegularEmployee;
 
         ViewBag.TotalPool = totalPool;
         ViewBag.TotalMy = totalMy;
@@ -387,18 +471,7 @@ public class WorkflowController : Controller
         {
             TempData["SuccessMessage"] = $"Transaction claimed successfully! It has been moved to your personal workspace ('My Transactions').";
 
-            try
-            {
-                await _hubContext.Clients.All.SendAsync("TransactionClaimed", new
-                {
-                    requestId = requestId,
-                    requestType = requestType,
-                    divisionId = (int)division,
-                    claimedBy = userInfo.userName,
-                    claimedUserId = userInfo.userId
-                });
-            }
-            catch { /* Ignore non-fatal broadcast failure */ }
+            await _workflowNotifier.NotifyTransactionClaimedAsync(requestId, requestType, (int)division, userInfo.userName, userInfo.userId);
         }
         else
         {
@@ -426,16 +499,7 @@ public class WorkflowController : Controller
         {
             TempData["SuccessMessage"] = "Transaction released back to the Shared Pool.";
 
-            try
-            {
-                await _hubContext.Clients.All.SendAsync("TransactionReleased", new
-                {
-                    requestId = requestId,
-                    requestType = requestType,
-                    divisionId = (int)division
-                });
-            }
-            catch { /* Ignore non-fatal broadcast failure */ }
+            await _workflowNotifier.NotifyTransactionReleasedAsync(requestId, requestType, (int)division);
         }
         else
         {
@@ -468,18 +532,7 @@ public class WorkflowController : Controller
 
         TempData["SuccessMessage"] = "Transaction has been marked as Deferred and retained in your workspace.";
 
-        try
-        {
-            await _hubContext.Clients.All.SendAsync("TransactionDeferred", new
-            {
-                requestId = requestId,
-                requestType = requestType,
-                divisionId = (int)division,
-                deferredBy = userInfo.userName,
-                remarks = remarks
-            });
-        }
-        catch { /* Ignore non-fatal broadcast failure */ }
+        await _workflowNotifier.NotifyTransactionDeferredAsync(requestId, requestType, (int)division, userInfo.userName, remarks);
 
         // When deferred, transaction stays in My Transactions
         return RedirectToAction(nameof(MyTransactions), new { divisionId = (int)division });
@@ -526,6 +579,18 @@ public class WorkflowController : Controller
         var userInfo = GetCurrentUserInfo();
         var senderName = string.IsNullOrWhiteSpace(forwardedByName) ? userInfo.userName : forwardedByName;
         var senderRole = string.IsNullOrWhiteSpace(role) ? userInfo.userRole : role;
+
+        // If action is "For Approval" or user is Non-Regular employee, tag it For Approval and return to pool
+        if (actionTaken == "For Approval" || (!userInfo.isRegularEmployee && !userInfo.isSuperAdminOrHead))
+        {
+            _workflowService.TagDocumentForApproval(requestId, requestType, division, userInfo.userId, senderName, senderRole, remarks);
+            TempData["SuccessMessage"] = "Transaction has been flagged 'For Approval' and returned to the shared department pool.";
+            
+            await _workflowNotifier.NotifyTransactionTaggedForApprovalAsync(requestId, requestType, (int)division, senderName, remarks);
+
+            return RedirectToAction(nameof(Pool), new { divisionId = (int)division });
+        }
+
         var stageEnum = (WorkflowStage)targetStage;
 
         var log = _workflowService.ForwardDocument(
@@ -541,29 +606,25 @@ public class WorkflowController : Controller
             orDateIssued);
 
         // Real-Time SignalR Broadcast to all connected receiving stations and staff
-        try
+        var targetStatus = _context.TransactionStatuses.FirstOrDefault(s => s.TransactionStatusId == targetStage);
+        var payload = new
         {
-            var targetStatus = _context.TransactionStatuses.FirstOrDefault(s => s.TransactionStatusId == targetStage);
-            var payload = new
-            {
-                requestId = requestId,
-                requestType = requestType,
-                trackingNumber = log.TrackingNumber,
-                divisionId = (int)division,
-                divisionName = division.ToString(),
-                targetStageId = targetStage,
-                targetStageName = targetStatus?.Name ?? stageEnum.ToString(),
-                targetRole = log.AssignedToRole,
-                forwardedByName = senderName,
-                forwardedByRole = senderRole,
-                remarks = remarks,
-                timestamp = log.Timestamp.ToString("MMM dd, yyyy hh:mm tt"),
-                orNumber = orNumber
-            };
+            requestId = requestId,
+            requestType = requestType,
+            trackingNumber = log.TrackingNumber,
+            divisionId = (int)division,
+            divisionName = division.ToString(),
+            targetStageId = targetStage,
+            targetStageName = targetStatus?.Name ?? stageEnum.ToString(),
+            targetRole = log.AssignedToRole,
+            forwardedByName = senderName,
+            forwardedByRole = senderRole,
+            remarks = remarks,
+            timestamp = log.Timestamp.ToString("MMM dd, yyyy hh:mm tt"),
+            orNumber = orNumber
+        };
 
-            await _hubContext.Clients.All.SendAsync("TransactionForwarded", payload);
-        }
-        catch { /* Non-fatal broadcast */ }
+        await _workflowNotifier.NotifyTransactionForwardedAsync(payload);
 
         TempData["SuccessMessage"] = $"Document successfully routed to {log.AssignedToRole}. It is now pooled for the target department.";
 
@@ -573,6 +634,34 @@ public class WorkflowController : Controller
         }
 
         return RedirectToAction(nameof(MyTransactions), new { divisionId = (int)division });
+    }
+
+    // POST: /Workflow/TagForApproval
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> TagForApproval(Guid requestId, string requestType, DivisionType division, string remarks, string? returnUrl = null)
+    {
+        if (!_permissionService.CanAccess(User, "Workflow", "MyTransactions") && !_permissionService.CanAccess(User, "Workflow", "Pool"))
+        {
+            TempData["ErrorMessage"] = "Your user role does not have permission to process or tag transactions.";
+            return Redirect(returnUrl ?? Url.Action(nameof(MyTransactions), new { divisionId = (int)division })!);
+        }
+
+        var userInfo = GetCurrentUserInfo();
+        var effectiveRemarks = string.IsNullOrWhiteSpace(remarks) ? "Flagged For Approval by Non-Regular staff" : remarks;
+
+        _workflowService.TagDocumentForApproval(requestId, requestType, division, userInfo.userId, userInfo.userName, userInfo.userRole, effectiveRemarks);
+
+        TempData["SuccessMessage"] = "Transaction has been successfully flagged 'For Approval' and returned to the shared department pool.";
+
+        await _workflowNotifier.NotifyTransactionTaggedForApprovalAsync(requestId, requestType, (int)division, userInfo.userName, effectiveRemarks);
+
+        if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+        {
+            return Redirect(returnUrl);
+        }
+
+        return RedirectToAction(nameof(Pool), new { divisionId = (int)division });
     }
 
     // GET: /Workflow/GetNextWorkflowStages
@@ -670,6 +759,7 @@ public class WorkflowController : Controller
         ViewBag.UserWorkflowRoleName = userInfo.workflowRoleName;
         ViewBag.IsSuperAdminOrHead = userInfo.isSuperAdminOrHead;
         ViewBag.CanChangeDivision = userInfo.isSuperAdminOrHead || isReleasingRole;
+        ViewBag.IsRegularEmployee = userInfo.isRegularEmployee;
 
         return View(filteredItems.ToList());
     }

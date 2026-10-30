@@ -182,7 +182,8 @@
 
                 <div>
                     <label class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">
-                        SEARCH &amp; SELECT REFERENCE TAX DECLARATION (TD) <span class="text-emerald-600 text-xs font-normal">(Multiple Selection Allowed)</span> <span class="text-rose-500 font-bold">*</span>
+                        SEARCH &amp; SELECT REFERENCE TAX DECLARATION (TD) <span class="text-emerald-600 text-xs font-normal">(Multiple Selection Allowed)</span> <span id="refPropertyAsterisk" class="text-rose-500 font-bold">*</span>
+                        <span id="refPropertyOptionalNotice" class="hidden text-amber-600 dark:text-amber-400 text-xs font-semibold italic ml-2">(Optional for Discovery / New Declaration)</span>
                     </label>
                     <select id="refPropertySelect" multiple class="w-full">
                         @foreach (var p in properties)
@@ -195,11 +196,11 @@
                                     data-location="@p.CompleteAddress"
                                     data-kind="@p.Kind"
                                     data-classification="@p.Classification"
-                                    data-area="@p.AreaSqMeters"
-                                    data-unitval="@p.UnitValue"
-                                    data-marketval="@p.MarketValue"
-                                    data-assesslevel="@p.AssessmentLevelPercent"
-                                    data-assessedval="@p.AssessedValue"
+                                    data-area="@(p.AreaSqMeters.ToString(System.Globalization.CultureInfo.InvariantCulture))"
+                                    data-unitval="@(p.UnitValue.ToString(System.Globalization.CultureInfo.InvariantCulture))"
+                                    data-marketval="@(p.MarketValue.ToString(System.Globalization.CultureInfo.InvariantCulture))"
+                                    data-assesslevel="@(p.AssessmentLevelPercent.ToString(System.Globalization.CultureInfo.InvariantCulture))"
+                                    data-assessedval="@(p.AssessedValue.ToString(System.Globalization.CultureInfo.InvariantCulture))"
                                     data-barangay="@p.DistrictOrBarangay">
                                 @p.TaxDeclarationNumber - @p.OwnerName (@p.PropertyIndexNumber) [@p.Kind &bull; @p.Classification &bull; @p.AreaSqMeters.ToString("N0") sqm]
                             </option>
@@ -510,7 +511,78 @@
                     Submit Request for Inspection
                 </button>
             </div>
-        </form>
+        <!-- SELECT DISCOVERY TD KIND MODAL -->
+<div id="discoveryTdKindModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-stone-900 rounded-3xl border border-slate-200 dark:border-stone-800 shadow-2xl max-w-lg w-full p-6 space-y-5 animate-in fade-in zoom-in-95 duration-150">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-stone-800">
+            <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center font-bold">
+                    <i data-lucide="sparkles" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <h3 class="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-tight">Select Tax Declaration (TD) Kind</h3>
+                    <p class="text-[11px] text-slate-500 dark:text-stone-400">Discovery / New Declaration &bull; Choose property type to generate</p>
+                </div>
+            </div>
+            <button type="button" onclick="closeDiscoveryTdKindModal()" class="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-stone-300 hover:bg-slate-100 dark:hover:bg-stone-800 transition-colors">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+
+        <div class="space-y-3">
+            <label class="block text-xs font-bold text-slate-700 dark:text-stone-300">Choose TD Type to Record:</label>
+            <div class="grid grid-cols-1 gap-2.5">
+                <!-- Land Option -->
+                <label class="flex items-start gap-3.5 p-3.5 rounded-2xl border-2 border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 cursor-pointer transition-all hover:border-emerald-600" id="tdKindOpt_Land" onclick="selectDiscoveryTdKindOption('Land')">
+                    <input type="radio" name="discoveryTdKindRadio" value="Land" checked class="mt-1 text-emerald-600 focus:ring-emerald-500" />
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-xs text-slate-900 dark:text-white">Land Appraisal & Assessment</span>
+                            <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300">Land (Annex I-E)</span>
+                        </div>
+                        <p class="text-[11px] text-slate-500 dark:text-stone-400 mt-0.5">Vacant residential, agricultural, commercial, or industrial parcels with boundaries and unit valuation.</p>
+                    </div>
+                </label>
+
+                <!-- Building Option -->
+                <label class="flex items-start gap-3.5 p-3.5 rounded-2xl border border-slate-200 dark:border-stone-800 bg-white dark:bg-stone-900 cursor-pointer transition-all hover:border-emerald-500" id="tdKindOpt_Building" onclick="selectDiscoveryTdKindOption('Building')">
+                    <input type="radio" name="discoveryTdKindRadio" value="Building" class="mt-1 text-emerald-600 focus:ring-emerald-500" />
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-xs text-slate-900 dark:text-white">Building & Other Structures</span>
+                            <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300">Building (Annex I-F)</span>
+                        </div>
+                        <p class="text-[11px] text-slate-500 dark:text-stone-400 mt-0.5">Residential houses, commercial structures, BUCC types, 17 structural materials, and floor breakdown.</p>
+                    </div>
+                </label>
+
+                <!-- Machinery Option -->
+                <label class="flex items-start gap-3.5 p-3.5 rounded-2xl border border-slate-200 dark:border-stone-800 bg-white dark:bg-stone-900 cursor-pointer transition-all hover:border-emerald-500" id="tdKindOpt_Machinery" onclick="selectDiscoveryTdKindOption('Machinery')">
+                    <input type="radio" name="discoveryTdKindRadio" value="Machinery" class="mt-1 text-emerald-600 focus:ring-emerald-500" />
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-xs text-slate-900 dark:text-white">Machinery & Heavy Equipment</span>
+                            <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300">Machinery (Annex I-G)</span>
+                        </div>
+                        <p class="text-[11px] text-slate-500 dark:text-stone-400 mt-0.5">Commercial or industrial machinery, plant equipment, economic life schedules, and depreciation.</p>
+                    </div>
+                </label>
+            </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-stone-800">
+            <button type="button" onclick="closeDiscoveryTdKindModal()" class="px-4 py-2 rounded-xl border border-slate-200 dark:border-stone-700 font-bold text-xs text-slate-700 dark:text-stone-300 hover:bg-slate-100 dark:hover:bg-stone-800 transition-colors">
+                Cancel
+            </button>
+            <button type="button" onclick="confirmGenerateDiscoveryPartitions()" class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-2 shadow-md shadow-emerald-600/20 transition-all">
+                <i data-lucide="check" class="w-4 h-4"></i>
+                Generate <span id="modalDiscoveryCountLbl">1</span> Partition Lot(s)
+            </button>
+        </div>
+    </div>
+</div>
+
+</form>
     </div>
 </div>
 
@@ -533,7 +605,7 @@
         const availableParticulars = [
             @foreach (var op in orderPayments)
             {
-                @: { code: "@op.Code", name: "@op.Particular", fee: @op.UnitCost },
+                @: { code: "@op.Code", name: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(op.Particular ?? "")), fee: @(op.UnitCost.ToString(System.Globalization.CultureInfo.InvariantCulture)) },
             }
         ];
 
@@ -543,18 +615,18 @@
             {
                 @: "@p.Id": {
                 @:     id: "@p.Id",
-                @:     tdn: "@p.TaxDeclarationNumber",
-                @:     pin: "@p.PropertyIndexNumber",
-                @:     owner: "@p.OwnerName",
-                @:     location: "@p.CompleteAddress",
-                @:     kind: "@p.Kind",
-                @:     classification: "@p.Classification",
-                @:     area: @p.AreaSqMeters,
-                @:     unitValue: @p.UnitValue,
-                @:     marketValue: @p.MarketValue,
-                @:     assessLevel: @p.AssessmentLevelPercent,
-                @:     assessedValue: @p.AssessedValue,
-                @:     barangay: "@p.DistrictOrBarangay"
+                @:     tdn: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(p.TaxDeclarationNumber ?? "")),
+                @:     pin: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(p.PropertyIndexNumber ?? "")),
+                @:     owner: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(p.OwnerName ?? "")),
+                @:     location: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(p.CompleteAddress ?? "")),
+                @:     kind: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(p.Kind.ToString())),
+                @:     classification: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(p.Classification.ToString())),
+                @:     area: @(p.AreaSqMeters.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                @:     unitValue: @(p.UnitValue.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                @:     marketValue: @(p.MarketValue.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                @:     assessLevel: @(p.AssessmentLevelPercent.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                @:     assessedValue: @(p.AssessedValue.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                @:     barangay: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(p.DistrictOrBarangay ?? ""))
                 @: },
             }
         };
@@ -564,7 +636,7 @@
         let generatedPartitions = [];
         const alphabetLetters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-        document.addEventListener('DOMContentLoaded', function () {
+        function initPage() {
             // Transaction Code selector sync & SD/CS/DC/PC/TR Workflow Banners
             const txSelect = document.getElementById('txCodeSelect');
             function updateInspectionBanners() {
@@ -631,6 +703,27 @@
                         cancelChk.checked = true;
                     }
                 }
+
+                // Reference TD required toggle & partition generator visibility for DC
+                const refAsterisk = document.getElementById('refPropertyAsterisk');
+                const refNotice = document.getElementById('refPropertyOptionalNotice');
+                const generatorCard = document.getElementById('partitionGeneratorCard');
+                const dupSection = document.getElementById('duplicateSourceSelector');
+
+                if (val === 'DC') {
+                    if (refAsterisk) refAsterisk.classList.add('hidden');
+                    if (refNotice) refNotice.classList.remove('hidden');
+                    if (generatorCard) generatorCard.classList.remove('hidden');
+                    if (dupSection && (!selectedPropertyIds || selectedPropertyIds.length === 0)) {
+                        dupSection.classList.add('hidden');
+                    }
+                } else {
+                    if (refAsterisk) refAsterisk.classList.remove('hidden');
+                    if (refNotice) refNotice.classList.add('hidden');
+                    if (generatorCard && (!selectedPropertyIds || selectedPropertyIds.length === 0)) {
+                        generatorCard.classList.add('hidden');
+                    }
+                }
             }
 
             if (txSelect) {
@@ -650,9 +743,12 @@
                     maxItems: null,
                     persist: false,
                     create: false,
-                    valueField: 'id',
-                    labelField: 'display',
-                    searchField: ['tdn', 'pin', 'owner', 'display', 'text'],
+                    openOnFocus: true,
+                    closeAfterSelect: false,
+                    selectOnTab: false,
+                    valueField: 'value',
+                    labelField: 'text',
+                    searchField: ['value', 'text', 'tdn', 'pin', 'owner', 'display'],
                     loadThrottle: 300,
                     placeholder: 'Search & select approved reference properties by TDN, PIN, or Owner Name...',
                     load: function(query, callback) {
@@ -661,9 +757,14 @@
                             .then(res => res.json())
                             .then(data => {
                                 if (Array.isArray(data)) {
-                                    data.forEach(item => {
-                                        referencePropertiesData[item.id] = {
-                                            id: item.id,
+                                    const mapped = data.map(item => ({
+                                        ...item,
+                                        value: String(item.id || item.value),
+                                        text: item.display || item.text || `${item.tdn || ''} - ${item.owner || ''}`
+                                    }));
+                                    mapped.forEach(item => {
+                                        referencePropertiesData[item.value] = {
+                                            id: item.value,
                                             tdn: item.tdn,
                                             pin: item.pin,
                                             owner: item.owner,
@@ -678,7 +779,7 @@
                                             barangay: item.barangay
                                         };
                                     });
-                                    callback(data);
+                                    callback(mapped);
                                 } else {
                                     callback();
                                 }
@@ -687,15 +788,36 @@
                     },
                     render: {
                         option: function(item, escape) {
-                            return `<div class="py-1">
-                                <span class="font-bold text-slate-900 dark:text-white font-mono">${escape(item.tdn || item.text || '')}</span>
-                                <span class="text-slate-700 dark:text-stone-200 text-xs font-medium"> - ${escape(item.owner || '')}</span>
-                                <span class="text-[11px] text-slate-600 dark:text-stone-300 font-mono">(${escape(item.pin || 'No PIN')})</span>
-                                ${item.kind ? `<div class="text-[11px] text-slate-600 dark:text-stone-300 font-medium mt-0.5">${escape(item.kind)} &bull; ${escape(item.classification || '')} &bull; ${Number(item.area || 0).toLocaleString()} sqm</div>` : ''}
-                            </div>`;
+                            const val = String(item.value || item.id || '');
+                            const prop = referencePropertiesData[val] || item;
+                            const tdn = prop.tdn || item.tdn || '';
+                            const owner = prop.owner || item.owner || '';
+                            const pin = prop.pin || item.pin || '';
+                            const kind = prop.kind || item.kind || '';
+                            const classification = prop.classification || item.classification || '';
+                            const area = prop.area || item.area || 0;
+
+                            if (tdn) {
+                                return `<div class="py-1">
+                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                        <span class="font-bold text-slate-900 dark:text-white font-mono">${escape(tdn)}</span>
+                                        <span class="text-slate-700 dark:text-stone-200 text-xs font-semibold"> - ${escape(owner)}</span>
+                                        ${pin ? `<span class="text-[11px] text-slate-500 dark:text-stone-400 font-mono">(${escape(pin)})</span>` : ''}
+                                    </div>
+                                    ${kind ? `<div class="text-[11px] text-slate-500 dark:text-stone-400 mt-0.5">${escape(kind)} &bull; ${escape(classification)} &bull; ${Number(area).toLocaleString()} sqm</div>` : ''}
+                                </div>`;
+                            }
+                            return `<div class="py-1 text-slate-900 dark:text-white font-mono">${escape(item.text || item.display || '')}</div>`;
                         },
                         item: function(item, escape) {
-                            return `<div>${escape(item.tdn || item.text || '')} - ${escape(item.owner || '')}</div>`;
+                            const val = String(item.value || item.id || '');
+                            const prop = referencePropertiesData[val] || item;
+                            const tdn = prop.tdn || item.tdn || '';
+                            const owner = prop.owner || item.owner || '';
+                            if (tdn && owner) {
+                                return `<div>${escape(tdn)} - ${escape(owner)}</div>`;
+                            }
+                            return `<div>${escape(item.text || item.display || item.value || '')}</div>`;
                         }
                     },
                     onItemAdd: function(value) {
@@ -734,72 +856,134 @@
             if (document.getElementById('registeredOwnerSelect')) {
                 new TomSelect('#registeredOwnerSelect', {
                     create: false,
-                    valueField: 'id',
-                    labelField: 'display',
-                    searchField: ['name', 'tin', 'text', 'display'],
+                    openOnFocus: true,
+                    closeAfterSelect: true,
+                    selectOnTab: false,
+                    valueField: 'value',
+                    labelField: 'text',
+                    searchField: ['value', 'text', 'name', 'tin', 'display'],
                     loadThrottle: 300,
                     placeholder: 'Search active registered owner by name, TIN, or RPTIN...',
                     load: function(query, callback) {
                         if (!query || !query.trim().length) return callback();
                         fetch(`/PropertyAssessmentRequest/SearchRegisteredOwners?term=${encodeURIComponent(query)}`)
                             .then(res => res.json())
-                            .then(data => callback(Array.isArray(data) ? data : []))
+                            .then(data => {
+                                if (Array.isArray(data)) {
+                                    const mapped = data.map(item => ({
+                                        ...item,
+                                        value: String(item.id || item.value),
+                                        text: item.display || item.text || item.name || ''
+                                    }));
+                                    callback(mapped);
+                                } else {
+                                    callback();
+                                }
+                            })
                             .catch(() => callback());
                     },
                     render: {
                         option: function(item, escape) {
-                            if (item.name) {
+                            const name = item.name || '';
+                            const tin = item.tin || '';
+                            const brgy = item.barangay || '';
+                            if (name) {
                                 return `<div class="py-1">
-                                    <span class="font-bold text-slate-900 dark:text-white">${escape(item.name)}</span>
-                                    <span class="text-[11px] text-slate-600 dark:text-stone-300 font-medium"> (TIN: ${escape(item.tin || 'N/A')} | ${escape(item.barangay || 'N/A')})</span>
+                                    <span class="font-bold text-slate-900 dark:text-white">${escape(name)}</span>
+                                    <span class="text-[11px] text-slate-600 dark:text-stone-300 font-medium"> (TIN: ${escape(tin || 'N/A')} | ${escape(brgy || 'N/A')})</span>
                                 </div>`;
                             }
-                            return `<div class="py-1">${escape(item.text || item.display || '')}</div>`;
+                            return `<div class="py-1 text-slate-900 dark:text-white">${escape(item.text || item.display || '')}</div>`;
                         },
                         item: function(item, escape) {
-                            if (item.name) {
-                                return `<div>${escape(item.name)} (TIN: ${escape(item.tin || 'N/A')})</div>`;
+                            const name = item.name || '';
+                            const tin = item.tin || '';
+                            if (name) {
+                                return `<div>${escape(name)} (TIN: ${escape(tin || 'N/A')})</div>`;
                             }
-                            return `<div>${escape(item.text || item.display || '')}</div>`;
+                            return `<div>${escape(item.text || item.display || item.value || '')}</div>`;
                         }
                     },
                     onChange: function (ownerId) {
                         const ownerIdInput = document.getElementById('requestOwnerIdInput');
                         if (ownerIdInput) ownerIdInput.value = ownerId || '';
                         if (!ownerId) return;
+
                         fetch(`/PropertyAssessmentRequest/GetOwnerDetails?id=${encodeURIComponent(ownerId)}`)
                             .then(res => res.json())
                             .then(data => {
                                 if (data) {
                                     if (ownerIdInput) ownerIdInput.value = data.id || ownerId;
                                     const nameInput = document.getElementById('ownerNameInput');
-                                    const phoneInput = document.getElementById('ContactNumber');
-                                    const emailInput = document.getElementById('EmailAddress');
-                                    const contactPersonInput = document.getElementById('ContactPerson');
+                                    const tinInput = document.getElementById('ownerTinInput');
+                                    const phoneInput = document.getElementById('contactNoInput');
+                                    const addressInput = document.getElementById('ownerAddressInput');
 
                                     if (nameInput) {
                                         nameInput.value = data.name || '';
+                                        nameInput.setAttribute('data-auto-filled', 'true');
                                         nameInput.dispatchEvent(new Event('input', { bubbles: true }));
                                     }
-                                    if (phoneInput && data.phone) phoneInput.value = data.phone;
-                                    if (emailInput && data.email) emailInput.value = data.email;
-                                    if (contactPersonInput && !contactPersonInput.value) contactPersonInput.value = data.name || '';
+                                    if (tinInput) tinInput.value = data.tin || '';
+                                    if (phoneInput) phoneInput.value = data.phone || '';
+                                    if (addressInput) {
+                                        addressInput.value = data.address || data.street || '';
+                                        addressInput.setAttribute('data-auto-filled', 'true');
+                                    }
 
                                     generatedPartitions.forEach(p => {
                                         if (!p.customOwner) {
-                                            p.newOwnerName = data.name || p.newOwnerName;
-                                            p.ownerId = data.id || ownerId;
+                                            p.newOwnerName = data.name || '';
                                         }
                                     });
-                                    serializePartitions();
                                     renderPartitionsTable();
+
+                                    // Auto-populate reference properties for this registered owner without opening dropdown
+                                    if (data.name && TomSelectRefProperty) {
+                                        fetch(`/PropertyAssessmentRequest/SearchApprovedProperties?term=${encodeURIComponent(data.name)}`)
+                                            .then(res => res.json())
+                                            .then(props => {
+                                                if (Array.isArray(props) && props.length > 0) {
+                                                    props.forEach(item => {
+                                                        const val = String(item.id || item.value);
+                                                        referencePropertiesData[val] = {
+                                                            id: val,
+                                                            tdn: item.tdn,
+                                                            pin: item.pin,
+                                                            owner: item.owner,
+                                                            location: item.location,
+                                                            kind: item.kind,
+                                                            classification: item.classification,
+                                                            area: item.area,
+                                                            unitValue: item.unitVal,
+                                                            marketValue: item.marketVal,
+                                                            assessLevel: item.assessLevel,
+                                                            assessedValue: item.assessedVal,
+                                                            barangay: item.barangay
+                                                        };
+                                                        TomSelectRefProperty.addOption({
+                                                            ...item,
+                                                            value: val,
+                                                            text: item.display || item.text || `${item.tdn} - ${item.owner}`
+                                                        });
+                                                    });
+                                                    if (!selectedPropertyIds || selectedPropertyIds.length === 0) {
+                                                        TomSelectRefProperty.addItem(String(props[0].id || props[0].value), true);
+                                                    }
+                                                    TomSelectRefProperty.close();
+                                                }
+                                            })
+                                            .catch(() => {});
+                                    }
 
                                     if (typeof toastr !== 'undefined') {
                                         toastr.success(`Owner details auto-filled for ${data.name}!`, 'Registered Owner Loaded');
                                     }
                                 }
                             })
-                            .catch(err => console.error('Error fetching owner details:', err));
+                            .catch(err => {
+                                console.error('Error fetching owner details:', err);
+                            });
                     }
                 });
             }
@@ -977,7 +1161,13 @@
                 }
             });
             syncOtherPurposeRequirement();
-        });
+        }
+
+        if (document.readyState !== 'loading') {
+            initPage();
+        } else {
+            document.addEventListener('DOMContentLoaded', initPage);
+        }
 
         // -------------------------------------------------------------
         // Form Validation (Request for Inspection)
@@ -1321,7 +1511,12 @@
 
             if (selectedPropertyIds.length === 0) {
                 if (summaryContainer) summaryContainer.classList.add('hidden');
-                if (generatorCard) generatorCard.classList.add('hidden');
+                const currentTxCode = (document.getElementById('txCodeSelect')?.value || '').trim().toUpperCase();
+                if (currentTxCode !== 'DC') {
+                    if (generatorCard) generatorCard.classList.add('hidden');
+                } else {
+                    if (generatorCard) generatorCard.classList.remove('hidden');
+                }
                 return;
             }
 
@@ -1475,7 +1670,13 @@
         // Partition Generation Engine
         // -------------------------------------------------------------
         function handleGeneratePartitions() {
+            const txCode = (document.getElementById('txCodeSelect') ? document.getElementById('txCodeSelect').value : "SD").trim().toUpperCase();
+
             if (selectedPropertyIds.length === 0) {
+                if (txCode === 'DC') {
+                    openDiscoveryTdKindModal();
+                    return;
+                }
                 toastr.warning('Please choose at least one Reference Property first.');
                 return;
             }
@@ -1702,30 +1903,148 @@
             renderPartitionsTable();
         }
 
+        // -------------------------------------------------------------
+        // Discovery / New Declaration TD Kind Selection Modal Helpers
+        // -------------------------------------------------------------
+        function openDiscoveryTdKindModal() {
+            const modal = document.getElementById('discoveryTdKindModal');
+            const countInput = document.getElementById('genPartitionCountInput');
+            const count = Math.max(1, Math.min(26, parseInt(countInput ? countInput.value : 1) || 1));
+            const countLbl = document.getElementById('modalDiscoveryCountLbl');
+            if (countLbl) countLbl.textContent = count;
+
+            const reqKindEl = document.getElementById('kindInput');
+            const curKind = reqKindEl && reqKindEl.value ? reqKindEl.value : 'Land';
+            const targetRadio = document.querySelector(`input[name="discoveryTdKindRadio"][value="${curKind}"]`);
+            if (targetRadio) {
+                targetRadio.checked = true;
+                selectDiscoveryTdKindOption(curKind);
+            }
+
+            if (modal) modal.classList.remove('hidden');
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+
+        function closeDiscoveryTdKindModal() {
+            const modal = document.getElementById('discoveryTdKindModal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function selectDiscoveryTdKindOption(kind) {
+            ['Land', 'Building', 'Machinery'].forEach(k => {
+                const opt = document.getElementById(`tdKindOpt_${k}`);
+                if (!opt) return;
+                if (k.toLowerCase() === kind.toLowerCase()) {
+                    opt.classList.add('border-emerald-500', 'bg-emerald-50/50', 'dark:bg-emerald-950/20');
+                    opt.classList.remove('border-slate-200', 'dark:border-stone-800', 'bg-white', 'dark:bg-stone-900');
+                    const r = opt.querySelector('input[type="radio"]');
+                    if (r) r.checked = true;
+                } else {
+                    opt.classList.remove('border-emerald-500', 'bg-emerald-50/50', 'dark:bg-emerald-950/20');
+                    opt.classList.add('border-slate-200', 'dark:border-stone-800', 'bg-white', 'dark:bg-stone-900');
+                }
+            });
+        }
+
+        function confirmGenerateDiscoveryPartitions() {
+            const kindRadio = document.querySelector('input[name="discoveryTdKindRadio"]:checked');
+            const chosenKind = kindRadio ? kindRadio.value : 'Land';
+            const countInput = document.getElementById('genPartitionCountInput');
+            const count = Math.max(1, Math.min(26, parseInt(countInput ? countInput.value : 1) || 1));
+            const ownerName = (document.getElementById('ownerNameInput') ? document.getElementById('ownerNameInput').value : '').trim();
+            const locInput = (document.getElementById('locationInput') ? document.getElementById('locationInput').value : '').trim();
+            const brgyEl = document.getElementById('barangaySelect');
+            const brgyName = brgyEl && brgyEl.value ? brgyEl.value : 'Brgy. Central';
+            const brgyCode = resolveCastBrgyCode(brgyName, '0001');
+
+            const reqKindEl = document.getElementById('kindInput');
+            if (reqKindEl) {
+                reqKindEl.value = chosenKind;
+                reqKindEl.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+
+            let defClassification = 'Residential';
+            let defArea = 150;
+            let defUnitVal = 1500;
+            let defAssessLevel = 20;
+
+            if (chosenKind === 'Building') {
+                defClassification = 'Residential';
+                defArea = 80;
+                defUnitVal = 6000;
+                defAssessLevel = 30;
+            } else if (chosenKind === 'Machinery') {
+                defClassification = 'Industrial';
+                defArea = 0;
+                defUnitVal = 0;
+                defAssessLevel = 80;
+            }
+
+            generatedPartitions = [];
+
+            for (let i = 0; i < count; i++) {
+                const letterSuffix = alphabetLetters[i % alphabetLetters.length];
+                const lotText = `Lot ${i + 1}-${letterSuffix}`;
+                const arpCombined = formatCastArpNumber(brgyCode, '001', `${i + 1}`);
+                const mv = chosenKind === 'Machinery' ? 350000 : Math.round((defArea * defUnitVal) * 100) / 100;
+                const av = Math.round((mv * (defAssessLevel / 100)) * 100) / 100;
+
+                generatedPartitions.push({
+                    partitionIndex: letterSuffix,
+                    baseTDN: 'NEW-DC',
+                    basePropertyId: null,
+                    systemGeneratedTDN: generateSystemTDN(letterSuffix, brgyCode, i + 1),
+                    arpNo: arpCombined,
+                    sectionNo: '001',
+                    pin: arpCombined,
+                    lotNumber: lotText,
+                    kind: chosenKind,
+                    classification: defClassification,
+                    areaSqMeters: defArea,
+                    unitValue: defUnitVal,
+                    marketValue: mv,
+                    assessmentLevelPercent: defAssessLevel,
+                    assessedValue: av,
+                    newOwnerName: ownerName || 'Applicant / Taxpayer',
+                    districtOrBarangay: brgyName,
+                    propertyLocation: locInput || brgyName || 'General Santos City',
+                    customOwner: false,
+                    customLocation: false
+                });
+            }
+
+            closeDiscoveryTdKindModal();
+            renderPartitionsTable();
+            toastr.success(`Generated ${generatedPartitions.length} partition lot(s) for ${chosenKind} (Discovery / New Declaration)!`);
+        }
+
         function handleAddManualPartitionLot() {
-            if (selectedPropertyIds.length === 0) {
+            const txCode = (document.getElementById('txCodeSelect') ? document.getElementById('txCodeSelect').value : "SD").trim().toUpperCase();
+
+            if (selectedPropertyIds.length === 0 && txCode !== 'DC') {
                 toastr.warning('Please select a reference property first.');
                 return;
             }
 
-            const baseProp = referencePropertiesData[selectedPropertyIds[0]];
+            const baseProp = selectedPropertyIds.length > 0 ? referencePropertiesData[selectedPropertyIds[0]] : null;
             const idx = generatedPartitions.length;
             const letter = alphabetLetters[idx % alphabetLetters.length];
             const ownerName = (document.getElementById('ownerNameInput') ? document.getElementById('ownerNameInput').value : '').trim();
             const reqKindEl = document.getElementById('kindInput');
-            const reqKind = reqKindEl && reqKindEl.value ? reqKindEl.value : null;
-            const effKind = (reqKind === 'Machinery' || reqKind === 'Building') ? reqKind : (baseProp ? baseProp.kind : "Land");
-
-            const area = 100;
-            const mv = Math.round((area * (baseProp ? baseProp.unitValue : 1500)) * 100) / 100;
-            const av = Math.round((mv * ((baseProp ? baseProp.assessLevel : 20) / 100)) * 100) / 100;
-
-            const brgyName = baseProp ? baseProp.barangay : "Brgy. Central";
+            const defaultKind = generatedPartitions.length > 0 ? generatedPartitions[0].kind : (reqKindEl && reqKindEl.value ? reqKindEl.value : 'Land');
+            const effKind = baseProp ? (baseProp.kind || defaultKind) : defaultKind;
+            const brgyName = baseProp ? baseProp.barangay : (document.getElementById('barangaySelect')?.value || 'Brgy. Central');
             const arpCombined = formatCastArpNumber(brgyName, '001', `${idx + 1}`);
+
+            const area = effKind === 'Machinery' ? 0 : (effKind === 'Building' ? 80 : (baseProp ? baseProp.area : 150));
+            const unitVal = baseProp ? baseProp.unitValue : (effKind === 'Building' ? 6000 : (effKind === 'Machinery' ? 0 : 1500));
+            const mv = effKind === 'Machinery' ? 350000 : Math.round((area * unitVal) * 100) / 100;
+            const al = baseProp ? baseProp.assessLevel : (effKind === 'Building' ? 30 : (effKind === 'Machinery' ? 80 : 20));
+            const av = Math.round((mv * (al / 100)) * 100) / 100;
 
             generatedPartitions.push({
                 partitionIndex: letter,
-                baseTDN: baseProp ? baseProp.tdn : "Manual",
+                baseTDN: baseProp ? baseProp.tdn : 'NEW-DC',
                 basePropertyId: baseProp ? baseProp.id : null,
                 systemGeneratedTDN: generateSystemTDN(letter, brgyName, idx + 1),
                 arpNo: arpCombined,
@@ -1733,20 +2052,21 @@
                 pin: baseProp && baseProp.pin ? `${baseProp.pin}-${letter}` : arpCombined,
                 lotNumber: `Lot ${idx + 1}-${letter}`,
                 kind: effKind,
-                classification: baseProp ? baseProp.classification : "Residential",
+                classification: baseProp ? baseProp.classification : 'Residential',
                 areaSqMeters: area,
-                unitValue: baseProp ? baseProp.unitValue : 1500,
+                unitValue: unitVal,
                 marketValue: mv,
-                assessmentLevelPercent: baseProp ? baseProp.assessLevel : 20,
+                assessmentLevelPercent: al,
                 assessedValue: av,
-                newOwnerName: ownerName || (baseProp ? baseProp.owner : ""),
+                newOwnerName: ownerName || (baseProp ? baseProp.owner : 'Applicant / Taxpayer'),
                 districtOrBarangay: brgyName,
-                propertyLocation: (document.getElementById('locationInput') ? document.getElementById('locationInput').value : '') || (baseProp ? baseProp.location : '') || (baseProp ? baseProp.barangay : '') || '',
+                propertyLocation: (document.getElementById('locationInput') ? document.getElementById('locationInput').value : '') || (baseProp ? baseProp.location : brgyName) || '',
                 customOwner: false,
                 customLocation: false
             });
 
             renderPartitionsTable();
+            toastr.info(`Added Lot ${idx + 1}-${letter} to partition register.`);
         }
 
         function updatePartitionsFootTotals() {

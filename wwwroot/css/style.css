@@ -297,3 +297,67 @@ select:-webkit-autofill:focus {
 
 
 
+
+/* -------------------------------------------------------------------------- */
+/* REAL PROPERTY TAX & ASSESSOR CONCEPT SPINNER & PROCESSING OVERLAY          */
+/* -------------------------------------------------------------------------- */
+#appProcessingOverlay {
+    transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.rpt-spinner-ring {
+    border-radius: 9999px;
+    border: 3.5px solid transparent;
+    border-top-color: #10b981;
+    border-bottom-color: #059669;
+    animation: rptSpin 1.8s cubic-bezier(0.55, 0.15, 0.45, 0.85) infinite;
+}
+
+.rpt-spinner-inner {
+    border-radius: 9999px;
+    border: 2px dashed rgba(16, 185, 129, 0.45);
+    animation: rptSpinReverse 6s linear infinite;
+}
+
+.rpt-pulse-glow {
+    animation: rptPulseGlow 2.2s ease-in-out infinite;
+}
+
+.rpt-seal-pulse {
+    animation: rptSealPulse 2.4s ease-in-out infinite;
+}
+
+@keyframes rptSpin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes rptSpinReverse {
+    0% { transform: rotate(360deg); }
+    100% { transform: rotate(0deg); }
+}
+
+@keyframes rptPulseGlow {
+    0%, 100% {
+        box-shadow: 0 0 25px -5px rgba(16, 185, 129, 0.4), 0 0 50px -10px rgba(5, 150, 105, 0.25);
+    }
+    50% {
+        box-shadow: 0 0 45px 5px rgba(16, 185, 129, 0.65), 0 0 80px 0px rgba(14, 165, 233, 0.35);
+    }
+}
+
+@keyframes rptSealPulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.08);
+    }
+}
+
+/* Button Inline Processing State */
+.btn-is-processing {
+    position: relative !important;
+    pointer-events: none !important;
+    opacity: 0.85 !important;
+}

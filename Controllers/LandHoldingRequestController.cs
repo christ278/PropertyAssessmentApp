@@ -11,19 +11,22 @@ public class LandHoldingRequestController : Controller
     private readonly IOrderPaymentService _orderPaymentService;
     private readonly IOwnerService _ownerService;
     private readonly IWebHostEnvironment _env;
+    private readonly IWorkflowNotifier _workflowNotifier;
 
     public LandHoldingRequestController(
         ILandHoldingRequestService lhRequestService,
         IAssessmentService assessmentService,
         IOrderPaymentService orderPaymentService,
         IOwnerService ownerService,
-        IWebHostEnvironment env)
+        IWebHostEnvironment env,
+        IWorkflowNotifier workflowNotifier)
     {
         _lhRequestService = lhRequestService;
         _assessmentService = assessmentService;
         _orderPaymentService = orderPaymentService;
         _ownerService = ownerService;
         _env = env;
+        _workflowNotifier = workflowNotifier;
     }
 
     // GET: /LandHoldingRequest
@@ -60,7 +63,7 @@ public class LandHoldingRequestController : Controller
     // POST: /LandHoldingRequest/Create
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult Create(LandHoldingRequest request, IFormFile? fileUpload)
+    public async Task<IActionResult> Create(LandHoldingRequest request, IFormFile? fileUpload)
     {
         if (ModelState.IsValid)
         {
@@ -68,6 +71,7 @@ public class LandHoldingRequestController : Controller
             {
                 var webRoot = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath ?? Directory.GetCurrentDirectory(), "wwwroot");
                 _lhRequestService.Add(request, fileUpload, webRoot);
+                await _workflowNotifier.NotifyTransactionCreatedAsync(request.Id, "LandHoldingRequest", request.TrackingNumber, 3, request.OwnerName);
                 TempData["SuccessMessage"] = $"Land Holding Request {request.TrackingNumber} successfully filed.";
                 return RedirectToAction(nameof(Index));
             }

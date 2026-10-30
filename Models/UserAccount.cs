@@ -77,6 +77,9 @@ public class UserAccount
     [Display(Name = "Account Active Status")]
     public bool IsActive { get; set; } = true;
 
+    [Display(Name = "Regular Employee Status")]
+    public bool IsRegularEmployee { get; set; } = true;
+
     [Display(Name = "Account Created Date")]
     public DateTime CreatedDate { get; set; } = DateTime.Now;
 

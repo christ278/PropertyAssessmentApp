@@ -75,7 +75,8 @@ public class AccountController : Controller
             new Claim("Department", user.Department),
             new Claim("DivisionId", user.DivisionId?.ToString() ?? ""),
             new Claim("WorkflowRoleId", user.WorkflowRoleId?.ToString() ?? ""),
-            new Claim("WorkflowRoleName", user.WorkflowRoleName ?? "")
+            new Claim("WorkflowRoleName", user.WorkflowRoleName ?? ""),
+            new Claim("IsRegularEmployee", user.IsRegularEmployee.ToString())
         };
 
         var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);

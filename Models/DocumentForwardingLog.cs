@@ -148,6 +148,9 @@ public class DocumentForwardingLog
     [Display(Name = "Is Deferred Status")]
     public bool IsDeferred { get; set; } = false;
 
+    [Display(Name = "Is Tagged For Approval")]
+    public bool IsForApproval { get; set; } = false;
+
     [Display(Name = "Forwarding Date & Time")]
     public DateTime Timestamp { get; set; } = DateTime.Now;
 }

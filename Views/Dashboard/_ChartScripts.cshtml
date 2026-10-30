@@ -1,5 +1,5 @@
 @model PropertyAssessmentApp.Models.DashboardViewModel
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="~/lib/chartjs/chart.umd.min.js" asp-append-version="true"></script>
 <script>
 (function () {
     const d = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(new {

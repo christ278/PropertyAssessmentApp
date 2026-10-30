@@ -4,7 +4,7 @@
 @inject PropertyAssessmentApp.Services.IPermissionService PermissionService
 
 @{
-    ViewData["Title"] = "My Transactions (Claimed Workspace)";
+    ViewData["Title"] = "My Transactions";
     var divisionId = ViewBag.DivisionId as int?;
     var search = ViewBag.Search as string ?? "";
     var typeFilter = ViewBag.TypeFilter as string ?? "";
@@ -12,6 +12,7 @@
 
     bool canChangeDivision = ViewBag.CanChangeDivision is bool b && b;
     bool isSuperAdminOrHead = ViewBag.IsSuperAdminOrHead is bool s && s;
+    bool isRegularStaff = ViewBag.IsRegularEmployee is bool reg ? reg : true;
     int? userDivId = ViewBag.UserDivisionId as int?;
     string userWorkflowRole = ViewBag.UserWorkflowRoleName as string ?? "";
     string currentUserName = ViewBag.CurrentUserName as string ?? "Staff User";
@@ -42,7 +43,7 @@
                 <span>Personal Processing Workspace</span>
             </div>
             <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-3">
-                <span>My Transactions (Claimed Workspace)</span>
+                <span>My Transactions</span>
                 <span class="px-3 py-1 rounded-full text-xs font-black bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300">
                     @totalMy Claimed
                 </span>
@@ -76,7 +77,7 @@
             <a asp-action="Pool" asp-route-divisionId="@(canChangeDivision ? divisionId : null)" class="px-4 py-2.5 rounded-2xl font-bold bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 flex items-center gap-2 shadow-xs transition-all">
                 <i data-lucide="inbox" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
                 <span>Department Pool</span>
-                <span class="px-2 py-0.5 rounded-full text-[10px] bg-emerald-600 text-white font-black">@totalPool</span>
+                <span id="myTransPoolCountBadge" class="px-2 py-0.5 rounded-full text-[10px] bg-emerald-600 text-white font-black transition-all duration-300">@totalPool</span>
             </a>
 
             @if (isSuperAdminOrHead)
@@ -331,11 +332,22 @@
                                     else
                                     {
                                         <div class="flex items-center justify-center gap-1.5 flex-wrap">
-                                            <!-- Forward / Route Button -->
-                                            <button type="button" onclick="openForwardModal('@item.RequestId', '@item.RequestType', '@item.TrackingNumber', '@((int)item.CurrentStage)', '@((int)item.Division)', '@(item.ORNumber ?? "")', '@(item.ORDateIssued?.ToString("yyyy-MM-dd") ?? "")')" class="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[11px] flex items-center gap-1 shadow-xs transition-all" title="Route transaction to next workflow stage">
-                                                <i data-lucide="git-pull-request" class="w-3.5 h-3.5"></i>
-                                                Forward
-                                            </button>
+                                            @if (isRegularStaff)
+                                            {
+                                                <!-- Forward / Route Button for Regular Employees -->
+                                                <button type="button" onclick="openForwardModal('@item.RequestId', '@item.RequestType', '@item.TrackingNumber', '@((int)item.CurrentStage)', '@((int)item.Division)', '@(item.ORNumber ?? "")', '@(item.ORDateIssued?.ToString("yyyy-MM-dd") ?? "")')" class="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[11px] flex items-center gap-1 shadow-xs transition-all" title="Route transaction to next workflow stage">
+                                                    <i data-lucide="git-pull-request" class="w-3.5 h-3.5"></i>
+                                                    Forward
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <!-- Tag For Approval Button for Non-Regular Staff -->
+                                                <button type="button" onclick="openTagForApprovalModal('@item.RequestId', '@item.RequestType', '@item.TrackingNumber', '@((int)item.Division)')" class="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-[11px] flex items-center gap-1 shadow-xs transition-all" title="Tag transaction For Approval and return to pool">
+                                                    <i data-lucide="stamp" class="w-3.5 h-3.5"></i>
+                                                    Tag For Approval
+                                                </button>
+                                            }
 
                                             <!-- Release Back to Pool -->
                                             <form asp-action="Release" method="post" class="inline">
@@ -531,6 +543,53 @@
     </div>
 </div>
 
+<!-- Tag For Approval Modal Component (for Non-Regular staff workflow) -->
+<div id="tagForApprovalModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+    <div class="bg-white dark:bg-stone-900 rounded-3xl border border-slate-200 dark:border-stone-800 p-6 max-w-lg w-full shadow-2xl space-y-4 font-mono text-xs">
+        <div class="flex items-center justify-between border-b border-slate-200 dark:border-stone-800 pb-3">
+            <h3 class="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2">
+                <i data-lucide="stamp" class="w-4 h-4 text-amber-600"></i>
+                Tag Transaction For Approval
+            </h3>
+            <button type="button" onclick="closeTagForApprovalModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+
+        <form asp-action="TagForApproval" method="post" class="space-y-4">
+            <input type="hidden" name="requestId" id="tagApprovalRequestId" />
+            <input type="hidden" name="requestType" id="tagApprovalRequestType" />
+            <input type="hidden" name="division" id="tagApprovalDivision" />
+
+            <div>
+                <label class="block font-bold text-slate-700 dark:text-stone-300 mb-1">Tracking Number</label>
+                <input type="text" id="tagApprovalTrackingNo" readonly class="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-500 font-bold border border-slate-200 dark:border-stone-700 focus:outline-none" />
+            </div>
+
+            <div class="p-3.5 rounded-2xl bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 text-amber-900 dark:text-amber-300 text-[11px] space-y-1.5 font-sans">
+                <div class="font-bold flex items-center gap-1.5 text-xs">
+                    <i data-lucide="alert-circle" class="w-4 h-4 text-amber-600"></i>
+                    <span>Non-Regular Staff Workflow Policy</span>
+                </div>
+                <p>
+                    As a non-regular employee, you are endorsing this transaction for review. Once confirmed, this document will <strong>return to the shared department pool</strong> flagged with <strong>For Approval</strong> so that a regular officer / supervisor can verify and forward it.
+                </p>
+            </div>
+
+            <div>
+                <label class="block font-bold text-slate-700 dark:text-stone-300 mb-1">Assessment Notes / Endorsement Remarks <span class="text-amber-600 font-bold">*</span></label>
+                <textarea name="remarks" rows="3" required placeholder="Specify assessment completed, verified computations, or endorsement remarks for supervisor review..." class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-950 text-slate-900 dark:text-white border border-slate-200 dark:border-stone-700 focus:outline-none focus:border-amber-600 font-sans"></textarea>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 pt-4 border-t border-slate-200 dark:border-stone-800">
+                <button type="button" onclick="closeTagForApprovalModal()" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold hover:bg-slate-200">Cancel</button>
+                <button type="submit" class="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold flex items-center gap-1.5 shadow-md shadow-amber-600/20">
+                    <i data-lucide="stamp" class="w-3.5 h-3.5"></i>
+                    <span>Confirm & Tag For Approval</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 @section Scripts {
     <script>
         function openForwardModal(reqId, reqType, trkNo, currentStage, div, orNumber, orDate) {
@@ -651,12 +710,50 @@
             document.getElementById('deferModal').classList.add('hidden');
         }
 
+        function openTagForApprovalModal(reqId, reqType, trkNo, div) {
+            document.getElementById('tagApprovalRequestId').value = reqId;
+            document.getElementById('tagApprovalRequestType').value = reqType;
+            document.getElementById('tagApprovalTrackingNo').value = trkNo;
+            document.getElementById('tagApprovalDivision').value = div;
+            document.getElementById('tagForApprovalModal').classList.remove('hidden');
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+        }
+
+        function closeTagForApprovalModal() {
+            document.getElementById('tagForApprovalModal').classList.add('hidden');
+        }
+
+        window.currentActiveDivisionId = '@(ViewBag.DivisionId ?? 0)';
+
         // Real-Time SignalR Auto-Sync for My Transactions
         window.addEventListener('workflow:transactionForwarded', function(e) {
+            if (typeof window.refreshWorkflowPoolCounts === 'function') {
+                window.refreshWorkflowPoolCounts(window.currentActiveDivisionId);
+            }
             // When an item currently in My Transactions is forwarded by this or another session
             var myRequestId = document.getElementById('modalRequestId')?.value;
             if (myRequestId && myRequestId === e.detail.requestId) {
                 setTimeout(function() { window.location.reload(); }, 1200);
+            }
+        });
+
+        window.addEventListener('workflow:transactionClaimed', function() {
+            if (typeof window.refreshWorkflowPoolCounts === 'function') {
+                window.refreshWorkflowPoolCounts(window.currentActiveDivisionId);
+            }
+        });
+
+        window.addEventListener('workflow:transactionReleased', function() {
+            if (typeof window.refreshWorkflowPoolCounts === 'function') {
+                window.refreshWorkflowPoolCounts(window.currentActiveDivisionId);
+            }
+        });
+
+        window.addEventListener('workflow:transactionCreated', function() {
+            if (typeof window.refreshWorkflowPoolCounts === 'function') {
+                window.refreshWorkflowPoolCounts(window.currentActiveDivisionId);
             }
         });
     </script>

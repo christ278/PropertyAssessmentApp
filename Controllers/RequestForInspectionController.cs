@@ -15,6 +15,7 @@ public class RequestForInspectionController : Controller
     private readonly ApplicationDbContext _context;
     private readonly IWebHostEnvironment _env;
     private readonly ITaxDeclarationPdfService _tdPdfService;
+    private readonly IWorkflowNotifier _workflowNotifier;
 
     public RequestForInspectionController(
         IRequestForInspectionService rfiService,
@@ -23,7 +24,8 @@ public class RequestForInspectionController : Controller
         IOwnerService ownerService,
         ApplicationDbContext context,
         IWebHostEnvironment env,
-        ITaxDeclarationPdfService tdPdfService)
+        ITaxDeclarationPdfService tdPdfService,
+        IWorkflowNotifier workflowNotifier)
     {
         _rfiService = rfiService;
         _assessmentService = assessmentService;
@@ -32,6 +34,7 @@ public class RequestForInspectionController : Controller
         _context = context;
         _env = env;
         _tdPdfService = tdPdfService;
+        _workflowNotifier = workflowNotifier;
     }
 
     // GET: /RequestForInspection/PrintPdf/5
@@ -237,7 +240,7 @@ public class RequestForInspectionController : Controller
     // POST: /RequestForInspection/Create
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult Create(RequestForInspection request, IFormFile? fileUpload)
+    public async Task<IActionResult> Create(RequestForInspection request, IFormFile? fileUpload)
     {
         ValidateInspectionRequest(request);
 
@@ -247,6 +250,7 @@ public class RequestForInspectionController : Controller
             {
                 var webRoot = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath ?? Directory.GetCurrentDirectory(), "wwwroot");
                 _rfiService.Add(request, fileUpload, webRoot);
+                await _workflowNotifier.NotifyTransactionCreatedAsync(request.Id, "RequestForInspection", request.TrackingNumber, 1, request.OwnerName);
                 TempData["SuccessMessage"] = $"Request for Inspection '{request.TrackingNumber}' successfully filed.";
                 return RedirectToAction(nameof(Index));
             }
