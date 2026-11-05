@@ -18,9 +18,10 @@
     </script>
 
     <!-- Tailwind CSS CDN with Dark Mode enabled -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="~/lib/tailwindcss/tailwind.js" asp-append-version="true"></script>
+    <script>if (typeof tailwind === 'undefined') { document.write('<script src="https://cdn.tailwindcss.com"><\/script>'); }</script>
     <script>
-        tailwind.config = {
+        if (typeof tailwind !== 'undefined') { tailwind.config = {
             darkMode: 'class',
             theme: {
                 extend: {
@@ -37,11 +38,12 @@
                     }
                 }
             }
-        }
+        } }
     </script>
     <!-- Google Fonts & Lucide Icons -->
     <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="~/lib/lucide/lucide.min.js" asp-append-version="true"></script>
+    <script>if (typeof lucide === 'undefined') { document.write('<script src="https://unpkg.com/lucide@latest"><\/script>'); }</script>
     <!-- Tom Select for Searchable Dropdowns -->
     <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
@@ -106,7 +108,8 @@
     bool canLandHolding = PermissionService.CanAccess(User, "LandHoldingRequest");
     bool canTaxDeclaration = PermissionService.CanAccess(User, "TaxDeclarationRequest");
     bool canTaxMapping = PermissionService.CanAccess(User, "TaxMapping");
-    bool showRequestsGroup = canLandHolding || canTaxDeclaration || canTaxMapping;
+    bool canRptReports = PermissionService.CanAccess(User, "RPTReport");
+    bool showRequestsGroup = canLandHolding || canTaxDeclaration || canTaxMapping || canRptReports;
 
     bool canDashStaff = PermissionService.CanAccess(User, "Dashboard", "Staff");
     bool canDashHead = PermissionService.CanAccess(User, "Dashboard", "AssessorHead");
@@ -224,7 +227,7 @@
                 {
                     <a asp-controller="PropertyAssessmentRequest" asp-action="Index" class="nav-item flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "PropertyAssessmentRequest" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300 hover:text-emerald-700 dark:hover:text-emerald-400")">
                         <i data-lucide="clipboard-list" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
-                        <span>Property Assessment (RPA)</span>
+                        <span>Property Assessment</span>
                     </a>
                 }
 
@@ -232,7 +235,7 @@
                 {
                     <a asp-controller="RequestForInspection" asp-action="Index" class="nav-item flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "RequestForInspection" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300 hover:text-emerald-700 dark:hover:text-emerald-400")">
                         <i data-lucide="clipboard-check" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
-                        <span>Inspection Requests (RFI)</span>
+                        <span>Inspection Requests</span>
                     </a>
                 }
 
@@ -270,6 +273,13 @@
                     <a asp-controller="TaxMapping" asp-action="Index" class="nav-item flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "TaxMapping" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300 hover:text-emerald-700 dark:hover:text-emerald-400")">
                         <i data-lucide="map-pin" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
                         <span>Tax Mapping Requests</span>
+                    </a>
+                }
+                @if (canRptReports)
+                {
+                    <a asp-controller="RPTReport" asp-action="Index" class="nav-item flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "RPTReport" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                        <i data-lucide="file-badge" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                        <span>RPT Reports & Certificates</span>
                     </a>
                 }
             }
@@ -508,6 +518,16 @@
                                         <div>
                                             <div class="font-bold">Tax Mapping Requests</div>
                                             <div class="text-[10px] text-slate-500 dark:text-stone-400">GIS parcel identification</div>
+                                        </div>
+                                    </a>
+                                }
+                                @if (canRptReports)
+                                {
+                                    <a asp-controller="RPTReport" asp-action="Index" class="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 text-xs text-slate-700 dark:text-stone-300">
+                                        <i data-lucide="file-badge" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                                        <div>
+                                            <div class="font-bold">RPT Reports & Certificates</div>
+                                            <div class="text-[10px] text-slate-500 dark:text-stone-400">Official tax declaration and holdings certificates</div>
                                         </div>
                                     </a>
                                 }
@@ -1087,7 +1107,7 @@
     }
     @await RenderSectionAsync("Scripts", required: false)
     <script>
-        lucide.createIcons();
+        if (window.lucide) lucide.createIcons();
 
         // ---------------------------------------------------------------------
         // NAVIGATION LAYOUT TOGGLE (Sidebar <-> Horizontal Top Navbar)
@@ -1105,7 +1125,7 @@
                 localStorage.setItem('nav_layout', 'sidebar');
             }
             updateNavLayoutUI();
-            lucide.createIcons();
+            if (window.lucide) lucide.createIcons();
         }
 
         function toggleNavLayout() {
@@ -1669,7 +1689,7 @@
                 badgeElem.innerText = isDark ? 'Dark' : 'Light';
             }
             if (window.lucide) {
-                lucide.createIcons();
+                if (window.lucide) lucide.createIcons();
             }
         }
 

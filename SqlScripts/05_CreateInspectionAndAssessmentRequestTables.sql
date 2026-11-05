@@ -30,6 +30,7 @@ BEGIN
         Kind NVARCHAR(50) NOT NULL DEFAULT 'Land',
         LotNo NVARCHAR(100) NOT NULL DEFAULT 'N/A',
         PropertyLocation NVARCHAR(300) NOT NULL DEFAULT 'N/A',
+        OwnerId UNIQUEIDENTIFIER NULL,
 
         -- Contact & Representative
         ContactPerson NVARCHAR(200) NULL,
@@ -80,6 +81,7 @@ BEGIN
         PrevOwner NVARCHAR(200) NOT NULL DEFAULT '',
         LotNo NVARCHAR(100) NOT NULL DEFAULT 'N/A',
         PropertyLocation NVARCHAR(300) NOT NULL DEFAULT 'N/A',
+        OwnerId UNIQUEIDENTIFIER NULL,
 
         -- New Owner / Declarant Information
         NewOwnerName NVARCHAR(200) NOT NULL,
@@ -131,5 +133,6 @@ BEGIN
 
     CREATE INDEX IX_PropertyAssessmentRequests_Tracking ON PropertyAssessmentRequests(TrackingNumber);
     CREATE INDEX IX_PropertyAssessmentRequests_Status ON PropertyAssessmentRequests(Status);
+    CREATE INDEX IX_PropertyAssessmentRequests_OwnerId ON PropertyAssessmentRequests(OwnerId);
 END
 GO

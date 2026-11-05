@@ -200,6 +200,42 @@ public class PermissionService : IPermissionService
             var faasMod = _context.SystemModules.FirstOrDefault(m => m.ModuleCode == "ASSESSMENT_FAAS" && m.IsActive);
             return faasMod != null && HasModuleRecordAccess(roleSetting.Id, faasMod.ModuleId);
         }
+
+        // RPT Reports & Certifications Directory & Individual Reports
+        if (controllerName.Equals("RPTReport", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrEmpty(actionName) || actionName.Equals("Index", StringComparison.OrdinalIgnoreCase))
+            {
+                var dirMod = _context.SystemModules.FirstOrDefault(m => m.ModuleCode == "REPORT_DIRECTORY" && m.IsActive);
+                if (dirMod != null && HasModuleRecordAccess(roleSetting.Id, dirMod.ModuleId))
+                {
+                    return true;
+                }
+
+                var reportModIds = _context.SystemModules
+                    .Where(m => m.Category == "Reports & Certifications" && m.IsActive)
+                    .Select(m => m.ModuleId)
+                    .ToList();
+
+                return _context.RoleModulePermissions.Any(p =>
+                    p.RoleId == roleSetting.Id &&
+                    reportModIds.Contains(p.ModuleId) &&
+                    (p.CanView || p.CanCreate || p.CanEdit || p.CanDelete || p.CanApprove));
+            }
+
+            var reportMod = _context.SystemModules.FirstOrDefault(m =>
+                m.IsActive &&
+                m.ControllerName != null &&
+                m.ControllerName.ToLower() == "rptreport" &&
+                m.ActionName != null &&
+                m.ActionName.ToLower() == actionName.ToLower());
+
+            if (reportMod != null)
+            {
+                return HasModuleRecordAccess(roleSetting.Id, reportMod.ModuleId);
+            }
+        }
+
         var module = GetModuleForRequest(controllerName, actionName);
         if (module == null)
         {
@@ -223,6 +259,66 @@ public class PermissionService : IPermissionService
         }
 
         return perm.CanView || perm.CanCreate || perm.CanEdit || perm.CanDelete || perm.CanApprove;
+    }
+
+    public bool CanAccessReport(ClaimsPrincipal user, int reportId)
+    {
+        if (user.Identity?.IsAuthenticated != true)
+        {
+            return false;
+        }
+
+        var roleClaim = user.FindFirst(ClaimTypes.Role)?.Value;
+        bool isSystemAdmin = roleClaim == nameof(UserRole.SystemAdmin) || user.IsInRole("SystemAdmin") || user.Identity?.Name == "admin";
+        if (isSystemAdmin)
+        {
+            return true;
+        }
+
+        var roleSetting = GetUserRoleSetting(user);
+        if (roleSetting == null)
+        {
+            return false;
+        }
+
+        var report = _context.RPTReports.FirstOrDefault(r => r.RPTReportId == reportId);
+        if (report == null)
+        {
+            return false;
+        }
+
+        // Match report module by REPORT_{reportId} or matching title
+        var mod = _context.SystemModules.FirstOrDefault(m =>
+            m.IsActive &&
+            (m.ModuleCode == $"REPORT_{reportId}" ||
+             m.ModuleName == report.Title));
+
+        if (mod == null)
+        {
+            var dirMod = _context.SystemModules.FirstOrDefault(m => m.ModuleCode == "REPORT_DIRECTORY" && m.IsActive);
+            return dirMod != null && HasModuleRecordAccess(roleSetting.Id, dirMod.ModuleId);
+        }
+
+        return HasModuleRecordAccess(roleSetting.Id, mod.ModuleId);
+    }
+
+    public bool CanAccessReport(ClaimsPrincipal user, string reportTitle)
+    {
+        var report = _context.RPTReports.FirstOrDefault(r => r.Title.ToLower() == reportTitle.ToLower());
+        if (report != null)
+        {
+            return CanAccessReport(user, report.RPTReportId);
+        }
+
+        if (user.Identity?.IsAuthenticated != true) return false;
+        var roleClaim = user.FindFirst(ClaimTypes.Role)?.Value;
+        if (roleClaim == nameof(UserRole.SystemAdmin) || user.IsInRole("SystemAdmin") || user.Identity?.Name == "admin") return true;
+
+        var roleSetting = GetUserRoleSetting(user);
+        if (roleSetting == null) return false;
+
+        var mod = _context.SystemModules.FirstOrDefault(m => m.IsActive && m.ModuleName.ToLower() == reportTitle.ToLower());
+        return mod != null && HasModuleRecordAccess(roleSetting.Id, mod.ModuleId);
     }
 
     public UserPermissionSummary GetUserPermissionSummary(ClaimsPrincipal user)
@@ -311,6 +407,18 @@ public class PermissionService : IPermissionService
             {
                 summary.AllowedControllers.Add("Workflow");
                 summary.AllowedCreateControllers.Add("Workflow");
+            }
+        }
+
+        // RPT Reports: if user has access to directory or any report
+        var reportModIds = allModules.Where(m => m.Category == "Reports & Certifications").Select(m => m.ModuleId).ToList();
+        bool hasReportAccess = isSystemAdmin || permissions.Any(p => reportModIds.Contains(p.ModuleId) && (p.CanView || p.CanCreate || p.CanEdit || p.CanDelete || p.CanApprove));
+        if (hasReportAccess)
+        {
+            if (!summary.AllowedControllers.Contains("RPTReport", StringComparer.OrdinalIgnoreCase))
+            {
+                summary.AllowedControllers.Add("RPTReport");
+                summary.AllowedCreateControllers.Add("RPTReport");
             }
         }
 

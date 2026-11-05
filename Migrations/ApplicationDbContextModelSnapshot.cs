@@ -6698,6 +6698,104 @@ namespace PropertyAssessmentApp.Migrations
                     b.ToTable("Provinces");
                 });
 
+            modelBuilder.Entity("PropertyAssessmentApp.Models.RPTReport", b =>
+                {
+                    b.Property<int>("RPTReportId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("RPTReportId"));
+
+                    b.Property<string>("CreatedBy")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasDefaultValue("System");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETDATE()");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("UpdatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("RPTReportId");
+
+                    b.ToTable("RPTReports", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            RPTReportId = 1,
+                            CreatedBy = "System",
+                            CreatedDate = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Tax Declaration Records Certification",
+                            Title = "Tax Decleration Recods Certification"
+                        },
+                        new
+                        {
+                            RPTReportId = 2,
+                            CreatedBy = "System",
+                            CreatedDate = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Certificate of No Improvement",
+                            Title = "Certificate of NO Improvement"
+                        },
+                        new
+                        {
+                            RPTReportId = 3,
+                            CreatedBy = "System",
+                            CreatedDate = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Assessment of Tax Declaration",
+                            Title = "Assessment of Tax Declaration"
+                        },
+                        new
+                        {
+                            RPTReportId = 4,
+                            CreatedBy = "System",
+                            CreatedDate = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Certificate of Improvement",
+                            Title = "Certificate of Improvement"
+                        },
+                        new
+                        {
+                            RPTReportId = 5,
+                            CreatedBy = "System",
+                            CreatedDate = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Certificate of No Land Holding",
+                            Title = "Certificate of no land holding"
+                        },
+                        new
+                        {
+                            RPTReportId = 6,
+                            CreatedBy = "System",
+                            CreatedDate = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "All Property Holding (BIR Certification)",
+                            Title = "All property Holding(BIR Certification)"
+                        },
+                        new
+                        {
+                            RPTReportId = 7,
+                            CreatedBy = "System",
+                            CreatedDate = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Agricultural Lands (DAR Certification)",
+                            Title = "Agricultural Lands (DAR Certification)"
+                        });
+                });
+
             modelBuilder.Entity("PropertyAssessmentApp.Models.RequestForInspection", b =>
                 {
                     b.Property<Guid>("Id")

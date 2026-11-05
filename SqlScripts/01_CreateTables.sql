@@ -70,6 +70,7 @@ BEGIN
         [TaxDeclarationNumber] NVARCHAR(50) NOT NULL UNIQUE,
         [TransactionCode] NVARCHAR(50) NOT NULL,
         [PropertyIndexNumber] NVARCHAR(50) NOT NULL,
+        [OwnerId] UNIQUEIDENTIFIER NULL,
         [OwnerName] NVARCHAR(200) NOT NULL,
         [OwnerTin] NVARCHAR(50) NOT NULL,
         [OwnerPhone] NVARCHAR(50) NOT NULL,
@@ -103,6 +104,7 @@ BEGIN
 
     CREATE INDEX [IX_TaxDeclarations_TDN] ON [dbo].[TaxDeclarations]([TaxDeclarationNumber]);
     CREATE INDEX [IX_TaxDeclarations_PIN] ON [dbo].[TaxDeclarations]([PropertyIndexNumber]);
+    CREATE INDEX [IX_TaxDeclarations_OwnerId] ON [dbo].[TaxDeclarations]([OwnerId]);
     PRINT 'Created table [dbo].[TaxDeclarations].';
 END
 GO
@@ -133,6 +135,7 @@ BEGIN
         [RequestNumber] NVARCHAR(50) NOT NULL UNIQUE,
         [RequestDate] DATETIME2 NOT NULL DEFAULT GETDATE(),
         [TaxDeclarationId] UNIQUEIDENTIFIER NULL,
+        [OwnerId] UNIQUEIDENTIFIER NULL,
         [TaxDeclarationNumber] NVARCHAR(50) NULL,
         [PropertyIndexNumber] NVARCHAR(50) NULL,
         [ApplicantName] NVARCHAR(200) NOT NULL,
@@ -179,6 +182,7 @@ BEGIN
     );
 
     CREATE INDEX [IX_TaxMappingRequests_ReqNo] ON [dbo].[TaxMappingRequests]([RequestNumber]);
+    CREATE INDEX [IX_TaxMappingRequests_OwnerId] ON [dbo].[TaxMappingRequests]([OwnerId]);
     PRINT 'Created table [dbo].[TaxMappingRequests].';
 END
 GO

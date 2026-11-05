@@ -1,0 +1,74 @@
+@model PropertyAssessmentApp.Models.OfficialCertificateViewModel
+@{
+    var firstItem = Model.Details.Items.FirstOrDefault();
+    var tdnParam = firstItem?.TaxDeclarationNo ?? "";
+    ViewData["Title"] = $"Certificate Preview — {Model.RawReportTitle} — {tdnParam}";
+
+    var pdfUrl = Url.Action("PrintPdf", "RPTReport", new {
+        tdn = tdnParam,
+        reportId = Model.ReportId,
+        requestor = Model.Footer.RequestorName,
+        purpose = Model.Footer.Purpose,
+        orNumber = Model.Footer.ORNumber
+    });
+
+    var downloadPdfUrl = Url.Action("PrintPdf", "RPTReport", new {
+        tdn = tdnParam,
+        reportId = Model.ReportId,
+        requestor = Model.Footer.RequestorName,
+        purpose = Model.Footer.Purpose,
+        orNumber = Model.Footer.ORNumber,
+        download = true
+    });
+
+    var printHtmlUrl = Url.Action("Print", "RPTReport", new {
+        tdn = tdnParam,
+        reportId = Model.ReportId,
+        requestor = Model.Footer.RequestorName,
+        purpose = Model.Footer.Purpose,
+        orNumber = Model.Footer.ORNumber
+    });
+}
+
+<div class="space-y-6">
+
+    <!-- Action Header Bar -->
+    <div class="flex flex-wrap items-center justify-between gap-3 no-print">
+        <a asp-action="Index" class="px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 hover:bg-slate-50 dark:hover:bg-stone-800 text-slate-700 dark:text-stone-200 font-bold text-xs font-mono border border-slate-200 dark:border-stone-800 shadow-sm flex items-center gap-2">
+            <i data-lucide="arrow-left" class="w-4 h-4"></i>
+            Back to Report Generator Form
+        </a>
+        <div class="flex flex-wrap items-center gap-2.5">
+            <a href="@pdfUrl" target="_blank" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs font-mono flex items-center gap-2 shadow-md shadow-emerald-600/20">
+                <i data-lucide="printer" class="w-4 h-4"></i>
+                Print Official Certificate (QuestPDF)
+            </a>
+            <a href="@downloadPdfUrl" class="px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs font-mono flex items-center gap-2 shadow-sm">
+                <i data-lucide="download" class="w-4 h-4"></i>
+                Download PDF
+            </a>
+            <a href="@printHtmlUrl" target="_blank" class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-slate-700 dark:text-stone-200 font-bold text-xs font-mono border border-slate-200 dark:border-stone-700 flex items-center gap-2">
+                <i data-lucide="file-text" class="w-4 h-4"></i>
+                HTML Print View
+            </a>
+        </div>
+    </div>
+
+    <!-- Embedded QuestPDF Document Viewer -->
+    <div class="rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm overflow-hidden">
+        <div class="px-5 py-3.5 border-b border-slate-200 dark:border-stone-800 flex items-center justify-between bg-slate-50 dark:bg-stone-950 font-mono text-xs">
+            <div class="flex items-center gap-2 font-bold text-slate-700 dark:text-stone-200">
+                <i data-lucide="file-check-2" class="w-4 h-4 text-emerald-600"></i>
+                <span>Official Certificate PDF Preview — @Model.RawReportTitle — @tdnParam</span>
+            </div>
+            <span class="px-2.5 py-0.5 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 text-[10px] font-bold">
+                Generated via QuestPDF
+            </span>
+        </div>
+        <iframe src="@pdfUrl"
+                class="w-full h-[850px] bg-slate-100 dark:bg-stone-950"
+                title="Official Certificate @tdnParam PDF">
+        </iframe>
+    </div>
+
+</div>

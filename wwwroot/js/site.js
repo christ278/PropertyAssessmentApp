@@ -282,11 +282,11 @@ document.addEventListener("DOMContentLoaded", function () {
             config.subtitle = "Registered Declarant Profiles, Tax Identification Numbers (TIN) & Holdings";
             config.step = "Accessing master taxpayer database...";
         } else if (linkTextLower.indexOf("property assessment") !== -1 || linkTextLower.indexOf("rpa") !== -1 || hrefLower.indexOf("/propertyassessmentrequest") !== -1) {
-            config.title = "Loading Property Assessment (RPA)...";
+            config.title = "Loading Property Assessment...";
             config.subtitle = "Subdivision, Consolidation, Discovery & Reassessment Requests";
             config.step = "Fetching assessment transaction partitions & filings...";
         } else if (linkTextLower.indexOf("inspection") !== -1 || linkTextLower.indexOf("rfi") !== -1 || hrefLower.indexOf("/requestforinspection") !== -1) {
-            config.title = "Loading Inspection Requests (RFI)...";
+            config.title = "Loading Inspection Requests...";
             config.subtitle = "Field Appraisal, Site Inspections & Ocular Property Verification";
             config.step = "Loading ocular verification schedules & appraiser files...";
         } else if (linkTextLower.indexOf("faas encoding") !== -1 || linkTextLower.indexOf("wizard") !== -1 || hrefLower.indexOf("/assessment/create") !== -1) {

@@ -80,6 +80,7 @@ VALUES (
 -- =========================================================================================
 INSERT INTO TaxDeclarations (
     Id,
+    OwnerId,
     Kind,
     TaxDeclarationNumber,
     TransactionCode,
@@ -116,6 +117,7 @@ INSERT INTO TaxDeclarations (
 )
 VALUES (
     @LandTdId,
+    @OwnerId,
     0, -- Land
     'TD-2026-LAND-0088',
     'DC',
@@ -292,6 +294,7 @@ VALUES (NEWID(), @LandDetailsId, 1, 'LAND', 1, 'RESIDENTIAL', 1881000.00, 20.00,
 -- =========================================================================================
 INSERT INTO TaxDeclarations (
     Id,
+    OwnerId,
     Kind,
     TaxDeclarationNumber,
     TransactionCode,
@@ -328,6 +331,7 @@ INSERT INTO TaxDeclarations (
 )
 VALUES (
     @BldgTdId,
+    @OwnerId,
     1, -- Building
     'TD-2026-BLDG-0088',
     'DC',
@@ -521,6 +525,7 @@ VALUES
 -- =========================================================================================
 INSERT INTO TaxDeclarations (
     Id,
+    OwnerId,
     Kind,
     TaxDeclarationNumber,
     TransactionCode,
@@ -557,6 +562,7 @@ INSERT INTO TaxDeclarations (
 )
 VALUES (
     @MachTdId,
+    @OwnerId,
     2, -- Machinery
     'TD-2026-MACH-0088',
     'DC',

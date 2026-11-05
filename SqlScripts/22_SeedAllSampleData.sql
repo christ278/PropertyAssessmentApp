@@ -84,14 +84,14 @@ IF NOT EXISTS (SELECT 1 FROM [dbo].[TaxpayerOwners] WHERE [TaxIdentNo] = '987-65
 IF NOT EXISTS (SELECT 1 FROM [dbo].[TaxDeclarations] WHERE [TaxDeclarationNumber] = 'TD-2026-GS-0001')
 BEGIN
     INSERT INTO [dbo].[TaxDeclarations] (
-        [Id], [Kind], [TaxDeclarationNumber], [TransactionCode], [PropertyIndexNumber],
+        [Id], [OwnerId], [Kind], [TaxDeclarationNumber], [TransactionCode], [PropertyIndexNumber],
         [OwnerName], [OwnerTin], [OwnerPhone], [OwnerEmail], [OwnerAddress], [OwnerSex],
         [AppraisedByName], [DateAppraised], [AssessedByName], [DateAssessed],
         [RecommendingApprovalName], [DateRecommended], [Memoranda], [ApprovedByName], [DateApproved],
         [EntryInRollName], [EntryInRollPosition], [EntryInRollDate], [EncodedByName], [DateEncoded], [Status]
     )
     VALUES (
-        '90000000-0000-0000-0000-000000000001', 0, N'TD-2026-GS-0001', N'TR-2026-NEW', N'126-00-0001-002-01',
+        '90000000-0000-0000-0000-000000000001', '60000000-0000-0000-0000-000000000001', 0, N'TD-2026-GS-0001', N'TR-2026-NEW', N'126-00-0001-002-01',
         N'Engr. Juan Dela Cruz', N'123-456-789-000', N'0917-111-2222', N'juan.delacruz@gmail.com', N'Pioneer Avenue, General Santos City', N'Male',
         N'Elena G. Reyes (Property Appraiser)', GETDATE(), N'Marcus Aurelius Santos (Assessment Officer)', GETDATE(),
         N'Engr. Roberto M. Dela Rosa (Assistant Assessor)', GETDATE(), N'Standard residential land assessment',
@@ -127,14 +127,14 @@ END
 IF NOT EXISTS (SELECT 1 FROM [dbo].[TaxDeclarations] WHERE [TaxDeclarationNumber] = 'TD-2026-GS-0002')
 BEGIN
     INSERT INTO [dbo].[TaxDeclarations] (
-        [Id], [Kind], [TaxDeclarationNumber], [TransactionCode], [PropertyIndexNumber],
+        [Id], [OwnerId], [Kind], [TaxDeclarationNumber], [TransactionCode], [PropertyIndexNumber],
         [OwnerName], [OwnerTin], [OwnerPhone], [OwnerEmail], [OwnerAddress], [OwnerSex],
         [AppraisedByName], [DateAppraised], [AssessedByName], [DateAssessed],
         [RecommendingApprovalName], [DateRecommended], [Memoranda], [ApprovedByName], [DateApproved],
         [EntryInRollName], [EntryInRollPosition], [EntryInRollDate], [EncodedByName], [DateEncoded], [Status]
     )
     VALUES (
-        '90000000-0000-0000-0000-000000000002', 1, N'TD-2026-GS-0002', N'TR-2026-NEW', N'126-00-0002-005-08',
+        '90000000-0000-0000-0000-000000000002', '60000000-0000-0000-0000-000000000002', 1, N'TD-2026-GS-0002', N'TR-2026-NEW', N'126-00-0002-005-08',
         N'Maria Clara O. Santos', N'987-654-321-000', N'0919-222-3333', N'maria.santos@gmail.com', N'Santiago Boulevard, General Santos City', N'Female',
         N'Elena G. Reyes (Property Appraiser)', GETDATE(), N'Marcus Aurelius Santos (Assessment Officer)', GETDATE(),
         N'Engr. Roberto M. Dela Rosa (Assistant Assessor)', GETDATE(), N'Commercial building assessment entry',
@@ -177,3 +177,4 @@ UNION ALL
 SELECT 'TaxpayerOwners' AS [Table], COUNT(*) AS [Count] FROM [dbo].[TaxpayerOwners]
 UNION ALL
 SELECT 'TaxDeclarations' AS [Table], COUNT(*) AS [Count] FROM [dbo].[TaxDeclarations];
+

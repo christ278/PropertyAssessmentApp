@@ -1,0 +1,58 @@
+@model PropertyAssessmentApp.Models.ReportDetailsTableModel
+
+<div class="report-details-component my-4 overflow-x-auto">
+    <table class="w-full border-collapse border border-slate-700 text-xs sm:text-sm font-serif">
+        <thead>
+            <tr class="bg-slate-50 text-slate-900 border-b border-slate-700">
+                <th class="py-2.5 px-3 border-r border-slate-700 font-bold text-center w-12 uppercase text-[11px] sm:text-xs">
+                    NO.
+                </th>
+                <th class="py-2.5 px-3 border-r border-slate-700 font-bold text-center w-36 uppercase text-[11px] sm:text-xs">
+                    Tax Declaration<br />No.
+                </th>
+                <th class="py-2.5 px-3 border-r border-slate-700 font-bold text-left uppercase text-[11px] sm:text-xs">
+                    Owner's Name
+                </th>
+                <th class="py-2.5 px-3 border-r border-slate-700 font-bold text-center w-28 uppercase text-[11px] sm:text-xs">
+                    Lot No.
+                </th>
+                <th class="py-2.5 px-3 font-bold text-left uppercase text-[11px] sm:text-xs">
+                    Location
+                </th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-700">
+            @if (Model.Items.Any())
+            {
+                @foreach (var row in Model.Items)
+                {
+                    <tr class="text-slate-900">
+                        <td class="py-3 px-3 border-r border-slate-700 text-center font-bold align-top">
+                            @row.No
+                        </td>
+                        <td class="py-3 px-3 border-r border-slate-700 text-center font-bold align-top whitespace-nowrap">
+                            @row.TaxDeclarationNo
+                        </td>
+                        <td class="py-3 px-3 border-r border-slate-700 text-left font-bold align-top uppercase">
+                            @row.OwnerName
+                        </td>
+                        <td class="py-3 px-3 border-r border-slate-700 text-center font-medium align-top">
+                            @row.LotNo
+                        </td>
+                        <td class="py-3 px-3 text-left font-medium align-top leading-snug">
+                            @row.Location
+                        </td>
+                    </tr>
+                }
+            }
+            else
+            {
+                <tr>
+                    <td colspan="5" class="py-4 text-center text-slate-500 italic">
+                        No property details recorded for this certification.
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

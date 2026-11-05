@@ -1,0 +1,245 @@
+@model PropertyAssessmentApp.Models.GenerateRPTReportViewModel
+@{
+    ViewData["Title"] = "Generate RPT Report & Certification";
+    bool canManagePermissions = ViewBag.CanManagePermissions == true;
+    int totalAccessible = ViewBag.TotalAccessibleReports ?? 0;
+}
+
+<div class="space-y-8">
+
+    <!-- Flash Notifications -->
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-300 flex items-center justify-between shadow-sm">
+            <div class="flex items-center gap-3">
+                <i data-lucide="alert-triangle" class="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0"></i>
+                <span class="font-bold">@TempData["ErrorMessage"]</span>
+            </div>
+            <button type="button" onclick="this.parentElement.remove()" class="text-rose-500 hover:text-rose-700">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+    }
+
+    <!-- Page Header (Matches Property Assessment Records Layout) -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <div class="inline-flex items-center gap-2 text-xs font-mono text-emerald-700 dark:text-emerald-400 font-bold mb-1">
+                <i data-lucide="file-badge" class="w-4 h-4"></i>
+                <span>Assessment Records & Certification Generator</span>
+            </div>
+            <h1 class="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">RPT Report Generator</h1>
+            <p class="text-slate-500 dark:text-stone-400 text-sm">Input the Tax Declaration (TDN) number and select an authorized report type to generate official LGU certifications.</p>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <a asp-controller="Assessment" asp-action="Index" class="px-4 py-3 rounded-xl bg-white dark:bg-stone-900 hover:bg-slate-50 dark:hover:bg-stone-800 border border-slate-200 dark:border-stone-800 text-slate-700 dark:text-stone-200 font-bold text-xs font-mono flex items-center gap-2 shadow-sm transition-all">
+                <i data-lucide="layers" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                View Assessment Records
+            </a>
+            @if (canManagePermissions)
+            {
+                <a asp-controller="UserRole" asp-action="Permissions" class="px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-till-950 font-bold text-xs font-mono flex items-center gap-2 shadow-md shadow-emerald-600/20 transition-all">
+                    <i data-lucide="shield-check" class="w-4 h-4"></i>
+                    <span>Manage Role Permissions</span>
+                </a>
+            }
+        </div>
+    </div>
+
+    <!-- User Authorization Status Card (Full Width - Matches Assessment Index Cards) -->
+    <div class="p-5 rounded-2xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div class="flex items-center gap-3.5">
+            <div class="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 flex items-center justify-center text-emerald-700 dark:text-emerald-400 shrink-0 ring-1 ring-emerald-500/20">
+                <i data-lucide="user-check" class="w-5 h-5"></i>
+            </div>
+            <div>
+                <span class="font-extrabold text-sm text-slate-900 dark:text-white block font-mono">
+                    Logged-in Operator: <span class="text-emerald-700 dark:text-emerald-400">@User.Identity?.Name</span>
+                </span>
+                <span class="text-xs text-slate-500 dark:text-stone-400 font-mono">
+                    Your role is currently authorized to generate <strong class="text-emerald-600 dark:text-emerald-400">@totalAccessible</strong> report type(s).
+                </span>
+            </div>
+        </div>
+
+        @if (totalAccessible == 0)
+        {
+            <div class="px-3.5 py-2 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-300 font-bold text-xs font-mono flex items-center gap-2 border border-rose-200 dark:border-rose-900">
+                <i data-lucide="shield-alert" class="w-4 h-4 text-rose-600"></i>
+                <span>No report permissions assigned to your role</span>
+            </div>
+        }
+        else
+        {
+            <div class="px-3.5 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 font-bold text-xs font-mono flex items-center gap-2 border border-emerald-200 dark:border-emerald-800">
+                <i data-lucide="shield-check" class="w-4 h-4 text-emerald-600"></i>
+                <span>Active Permission Scope Verified</span>
+            </div>
+        }
+    </div>
+
+    <!-- Main Report Generation Form Card (Full Width - Matches Assessment Table Card Width) -->
+    <div class="bg-white dark:bg-stone-900 rounded-3xl border border-slate-200 dark:border-stone-800 shadow-sm p-6 sm:p-8 font-mono text-xs">
+        <form asp-action="Generate" method="post" id="reportGenerationForm" class="space-y-6">
+            @Html.AntiForgeryToken()
+
+            <div asp-validation-summary="ModelOnly" class="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-300 font-bold mb-4"></div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                <!-- 1. INPUT: Tax Declaration Number (TDN) with Real-Time Assessment Records Validation -->
+                <div class="space-y-2">
+                    <label asp-for="TaxDeclarationNumber" class="block text-xs font-mono font-extrabold uppercase tracking-wider text-slate-700 dark:text-stone-300 flex items-center gap-1.5">
+                        <i data-lucide="file-text" class="w-4 h-4 text-emerald-600"></i>
+                        <span>Tax Declaration (TDN) No. <span class="text-rose-500">*</span></span>
+                    </label>
+
+                    <div class="relative">
+                        <input asp-for="TaxDeclarationNumber" id="tdnInput" autocomplete="off" placeholder="e.g. TD-2026-LAND-0088 or TD-2026-GS-0001" 
+                               class="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-sm focus:outline-none focus:border-emerald-600 shadow-xs uppercase transition-all" />
+                        <div id="tdnValidationSpinner" class="hidden absolute right-3.5 top-3.5">
+                            <div class="animate-spin rounded-full h-4 w-4 border-2 border-emerald-600 border-t-transparent"></div>
+                        </div>
+                    </div>
+
+                    <!-- Real-Time TDN Validation Status Feedback -->
+                    <div id="tdnValidationFeedback" class="text-[11px] font-mono hidden"></div>
+
+                    <!-- Server-Side Validation Error -->
+                    <span asp-validation-for="TaxDeclarationNumber" class="text-rose-600 font-bold text-[11px] block mt-1"></span>
+                    <p class="text-[11px] text-slate-400 dark:text-stone-500">
+                        Must exist in the list of Assessment Records (TDNs). Verified dynamically against the assessment roll.
+                    </p>
+                </div>
+
+                <!-- 2. SELECT: Report / Certification Type (Populated with current user's accessible reports) -->
+                <div class="space-y-2">
+                    <label asp-for="RPTReportId" class="block text-xs font-mono font-extrabold uppercase tracking-wider text-slate-700 dark:text-stone-300 flex items-center gap-1.5">
+                        <i data-lucide="award" class="w-4 h-4 text-emerald-600"></i>
+                        <span>Select Report / Certification Type <span class="text-rose-500">*</span></span>
+                    </label>
+
+                    @if (Model.AccessibleReports.Any())
+                    {
+                        <select asp-for="RPTReportId" id="reportSelect" class="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-sm focus:outline-none focus:border-emerald-600 shadow-xs cursor-pointer transition-all">
+                            <option value="">-- Select Authorized Report Type --</option>
+                            @foreach (var opt in Model.AccessibleReports)
+                            {
+                                <option value="@opt.Value" selected="@(opt.Value == Model.RPTReportId?.ToString() ? "selected" : null)">@opt.Text</option>
+                            }
+                        </select>
+                    }
+                    else
+                    {
+                        <div class="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 font-bold text-xs">
+                            You currently do not have access to any report types. Please contact your system administrator.
+                        </div>
+                    }
+                    <span asp-validation-for="RPTReportId" class="text-rose-600 font-bold text-[11px] block mt-1"></span>
+                    <p class="text-[11px] text-slate-400 dark:text-stone-500">
+                        Displays only reports that your logged-in role has verified authorization to generate.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Optional Certification Particulars -->
+            <div class="pt-6 border-t border-slate-200 dark:border-stone-800 grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div class="space-y-1.5">
+                    <label asp-for="Purpose" class="block text-[11px] font-mono uppercase text-slate-600 dark:text-stone-400 font-bold">Purpose of Certification</label>
+                    <input asp-for="Purpose" placeholder="e.g. Bank Loan, BIR Capital Gains, Bail Bond, Legal" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs focus:outline-none focus:border-emerald-600" />
+                </div>
+
+                <div class="space-y-1.5">
+                    <label asp-for="RequestedBy" class="block text-[11px] font-mono uppercase text-slate-600 dark:text-stone-400 font-bold">Requestor / Representative</label>
+                    <input asp-for="RequestedBy" placeholder="Leave blank to use Registered Owner Name" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs focus:outline-none focus:border-emerald-600" />
+                </div>
+
+                <div class="space-y-1.5">
+                    <label asp-for="ORNumber" class="block text-[11px] font-mono uppercase text-slate-600 dark:text-stone-400 font-bold">Official Receipt (O.R.) No.</label>
+                    <input asp-for="ORNumber" placeholder="e.g. OR-2026-99120" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs focus:outline-none focus:border-emerald-600" />
+                </div>
+            </div>
+
+            <!-- Action Toolbar -->
+            <div class="pt-6 border-t border-slate-200 dark:border-stone-800 flex items-center justify-between flex-wrap gap-4">
+                <div class="text-slate-500 dark:text-stone-400 text-xs flex items-center gap-2">
+                    <i data-lucide="shield-check" class="w-4 h-4 text-emerald-600"></i>
+                    <span>Both TDN and Report Type are mandatory. TDN must exist in Assessment Records.</span>
+                </div>
+
+                <button type="submit" id="btnGenerate" @(totalAccessible == 0 ? "disabled" : "") 
+                        class="px-6 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-extrabold text-sm flex items-center gap-2 shadow-lg shadow-emerald-600/25 transition-all">
+                    <i data-lucide="file-check-2" class="w-5 h-5"></i>
+                    <span>Generate & View Certificate</span>
+                </button>
+            </div>
+        </form>
+    </div>
+
+</div>
+
+@section Scripts {
+<script>
+    var tdnInput = document.getElementById('tdnInput');
+    var feedback = document.getElementById('tdnValidationFeedback');
+    var spinner = document.getElementById('tdnValidationSpinner');
+    var validationTimer = null;
+    var isTdnValid = false;
+
+    function validateTdnRealTime() {
+        if (!tdnInput) return;
+        var val = tdnInput.value.trim();
+
+        if (val.length === 0) {
+            feedback.className = 'text-[11px] font-mono hidden';
+            feedback.innerHTML = '';
+            tdnInput.classList.remove('border-rose-500', 'border-emerald-500');
+            isTdnValid = false;
+            return;
+        }
+
+        if (spinner) spinner.classList.remove('hidden');
+
+        fetch('/RPTReport/ValidateTdn?tdn=' + encodeURIComponent(val))
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                if (spinner) spinner.classList.add('hidden');
+                feedback.classList.remove('hidden');
+
+                if (data.exists) {
+                    isTdnValid = true;
+                    tdnInput.classList.remove('border-rose-500');
+                    tdnInput.classList.add('border-emerald-500');
+                    feedback.className = 'text-[11px] font-mono text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-1.5 mt-1';
+                    feedback.innerHTML = '<i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-600"></i> <span>' + data.message + '</span>';
+                } else {
+                    isTdnValid = false;
+                    tdnInput.classList.remove('border-emerald-500');
+                    tdnInput.classList.add('border-rose-500');
+                    feedback.className = 'text-[11px] font-mono text-rose-600 dark:text-rose-400 font-bold flex items-center gap-1.5 mt-1';
+                    feedback.innerHTML = '<i data-lucide="alert-circle" class="w-3.5 h-3.5 text-rose-600"></i> <span>' + data.message + '</span>';
+                }
+                if (window.lucide) {
+                    lucide.createIcons();
+                }
+            })
+            .catch(function() {
+                if (spinner) spinner.classList.add('hidden');
+            });
+    }
+
+    if (tdnInput) {
+        tdnInput.addEventListener('blur', validateTdnRealTime);
+        tdnInput.addEventListener('input', function() {
+            clearTimeout(validationTimer);
+            validationTimer = setTimeout(validateTdnRealTime, 500);
+        });
+
+        // Trigger on initial page load if TDN is prefilled
+        if (tdnInput.value.trim().length > 0) {
+            validateTdnRealTime();
+        }
+    }
+</script>
+}

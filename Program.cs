@@ -49,6 +49,7 @@ builder.Services.AddScoped<IUserRoleService, UserRoleService>();
 builder.Services.AddScoped<IPermissionService, PermissionService>();
 builder.Services.AddScoped<IDataTransferService, DataTransferService>();
 builder.Services.AddScoped<ITaxDeclarationPdfService, TaxDeclarationPdfService>();
+builder.Services.AddScoped<IRPTCertificatePdfService, RPTCertificatePdfService>();
 builder.Services.AddScoped<IWorkflowNotifier, WorkflowNotifier>();
 
 QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
@@ -63,6 +64,7 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseStaticFiles();
 app.UseRouting();
 
 app.UseAuthentication();

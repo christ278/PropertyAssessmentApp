@@ -22,8 +22,9 @@
     </script>
 
     <script src="~/lib/tailwindcss/tailwind.js" asp-append-version="true"></script>
+    <script>if (typeof tailwind === 'undefined') { document.write('<script src="https://cdn.tailwindcss.com"><\/script>'); }</script>
     <script>
-        tailwind.config = {
+        if (typeof tailwind !== 'undefined') { tailwind.config = {
             darkMode: 'class',
             theme: {
                 extend: {
@@ -37,10 +38,11 @@
                     }
                 }
             }
-        }
+        } }
     </script>
     <link rel="stylesheet" href="~/lib/fonts/poppins/poppins.css" asp-append-version="true" />
     <script src="~/lib/lucide/lucide.min.js" asp-append-version="true"></script>
+    <script>if (typeof lucide === 'undefined') { document.write('<script src="https://unpkg.com/lucide@latest"><\/script>'); }</script>
 
     <style>
         /* Cadastral / GIS Lot Grid Pattern Background */
@@ -298,7 +300,7 @@
 
     <!-- Scripts -->
     <script>
-        lucide.createIcons();
+        if (window.lucide) lucide.createIcons();
 
         // Password Show/Hide Toggle
         const togglePasswordBtn = document.getElementById('togglePasswordBtn');
@@ -313,7 +315,7 @@
                 // Update Lucide icon
                 if (eyeIcon) {
                     eyeIcon.setAttribute('data-lucide', isPassword ? 'eye-off' : 'eye');
-                    lucide.createIcons();
+                    if (window.lucide) lucide.createIcons();
                 }
             });
         }
@@ -349,3 +351,4 @@
     </script>
 </body>
 </html>
+

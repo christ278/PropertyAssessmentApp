@@ -1,0 +1,117 @@
+@model PropertyAssessmentApp.Models.ReportFooterModel
+
+<div class="report-footer-component space-y-6 pt-2 font-serif text-slate-900 text-xs sm:text-sm">
+
+    <!-- Request Particulars Block -->
+    <div class="space-y-1">
+        <p class="font-normal text-slate-800">
+            @Model.RequestIntro
+        </p>
+        <div class="grid grid-cols-[80px_1fr] sm:grid-cols-[100px_1fr] gap-y-1 text-slate-900 font-medium pl-2 pt-1">
+            <span class="text-slate-600">Name</span>
+            <span class="font-bold">: @Model.RequestorName</span>
+
+            <span class="text-slate-600">Address</span>
+            <span>: @Model.RequestorAddress</span>
+
+            <span class="text-slate-600">Purpose</span>
+            <span class="font-bold">: @Model.Purpose</span>
+        </div>
+    </div>
+
+    <!-- Issuance Statement -->
+    <div class="text-justify pt-2">
+        <p>
+            Issued this <span class="font-bold">@Model.IssueDay</span> day of <span class="font-bold">@Model.IssueMonth</span> @Model.IssueYear at the @Model.IssueCityProvince
+        </p>
+    </div>
+
+    <!-- Signatories Section (Dual column layout matching template) -->
+    <div class="pt-6 grid grid-cols-1 sm:grid-cols-2 gap-8 text-slate-900">
+        <!-- Left Signatory: Verified as per records -->
+        <div class="space-y-8">
+            <div>
+                <span class="font-medium text-slate-700 block mb-6">@Model.VerifiedBy.SectionTitle</span>
+                <div class="inline-block border-b-2 border-slate-900 font-extrabold uppercase tracking-wide text-xs sm:text-sm pb-0.5">
+                    @Model.VerifiedBy.Name
+                </div>
+                <div class="text-[11px] sm:text-xs text-slate-700 font-medium mt-0.5">
+                    @Model.VerifiedBy.Designation
+                </div>
+            </div>
+
+            <!-- Bottom Left Fee & O.R. Details -->
+            <div class="font-mono text-xs text-slate-900 space-y-0.5 pt-4">
+                <div class="grid grid-cols-[80px_1fr]">
+                    <span class="text-slate-600">Cert. Fee</span>
+                    <span class="font-bold">: @Model.CertFee.ToString("N2")</span>
+                </div>
+                <div class="grid grid-cols-[80px_1fr]">
+                    <span class="text-slate-600">O.R No.</span>
+                    <span class="font-bold underline">: @Model.ORNumber</span>
+                </div>
+                <div class="grid grid-cols-[80px_1fr]">
+                    <span class="text-slate-600">Date</span>
+                    <span class="font-bold">: @Model.ORDate</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Signatories: Noted By and Acting Officer -->
+        <div class="space-y-6 text-left sm:text-right">
+            <!-- Noted By -->
+            <div>
+                <span class="font-medium text-slate-700 block mb-6">@Model.NotedBy.SectionTitle</span>
+                <div class="inline-block border-b-2 border-slate-900 font-extrabold uppercase tracking-wide text-xs sm:text-sm pb-0.5">
+                    @Model.NotedBy.Name
+                </div>
+                <div class="text-[11px] sm:text-xs text-slate-700 font-medium mt-0.5">
+                    @Model.NotedBy.Designation
+                </div>
+            </div>
+
+            <!-- Acting Records Officer / Authority Note -->
+            <div class="pt-3">
+                @if (!string.IsNullOrWhiteSpace(Model.ActingOfficer.SectionTitle))
+                {
+                    <span class="text-[11px] text-slate-600 italic block mb-3">@Model.ActingOfficer.SectionTitle</span>
+                }
+                <div class="inline-block border-b-2 border-slate-900 font-extrabold uppercase tracking-wide text-xs sm:text-sm pb-0.5">
+                    @Model.ActingOfficer.Name
+                </div>
+                <div class="text-[11px] sm:text-xs text-slate-700 font-medium mt-0.5">
+                    @Model.ActingOfficer.Designation
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Official Koronadal Footer Banner with Brand Logo & Contact Bar -->
+    <div class="pt-10 border-t-2 border-rose-300 mt-10 space-y-2">
+        <!-- Brand Wordmark Centered -->
+        <div class="text-center">
+            <span class="text-[9px] font-black uppercase tracking-widest text-slate-600 block">@Model.BrandPrefix</span>
+            <span class="text-2xl font-black uppercase tracking-tighter text-rose-800 inline-block font-sans">
+                👑 @Model.BrandTitle
+            </span>
+        </div>
+
+        <!-- Contact Particulars Strip with Icons -->
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-2 text-[10px] text-slate-600 font-sans pt-1">
+            <div class="flex items-center gap-1.5">
+                <span class="text-rose-600 font-bold">📞</span>
+                <span>@Model.ContactPhone</span>
+            </div>
+
+            <div class="flex items-center gap-1.5">
+                <span class="text-rose-600 font-bold">✉️</span>
+                <span>@Model.ContactEmail</span>
+            </div>
+
+            <div class="flex items-center gap-1.5">
+                <span class="text-rose-600 font-bold">📍</span>
+                <span>@Model.ContactAddress</span>
+            </div>
+        </div>
+    </div>
+</div>

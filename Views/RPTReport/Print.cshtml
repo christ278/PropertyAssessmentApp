@@ -1,0 +1,60 @@
+@model PropertyAssessmentApp.Models.OfficialCertificateViewModel
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@Model.Header.DocumentTitle - @Model.Details.Items.FirstOrDefault()?.TaxDeclarationNo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: "Times New Roman", Times, Georgia, serif;
+            color: #000000;
+            background: #ffffff;
+            margin: 0;
+            padding: 20px;
+        }
+
+        @@media print {
+            body {
+                padding: 0;
+            }
+            .no-print {
+                display: none !important;
+            }
+            @@page {
+                size: A4 portrait;
+                margin: 15mm 15mm 12mm 15mm;
+            }
+        }
+    </style>
+</head>
+<body class="bg-white text-slate-900 font-serif">
+
+    <!-- Top floating print button for browser preview -->
+    <div class="no-print p-4 bg-slate-100 border-b border-slate-300 flex items-center justify-between font-sans text-xs mb-6 max-w-4xl mx-auto rounded-xl">
+        <span class="font-bold text-slate-700">Official Assessor Certificate Print Preview</span>
+        <button type="button" onclick="window.print()" class="px-5 py-2 bg-emerald-700 text-white font-bold rounded-lg hover:bg-emerald-800 shadow cursor-pointer">
+            Print Now
+        </button>
+    </div>
+
+    <!-- Official Certificate Document Container -->
+    <div class="max-w-4xl mx-auto p-4 sm:p-8 space-y-6">
+        
+        <!-- Common Header Helper -->
+        <partial name="Reports/_ReportHeader" model="Model.Header" />
+
+        <!-- Common Property Details Table Helper -->
+        <partial name="Reports/_ReportDetailsTable" model="Model.Details" />
+
+        <!-- Common Footer & Signatories Helper -->
+        <partial name="Reports/_ReportFooter" model="Model.Footer" />
+
+    </div>
+
+</body>
+</html>

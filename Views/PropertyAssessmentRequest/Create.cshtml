@@ -2,7 +2,7 @@
 @using PropertyAssessmentApp.Models
 
 @{
-    ViewData["Title"] = "New Property Assessment Request (RPA)";
+    ViewData["Title"] = "New Property Assessment Request";
     var properties = ViewBag.Properties as IEnumerable<TaxDeclaration> ?? new List<TaxDeclaration>();
     var orderPayments = ViewBag.OrderPayments as IEnumerable<OrderPayment> ?? new List<OrderPayment>();
     var registeredOwners = ViewBag.RegisteredOwners as IEnumerable<Owner> ?? new List<Owner>();

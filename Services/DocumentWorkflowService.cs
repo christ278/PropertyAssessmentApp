@@ -1310,7 +1310,7 @@ public class DocumentWorkflowService : IDocumentWorkflowService
                 {
                     RequestId = rpa.Id,
                     RequestType = "PropertyAssessmentRequest",
-                    DisplayType = "Property Assessment (RPA)",
+                    DisplayType = "Property Assessment",
                     TrackingNumber = rpa.TrackingNumber,
                     OwnerOrApplicant = rpa.NewOwnerName ?? rpa.PrevOwner ?? "Property Owner",
                     ReferenceNumber = rpa.PrevPIN ?? rpa.PrevTDN ?? rpa.TrackingNumber,

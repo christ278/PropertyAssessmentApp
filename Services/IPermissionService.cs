@@ -21,4 +21,6 @@ public interface IPermissionService
     bool CanAccess(ClaimsPrincipal user, string controllerName, string? actionName = null);
     UserPermissionSummary GetUserPermissionSummary(ClaimsPrincipal user);
     UserRoleSetting? GetUserRoleSetting(ClaimsPrincipal user);
+    bool CanAccessReport(ClaimsPrincipal user, int reportId);
+    bool CanAccessReport(ClaimsPrincipal user, string reportTitle);
 }

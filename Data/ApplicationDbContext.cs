@@ -61,6 +61,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<TDNMachineryPropertyAssessment> TDNMachineryPropertyAssessments { get; set; } = null!;
     public DbSet<MachineryActualUse> MachineryActualUses { get; set; } = null!;
     public DbSet<MachineryAssessmentLevel> MachineryAssessmentLevels { get; set; } = null!;
+    public DbSet<RPTReport> RPTReports { get; set; } = null!;
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -636,6 +637,79 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.EffectiveDepreciationPercent).HasPrecision(18, 2);
             entity.HasIndex(e => new { e.ClassificationCode, e.AgeLowerBound, e.AgeUpperBound });
             entity.HasData(PropertyAssessmentApp.Services.BuildingDepreciationSchedule.GetSeedEntities());
+        });
+
+        // -------------------------------------------------------------
+        // RPT REPORTS DIRECTORY
+        // -------------------------------------------------------------
+        modelBuilder.Entity<RPTReport>(entity =>
+        {
+            entity.ToTable("RPTReports");
+            entity.HasKey(e => e.RPTReportId);
+            entity.Property(e => e.Title).IsRequired().HasMaxLength(250);
+            entity.Property(e => e.Description).HasMaxLength(500);
+            entity.Property(e => e.CreatedBy).HasMaxLength(100).HasDefaultValue("System");
+            entity.Property(e => e.CreatedDate).HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.UpdatedBy).HasMaxLength(100);
+
+            entity.HasData(
+                new RPTReport
+                {
+                    RPTReportId = 1,
+                    Title = "Tax Decleration Recods Certification",
+                    Description = "Tax Declaration Records Certification",
+                    CreatedBy = "System",
+                    CreatedDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                },
+                new RPTReport
+                {
+                    RPTReportId = 2,
+                    Title = "Certificate of NO Improvement",
+                    Description = "Certificate of No Improvement",
+                    CreatedBy = "System",
+                    CreatedDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                },
+                new RPTReport
+                {
+                    RPTReportId = 3,
+                    Title = "Assessment of Tax Declaration",
+                    Description = "Assessment of Tax Declaration",
+                    CreatedBy = "System",
+                    CreatedDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                },
+                new RPTReport
+                {
+                    RPTReportId = 4,
+                    Title = "Certificate of Improvement",
+                    Description = "Certificate of Improvement",
+                    CreatedBy = "System",
+                    CreatedDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                },
+                new RPTReport
+                {
+                    RPTReportId = 5,
+                    Title = "Certificate of no land holding",
+                    Description = "Certificate of No Land Holding",
+                    CreatedBy = "System",
+                    CreatedDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                },
+                new RPTReport
+                {
+                    RPTReportId = 6,
+                    Title = "All property Holding(BIR Certification)",
+                    Description = "All Property Holding (BIR Certification)",
+                    CreatedBy = "System",
+                    CreatedDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                },
+                new RPTReport
+                {
+                    RPTReportId = 7,
+                    Title = "Agricultural Lands (DAR Certification)",
+                    Description = "Agricultural Lands (DAR Certification)",
+                    CreatedBy = "System",
+                    CreatedDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                }
+            );
         });
     }
 }

@@ -81,6 +81,43 @@ public class UserRoleService : IUserRoleService
             });
         }
 
+        // Ensure RPT Reports modules exist in SystemModules
+        if (!_context.SystemModules.Any(m => m.ModuleCode == "REPORT_DIRECTORY"))
+        {
+            _context.SystemModules.Add(new SystemModule
+            {
+                ModuleCode = "REPORT_DIRECTORY",
+                ModuleName = "RPT Reports & Certifications Directory",
+                Category = "Reports & Certifications",
+                ControllerName = "RPTReport",
+                ActionName = "Index",
+                Icon = "file-text",
+                SortOrder = 30,
+                IsActive = true
+            });
+        }
+
+        var rptReports = _context.RPTReports.OrderBy(r => r.RPTReportId).ToList();
+        int reportSort = 31;
+        foreach (var r in rptReports)
+        {
+            var code = $"REPORT_{r.RPTReportId}";
+            if (!_context.SystemModules.Any(m => m.ModuleCode == code))
+            {
+                _context.SystemModules.Add(new SystemModule
+                {
+                    ModuleCode = code,
+                    ModuleName = r.Title,
+                    Category = "Reports & Certifications",
+                    ControllerName = "RPTReport",
+                    ActionName = $"ViewReport/{r.RPTReportId}",
+                    Icon = "file-badge",
+                    SortOrder = reportSort++,
+                    IsActive = true
+                });
+            }
+        }
+
         _context.SaveChanges();
     }
 
