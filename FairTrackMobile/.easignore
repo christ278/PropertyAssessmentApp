@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Expo
+.expo/
+web-build/
+dist/
+
+# Native build artifacts
+android/
+ios/
+
+# Git
+.git/
+.gitignore
+
+# Environment & logs
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+.env*.local
+*.log
+
+# Editor & OS
+.vs/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

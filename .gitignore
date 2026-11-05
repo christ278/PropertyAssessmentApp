@@ -1,4 +1,4 @@
-﻿## Build & Compiled binaries
+## Build & Compiled binaries
 [Bb]in/
 [Oo]bj/
 out/
@@ -21,3 +21,8 @@ update_edit_partition_js.ps1
 ## OS generated files
 .DS_Store
 Thumbs.db
+
+## Mobile App
+FairTrackMobile/node_modules/
+FairTrackMobile/.expo/
+FairTrackMobile/.eas/

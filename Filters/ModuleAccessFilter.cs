@@ -18,10 +18,13 @@ public class ModuleAccessFilter : IActionFilter
         var controllerName = context.RouteData.Values["controller"]?.ToString() ?? "";
         var actionName = context.RouteData.Values["action"]?.ToString() ?? "";
 
-        // Unrestricted system controllers
-        if (controllerName.Equals("Account", StringComparison.OrdinalIgnoreCase) ||
+        // Unrestricted system controllers & API endpoints
+        if (context.ActionDescriptor.EndpointMetadata.OfType<Microsoft.AspNetCore.Authorization.AllowAnonymousAttribute>().Any() ||
+            controllerName.Equals("Account", StringComparison.OrdinalIgnoreCase) ||
             controllerName.Equals("Home", StringComparison.OrdinalIgnoreCase) ||
-            controllerName.Equals("Location", StringComparison.OrdinalIgnoreCase))
+            controllerName.Equals("Location", StringComparison.OrdinalIgnoreCase) ||
+            controllerName.StartsWith("Mobile", StringComparison.OrdinalIgnoreCase) ||
+            context.HttpContext.Request.Path.StartsWithSegments("/api"))
         {
             return;
         }

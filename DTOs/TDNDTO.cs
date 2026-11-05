@@ -83,6 +83,9 @@ public class TDNDTO
     public string? Phase { get; set; }
     public string? Location { get; set; }
     public string? SurveyorName { get; set; }
+    public string? SurveyNo { get; set; }
+    public string? PropLocationStreet { get; set; }
+    public string? TransactionCode { get; set; }
 
     // Client-side mapping flag
     public bool isAlreadyExist { get; set; }

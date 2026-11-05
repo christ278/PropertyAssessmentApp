@@ -24,3 +24,9 @@ This application (`PropertyAssessmentApp`) is an ASP.NET Core 9 MVC web applicat
   - Dynamic cascading location API for Province -> City/Municipality -> Barangay (`Services/GeographicService.cs`, `Controllers/LocationController.cs`).
 - **User Account & Role-Based Security:**
   - Cookie authentication supporting LGU Assessor roles: `SystemAdministrator`, `CityAssessorHead`, `PropertyAppraiser`, `TaxMapper`, `AssessmentClerk` (`Controllers/AccountController.cs`, `Controllers/UserAccountController.cs`).
+- **FairTrack Mobile Field Assessment & Offline Sync (`FairTrackMobile/`):**
+  - React Native (Expo) Android mobile application for field appraisers and inspectors.
+  - Offline-first field data entry for Building FAAS, Land Appraisal, and Machinery FAAS forms.
+  - One-tap batch office sync with server (`/api/mobile/form/update-*`, `/api/mobile/workflow/forward`).
+  - Mobile REST API with RFC-7519 HMAC-SHA256 JWT security (`Controllers/Api/MobileAuthController.cs`, `Controllers/Api/MobileApiController.cs`, `Filters/JwtAuthorizeAttribute.cs`, `Helpers/JwtHelper.cs`).
+

@@ -1,0 +1,1026 @@
+import React, { useState, useEffect, useContext } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+  Switch
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { SyncContext } from '../context/SyncContext';
+import { MobileApi } from '../api/mobileApi';
+import { HeaderBar } from '../components/HeaderBar';
+import { COLORS, SHADOWS } from '../constants/theme';
+
+export const MachineryFormScreen = ({ route, navigation }) => {
+  const trackingNoParam = route?.params?.trackingNo || '';
+  const formWorkflowIdParam = route?.params?.formWorkflowId || null;
+  const { queueOfflineUpdate, getDownloadedFormData, isTransactionDownloaded } = useContext(SyncContext);
+
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [notDownloadedError, setNotDownloadedError] = useState(false);
+  const isDownloaded = isTransactionDownloaded(trackingNoParam, formWorkflowIdParam);
+
+  // Active section tab (0: Identification & Owner, 1: Machine Specs, 2: Valuation, 3: Memoranda & Transfer)
+  const [activeTab, setActiveTab] = useState(0);
+
+  // 1. Property Identification & Ownership
+  const [tdnId, setTdnId] = useState(route?.params?.tdnId || null);
+  const [tdnMachineId, setTdnMachineId] = useState(null);
+  const [tdnMachineDetailId, setTdnMachineDetailId] = useState(null);
+  const [trackingNo, setTrackingNo] = useState(trackingNoParam);
+  const [declarationNo, setDeclarationNo] = useState('');
+  const [arpNo, setArpNo] = useState('');
+  const [pin, setPin] = useState('');
+  const [ownerName, setOwnerName] = useState('');
+  const [ownerAddress, setOwnerAddress] = useState('');
+  const [ownerTin, setOwnerTin] = useState('');
+  const [ownerContact, setOwnerContact] = useState('');
+  const [plantLocation, setPlantLocation] = useState('');
+  const [cadastralSurveyNo, setCadastralSurveyNo] = useState('');
+  const [lotNo, setLotNo] = useState('');
+  const [landOwner, setLandOwner] = useState('');
+  const [landOwnerPin, setLandOwnerPin] = useState('');
+  const [buildingOwner, setBuildingOwner] = useState('');
+  const [buildingOwnerPin, setBuildingOwnerPin] = useState('');
+  const [transactionCode, setTransactionCode] = useState('');
+
+  // 2. Machinery Specifications
+  const [kindOfMachinery, setKindOfMachinery] = useState('');
+  const [brandModel, setBrandModel] = useState('');
+  const [capacity, setCapacity] = useState('');
+  const [dateAcquired, setDateAcquired] = useState('');
+  const [dateInstalled, setDateInstalled] = useState('');
+  const [dateOperational, setDateOperational] = useState('');
+  const [conditionWhenAcquired, setConditionWhenAcquired] = useState('New');
+  const [economicLifeEstimated, setEconomicLifeEstimated] = useState('10');
+
+  // 3. Valuation & Depreciation
+  const [originalCost, setOriginalCost] = useState('');
+  const [freightCost, setFreightCost] = useState('');
+  const [marketValue, setMarketValue] = useState('');
+  const [depreciationRate, setDepreciationRate] = useState('');
+  const [depreciatedValue, setDepreciatedValue] = useState('');
+  const [assessmentLevel, setAssessmentLevel] = useState('80');
+  const [assessedValue, setAssessedValue] = useState('');
+  const [taxability, setTaxability] = useState(true); // true = Taxable, false = Exempt
+
+  // 4. Effectivity & Memoranda
+  const [yearEffectivity, setYearEffectivity] = useState(new Date().getFullYear().toString());
+  const [quarterEffectivity, setQuarterEffectivity] = useState('1');
+  const [memoranda, setMemoranda] = useState('');
+  const [remarks, setRemarks] = useState('');
+
+  // Workflow Forwarding
+  const [autoForward, setAutoForward] = useState(true);
+  const [nextStatusId, setNextStatusId] = useState(4); // 4 = Checked / Recommend Approval
+
+  useEffect(() => {
+    loadMachineryData();
+  }, []);
+
+  const loadMachineryData = async () => {
+    setNotDownloadedError(false);
+
+    // 1. Check if downloaded offline copy exists
+    const downloaded = getDownloadedFormData(trackingNoParam, formWorkflowIdParam);
+    if (downloaded) {
+      if (downloaded.owner) setOwnerName(downloaded.owner);
+      if (downloaded.arpNo) setArpNo(downloaded.arpNo);
+      if (downloaded.tdnId) setTdnId(downloaded.tdnId);
+
+      if (downloaded.formData) {
+        populateFieldsFromDTO(downloaded.formData);
+      }
+      return;
+    }
+
+    // 2. Fetch live if online
+    try {
+      setLoading(true);
+      const res = await MobileApi.getMachineryForm(tdnId || 1, tdnMachineId || 1);
+      if (res && res.success && res.data) {
+        populateFieldsFromDTO(res.data);
+      } else {
+        setNotDownloadedError(true);
+      }
+    } catch (err) {
+      console.warn('Cannot fetch live machinery form and not downloaded:', err);
+      setNotDownloadedError(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const populateFieldsFromDTO = (d) => {
+    if (d.TDN) {
+      const t = d.TDN;
+      if (t.TDNId) setTdnId(t.TDNId);
+      if (t.DeclarationNo) setDeclarationNo(t.DeclarationNo);
+      if (t.ARPNo) setArpNo(t.ARPNo);
+      if (t.PIN) setPin(t.PIN);
+      if (t.DisplayName) setOwnerName(t.DisplayName);
+      if (t.OwnerAddress) setOwnerAddress(t.OwnerAddress);
+      if (t.Location || t.PropLocationStreet) setPlantLocation(t.Location || t.PropLocationStreet);
+      if (t.CadastralSurveyNo) setCadastralSurveyNo(t.CadastralSurveyNo);
+      if (t.LotNo) setLotNo(t.LotNo);
+      if (t.TransactionCode) setTransactionCode(t.TransactionCode);
+      if (t.YearEffectivity != null) setYearEffectivity(t.YearEffectivity.toString());
+      if (t.QuarterEffectivity != null) setQuarterEffectivity(t.QuarterEffectivity.toString());
+      if (t.TotalMarketValue != null) setMarketValue(t.TotalMarketValue.toString());
+      if (t.TotalAssessedValue != null) setAssessedValue(t.TotalAssessedValue.toString());
+      if (t.Memoranda) setMemoranda(t.Memoranda);
+      if (t.Taxability != null) setTaxability(!!t.Taxability);
+    }
+
+    if (d.refOwner) {
+      const o = d.refOwner;
+      if (!ownerName && (o.OwnerName || o.FullName)) setOwnerName(o.OwnerName || o.FullName);
+      if (o.TaxIdentNo) setOwnerTin(o.TaxIdentNo);
+      if (o.ContactNo) setOwnerContact(o.ContactNo);
+    }
+
+    if (d.TDNMachine) {
+      const m = d.TDNMachine;
+      if (m.TDNMachineId) setTdnMachineId(m.TDNMachineId);
+      if (m.LandOwner) setLandOwner(m.LandOwner);
+      if (m.LandOwnerPIN) setLandOwnerPin(m.LandOwnerPIN);
+      if (m.BuildingOwner) setBuildingOwner(m.BuildingOwner);
+      if (m.BuildingOwnerPIN) setBuildingOwnerPin(m.BuildingOwnerPIN);
+    }
+
+    if (d.TDNMachineDetail && d.TDNMachineDetail.length > 0) {
+      const md = d.TDNMachineDetail[0];
+      if (md.TDNMachineDetailId) setTdnMachineDetailId(md.TDNMachineDetailId);
+      if (md.KindOfMachinery) setKindOfMachinery(md.KindOfMachinery);
+      if (md.BrandModel) setBrandModel(md.BrandModel);
+      if (md.Capacity) setCapacity(md.Capacity);
+      if (md.AcquiredDate) setDateAcquired(md.AcquiredDate.toString().substring(0, 10));
+      if (md.DateOfInstallation) setDateInstalled(md.DateOfInstallation.toString().substring(0, 10));
+      if (md.DateOfOperation) setDateOperational(md.DateOfOperation.toString().substring(0, 10));
+      if (md.ConditionWhenAcquired) setConditionWhenAcquired(md.ConditionWhenAcquired);
+      if (md.EconomicLifeEstimated != null) setEconomicLifeEstimated(md.EconomicLifeEstimated.toString());
+      if (md.OriginalCost != null) setOriginalCost(md.OriginalCost.toString());
+      if (md.MarketValue != null && !marketValue) setMarketValue(md.MarketValue.toString());
+      if (md.AssessmentLevel != null) setAssessmentLevel(md.AssessmentLevel.toString());
+      if (md.AssessedValue != null && !assessedValue) setAssessedValue(md.AssessedValue.toString());
+      if (md.DepreciatedValue != null) setDepreciatedValue(md.DepreciatedValue.toString());
+      if (md.DepreciationTotalPercentage != null) setDepreciationRate(md.DepreciationTotalPercentage.toString());
+    }
+  };
+
+  const handleSave = async (forceOffline = false) => {
+    const payload = {
+      TDN: {
+        TDNId: parseInt(tdnId) || 0,
+        DeclarationNo: declarationNo,
+        ARPNo: arpNo,
+        PIN: pin,
+        DisplayName: ownerName,
+        OwnerAddress: ownerAddress,
+        Location: plantLocation,
+        PropLocationStreet: plantLocation,
+        CadastralSurveyNo: cadastralSurveyNo,
+        LotNo: lotNo,
+        TransactionCode: transactionCode,
+        TotalMarketValue: parseFloat(marketValue) || 0,
+        TotalAssessedValue: parseFloat(assessedValue) || 0,
+        YearEffectivity: parseInt(yearEffectivity) || null,
+        QuarterEffectivity: parseInt(quarterEffectivity) || null,
+        Memoranda: memoranda,
+        Taxability: taxability
+      },
+      TDNMachine: {
+        TDNMachineId: parseInt(tdnMachineId) || 0,
+        TDNId: parseInt(tdnId) || 0,
+        LandOwner: landOwner,
+        LandOwnerPIN: landOwnerPin,
+        BuildingOwner: buildingOwner,
+        BuildingOwnerPIN: buildingOwnerPin
+      },
+      TDNMachineDetail: [
+        {
+          TDNMachineDetailId: parseInt(tdnMachineDetailId) || 0,
+          TDNMachineId: parseInt(tdnMachineId) || 0,
+          KindOfMachinery: kindOfMachinery,
+          BrandModel: brandModel,
+          Capacity: capacity,
+          AcquiredDate: dateAcquired || null,
+          DateOfInstallation: dateInstalled || null,
+          DateOfOperation: dateOperational || null,
+          ConditionWhenAcquired: conditionWhenAcquired,
+          EconomicLifeEstimated: parseInt(economicLifeEstimated) || null,
+          OriginalCost: parseFloat(originalCost) || null,
+          MarketValue: parseFloat(marketValue) || 0,
+          AssessmentLevel: parseInt(assessmentLevel) || null,
+          AssessedValue: parseFloat(assessedValue) || 0,
+          DepreciatedValue: parseFloat(depreciatedValue) || null,
+          DepreciationTotalPercentage: parseInt(depreciationRate) || null
+        }
+      ]
+    };
+
+    const workflowForwardPayload = autoForward && formWorkflowIdParam ? {
+      formWorkflowId: formWorkflowIdParam,
+      nextStatusId: nextStatusId,
+      remarks: remarks || 'Field machinery appraisal completed.'
+    } : null;
+
+    if (forceOffline) {
+      await queueOfflineUpdate(
+        'UPDATE_MACHINERY',
+        payload,
+        `Machinery FAAS: ${trackingNo || arpNo} (${ownerName || 'Company'})`,
+        workflowForwardPayload
+      );
+      Alert.alert(
+        'Queued for Office Sync',
+        'Your machinery inspection changes are saved locally on this phone. It will automatically upload and transfer to the next step when you return to the office.',
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      );
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const res = await MobileApi.updateMachineryForm(payload);
+      if (res && res.success) {
+        if (workflowForwardPayload) {
+          try {
+            await MobileApi.forwardWorkflow(
+              workflowForwardPayload.formWorkflowId,
+              workflowForwardPayload.nextStatusId,
+              workflowForwardPayload.remarks
+            );
+          } catch (fwdErr) {
+            console.warn('Forward workflow warning:', fwdErr);
+          }
+        }
+        Alert.alert('Saved to Server', 'Machinery assessment updated and transferred successfully.', [
+          { text: 'OK', onPress: () => navigation.goBack() }
+        ]);
+      } else {
+        throw new Error(res?.message || 'Server error');
+      }
+    } catch (err) {
+      await queueOfflineUpdate(
+        'UPDATE_MACHINERY',
+        payload,
+        `Machinery FAAS: ${trackingNo || arpNo} (${ownerName || 'Company'})`,
+        workflowForwardPayload
+      );
+      Alert.alert(
+        'Saved Offline',
+        'Network disconnected. Your changes and next-step transfer are safely queued on this phone. Tap Sync All when you return to the office.',
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <HeaderBar title="MACHINERY FAAS" subtitle={`Tracking No: ${trackingNo || 'N/A'}`} navigation={navigation} />
+
+      {/* Offline Status Ribbon */}
+      <View style={[styles.ribbon, isDownloaded ? styles.ribbonDownloaded : styles.ribbonStandard]}>
+        <Ionicons name={isDownloaded ? "shield-checkmark" : "cloud-outline"} size={16} color={isDownloaded ? "#15803d" : COLORS.primary} />
+        <Text style={[styles.ribbonText, isDownloaded && { color: '#15803d' }]}>
+          {isDownloaded ? "Downloaded Form • 100% Offline Field Ready" : "Live Online Form"}
+        </Text>
+      </View>
+
+      {/* Form Navigation Tabs */}
+      <View style={styles.sectionTabs}>
+        <TouchableOpacity
+          style={[styles.sectionTabBtn, activeTab === 0 && styles.sectionTabBtnActive]}
+          onPress={() => setActiveTab(0)}
+        >
+          <Text style={[styles.sectionTabText, activeTab === 0 && styles.sectionTabTextActive]}>1. Identification</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.sectionTabBtn, activeTab === 1 && styles.sectionTabBtnActive]}
+          onPress={() => setActiveTab(1)}
+        >
+          <Text style={[styles.sectionTabText, activeTab === 1 && styles.sectionTabTextActive]}>2. Machine Specs</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.sectionTabBtn, activeTab === 2 && styles.sectionTabBtnActive]}
+          onPress={() => setActiveTab(2)}
+        >
+          <Text style={[styles.sectionTabText, activeTab === 2 && styles.sectionTabTextActive]}>3. Valuation</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.sectionTabBtn, activeTab === 3 && styles.sectionTabBtnActive]}
+          onPress={() => setActiveTab(3)}
+        >
+          <Text style={[styles.sectionTabText, activeTab === 3 && styles.sectionTabTextActive]}>4. Transfer</Text>
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {loading ? (
+          <ActivityIndicator color={COLORS.primary} size="large" style={{ marginVertical: 30 }} />
+        ) : notDownloadedError ? (
+          <View style={styles.notDownloadedBox}>
+            <Ionicons name="cloud-offline-outline" size={56} color="#d97706" />
+            <Text style={styles.notDownloadedTitle}>Form Not Stored on Phone</Text>
+            <Text style={styles.notDownloadedText}>
+              This machinery assessment data has not been downloaded to your device storage. To view and inspect this form in offline mode, please connect to Wi-Fi/Mobile Data and tap "Download" in the transactions list.
+            </Text>
+            <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+              <Ionicons name="arrow-back" size={18} color="#ffffff" />
+              <Text style={styles.backBtnText}>Return to Transactions</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <>
+            {/* TAB 0: PROPERTY IDENTIFICATION & OWNERSHIP */}
+            {activeTab === 0 && (
+              <View style={styles.tabContentBlock}>
+                <View style={[styles.card, SHADOWS.card]}>
+                  <Text style={styles.cardHeaderTitle}>Property Numbers & References</Text>
+
+                  <View style={styles.rowInputs}>
+                    <View style={[styles.inputGroup, { flex: 1 }]}>
+                      <Text style={styles.inputLabel}>ARP No.</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={arpNo}
+                        onChangeText={setArpNo}
+                        placeholder="02-0003-XXXX"
+                      />
+                    </View>
+                    <View style={[styles.inputGroup, { flex: 1 }]}>
+                      <Text style={styles.inputLabel}>PIN</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={pin}
+                        onChangeText={setPin}
+                        placeholder="PIN No."
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.rowInputs}>
+                    <View style={[styles.inputGroup, { flex: 1 }]}>
+                      <Text style={styles.inputLabel}>Declaration No.</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={declarationNo}
+                        onChangeText={setDeclarationNo}
+                        placeholder="Declaration No."
+                      />
+                    </View>
+                    <View style={[styles.inputGroup, { flex: 1 }]}>
+                      <Text style={styles.inputLabel}>Transaction Code</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={transactionCode}
+                        onChangeText={setTransactionCode}
+                        placeholder="e.g. TR-MACH"
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.rowInputs}>
+                    <View style={[styles.inputGroup, { flex: 1 }]}>
+                      <Text style={styles.inputLabel}>Cadastral Survey No.</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={cadastralSurveyNo}
+                        onChangeText={setCadastralSurveyNo}
+                        placeholder="Survey No."
+                      />
+                    </View>
+                    <View style={[styles.inputGroup, { flex: 1 }]}>
+                      <Text style={styles.inputLabel}>Lot No.</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={lotNo}
+                        onChangeText={setLotNo}
+                        placeholder="Lot No."
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Plant / Installation Location</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={plantLocation}
+                      onChangeText={setPlantLocation}
+                      placeholder="Street, Sitio, or Barangay"
+                    />
+                  </View>
+                </View>
+
+                <View style={[styles.card, SHADOWS.card]}>
+                  <Text style={styles.cardHeaderTitle}>Machinery Owner & Facility References</Text>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Owner / Company Name</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={ownerName}
+                      onChangeText={setOwnerName}
+                      placeholder="Company / Owner Name"
+                    />
+                  </View>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Owner Address</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={ownerAddress}
+                      onChangeText={setOwnerAddress}
+                      placeholder="Business / Mailing Address"
+                    />
+                  </View>
+
+                  <View style={styles.rowInputs}>
+                    <View style={[styles.inputGroup, { flex: 1 }]}>
+                      <Text style={styles.inputLabel}>Owner TIN</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={ownerTin}
+                        onChangeText={setOwnerTin}
+                        placeholder="TIN No."
+                      />
+                    </View>
+                    <View style={[styles.inputGroup, { flex: 1 }]}>
+                      <Text style={styles.inputLabel}>Contact No.</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={ownerContact}
+                        onChangeText={setOwnerContact}
+                        placeholder="Phone / Mobile"
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.rowInputs}>
+                    <View style={[styles.inputGroup, { flex: 1 }]}>
+                      <Text style={styles.inputLabel}>Land Owner</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={landOwner}
+                        onChangeText={setLandOwner}
+                        placeholder="Land Owner"
+                      />
+                    </View>
+                    <View style={[styles.inputGroup, { flex: 1 }]}>
+                      <Text style={styles.inputLabel}>Land Owner PIN</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={landOwnerPin}
+                        onChangeText={setLandOwnerPin}
+                        placeholder="PIN"
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.rowInputs}>
+                    <View style={[styles.inputGroup, { flex: 1 }]}>
+                      <Text style={styles.inputLabel}>Building Owner</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={buildingOwner}
+                        onChangeText={setBuildingOwner}
+                        placeholder="Building Owner"
+                      />
+                    </View>
+                    <View style={[styles.inputGroup, { flex: 1 }]}>
+                      <Text style={styles.inputLabel}>Building Owner PIN</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={buildingOwnerPin}
+                        onChangeText={setBuildingOwnerPin}
+                        placeholder="PIN"
+                      />
+                    </View>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {/* TAB 1: MACHINERY SPECIFICATIONS */}
+            {activeTab === 1 && (
+              <View style={styles.tabContentBlock}>
+                <View style={[styles.card, SHADOWS.card]}>
+                  <Text style={styles.cardHeaderTitle}>Equipment Description & Specs</Text>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Kind / Description of Machinery</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={kindOfMachinery}
+                      onChangeText={setKindOfMachinery}
+                      placeholder="e.g. Rice Mill Generator, Excavator, Lathe"
+                    />
+                  </View>
+
+                  <View style={styles.rowInputs}>
+                    <View style={[styles.inputGroup, { flex: 1 }]}>
+                      <Text style={styles.inputLabel}>Brand & Model</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={brandModel}
+                        onChangeText={setBrandModel}
+                        placeholder="e.g. Caterpillar 320D"
+                      />
+                    </View>
+                    <View style={[styles.inputGroup, { flex: 1 }]}>
+                      <Text style={styles.inputLabel}>Capacity / Rating</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={capacity}
+                        onChangeText={setCapacity}
+                        placeholder="e.g. 500 kVA / 20 HP"
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.rowInputs}>
+                    <View style={[styles.inputGroup, { flex: 1 }]}>
+                      <Text style={styles.inputLabel}>Condition Acquired</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={conditionWhenAcquired}
+                        onChangeText={setConditionWhenAcquired}
+                        placeholder="New / Second Hand"
+                      />
+                    </View>
+                    <View style={[styles.inputGroup, { flex: 1 }]}>
+                      <Text style={styles.inputLabel}>Economic Life (Yrs)</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={economicLifeEstimated}
+                        onChangeText={setEconomicLifeEstimated}
+                        keyboardType="numeric"
+                      />
+                    </View>
+                  </View>
+                </View>
+
+                <View style={[styles.card, SHADOWS.card]}>
+                  <Text style={styles.cardHeaderTitle}>Acquisition & Operation Timeline</Text>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Date Acquired (YYYY-MM-DD)</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={dateAcquired}
+                      onChangeText={setDateAcquired}
+                      placeholder="YYYY-MM-DD"
+                    />
+                  </View>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Date of Installation (YYYY-MM-DD)</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={dateInstalled}
+                      onChangeText={setDateInstalled}
+                      placeholder="YYYY-MM-DD"
+                    />
+                  </View>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Date of Operation (YYYY-MM-DD)</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={dateOperational}
+                      onChangeText={setDateOperational}
+                      placeholder="YYYY-MM-DD"
+                    />
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {/* TAB 2: APPRAISAL & VALUATION */}
+            {activeTab === 2 && (
+              <View style={styles.tabContentBlock}>
+                <View style={[styles.card, SHADOWS.card]}>
+                  <Text style={styles.cardHeaderTitle}>Acquisition Cost & Market Valuation</Text>
+
+                  <View style={styles.rowInputs}>
+                    <View style={[styles.inputGroup, { flex: 1 }]}>
+                      <Text style={styles.inputLabel}>Original Cost (PHP)</Text>
+                      <TextInput
+                        style={[styles.input, styles.valuationInput]}
+                        value={originalCost}
+                        onChangeText={setOriginalCost}
+                        keyboardType="numeric"
+                      />
+                    </View>
+                    <View style={[styles.inputGroup, { flex: 1 }]}>
+                      <Text style={styles.inputLabel}>Freight / Setup (PHP)</Text>
+                      <TextInput
+                        style={[styles.input, styles.valuationInput]}
+                        value={freightCost}
+                        onChangeText={setFreightCost}
+                        keyboardType="numeric"
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Total Market Value / Replacement Cost New (PHP)</Text>
+                    <TextInput
+                      style={[styles.input, styles.valuationInput]}
+                      value={marketValue}
+                      onChangeText={setMarketValue}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                </View>
+
+                <View style={[styles.card, SHADOWS.card]}>
+                  <Text style={styles.cardHeaderTitle}>Depreciation & Assessed Value</Text>
+
+                  <View style={styles.rowInputs}>
+                    <View style={[styles.inputGroup, { flex: 1 }]}>
+                      <Text style={styles.inputLabel}>Depreciation Rate (%)</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={depreciationRate}
+                        onChangeText={setDepreciationRate}
+                        keyboardType="numeric"
+                      />
+                    </View>
+                    <View style={[styles.inputGroup, { flex: 1 }]}>
+                      <Text style={styles.inputLabel}>Depreciated Value (PHP)</Text>
+                      <TextInput
+                        style={[styles.input, styles.valuationInput]}
+                        value={depreciatedValue}
+                        onChangeText={setDepreciatedValue}
+                        keyboardType="numeric"
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.rowInputs}>
+                    <View style={[styles.inputGroup, { flex: 1 }]}>
+                      <Text style={styles.inputLabel}>Assessment Level (%)</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={assessmentLevel}
+                        onChangeText={setAssessmentLevel}
+                        keyboardType="numeric"
+                        placeholder="e.g. 80"
+                      />
+                    </View>
+                    <View style={[styles.inputGroup, { flex: 2 }]}>
+                      <Text style={styles.inputLabel}>Total Assessed Value (PHP)</Text>
+                      <TextInput
+                        style={[styles.input, styles.valuationInput]}
+                        value={assessedValue}
+                        onChangeText={setAssessedValue}
+                        keyboardType="numeric"
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.switchRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.switchTitle}>Property Taxability</Text>
+                      <Text style={styles.switchSubtitle}>{taxability ? 'TAXABLE Property' : 'EXEMPT from Real Property Tax'}</Text>
+                    </View>
+                    <Switch
+                      value={taxability}
+                      onValueChange={setTaxability}
+                      trackColor={{ false: '#cbd5e1', true: COLORS.primary }}
+                    />
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {/* TAB 3: EFFECTIVITY, MEMORANDA & WORKFLOW */}
+            {activeTab === 3 && (
+              <View style={styles.tabContentBlock}>
+                <View style={[styles.card, SHADOWS.card]}>
+                  <Text style={styles.cardHeaderTitle}>Tax Effectivity & Memoranda</Text>
+
+                  <View style={styles.rowInputs}>
+                    <View style={[styles.inputGroup, { flex: 1 }]}>
+                      <Text style={styles.inputLabel}>Year Effectivity</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={yearEffectivity}
+                        onChangeText={setYearEffectivity}
+                        keyboardType="numeric"
+                      />
+                    </View>
+                    <View style={[styles.inputGroup, { flex: 1 }]}>
+                      <Text style={styles.inputLabel}>Quarter Effectivity (1-4)</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={quarterEffectivity}
+                        onChangeText={setQuarterEffectivity}
+                        keyboardType="numeric"
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Memoranda</Text>
+                    <TextInput
+                      style={[styles.input, { height: 60, textAlignVertical: 'top' }]}
+                      value={memoranda}
+                      onChangeText={setMemoranda}
+                      multiline
+                      placeholder="Superceded assessment memoranda..."
+                    />
+                  </View>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Inspector Field Remarks</Text>
+                    <TextInput
+                      style={[styles.input, { height: 60, textAlignVertical: 'top' }]}
+                      value={remarks}
+                      onChangeText={setRemarks}
+                      multiline
+                      placeholder="Field inspection observations..."
+                    />
+                  </View>
+                </View>
+
+                <View style={[styles.card, SHADOWS.card]}>
+                  <Text style={styles.cardHeaderTitle}>Office Workflow Transfer</Text>
+
+                  <View style={styles.switchRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.switchTitle}>Transfer to Next Step on Sync</Text>
+                      <Text style={styles.switchSubtitle}>Automatically forwards workflow after office sync</Text>
+                    </View>
+                    <Switch
+                      value={autoForward}
+                      onValueChange={setAutoForward}
+                      trackColor={{ false: '#cbd5e1', true: COLORS.primary }}
+                    />
+                  </View>
+
+                  {autoForward && (
+                    <View style={styles.nextStepBox}>
+                      <Text style={styles.nextStepLabel}>Target Next Stage:</Text>
+                      <View style={styles.nextStepBadge}>
+                        <Ionicons name="checkmark-circle-outline" size={16} color={COLORS.primary} />
+                        <Text style={styles.nextStepBadgeText}>Inspection Checked / Recommend Approval</Text>
+                      </View>
+                    </View>
+                  )}
+                </View>
+              </View>
+            )}
+
+            {/* Action Buttons */}
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity
+                style={[styles.saveBtn, styles.saveBtnPrimary]}
+                onPress={() => handleSave(false)}
+                disabled={saving}
+              >
+                {saving ? (
+                  <ActivityIndicator color="#ffffff" />
+                ) : (
+                  <>
+                    <Ionicons name="cloud-upload" size={18} color="#ffffff" />
+                    <Text style={styles.saveBtnText}>Save Machinery & Stage Transfer</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.saveBtn, styles.saveBtnSecondary]}
+                onPress={() => handleSave(true)}
+              >
+                <Ionicons name="save-outline" size={18} color={COLORS.primary} />
+                <Text style={styles.saveBtnSecondaryText}>Save to Offline Queue Only</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+      </ScrollView>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.bgLight
+  },
+  ribbon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 8,
+    borderBottomWidth: 1
+  },
+  ribbonDownloaded: {
+    backgroundColor: '#dcfce7',
+    borderBottomColor: '#bbf7d0'
+  },
+  ribbonStandard: {
+    backgroundColor: '#e0f2fe',
+    borderBottomColor: '#bae6fd'
+  },
+  ribbonText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: COLORS.primaryDark
+  },
+  sectionTabs: {
+    flexDirection: 'row',
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    gap: 6
+  },
+  sectionTabBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 8
+  },
+  sectionTabBtnActive: {
+    backgroundColor: COLORS.primaryLight
+  },
+  sectionTabText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.textMuted
+  },
+  sectionTabTextActive: {
+    color: COLORS.primaryDark,
+    fontWeight: '800'
+  },
+  scrollContent: {
+    padding: 16,
+    gap: 14,
+    paddingBottom: 50
+  },
+  tabContentBlock: {
+    gap: 14
+  },
+  card: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    gap: 12
+  },
+  cardHeaderTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: COLORS.primaryDark,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    paddingBottom: 8
+  },
+  inputGroup: {
+    gap: 4
+  },
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.textDark
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 13,
+    color: COLORS.textDark,
+    backgroundColor: '#f8fafc'
+  },
+  valuationInput: {
+    fontWeight: '800',
+    color: COLORS.primaryDark,
+    backgroundColor: '#f0fdf4'
+  },
+  rowInputs: {
+    flexDirection: 'row',
+    gap: 10
+  },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 4
+  },
+  switchTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: COLORS.textDark
+  },
+  switchSubtitle: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    marginTop: 2
+  },
+  nextStepBox: {
+    backgroundColor: '#f8fafc',
+    padding: 10,
+    borderRadius: 10,
+    gap: 4
+  },
+  nextStepLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.textMuted
+  },
+  nextStepBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6
+  },
+  nextStepBadgeText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: COLORS.primary
+  },
+  buttonContainer: {
+    gap: 10,
+    marginTop: 8
+  },
+  saveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 14,
+    gap: 8
+  },
+  saveBtnPrimary: {
+    backgroundColor: COLORS.primary
+  },
+  saveBtnText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '800'
+  },
+  saveBtnSecondary: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: COLORS.primary
+  },
+  saveBtnSecondaryText: {
+    color: COLORS.primary,
+    fontSize: 13,
+    fontWeight: '800'
+  },
+  notDownloadedBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    padding: 24,
+    marginTop: 20,
+    borderWidth: 1,
+    borderColor: COLORS.border
+  },
+  notDownloadedTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: COLORS.textDark,
+    marginTop: 12,
+    marginBottom: 8
+  },
+  notDownloadedText: {
+    fontSize: 13,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 20
+  },
+  backBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 12
+  },
+  backBtnText: {
+    color: '#ffffff',
+    fontWeight: '800',
+    fontSize: 13
+  }
+});

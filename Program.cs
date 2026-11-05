@@ -52,6 +52,16 @@ builder.Services.AddScoped<ITaxDeclarationPdfService, TaxDeclarationPdfService>(
 builder.Services.AddScoped<IRPTCertificatePdfService, RPTCertificatePdfService>();
 builder.Services.AddScoped<IWorkflowNotifier, WorkflowNotifier>();
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowMobileClients", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
+
 QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
 var app = builder.Build();
@@ -66,6 +76,8 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
+
+app.UseCors("AllowMobileClients");
 
 app.UseAuthentication();
 app.UseAuthorization();
