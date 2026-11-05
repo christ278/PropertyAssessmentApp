@@ -1,0 +1,176 @@
+@model PropertyAssessmentApp.Models.AgriculturalDarCertificationModel
+
+<div class="agricultural-dar-certification space-y-5 font-serif text-slate-950 text-xs sm:text-sm">
+    <!-- 1. Government Letterhead with Official Seal -->
+    <div class="text-center space-y-0.5">
+        <div class="text-[11px] sm:text-xs text-slate-700">@Model.HeaderCountry</div>
+        <div class="text-[11px] sm:text-xs text-slate-700">@Model.HeaderProvince</div>
+        <div class="text-xs sm:text-sm font-bold text-slate-900 uppercase">@Model.HeaderLguName</div>
+    </div>
+
+    <!-- Banner: Transparent Seal on Left, OFFICE OF THE CITY ASSESSOR Dead-Centered -->
+    <div class="relative py-2 flex items-center justify-center">
+        <div class="absolute left-0 top-1/2 -translate-y-1/2 w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center">
+            <img src="/images/koronadal_seal.png" alt="City of Koronadal Official Seal" class="w-full h-full object-contain" />
+        </div>
+        <div class="text-center w-full max-w-lg px-16">
+            <h1 class="text-lg sm:text-2xl font-black text-rose-700 uppercase tracking-wide">@Model.HeaderOfficeTitle</h1>
+            <div class="h-0.5 bg-rose-600 mt-1 mx-auto w-full"></div>
+        </div>
+    </div>
+
+    <!-- 2. Document Title -->
+    <div class="text-center pt-2 pb-1">
+        <h2 class="text-xl sm:text-2xl font-bold text-slate-900 uppercase tracking-wide inline-block">
+            @Model.DocumentTitle
+        </h2>
+    </div>
+
+    <!-- 3. Salutation -->
+    <div class="pt-1">
+        <span class="font-extrabold text-sm sm:text-base uppercase tracking-wider block">@Model.Salutation</span>
+    </div>
+
+    <!-- 4. Lead-in Statement -->
+    <div class="pt-1 text-justify leading-relaxed text-xs sm:text-[13px]">
+        <p class="indent-10">
+            This is to certify that the assessment of Tax Declaration No. <strong class="font-bold">@Model.TaxDeclarationNo</strong> as per record of this Office are the following :
+        </p>
+    </div>
+
+    <!-- 5. Key-Value Property Particulars -->
+    <div class="pl-6 sm:pl-14 space-y-1 text-xs sm:text-[13px]">
+        <div class="flex">
+            <span class="w-36 sm:w-44">Lot #</span>
+            <span class="w-6 text-center">:</span>
+            <span class="font-bold">@Model.LotNo</span>
+        </div>
+        <div class="flex">
+            <span class="w-36 sm:w-44">Name of Owner</span>
+            <span class="w-6 text-center">:</span>
+            <span class="font-bold">@Model.OwnerName</span>
+        </div>
+        <div class="flex items-start">
+            <span class="w-36 sm:w-44">Location</span>
+            <span class="w-6 text-center">:</span>
+            <div class="flex flex-col">
+                <span class="font-bold">@Model.LocationLine1</span>
+                <span class="font-bold">@Model.LocationLine2</span>
+            </div>
+        </div>
+        <div class="flex">
+            <span class="w-36 sm:w-44">Title No</span>
+            <span class="w-6 text-center">:</span>
+            <span>@Model.TitleNo</span>
+        </div>
+        <div class="flex">
+            <span class="w-36 sm:w-44">Survey No</span>
+            <span class="w-6 text-center">:</span>
+            <span class="font-bold">@Model.SurveyNo</span>
+        </div>
+        <div class="flex">
+            <span class="w-36 sm:w-44">Classification</span>
+            <span class="w-6 text-center">:</span>
+            <span class="font-bold">@Model.Classification</span>
+        </div>
+        <div class="flex">
+            <span class="w-36 sm:w-44">Area</span>
+            <span class="w-6 text-center">:</span>
+            <span class="font-bold">@Model.AreaDisplay</span>
+        </div>
+        <div class="flex">
+            <span class="w-36 sm:w-44">Market Value</span>
+            <span class="w-6 text-center">:</span>
+            <span class="font-bold">@Model.MarketValue.ToString("N2")</span>
+        </div>
+        <div class="flex">
+            <span class="w-36 sm:w-44">Assessed Value</span>
+            <span class="w-6 text-center">:</span>
+            <span class="font-bold">@Model.AssessedValue.ToString("N2")</span>
+        </div>
+    </div>
+
+    <!-- 6. Requestor Statement -->
+    <div class="pt-4 text-justify leading-relaxed text-xs sm:text-[13px]">
+        <p class="indent-10">
+            This certification is hereby issued upon the request of <strong class="font-bold uppercase underline">@Model.RequestorName</strong> for <strong class="font-bold uppercase underline">@Model.Purpose</strong> purposes only.
+        </p>
+    </div>
+
+    <!-- 7. Issuance Date -->
+    <div class="pt-2 text-xs sm:text-[13px]">
+        <p class="indent-10">
+            Issued this @Model.IssueDay day of @Model.IssueMonth @Model.IssueYear at @Model.IssueLocation.
+        </p>
+    </div>
+
+    <!-- 8. Dual / Triple Official Signatories -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-8 pt-5">
+        <!-- Left: Verified as per records -->
+        <div class="space-y-1">
+            <div class="text-xs text-slate-700">@Model.ClerkSignatory.SectionTitle</div>
+            <div class="pt-8">
+                <div class="font-bold uppercase underline text-xs sm:text-[13px]">@Model.ClerkSignatory.Name</div>
+                <div class="text-[11px] text-slate-600">@Model.ClerkSignatory.Designation</div>
+                @if (!string.IsNullOrWhiteSpace(Model.ClerkSignatory.SubNote))
+                {
+                    <div class="text-[10px] text-slate-600">@Model.ClerkSignatory.SubNote</div>
+                }
+            </div>
+        </div>
+
+        <!-- Right: Noted by City Assessor & Acting Records Officer -->
+        <div class="space-y-5">
+            <div class="space-y-1">
+                <div class="text-xs text-slate-700">@Model.AssessorSignatory.SectionTitle</div>
+                <div class="pt-8">
+                    <div class="font-bold uppercase underline text-xs sm:text-[13px]">@Model.AssessorSignatory.Name</div>
+                    <div class="text-[11px] text-slate-600">@Model.AssessorSignatory.Designation</div>
+                </div>
+            </div>
+
+            <div class="space-y-1 pt-2">
+                <div class="text-[11px] text-slate-600 italic">@Model.RecordsOfficerSignatory.SectionTitle</div>
+                <div class="pt-3">
+                    <div class="font-bold uppercase underline text-xs sm:text-[13px]">@Model.RecordsOfficerSignatory.Name</div>
+                    <div class="text-[11px] text-slate-600">@Model.RecordsOfficerSignatory.Designation</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 9. Fee & Receipt Metadata (Bottom Left) -->
+    <div class="pt-5">
+        <div class="w-56 text-xs space-y-0.5 font-mono italic text-slate-800">
+            <div class="flex">
+                <span class="w-16">Date:</span>
+                <span>@Model.ReceiptDate</span>
+            </div>
+            <div class="flex">
+                <span class="w-16">Amount:</span>
+                <span>@Model.Amount.ToString("N2")</span>
+            </div>
+            <div class="flex">
+                <span class="w-16">Or :</span>
+                <span>@Model.ORNumber</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 10. Bottom LGU Contact Strip -->
+    <div class="pt-6 border-t border-slate-200 text-center space-y-2">
+        <div class="flex items-center justify-center gap-2">
+            <div class="h-0.5 bg-rose-600 flex-1"></div>
+            <div class="text-sm font-black text-rose-700 tracking-wider">
+                <span class="text-[10px] text-amber-500 font-bold block -mb-1">@Model.BrandPrefix</span>
+                @Model.BrandTitle
+            </div>
+            <div class="h-0.5 bg-rose-600 flex-1"></div>
+        </div>
+        <div class="flex flex-wrap items-center justify-center gap-4 text-[10px] text-slate-600 font-sans">
+            <span>Tel: @Model.ContactPhone</span>
+            <span>Email: @Model.ContactEmail</span>
+            <span>Office: @Model.ContactAddress</span>
+        </div>
+    </div>
+</div>

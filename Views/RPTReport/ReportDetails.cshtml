@@ -1,7 +1,7 @@
 @model PropertyAssessmentApp.Models.OfficialCertificateViewModel
 @{
     var firstItem = Model.Details.Items.FirstOrDefault();
-    var tdnParam = firstItem?.TaxDeclarationNo ?? "";
+    var tdnParam = firstItem?.TaxDeclarationNo ?? Model.AssessmentDetails?.TaxDeclarationNo ?? Model.NoImprovementDetails?.ArpNo ?? "";
     ViewData["Title"] = $"Certificate Preview — {Model.RawReportTitle} — {tdnParam}";
 
     var pdfUrl = Url.Action("PrintPdf", "RPTReport", new {

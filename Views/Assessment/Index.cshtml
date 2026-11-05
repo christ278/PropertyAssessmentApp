@@ -1,4 +1,4 @@
-@model IEnumerable<PropertyAssessmentApp.Models.TaxDeclaration>
+﻿@model IEnumerable<PropertyAssessmentApp.Models.TaxDeclaration>
 @using PropertyAssessmentApp.Models
 @inject PropertyAssessmentApp.Services.IPermissionService PermissionService
 
@@ -53,7 +53,7 @@
                 <span class="text-xs font-mono text-slate-500 dark:text-stone-400 font-bold uppercase">Total Market Value</span>
                 <i data-lucide="building" class="w-4 h-4 text-amber-600 dark:text-amber-400"></i>
             </div>
-            <div class="text-xl font-black font-mono text-slate-800 dark:text-stone-200">₱@(((decimal)ViewBag.TotalMarketValue).ToString("N0"))</div>
+            <div class="text-xl font-black font-mono text-slate-800 dark:text-stone-200">â‚±@(((decimal)ViewBag.TotalMarketValue).ToString("N0"))</div>
             <span class="text-[10px] font-mono text-slate-400 dark:text-stone-500">Aggregate Base FMV</span>
         </div>
 
@@ -62,7 +62,7 @@
                 <span class="text-xs font-mono text-emerald-700 dark:text-emerald-400 font-bold uppercase">Total Assessed Value</span>
                 <i data-lucide="scale" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
             </div>
-            <div class="text-xl font-black font-mono text-emerald-700 dark:text-emerald-400">₱@(((decimal)ViewBag.TotalAssessedValue).ToString("N0"))</div>
+            <div class="text-xl font-black font-mono text-emerald-700 dark:text-emerald-400">â‚±@(((decimal)ViewBag.TotalAssessedValue).ToString("N0"))</div>
             <span class="text-[10px] font-mono text-slate-500 dark:text-stone-500">Assessment Base Benchmark</span>
         </div>
 
@@ -71,7 +71,7 @@
                 <span class="text-xs font-mono text-amber-700 dark:text-gold-400 font-bold uppercase">Est. Annual RPT Due</span>
                 <i data-lucide="banknote" class="w-4 h-4 text-amber-600 dark:text-gold-400"></i>
             </div>
-            <div class="text-xl font-black font-mono text-amber-700 dark:text-gold-400">₱@(((decimal)ViewBag.TotalRevenue).ToString("N0"))</div>
+            <div class="text-xl font-black font-mono text-amber-700 dark:text-gold-400">â‚±@(((decimal)ViewBag.TotalRevenue).ToString("N0"))</div>
             <span class="text-[10px] font-mono text-slate-500 dark:text-stone-500">Basic RPT + SEF Levies</span>
         </div>
     </div>
@@ -85,8 +85,8 @@
 
         <div class="flex flex-wrap items-center gap-3">
             <div class="flex items-center gap-2 bg-slate-50 dark:bg-stone-800 px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-700 shadow-xs shrink-0">
-                <span class="limit-label text-[10px] text-slate-500 dark:text-emerald-400 font-extrabold uppercase">Limit:</span>
-                <select class="table-limit-select bg-transparent font-extrabold text-slate-900 dark:text-white focus:outline-none cursor-pointer">
+                <span class="limit-label text-[10px] text-slate-500 dark:text-emerald-400 font-semibold uppercase">Limit:</span>
+                <select class="table-limit-select bg-transparent font-semibold text-slate-900 dark:text-white focus:outline-none cursor-pointer">
                     <option value="5" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">5</option>
                     <option value="10" selected class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">10</option>
                     <option value="25" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">25</option>

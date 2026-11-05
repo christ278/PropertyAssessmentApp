@@ -1,4 +1,4 @@
-@model PropertyAssessmentApp.Models.ReportFooterModel
+﻿@model PropertyAssessmentApp.Models.ReportFooterModel
 
 <div class="report-footer-component space-y-6 pt-2 font-serif text-slate-900 text-xs sm:text-sm">
 
@@ -32,7 +32,7 @@
         <div class="space-y-8">
             <div>
                 <span class="font-medium text-slate-700 block mb-6">@Model.VerifiedBy.SectionTitle</span>
-                <div class="inline-block border-b-2 border-slate-900 font-extrabold uppercase tracking-wide text-xs sm:text-sm pb-0.5">
+                <div class="inline-block border-b-2 border-slate-900 font-semibold uppercase tracking-wide text-xs sm:text-sm pb-0.5">
                     @Model.VerifiedBy.Name
                 </div>
                 <div class="text-[11px] sm:text-xs text-slate-700 font-medium mt-0.5">
@@ -62,7 +62,7 @@
             <!-- Noted By -->
             <div>
                 <span class="font-medium text-slate-700 block mb-6">@Model.NotedBy.SectionTitle</span>
-                <div class="inline-block border-b-2 border-slate-900 font-extrabold uppercase tracking-wide text-xs sm:text-sm pb-0.5">
+                <div class="inline-block border-b-2 border-slate-900 font-semibold uppercase tracking-wide text-xs sm:text-sm pb-0.5">
                     @Model.NotedBy.Name
                 </div>
                 <div class="text-[11px] sm:text-xs text-slate-700 font-medium mt-0.5">
@@ -76,7 +76,7 @@
                 {
                     <span class="text-[11px] text-slate-600 italic block mb-3">@Model.ActingOfficer.SectionTitle</span>
                 }
-                <div class="inline-block border-b-2 border-slate-900 font-extrabold uppercase tracking-wide text-xs sm:text-sm pb-0.5">
+                <div class="inline-block border-b-2 border-slate-900 font-semibold uppercase tracking-wide text-xs sm:text-sm pb-0.5">
                     @Model.ActingOfficer.Name
                 </div>
                 <div class="text-[11px] sm:text-xs text-slate-700 font-medium mt-0.5">
@@ -92,24 +92,24 @@
         <div class="text-center">
             <span class="text-[9px] font-black uppercase tracking-widest text-slate-600 block">@Model.BrandPrefix</span>
             <span class="text-2xl font-black uppercase tracking-tighter text-rose-800 inline-block font-sans">
-                👑 @Model.BrandTitle
+                ðŸ‘‘ @Model.BrandTitle
             </span>
         </div>
 
         <!-- Contact Particulars Strip with Icons -->
         <div class="flex flex-col sm:flex-row items-center justify-between gap-2 text-[10px] text-slate-600 font-sans pt-1">
             <div class="flex items-center gap-1.5">
-                <span class="text-rose-600 font-bold">📞</span>
+                <span class="text-rose-600 font-bold">ðŸ“ž</span>
                 <span>@Model.ContactPhone</span>
             </div>
 
             <div class="flex items-center gap-1.5">
-                <span class="text-rose-600 font-bold">✉️</span>
+                <span class="text-rose-600 font-bold">âœ‰ï¸</span>
                 <span>@Model.ContactEmail</span>
             </div>
 
             <div class="flex items-center gap-1.5">
-                <span class="text-rose-600 font-bold">📍</span>
+                <span class="text-rose-600 font-bold">ðŸ“</span>
                 <span>@Model.ContactAddress</span>
             </div>
         </div>

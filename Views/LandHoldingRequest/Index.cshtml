@@ -1,4 +1,4 @@
-@model IEnumerable<PropertyAssessmentApp.Models.LandHoldingRequest>
+﻿@model IEnumerable<PropertyAssessmentApp.Models.LandHoldingRequest>
 @using PropertyAssessmentApp.Models
 @inject PropertyAssessmentApp.Services.IPermissionService PermissionService
 
@@ -69,8 +69,8 @@
 
         <div class="flex flex-wrap items-center gap-3">
             <div class="flex items-center gap-2 bg-slate-50 dark:bg-stone-800 px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-700 shadow-xs shrink-0">
-                <span class="limit-label text-[10px] text-slate-500 dark:text-emerald-400 font-extrabold uppercase">Limit:</span>
-                <select class="table-limit-select bg-transparent font-extrabold text-slate-900 dark:text-white focus:outline-none cursor-pointer">
+                <span class="limit-label text-[10px] text-slate-500 dark:text-emerald-400 font-semibold uppercase">Limit:</span>
+                <select class="table-limit-select bg-transparent font-semibold text-slate-900 dark:text-white focus:outline-none cursor-pointer">
                     <option value="5" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">5</option>
                     <option value="10" selected class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">10</option>
                     <option value="25" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">25</option>
@@ -98,7 +98,7 @@
                         <th class="hidden sm:table-cell px-4 py-3.5">TD NO. & PIN</th>
                         <th class="px-3 sm:px-4 py-3.5">OWNER & SPOUSE</th>
                         <th class="hidden lg:table-cell px-4 py-3.5">O.R. NO. & DATE</th>
-                        <th class="hidden md:table-cell px-4 py-3.5 text-right">TOTAL FEES (₱)</th>
+                        <th class="hidden md:table-cell px-4 py-3.5 text-right">TOTAL FEES (â‚±)</th>
                         <th class="px-2 sm:px-4 py-3.5 text-center">STATUS</th>
                         <th class="px-2 sm:px-4 py-3.5 text-center">ACTION</th>
                     </tr>
@@ -138,7 +138,7 @@
                                         <span class="text-[10px] text-slate-400 block">Spouse: @item.SpouseName</span>
                                     }
                                     <div class="md:hidden mt-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-                                        ₱@item.TotalFeesAmount.ToString("N2")
+                                        â‚±@item.TotalFeesAmount.ToString("N2")
                                     </div>
                                 </td>
                                 <td class="hidden lg:table-cell px-4 py-3.5 text-slate-700 dark:text-stone-300 font-mono">
@@ -146,7 +146,7 @@
                                     <span class="text-[10px] text-slate-400 block">@item.ORDateIssued?.ToString("MMM dd, yyyy")</span>
                                 </td>
                                 <td class="hidden md:table-cell px-4 py-3.5 text-right font-bold text-emerald-700 dark:text-emerald-400">
-                                    ₱@item.TotalFeesAmount.ToString("N2")
+                                    â‚±@item.TotalFeesAmount.ToString("N2")
                                 </td>
                                 <td class="px-2 sm:px-4 py-3.5 text-center">
                                     @switch (item.Status)

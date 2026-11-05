@@ -1,32 +1,26 @@
 @model PropertyAssessmentApp.Models.ReportHeaderModel
 
-<div class="report-header-component space-y-4">
-    <!-- Letterhead top row with Circular Seal & Text -->
-    <div class="flex items-center justify-center gap-6 relative">
-        <!-- Official Seal Emblem on Left -->
-        <div class="absolute left-0 top-0">
-            <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-2 border-emerald-700 p-0.5 flex items-center justify-center bg-white shadow-xs">
-                <div class="w-full h-full rounded-full border border-amber-500 bg-gradient-to-b from-emerald-50 to-white flex flex-col items-center justify-center text-center p-1 relative overflow-hidden">
-                    <span class="text-[7px] font-black uppercase tracking-tight text-emerald-900 leading-tight block">City of Koronadal</span>
-                    <span class="text-sm my-0.5">🏛️</span>
-                    <span class="text-[6px] font-bold uppercase tracking-wider text-amber-700 block">Official Seal</span>
-                </div>
-            </div>
-        </div>
+<div class="report-header-component space-y-3">
+    <!-- Center Letterhead Typography -->
+    <div class="text-center space-y-0.5">
+        <div class="text-[11px] sm:text-xs font-serif text-slate-700 tracking-wide">@Model.Country</div>
+        <div class="text-[11px] sm:text-xs font-serif text-slate-700 tracking-wide">@Model.Province</div>
+        <div class="text-xs sm:text-sm font-semibold font-serif text-slate-900 uppercase tracking-wide">@Model.LguName</div>
+    </div>
 
-        <!-- Center Letterhead Typography -->
-        <div class="text-center space-y-0.5">
-            <div class="text-[11px] sm:text-xs font-serif text-slate-700 tracking-wide">@Model.Country</div>
-            <div class="text-[11px] sm:text-xs font-serif text-slate-700 tracking-wide">@Model.Province</div>
-            <div class="text-xs sm:text-sm font-bold font-serif text-slate-900 uppercase tracking-wide">@Model.LguName</div>
-            <div class="text-lg sm:text-xl font-black font-serif text-rose-700 tracking-wide uppercase pt-1">
-                @Model.OfficeTitle
-            </div>
+    <!-- Banner: Transparent Seal on Left, OFFICE OF THE CITY ASSESSOR Dead-Centered -->
+    <div class="relative py-2 flex items-center justify-center">
+        <div class="absolute left-0 top-1/2 -translate-y-1/2 w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center">
+            <img src="/images/koronadal_seal.png" alt="City of Koronadal Official Seal" class="w-full h-full object-contain" />
+        </div>
+        <div class="text-center w-full max-w-lg px-16">
+            <h1 class="text-lg sm:text-2xl font-black text-rose-700 uppercase tracking-wide font-serif">@Model.OfficeTitle</h1>
+            <div class="h-0.5 bg-rose-600 mt-1 mx-auto w-full"></div>
         </div>
     </div>
 
     <!-- Centered Document Title -->
-    <div class="text-center pt-4 pb-2">
+    <div class="text-center pt-2 pb-1">
         <h2 class="text-2xl sm:text-3xl font-black font-serif text-slate-900 uppercase tracking-wider inline-block">
             @Model.DocumentTitle
         </h2>

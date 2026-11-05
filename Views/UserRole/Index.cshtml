@@ -1,4 +1,4 @@
-@model IEnumerable<PropertyAssessmentApp.Models.UserRoleSetting>
+﻿@model IEnumerable<PropertyAssessmentApp.Models.UserRoleSetting>
 @using PropertyAssessmentApp.Models
 
 @{
@@ -73,8 +73,8 @@
 
         <div class="flex flex-wrap items-center gap-3">
             <div class="flex items-center gap-2 bg-slate-50 dark:bg-stone-800 px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-700 shadow-xs shrink-0">
-                <span class="limit-label text-[10px] text-slate-500 dark:text-emerald-400 font-extrabold uppercase">Limit:</span>
-                <select class="table-limit-select bg-transparent font-extrabold text-slate-900 dark:text-white focus:outline-none cursor-pointer">
+                <span class="limit-label text-[10px] text-slate-500 dark:text-emerald-400 font-semibold uppercase">Limit:</span>
+                <select class="table-limit-select bg-transparent font-semibold text-slate-900 dark:text-white focus:outline-none cursor-pointer">
                     <option value="5" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">5</option>
                     <option value="10" selected class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">10</option>
                     <option value="25" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">25</option>
@@ -138,7 +138,7 @@
                                                 Admin
                                             </span>
                                         }
-                                        <span class="font-extrabold text-slate-900 dark:text-white font-mono text-sm block">
+                                        <span class="font-semibold text-slate-900 dark:text-white font-mono text-sm block">
                                             @item.RoleName
                                         </span>
                                     </div>
@@ -149,7 +149,7 @@
                                             {
                                                 foreach (var target in item.AllowedTargetSteps)
                                                 {
-                                                    <span class="px-2 py-0.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 text-[10px] font-extrabold border border-emerald-200 dark:border-emerald-800">
+                                                    <span class="px-2 py-0.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 text-[10px] font-semibold border border-emerald-200 dark:border-emerald-800">
                                                         @target
                                                     </span>
                                                 }
@@ -193,7 +193,7 @@
                                         <div class="flex flex-wrap gap-1.5 items-center">
                                             @foreach (var target in item.AllowedTargetSteps)
                                             {
-                                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-extrabold text-[11px] shadow-xs">
+                                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-semibold text-[11px] shadow-xs">
                                                     <i data-lucide="arrow-right-circle" class="w-3.5 h-3.5 text-emerald-600"></i>
                                                     <span>@target</span>
                                                 </span>

@@ -1,4 +1,4 @@
-@model IEnumerable<PropertyAssessmentApp.Models.Owner>
+﻿@model IEnumerable<PropertyAssessmentApp.Models.Owner>
 @using PropertyAssessmentApp.Models
 
 @{
@@ -65,8 +65,8 @@
 
         <div class="flex flex-wrap items-center gap-3">
             <div class="flex items-center gap-2 bg-slate-50 dark:bg-stone-800 px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-700 shadow-xs shrink-0">
-                <span class="limit-label text-[10px] text-slate-500 dark:text-emerald-400 font-extrabold uppercase">Limit:</span>
-                <select class="table-limit-select bg-transparent font-extrabold text-slate-900 dark:text-white focus:outline-none cursor-pointer">
+                <span class="limit-label text-[10px] text-slate-500 dark:text-emerald-400 font-semibold uppercase">Limit:</span>
+                <select class="table-limit-select bg-transparent font-semibold text-slate-900 dark:text-white focus:outline-none cursor-pointer">
                     <option value="5" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">5</option>
                     <option value="10" selected class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">10</option>
                     <option value="25" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">25</option>
@@ -133,8 +133,8 @@
                                     <span class="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold block">@item.RptinNumber</span>
                                 </td>
                                 <td class="hidden lg:table-cell px-4 py-3.5 text-slate-700 dark:text-stone-300">
-                                    <div>📞 @(string.IsNullOrEmpty(item.ContactNo) ? "N/A" : item.ContactNo)</div>
-                                    <div class="text-[10px] text-slate-400 dark:text-stone-500">✉️ @(string.IsNullOrEmpty(item.Email) ? "N/A" : item.Email)</div>
+                                    <div>ðŸ“ž @(string.IsNullOrEmpty(item.ContactNo) ? "N/A" : item.ContactNo)</div>
+                                    <div class="text-[10px] text-slate-400 dark:text-stone-500">âœ‰ï¸ @(string.IsNullOrEmpty(item.Email) ? "N/A" : item.Email)</div>
                                 </td>
                                 <td class="hidden md:table-cell px-4 py-3.5 text-slate-700 dark:text-stone-300">
                                     <div class="font-bold text-slate-800 dark:text-stone-200">@item.BarangayName</div>

@@ -1,4 +1,4 @@
-@model PropertyAssessmentApp.Models.TaxDeclaration
+﻿@model PropertyAssessmentApp.Models.TaxDeclaration
 @using PropertyAssessmentApp.Models
 
 @{
@@ -66,7 +66,7 @@
 
                 <!-- Property Kind Selector -->
                 <div class="p-5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-3">
-                    <label asp-for="Kind" class="block text-slate-800 dark:text-stone-200 font-extrabold uppercase text-xs">Select Property Kind / Category</label>
+                    <label asp-for="Kind" class="block text-slate-800 dark:text-stone-200 font-semibold uppercase text-xs">Select Property Kind / Category</label>
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <label class="kind-option p-4 rounded-xl border border-slate-300 dark:border-stone-700 bg-white dark:bg-stone-900 cursor-pointer flex items-center gap-3 transition-all hover:border-emerald-600">
                             <input type="radio" name="Kind" value="Machinery" class="kind-radio text-emerald-600 focus:ring-emerald-500" @(Model.Kind == PropertyKind.Machinery ? "checked" : "") onclick="onKindChanged('Machinery')">
@@ -387,15 +387,15 @@
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 p-5 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-center">
                     <div>
                         <span class="text-slate-500 dark:text-stone-400 text-[10px] uppercase font-bold block mb-1">Total Market Value (FMV)</span>
-                        <span id="computedFmvDisplay" class="text-xl font-black text-slate-900 dark:text-white font-mono">₱0.00</span>
+                        <span id="computedFmvDisplay" class="text-xl font-black text-slate-900 dark:text-white font-mono">â‚±0.00</span>
                     </div>
                     <div>
                         <span class="text-emerald-700 dark:text-emerald-400 text-[10px] uppercase font-bold block mb-1">Computed Assessed Value</span>
-                        <span id="computedAssessedDisplay" class="text-xl font-black text-emerald-700 dark:text-emerald-400 font-mono">₱0.00</span>
+                        <span id="computedAssessedDisplay" class="text-xl font-black text-emerald-700 dark:text-emerald-400 font-mono">â‚±0.00</span>
                     </div>
                     <div>
                         <span class="text-amber-700 dark:text-gold-400 text-[10px] uppercase font-bold block mb-1">Est. Total Annual Tax Due</span>
-                        <span id="computedTaxDueDisplay" class="text-xl font-black text-amber-700 dark:text-gold-400 font-mono">₱0.00</span>
+                        <span id="computedTaxDueDisplay" class="text-xl font-black text-amber-700 dark:text-gold-400 font-mono">â‚±0.00</span>
                     </div>
                 </div>
             </div>
@@ -722,9 +722,9 @@
             var assessed = fmv * (level / 100.0);
             var taxDue = assessed * ((basicRate + sefRate) / 100.0);
 
-            $('#computedFmvDisplay').text('₱' + fmv.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-            $('#computedAssessedDisplay').text('₱' + assessed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-            $('#computedTaxDueDisplay').text('₱' + taxDue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            $('#computedFmvDisplay').text('â‚±' + fmv.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            $('#computedAssessedDisplay').text('â‚±' + assessed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            $('#computedTaxDueDisplay').text('â‚±' + taxDue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
             
             return { fmv: fmv, assessed: assessed, taxDue: taxDue };
         }
@@ -840,7 +840,7 @@
             if (buildingFloors.length === 0) {
                 tbody.append('<tr><td colspan="6" class="p-4 text-center text-slate-400 italic">No floor levels added yet. Click "+ Add Floor Level" above.</td></tr>');
                 $('#displayTotalBldgArea').text('0.00 sq.m.');
-                $('#displayTotalBaseRcn').text('₱0.00');
+                $('#displayTotalBaseRcn').text('â‚±0.00');
                 $('#buildingFloorBreakdownJson').val('');
                 return;
             }
@@ -856,8 +856,8 @@
                         <td class="p-3 font-bold text-slate-900 dark:text-white">${f.floorNumber}</td>
                         <td class="p-3 text-slate-600 dark:text-stone-300">${f.description}</td>
                         <td class="p-3 text-right font-mono">${f.floorAreaSqm.toFixed(2)}</td>
-                        <td class="p-3 text-right font-mono">₱${f.baseUnitCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                        <td class="p-3 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">₱${f.marketValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                        <td class="p-3 text-right font-mono">â‚±${f.baseUnitCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                        <td class="p-3 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">â‚±${f.marketValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                         <td class="p-3 text-center">
                             <button type="button" onclick="removeFloorLevel(${idx})" class="text-rose-500 hover:text-rose-700 p-1 rounded hover:bg-rose-50 dark:hover:bg-rose-950/40">
                                 <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
@@ -869,7 +869,7 @@
             });
 
             $('#displayTotalBldgArea').text(totalArea.toFixed(2) + ' sq.m.');
-            $('#displayTotalBaseRcn').text('₱' + totalRcn.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            $('#displayTotalBaseRcn').text('â‚±' + totalRcn.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
             $('#totalBuildingAreaInput').val(totalArea.toFixed(2));
             $('#noOfStoreysInput').val(buildingFloors.length);
             $('#baseRcnValue').val(totalRcn.toFixed(2));
@@ -970,7 +970,7 @@
 
             if (buildingAdditions.length === 0) {
                 tbody.append('<tr><td colspan="6" class="p-4 text-center text-slate-400 italic">No additional items added. Click "+ Add Improvement Item" above.</td></tr>');
-                $('#displayTotalAdditions').text('₱0.00');
+                $('#displayTotalAdditions').text('â‚±0.00');
                 $('#buildingAdditionalItemsJson').val('');
                 $('#buildingTotalAdditionsValue').val('0');
                 return;
@@ -979,14 +979,14 @@
             var totalAdditions = 0;
             buildingAdditions.forEach(function (item, idx) {
                 totalAdditions += item.totalValue;
-                var rateText = item.rateType === 'Percent' ? `${item.multiplierPercent}%` : `₱${item.unitRate.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+                var rateText = item.rateType === 'Percent' ? `${item.multiplierPercent}%` : `â‚±${item.unitRate.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
                 var row = `
                     <tr class="hover:bg-slate-50 dark:hover:bg-stone-950">
                         <td class="p-3 font-bold text-slate-900 dark:text-white">${item.itemDescription}</td>
                         <td class="p-3 text-right font-mono">${item.quantity.toFixed(2)}</td>
-                        <td class="p-3 text-right font-mono">₱${item.unitRate.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                        <td class="p-3 text-right font-mono">â‚±${item.unitRate.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                         <td class="p-3 text-right font-mono">${rateText}</td>
-                        <td class="p-3 text-right font-mono font-bold text-sky-600 dark:text-sky-400">₱${item.totalValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                        <td class="p-3 text-right font-mono font-bold text-sky-600 dark:text-sky-400">â‚±${item.totalValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                         <td class="p-3 text-center">
                             <button type="button" onclick="removeAdditionItem(${idx})" class="text-rose-500 hover:text-rose-700 p-1 rounded hover:bg-rose-50 dark:hover:bg-rose-950/40">
                                 <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
@@ -997,7 +997,7 @@
                 tbody.append(row);
             });
 
-            $('#displayTotalAdditions').text('₱' + totalAdditions.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            $('#displayTotalAdditions').text('â‚±' + totalAdditions.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
             $('#buildingTotalAdditionsValue').val(totalAdditions.toFixed(2));
             $('#buildingAdditionalItemsJson').val(JSON.stringify(buildingAdditions));
 
@@ -1021,13 +1021,13 @@
             $('#buildingDepreciationAccumulated').val(accDepr.toFixed(2));
             $('#buildingDepreciatedMarketValue').val(depreciatedCore.toFixed(2));
 
-            $('#kpiBaseRcn').text('₱' + baseRcn.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-            $('#kpiDepreciation').text('-₱' + accDepr.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' (' + deprRate.toFixed(1) + '%)');
-            $('#kpiDepreciatedCore').text('₱' + depreciatedCore.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-            $('#kpiAdditions').text('+₱' + totalAdditions.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            $('#kpiBaseRcn').text('â‚±' + baseRcn.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            $('#kpiDepreciation').text('-â‚±' + accDepr.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' (' + deprRate.toFixed(1) + '%)');
+            $('#kpiDepreciatedCore').text('â‚±' + depreciatedCore.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            $('#kpiAdditions').text('+â‚±' + totalAdditions.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 
-            $('#displayDepreciationAcc').val('₱' + accDepr.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-            $('#displayFinalBldgMarketValue').val('₱' + finalMarketVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            $('#displayDepreciationAcc').val('â‚±' + accDepr.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            $('#displayFinalBldgMarketValue').val('â‚±' + finalMarketVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 
             if (getSelectedKind() === 'Building' && finalMarketVal > 0) {
                 $('#marketValueInput').val(finalMarketVal.toFixed(2));

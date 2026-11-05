@@ -37,11 +37,11 @@
         <div class="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
             <!-- Filter Division -->
             <div>
-                <label for="divisionSelector" class="block text-[11px] font-extrabold uppercase tracking-wider text-slate-600 dark:text-stone-400 mb-1.5 flex items-center gap-1.5">
+                <label for="divisionSelector" class="block text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-stone-400 mb-1.5 flex items-center gap-1.5">
                     <i data-lucide="layers" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
                     <span>Filter Division:</span>
                 </label>
-                <select id="divisionSelector" onchange="onDivisionChange(this.value)" class="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-extrabold text-sm focus:outline-none focus:border-emerald-600 cursor-pointer shadow-xs">
+                <select id="divisionSelector" onchange="onDivisionChange(this.value)" class="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-semibold text-sm focus:outline-none focus:border-emerald-600 cursor-pointer shadow-xs">
                     <option value="">All Divisions / System</option>
                     <option value="1" selected="@(selectedDivisionId == "1" ? "selected" : null)">Division 1: Appraisal and Assessment</option>
                     <option value="2" selected="@(selectedDivisionId == "2" ? "selected" : null)">Division 2: Tax Mapping</option>
@@ -51,11 +51,11 @@
 
             <!-- Select User Role to Configure -->
             <div>
-                <label for="roleSelector" class="block text-[11px] font-extrabold uppercase tracking-wider text-slate-600 dark:text-stone-400 mb-1.5 flex items-center gap-1.5">
+                <label for="roleSelector" class="block text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-stone-400 mb-1.5 flex items-center gap-1.5">
                     <i data-lucide="user-cog" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
                     <span>Select User Role to Configure:</span>
                 </label>
-                <select id="roleSelector" onchange="onRoleChange(this.value)" class="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-extrabold text-sm focus:outline-none focus:border-emerald-600 cursor-pointer shadow-xs">
+                <select id="roleSelector" onchange="onRoleChange(this.value)" class="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-semibold text-sm focus:outline-none focus:border-emerald-600 cursor-pointer shadow-xs">
                     @if (allRoles.Any())
                     {
                         @foreach (var r in allRoles)
@@ -218,7 +218,7 @@
             html += '  <div class="flex items-center justify-between border-b border-slate-100 dark:border-stone-800 pb-3">';
             html += '    <div class="flex items-center gap-2">';
             html += '      <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>';
-            html += '      <h3 class="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider">' + escapeHtml(cat.categoryName) + '</h3>';
+            html += '      <h3 class="text-sm font-semibold text-slate-900 dark:text-white uppercase tracking-wider">' + escapeHtml(cat.categoryName) + '</h3>';
             html += '    </div>';
             html += '    <button type="button" onclick="toggleCategoryRows(' + catIdx + ')" class="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400">Toggle Category All</button>';
             html += '  </div>';
@@ -238,13 +238,13 @@
                 var isChecked = mod.isAllowed || mod.canView;
                 html += '        <tr class="hover:bg-slate-50/80 dark:hover:bg-stone-800/50 transition-all module-perm-row" data-moduleid="' + mod.moduleId + '" data-modulecode="' + escapeHtml(mod.moduleCode) + '">';
                 html += '          <td class="px-5 py-3.5">';
-                html += '            <div class="font-extrabold text-slate-900 dark:text-white text-sm">' + escapeHtml(mod.moduleName) + '</div>';
+                html += '            <div class="font-semibold text-slate-900 dark:text-white text-sm">' + escapeHtml(mod.moduleName) + '</div>';
                 html += '            <div class="text-[10px] text-slate-400 dark:text-stone-500 font-bold uppercase tracking-wider mt-0.5">Code: <code>' + escapeHtml(mod.moduleCode) + '</code></div>';
                 html += '          </td>';
 
                 html += '          <td class="px-4 py-3.5 text-center">';
                 html += '            <div class="perm-status-badge">' + (isChecked 
-                                        ? '<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300"><i data-lucide="check-circle" class="w-3.5 h-3.5"></i>Full Form Access (View, Create, Update, Inactive)</span>' 
+                                        ? '<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300"><i data-lucide="check-circle" class="w-3.5 h-3.5"></i>Full Form Access (View, Create, Update, Inactive)</span>' 
                                         : '<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-slate-100 dark:bg-stone-800 text-slate-400 dark:text-stone-500"><i data-lucide="minus-circle" class="w-3.5 h-3.5"></i>No Access</span>') + '</div>';
                 html += '          </td>';
 
@@ -279,7 +279,7 @@
         var modCode = row.getAttribute("data-modulecode") || "";
 
         if (isChecked) {
-            badgeCell.innerHTML = '<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300"><i data-lucide="check-circle" class="w-3.5 h-3.5"></i>Full Form Access (View, Create, Update, Inactive)</span>';
+            badgeCell.innerHTML = '<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300"><i data-lucide="check-circle" class="w-3.5 h-3.5"></i>Full Form Access (View, Create, Update, Inactive)</span>';
             if (statusText) {
                 statusText.textContent = "Allowed";
                 statusText.className = "text-xs font-bold text-emerald-700 dark:text-emerald-400 status-text";

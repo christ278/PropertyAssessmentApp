@@ -1,4 +1,4 @@
-@model IEnumerable<PropertyAssessmentApp.Models.OrderPayment>
+﻿@model IEnumerable<PropertyAssessmentApp.Models.OrderPayment>
 @using PropertyAssessmentApp.Models
 
 @{
@@ -42,7 +42,7 @@
                 <span class="text-xs font-mono text-slate-500 dark:text-stone-400 font-bold uppercase">Average Unit Fee</span>
                 <i data-lucide="banknote" class="w-4 h-4 text-amber-600 dark:text-amber-400"></i>
             </div>
-            <div class="text-2xl font-black font-mono text-slate-800 dark:text-stone-200">₱@(((decimal)ViewBag.AverageFee).ToString("N2"))</div>
+            <div class="text-2xl font-black font-mono text-slate-800 dark:text-stone-200">â‚±@(((decimal)ViewBag.AverageFee).ToString("N2"))</div>
             <span class="text-[10px] font-mono text-slate-400 dark:text-stone-500">Standard Rate Benchmark</span>
         </div>
 
@@ -65,8 +65,8 @@
 
         <div class="flex flex-wrap items-center gap-3">
             <div class="flex items-center gap-2 bg-slate-50 dark:bg-stone-800 px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-700 shadow-xs shrink-0">
-                <span class="limit-label text-[10px] text-slate-500 dark:text-emerald-400 font-extrabold uppercase">Limit:</span>
-                <select class="table-limit-select bg-transparent font-extrabold text-slate-900 dark:text-white focus:outline-none cursor-pointer">
+                <span class="limit-label text-[10px] text-slate-500 dark:text-emerald-400 font-semibold uppercase">Limit:</span>
+                <select class="table-limit-select bg-transparent font-semibold text-slate-900 dark:text-white focus:outline-none cursor-pointer">
                     <option value="5" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">5</option>
                     <option value="10" selected class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">10</option>
                     <option value="25" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">25</option>
@@ -100,7 +100,7 @@
                         <th class="px-3 sm:px-4 py-3.5">FEE CODE</th>
                         <th class="px-3 sm:px-4 py-3.5">PARTICULAR / DESCRIPTION</th>
                         <th class="hidden md:table-cell px-4 py-3.5">CATEGORY</th>
-                        <th class="hidden sm:table-cell px-4 py-3.5 text-right">UNIT COST (₱)</th>
+                        <th class="hidden sm:table-cell px-4 py-3.5 text-right">UNIT COST (â‚±)</th>
                         <th class="px-2 sm:px-4 py-3.5 text-center">STATUS</th>
                         <th class="px-2 sm:px-4 py-3.5 text-center">ACTION</th>
                     </tr>
@@ -129,7 +129,7 @@
                                     <div class="font-bold text-slate-800 dark:text-stone-200">@item.Particular</div>
                                     <span class="text-[10px] text-slate-400 dark:text-stone-500 block">Updated @item.UpdatedDate.ToString("MMM dd, yyyy")</span>
                                     <div class="sm:hidden mt-1 flex items-center gap-1.5 flex-wrap">
-                                        <span class="text-[10px] font-bold text-emerald-700 dark:text-emerald-400">₱@item.UnitCost.ToString("N2")</span>
+                                        <span class="text-[10px] font-bold text-emerald-700 dark:text-emerald-400">â‚±@item.UnitCost.ToString("N2")</span>
                                         <span class="text-[9px] text-slate-400">&bull;</span>
                                         <span class="text-[9px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-300 font-bold uppercase">@item.Category</span>
                                     </div>
@@ -139,7 +139,7 @@
                                         @item.Category
                                     </span>
                                 </td>
-                                <td class="hidden sm:table-cell px-4 py-3.5 text-right font-bold text-emerald-700 dark:text-emerald-400 text-sm">₱@item.UnitCost.ToString("N2")</td>
+                                <td class="hidden sm:table-cell px-4 py-3.5 text-right font-bold text-emerald-700 dark:text-emerald-400 text-sm">â‚±@item.UnitCost.ToString("N2")</td>
                                 <td class="px-2 sm:px-4 py-3.5 text-center">
                                     @if (item.IsActive)
                                     {

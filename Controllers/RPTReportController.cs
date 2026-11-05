@@ -142,6 +142,17 @@ public class RPTReportController : Controller
                     .ToListAsync();
             }
         }
+        else if (report.RPTReportId == 4 || (report.Title.Contains("Certificate of Improvement", StringComparison.OrdinalIgnoreCase) && !report.Title.Contains("NO Improvement", StringComparison.OrdinalIgnoreCase)))
+        {
+            var cleanTdnVal = taxDeclaration.TaxDeclarationNumber;
+            relatedProperties = await _context.TaxDeclarations
+                .Include(t => t.BuildingDetails)
+                .Where(t => t.Kind == PropertyKind.Building &&
+                            ((t.BuildingDetails != null && t.BuildingDetails.LandTdNo == cleanTdnVal) ||
+                             (taxDeclaration.LotNo != null && t.BuildingDetails != null && t.BuildingDetails.LandLotNo == taxDeclaration.LotNo)))
+                .OrderBy(t => t.TaxDeclarationNumber)
+                .ToListAsync();
+        }
 
         // 6. Build the standardized certificate model using the common helper
         var certificateModel = ReportPrintHelper.BuildCertificateModel(
@@ -212,6 +223,17 @@ public class RPTReportController : Controller
                     .ToListAsync();
             }
         }
+        else if (report.RPTReportId == 4 || (report.Title.Contains("Certificate of Improvement", StringComparison.OrdinalIgnoreCase) && !report.Title.Contains("NO Improvement", StringComparison.OrdinalIgnoreCase)))
+        {
+            var cleanTdnVal = taxDeclaration.TaxDeclarationNumber;
+            relatedProperties = await _context.TaxDeclarations
+                .Include(t => t.BuildingDetails)
+                .Where(t => t.Kind == PropertyKind.Building &&
+                            ((t.BuildingDetails != null && t.BuildingDetails.LandTdNo == cleanTdnVal) ||
+                             (taxDeclaration.LotNo != null && t.BuildingDetails != null && t.BuildingDetails.LandLotNo == taxDeclaration.LotNo)))
+                .OrderBy(t => t.TaxDeclarationNumber)
+                .ToListAsync();
+        }
 
         var certificateModel = ReportPrintHelper.BuildCertificateModel(
             taxDeclaration,
@@ -280,6 +302,17 @@ public class RPTReportController : Controller
                     .OrderBy(t => t.TaxDeclarationNumber)
                     .ToListAsync();
             }
+        }
+        else if (report.RPTReportId == 4 || (report.Title.Contains("Certificate of Improvement", StringComparison.OrdinalIgnoreCase) && !report.Title.Contains("NO Improvement", StringComparison.OrdinalIgnoreCase)))
+        {
+            var cleanTdnVal = taxDeclaration.TaxDeclarationNumber;
+            relatedProperties = await _context.TaxDeclarations
+                .Include(t => t.BuildingDetails)
+                .Where(t => t.Kind == PropertyKind.Building &&
+                            ((t.BuildingDetails != null && t.BuildingDetails.LandTdNo == cleanTdnVal) ||
+                             (taxDeclaration.LotNo != null && t.BuildingDetails != null && t.BuildingDetails.LandLotNo == taxDeclaration.LotNo)))
+                .OrderBy(t => t.TaxDeclarationNumber)
+                .ToListAsync();
         }
 
         var certificateModel = ReportPrintHelper.BuildCertificateModel(

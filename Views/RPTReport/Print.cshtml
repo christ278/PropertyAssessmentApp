@@ -44,16 +44,41 @@
 
     <!-- Official Certificate Document Container -->
     <div class="max-w-4xl mx-auto p-4 sm:p-8 space-y-6">
-        
-        <!-- Common Header Helper -->
-        <partial name="Reports/_ReportHeader" model="Model.Header" />
+        @if (Model.IsNoImprovementCertificate && Model.NoImprovementDetails != null)
+        {
+            <partial name="Reports/_CertificateNoImprovement" model="Model.NoImprovementDetails" />
+        }
+        else if (Model.IsImprovementCertificate && Model.ImprovementDetails != null)
+        {
+            <partial name="Reports/_CertificateImprovement" model="Model.ImprovementDetails" />
+        }
+        else if (Model.IsAssessmentOfTdCertificate && Model.AssessmentDetails != null)
+        {
+            <partial name="Reports/_AssessmentOfTaxDeclaration" model="Model.AssessmentDetails" />
+        }
+        else if (Model.IsNoLandHoldingCertificate && Model.NoLandHoldingDetails != null)
+        {
+            <partial name="Reports/_CertificationNoLandHolding" model="Model.NoLandHoldingDetails" />
+        }
+        else if (Model.IsBirCertification && Model.BirHoldingsDetails != null)
+        {
+            <partial name="Reports/_AllPropertyHoldingsBir" model="Model.BirHoldingsDetails" />
+        }
+        else if (Model.IsDarCertification && Model.DarDetails != null)
+        {
+            <partial name="Reports/_AgriculturalDarCertification" model="Model.DarDetails" />
+        }
+        else
+        {
+            <!-- Common Header Helper -->
+            <partial name="Reports/_ReportHeader" model="Model.Header" />
 
-        <!-- Common Property Details Table Helper -->
-        <partial name="Reports/_ReportDetailsTable" model="Model.Details" />
+            <!-- Common Property Details Table Helper -->
+            <partial name="Reports/_ReportDetailsTable" model="Model.Details" />
 
-        <!-- Common Footer & Signatories Helper -->
-        <partial name="Reports/_ReportFooter" model="Model.Footer" />
-
+            <!-- Common Footer & Signatories Helper -->
+            <partial name="Reports/_ReportFooter" model="Model.Footer" />
+        }
     </div>
 
 </body>
