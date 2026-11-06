@@ -87,6 +87,16 @@ export const MobileApi = {
     return response.data;
   },
 
+  // Upload Multiple Inspection Attachment Files
+  uploadAttachment: async (formData) => {
+    const response = await apiClient.post('/api/mobile/upload-attachment', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
   // Advance Workflow
   forwardWorkflow: async (formWorkflowId, nextStatusId, remarks = '') => {
     const response = await apiClient.post('/api/mobile/workflow/forward', {

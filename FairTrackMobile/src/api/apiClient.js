@@ -23,6 +23,26 @@ export const DEFAULT_BASE_URL = Platform.OS === 'web'
   ? 'http://localhost:5156'
   : getLanBaseUrl();
 
+export const resolveServerUrl = async (path) => {
+  if (!path) return '';
+  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:') || path.startsWith('file://')) {
+    return path;
+  }
+  let base = DEFAULT_BASE_URL.replace(/\/+$/, '');
+  try {
+    const saved = await AsyncStorage.getItem('@fairtrack_server_url');
+    if (saved && saved.trim()) {
+      const cleanSaved = saved.trim().replace(/\/+$/, '');
+      const isInvalid = Platform.OS !== 'web' && (cleanSaved.includes('localhost') || cleanSaved.includes('10.0.2.2'));
+      if (!isInvalid) {
+        base = cleanSaved;
+      }
+    }
+  } catch (e) {}
+  const cleanPath = path.startsWith('/') ? path : '/' + path;
+  return `${base}${cleanPath}`;
+};
+
 const apiClient = axios.create({
   baseURL: DEFAULT_BASE_URL,
   timeout: 15000,

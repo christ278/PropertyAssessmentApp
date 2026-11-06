@@ -12,16 +12,26 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { MobileApi } from '../api/mobileApi';
-import { SyncContext } from '../context/SyncContext';
+import { SyncContext, isAllowedMobileTransaction, normalizeTransactionItem } from '../context/SyncContext';
 import { useTheme } from '../context/ThemeContext';
 import { HeaderBar } from '../components/HeaderBar';
 import { StatusBadge } from '../components/StatusBadge';
-import { COLORS, SHADOWS } from '../constants/theme';
+import { COLORS } from '../constants/theme';
+
+const formatSubmittedDate = (dateValue) => {
+  if (!dateValue) return 'Date not recorded';
+  const parsed = new Date(dateValue);
+  if (isNaN(parsed.getTime())) return String(dateValue);
+  return parsed.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
+};
 
 export const TransactionsScreen = ({ navigation }) => {
   const { isDarkMode, colors, shadows } = useTheme();
   const {
-
     downloadSingleTransaction,
     downloadAllTransactions,
     isTransactionDownloaded,
@@ -46,7 +56,7 @@ export const TransactionsScreen = ({ navigation }) => {
   const loadOfflineData = async () => {
     if (typeof getOfflineTransactions === 'function') {
       const offlineList = await getOfflineTransactions();
-      setTransactions(offlineList || []);
+      setTransactions((offlineList || []).map(normalizeTransactionItem).filter(isAllowedMobileTransaction));
     }
   };
 
@@ -61,7 +71,9 @@ export const TransactionsScreen = ({ navigation }) => {
       );
       if (res && res.success) {
         setIsOffline(false);
-        const list = res.data || [];
+        const list = (res.data || [])
+          .map(normalizeTransactionItem)
+          .filter(isAllowedMobileTransaction);
         setTransactions(list);
       }
     } catch (err) {
@@ -89,7 +101,8 @@ export const TransactionsScreen = ({ navigation }) => {
         (t.TrackingNo || '').toLowerCase().includes(q) ||
         (t.Owner || '').toLowerCase().includes(q) ||
         (t.ARPNo || '').toLowerCase().includes(q) ||
-        (t.Requestor || '').toLowerCase().includes(q)
+        (t.Requestor || '').toLowerCase().includes(q) ||
+        (t.RequestType || '').toLowerCase().includes(q)
       );
     }
     return list;
@@ -137,6 +150,16 @@ export const TransactionsScreen = ({ navigation }) => {
   };
 
   const handleTransactionPress = (item) => {
+    // Guard: Transactions without generated partitions cannot be edited on mobile
+    if (!item.HasPartition) {
+      Alert.alert(
+        'Cannot Edit Transaction',
+        `Transaction "${item.TrackingNo}" has no generated partitions.\n\nPartitions must first be generated and configured in the Office Web Portal before field appraisal and inspection can be edited.`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
     const downloaded = isTransactionDownloaded(item.TrackingNo, item.FormworkflowId);
 
     // If offline and NOT downloaded, prevent opening and inform user
@@ -170,13 +193,22 @@ export const TransactionsScreen = ({ navigation }) => {
     }
   };
 
-  const renderItem = ({ item }) => {
+  const renderItem = ({ item: rawItem }) => {
+    const item = normalizeTransactionItem(rawItem);
     const isDownloaded = isTransactionDownloaded(item.TrackingNo, item.FormworkflowId);
     const isThisDownloading = downloadingId === item.FormworkflowId;
 
-    const typeLabel = item.TransactionTypeId === 2 ? 'Building FAAS' :
+    const kindLabel = item.TransactionTypeId === 2 ? 'Building FAAS' :
                       item.TransactionTypeId === 1 ? 'Land Appraisal' :
                       item.TransactionTypeId === 3 ? 'Machinery FAAS' : 'Property Assessment';
+    const moduleLabel = (item.RequestType && item.RequestType.toLowerCase().includes('inspection')) ||
+                        (item.TrackingNo || '').toUpperCase().startsWith('RFI-')
+                        ? 'Field Inspection'
+                        : 'Property Assessment';
+    const typeLabel = `${moduleLabel} • ${kindLabel}`;
+    const ownerOrApplicant = item.Owner || item.Requestor || 'Property Owner';
+    const hasDistinctApplicant = item.Requestor && item.Owner && item.Requestor.toLowerCase() !== item.Owner.toLowerCase();
+    const showReferenceNo = item.ARPNo && item.ARPNo !== item.TrackingNo;
 
     return (
       <TouchableOpacity
@@ -192,35 +224,53 @@ export const TransactionsScreen = ({ navigation }) => {
       >
         <View style={styles.cardHeader}>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.trackingNoText, { color: colors.textDark }]}>{item.TrackingNo || 'N/A'}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <Text style={[styles.trackingNoText, { color: colors.textDark }]}>{item.TrackingNo || 'Unassigned Tracking No.'}</Text>
+              {!item.HasPartition ? (
+                <View style={styles.noPartitionBadge}>
+                  <Ionicons name="lock-closed" size={10} color="#b91c1c" />
+                  <Text style={styles.noPartitionBadgeText}>NO PARTITION</Text>
+                </View>
+              ) : null}
+            </View>
             <Text style={styles.typeBadgeText}>{typeLabel}</Text>
           </View>
           <StatusBadge
             statusId={item.CurrentStatusId}
+            statusText={item.CurrentStatus}
             isComplete={item.IsComplete}
             isDeferred={item.IsDeffered}
           />
         </View>
 
         <View style={styles.cardBody}>
-          {item.Owner ? (
+          <View style={styles.infoRow}>
+            <Ionicons name="person-circle-outline" size={15} color={colors.textDark} />
+            <Text style={[styles.ownerText, { color: colors.textDark }]}>
+              Owner / Applicant: {ownerOrApplicant}
+            </Text>
+          </View>
+
+          {hasDistinctApplicant ? (
             <View style={styles.infoRow}>
-              <Ionicons name="person-circle-outline" size={15} color={colors.textDark} />
-              <Text style={[styles.ownerText, { color: colors.textDark }]}>{item.Owner}</Text>
+              <Ionicons name="people-outline" size={14} color={colors.textMuted} />
+              <Text style={[styles.infoText, { color: colors.textMuted }]}>
+                Representative / Requestor: {item.Requestor}
+              </Text>
             </View>
           ) : null}
 
-          {item.ARPNo ? (
+          {showReferenceNo ? (
             <View style={styles.infoRow}>
               <Ionicons name="pricetag-outline" size={14} color={colors.textMuted} />
-              <Text style={[styles.infoText, { color: colors.textMuted }]}>ARP No: {item.ARPNo}</Text>
+              <Text style={[styles.infoText, { color: colors.textMuted }]}>PIN / TDN Ref: {item.ARPNo}</Text>
             </View>
           ) : null}
 
           <View style={styles.infoRow}>
             <Ionicons name="calendar-outline" size={14} color={colors.textMuted} />
             <Text style={[styles.infoText, { color: colors.textMuted }]}>
-              Submitted: {new Date(item.SubmittedDate).toLocaleDateString()}
+              Date Submitted: {formatSubmittedDate(item.SubmittedDate)}
             </Text>
           </View>
 
@@ -240,36 +290,47 @@ export const TransactionsScreen = ({ navigation }) => {
 
         {/* Download Indicator & Actions */}
         <View style={styles.cardFooter}>
-          {isDownloaded ? (
-            <View style={styles.downloadedBadge}>
-              <Ionicons name="checkmark-circle" size={14} color="#16a34a" />
-              <Text style={styles.downloadedBadgeText}>Downloaded (Offline Ready)</Text>
-            </View>
+          {item.HasPartition ? (
+            isDownloaded ? (
+              <View style={styles.downloadedBadge}>
+                <Ionicons name="checkmark-circle" size={14} color="#16a34a" />
+                <Text style={styles.downloadedBadgeText}>Downloaded (Offline Ready)</Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={[
+                  styles.downloadBtn,
+                  isDarkMode && { backgroundColor: '#134e4a', borderColor: '#0d9488' }
+                ]}
+                onPress={() => handleDownloadSingle(item)}
+                disabled={isThisDownloading}
+              >
+                {isThisDownloading ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <>
+                    <Ionicons name="cloud-download-outline" size={14} color={colors.primary} />
+                    <Text style={[styles.downloadBtnText, { color: colors.primary }]}>Download to Device</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )
           ) : (
-            <TouchableOpacity
-              style={[
-                styles.downloadBtn,
-                isDarkMode && { backgroundColor: '#134e4a', borderColor: '#0d9488' }
-              ]}
-              onPress={() => handleDownloadSingle(item)}
-              disabled={isThisDownloading}
-            >
-              {isThisDownloading ? (
-                <ActivityIndicator size="small" color={colors.primary} />
-              ) : (
-                <>
-                  <Ionicons name="cloud-download-outline" size={14} color={colors.primary} />
-                  <Text style={[styles.downloadBtnText, { color: colors.primary }]}>Download to Device</Text>
-                </>
-              )}
-            </TouchableOpacity>
+            <View style={styles.lockedBadge}>
+              <Ionicons name="lock-closed" size={12} color="#b91c1c" />
+              <Text style={styles.lockedBadgeText}>Pending Office Partition</Text>
+            </View>
           )}
 
           <View style={styles.openActionWrapper}>
-            <Text style={[styles.tapActionText, { color: colors.primary }]}>
-              {isDownloaded ? 'Open Offline' : 'Inspect Form'}
+            <Text style={[styles.tapActionText, { color: item.HasPartition ? colors.primary : colors.textMuted }]}>
+              {item.HasPartition ? (isDownloaded ? 'Open Offline' : 'Inspect Form') : 'Cannot Edit'}
             </Text>
-            <Ionicons name="arrow-forward-circle" size={18} color={colors.primary} />
+            <Ionicons
+              name={item.HasPartition ? 'arrow-forward-circle' : 'lock-closed'}
+              size={18}
+              color={item.HasPartition ? colors.primary : colors.textMuted}
+            />
           </View>
         </View>
       </TouchableOpacity>
@@ -278,7 +339,7 @@ export const TransactionsScreen = ({ navigation }) => {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bgLight }]}>
-      <HeaderBar title="MY TRANSACTIONS" subtitle="Assigned Field Inspections" navigation={navigation} />
+      <HeaderBar title="MY TRANSACTIONS" subtitle="Property Assessment & Field Inspection" navigation={navigation} />
 
       {/* Offline Status Alert */}
       {isOffline ? (
@@ -337,7 +398,7 @@ export const TransactionsScreen = ({ navigation }) => {
           <Ionicons name="search" size={18} color={colors.textMuted} />
           <TextInput
             style={[styles.searchInput, { color: colors.textDark }]}
-            placeholder="Search by Tracking No, ARP, Owner..."
+            placeholder="Search by Tracking No, Owner, PIN..."
             placeholderTextColor={colors.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -459,7 +520,7 @@ export const TransactionsScreen = ({ navigation }) => {
       ) : (
         <FlatList
           data={displayTransactions}
-          keyExtractor={(item) => (item.FormworkflowId || item.TrackingNo || Math.random()).toString()}
+          keyExtractor={(item, idx) => (item.FormworkflowId || item.TrackingNo || idx).toString()}
           renderItem={renderItem}
           contentContainerStyle={styles.listContent}
           refreshControl={
@@ -474,7 +535,7 @@ export const TransactionsScreen = ({ navigation }) => {
               <Text style={styles.emptySubtitle}>
                 {isOffline
                   ? 'You have not downloaded any forms to your device yet. Connect to the internet to download transactions for offline use.'
-                  : 'You currently have no transactions checked out to your account.'}
+                  : 'You currently have no Property Assessment or Field Inspection transactions in your queue.'}
               </Text>
             </View>
           }
@@ -616,6 +677,39 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: COLORS.primaryDark
   },
+  noPartitionBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fee2e2',
+    borderWidth: 1,
+    borderColor: '#fca5a5',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    gap: 3
+  },
+  noPartitionBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#b91c1c',
+    letterSpacing: 0.4
+  },
+  lockedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 4
+  },
+  lockedBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#991b1b'
+  },
   typeBadgeText: {
     fontSize: 11,
     fontWeight: '600',
@@ -725,6 +819,8 @@ const styles = StyleSheet.create({
   emptySubtitle: {
     fontSize: 12,
     color: COLORS.textMuted,
-    marginTop: 4
+    marginTop: 4,
+    textAlign: 'center',
+    paddingHorizontal: 24
   }
 });

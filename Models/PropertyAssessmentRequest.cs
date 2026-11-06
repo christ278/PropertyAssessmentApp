@@ -339,6 +339,9 @@ public class AssessmentPartitionItem
     public string? BuildingFloorPlanSketchPath { get; set; }
     public string? BuildingFloorPlanSketchBase64 { get; set; }
 
+    // Multi-file inspection attachments (photos, PDFs, documents)
+    public string? AttachmentsJson { get; set; }
+
     // Structural Characteristics & Construction Timeline (CAST Reference)
     public string StructuralType { get; set; } = "Type I";
     public string BuildingClassification { get; set; } = "Class A - Reinforced Concrete";

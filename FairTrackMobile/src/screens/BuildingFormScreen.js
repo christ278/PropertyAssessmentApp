@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SyncContext } from '../context/SyncContext';
 import { MobileApi } from '../api/mobileApi';
 import { HeaderBar } from '../components/HeaderBar';
+import { AttachmentsSection } from '../components/AttachmentsSection';
 import { COLORS, SHADOWS } from '../constants/theme';
 
 export const BuildingFormScreen = ({ route, navigation }) => {
@@ -74,7 +75,9 @@ export const BuildingFormScreen = ({ route, navigation }) => {
   const [marketValue, setMarketValue] = useState('');
   const [assessmentLevel, setAssessmentLevel] = useState('');
   const [assessedValue, setAssessedValue] = useState('');
-  const [taxability, setTaxability] = useState(true); // true = Taxable, false = Exempt
+  const [taxability, setTaxability] = useState(true);
+  const [sketchUrl, setSketchUrl] = useState('');
+  const [attachments, setAttachments] = useState([]); // true = Taxable, false = Exempt
 
   // 4. Effectivity & Memoranda
   const [yearEffectivity, setYearEffectivity] = useState(new Date().getFullYear().toString());
@@ -99,6 +102,8 @@ export const BuildingFormScreen = ({ route, navigation }) => {
       if (downloaded.owner) setOwnerName(downloaded.owner);
       if (downloaded.arpNo) setArpNo(downloaded.arpNo);
       if (downloaded.tdnId) setTdnId(downloaded.tdnId);
+      if (downloaded.sketchUrl) setSketchUrl(downloaded.sketchUrl);
+      if (downloaded.attachments && Array.isArray(downloaded.attachments)) setAttachments(downloaded.attachments);
 
       if (downloaded.formData) {
         populateFieldsFromDTO(downloaded.formData);
@@ -146,6 +151,8 @@ export const BuildingFormScreen = ({ route, navigation }) => {
       if (t.QuarterEffectivity != null) setQuarterEffectivity(t.QuarterEffectivity.toString());
       if (t.Memoranda) setMemoranda(t.Memoranda);
       if (t.Taxability != null) setTaxability(!!t.Taxability);
+      if (t.FloorPlanSketchPath) setSketchUrl(t.FloorPlanSketchPath);
+      if (t.Attachments && Array.isArray(t.Attachments)) setAttachments(t.Attachments);
     }
 
     if (d.refOwner) {
@@ -184,6 +191,8 @@ export const BuildingFormScreen = ({ route, navigation }) => {
     const payload = {
       TDN: {
         TDNId: parseInt(tdnId) || 0,
+        TrackingNo: trackingNo || trackingNoParam,
+        FormWorkflowId: formWorkflowIdParam,
         DeclarationNo: declarationNo,
         ARPNo: arpNo,
         PIN: pin,
@@ -205,7 +214,9 @@ export const BuildingFormScreen = ({ route, navigation }) => {
         Memoranda: memoranda,
         Taxability: taxability,
         TotalMarketValue: parseFloat(marketValue) || 0,
-        TotalAssessedValue: parseFloat(assessedValue) || 0
+        TotalAssessedValue: parseFloat(assessedValue) || 0,
+        FloorPlanSketchPath: sketchUrl,
+        Attachments: attachments
       },
       CAST_TDNBuildingDTO: {
         CAST_TDNBuildingId: parseInt(castTdnBuildingId) || 0,
@@ -312,13 +323,13 @@ export const BuildingFormScreen = ({ route, navigation }) => {
         </Text>
       </View>
 
-      {/* Form Navigation Tabs */}
+            {/* Form Navigation Tabs */}
       <View style={styles.sectionTabs}>
         <TouchableOpacity
           style={[styles.sectionTabBtn, activeTab === 0 && styles.sectionTabBtnActive]}
           onPress={() => setActiveTab(0)}
         >
-          <Text style={[styles.sectionTabText, activeTab === 0 && styles.sectionTabTextActive]}>1. Identification</Text>
+          <Text style={[styles.sectionTabText, activeTab === 0 && styles.sectionTabTextActive]}>1. Ident</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.sectionTabBtn, activeTab === 1 && styles.sectionTabBtnActive]}
@@ -336,7 +347,13 @@ export const BuildingFormScreen = ({ route, navigation }) => {
           style={[styles.sectionTabBtn, activeTab === 3 && styles.sectionTabBtnActive]}
           onPress={() => setActiveTab(3)}
         >
-          <Text style={[styles.sectionTabText, activeTab === 3 && styles.sectionTabTextActive]}>4. Transfer</Text>
+          <Text style={[styles.sectionTabText, activeTab === 3 && styles.sectionTabTextActive]}>4. Photos & Sketch</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.sectionTabBtn, activeTab === 4 && styles.sectionTabBtnActive]}
+          onPress={() => setActiveTab(4)}
+        >
+          <Text style={[styles.sectionTabText, activeTab === 4 && styles.sectionTabTextActive]}>5. Transfer</Text>
         </TouchableOpacity>
       </View>
 
@@ -747,8 +764,21 @@ export const BuildingFormScreen = ({ route, navigation }) => {
               </View>
             )}
 
-            {/* TAB 3: EFFECTIVITY, MEMORANDA & WORKFLOW */}
+            {/* TAB 3: SITE SKETCH & FIELD INSPECTION ATTACHMENTS */}
             {activeTab === 3 && (
+              <View style={styles.tabContentBlock}>
+                <AttachmentsSection
+                  trackingNo={trackingNo || trackingNoParam}
+                  sketchUrl={sketchUrl}
+                  attachments={attachments}
+                  onAttachmentsChange={setAttachments}
+                  propertyKind="Building"
+                />
+              </View>
+            )}
+
+            {/* TAB 4: EFFECTIVITY, MEMORANDA & WORKFLOW */}
+            {activeTab === 4 && (
               <View style={styles.tabContentBlock}>
                 <View style={[styles.card, SHADOWS.card]}>
                   <Text style={styles.cardHeaderTitle}>Tax Effectivity & Memoranda</Text>

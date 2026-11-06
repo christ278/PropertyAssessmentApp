@@ -16,6 +16,18 @@ public class MobileForwardWorkflowRequest
     public string Remarks { get; set; } = string.Empty;
 }
 
+public class MobileAttachmentDTO
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public string FileName { get; set; } = string.Empty;
+    public string? FileUrl { get; set; }
+    public string? FileType { get; set; } // "image" | "document"
+    public string? FileSize { get; set; }
+    public string? Base64Data { get; set; }
+    public string? Caption { get; set; }
+    public DateTime UploadedAt { get; set; } = DateTime.Now;
+}
+
 public class TransactionWorkFlowDTO
 {
     public long FormworkflowId { get; set; }
@@ -37,6 +49,8 @@ public class TransactionWorkFlowDTO
     public string ForwarderBy { get; set; } = string.Empty;
     public int ForwarderById { get; set; }
     public long? TdnId { get; set; }
+    public bool HasPartition { get; set; }
+    public int PartitionCount { get; set; }
 }
 
 public class CAST_TDNBuildingDTO

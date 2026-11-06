@@ -86,6 +86,13 @@ public class TDNDTO
     public string? SurveyNo { get; set; }
     public string? PropLocationStreet { get; set; }
     public string? TransactionCode { get; set; }
+    public string? TrackingNo { get; set; }
+    public long? FormWorkflowId { get; set; }
+
+    // Floor Plan / Site Sketch File & Attachments
+    public string? FloorPlanSketchPath { get; set; }
+    public string? AttachmentsJson { get; set; }
+    public List<MobileAttachmentDTO>? Attachments { get; set; } = new();
 
     // Client-side mapping flag
     public bool isAlreadyExist { get; set; }

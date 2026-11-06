@@ -4,6 +4,121 @@ import { MobileApi } from '../api/mobileApi';
 
 export const SyncContext = createContext();
 
+// Normalize transaction items from either PascalCase or camelCase API/storage payloads
+export const normalizeTransactionItem = (raw) => {
+  if (!raw || typeof raw !== 'object') return raw;
+  const trackingNo = raw.TrackingNo ?? raw.trackingNo ?? '';
+  const requestType = raw.RequestType ?? raw.requestType ?? (
+    trackingNo.toUpperCase().startsWith('RFI-') ? 'Field Inspection' : 'Property Assessment'
+  );
+  const owner = raw.Owner ?? raw.owner ?? raw.Requestor ?? raw.requestor ?? '';
+  const requestor = raw.Requestor ?? raw.requestor ?? owner;
+  const hasPartition = raw.HasPartition ?? raw.hasPartition ?? false;
+  const partitionCount = raw.PartitionCount ?? raw.partitionCount ?? (hasPartition ? 1 : 0);
+
+  return {
+    ...raw,
+    FormworkflowId: raw.FormworkflowId ?? raw.formworkflowId ?? raw.FormWorkflowId ?? raw.formWorkflowId ?? null,
+    TrackingNo: trackingNo,
+    TransactionTypeId: raw.TransactionTypeId ?? raw.transactionTypeId ?? 2,
+    RequestType: requestType,
+    ARPNo: raw.ARPNo ?? raw.arpNo ?? '',
+    Owner: owner,
+    Requestor: requestor,
+    AcceptedBy: raw.AcceptedBy ?? raw.acceptedBy ?? 'Staff',
+    CurrentStatusId: raw.CurrentStatusId ?? raw.currentStatusId ?? 1,
+    CurrentStatus: raw.CurrentStatus ?? raw.currentStatus ?? 'Receiving',
+    Remarks: raw.Remarks ?? raw.remarks ?? '',
+    IsComplete: raw.IsComplete ?? raw.isComplete ?? false,
+    IsDeffered: raw.IsDeffered ?? raw.isDeffered ?? raw.IsDeferred ?? raw.isDeferred ?? false,
+    IsCheckout: raw.IsCheckout ?? raw.isCheckout ?? false,
+    SubmittedDate: raw.SubmittedDate ?? raw.submittedDate ?? null,
+    ForwarderBy: raw.ForwarderBy ?? raw.forwarderBy ?? 'Office Staff',
+    TdnId: raw.TdnId ?? raw.tdnId ?? null,
+    HasPartition: hasPartition,
+    PartitionCount: partitionCount
+  };
+};
+
+// Recursively add PascalCase aliases for any camelCase keys in downloaded form DTOs
+const withPascalCaseKeys = (obj) => {
+  if (Array.isArray(obj)) return obj.map(withPascalCaseKeys);
+  if (!obj || typeof obj !== 'object') return obj;
+
+  const result = { ...obj };
+  for (const [k, v] of Object.entries(obj)) {
+    const transformedVal = withPascalCaseKeys(v);
+    result[k] = transformedVal;
+    if (k.length > 0) {
+      const pascalKey = k[0].toUpperCase() + k.slice(1);
+      if (!(pascalKey in result)) {
+        result[pascalKey] = transformedVal;
+      }
+    }
+  }
+  // Specific acronym keys used by form screens
+  if (result.tdn && !result.TDN) result.TDN = result.tdn;
+  if (result.Tdn && !result.TDN) result.TDN = result.Tdn;
+  if (result.cast_TDNBuildingDTO && !result.CAST_TDNBuildingDTO) result.CAST_TDNBuildingDTO = result.cast_TDNBuildingDTO;
+  if (result.Cast_TDNBuildingDTO && !result.CAST_TDNBuildingDTO) result.CAST_TDNBuildingDTO = result.Cast_TDNBuildingDTO;
+  if (result.tdnLand && !result.TDNLand) result.TDNLand = result.tdnLand;
+  if (result.TdnLand && !result.TDNLand) result.TDNLand = result.TdnLand;
+  if (result.tdnLandDetails && !result.TDNLandDetails) result.TDNLandDetails = result.tdnLandDetails;
+  if (result.TdnLandDetails && !result.TDNLandDetails) result.TDNLandDetails = result.TdnLandDetails;
+  if (result.tdnMachine && !result.TDNMachine) result.TDNMachine = result.tdnMachine;
+  if (result.TdnMachine && !result.TDNMachine) result.TDNMachine = result.TdnMachine;
+  if (result.tdnMachineDetail && !result.TDNMachineDetail) result.TDNMachineDetail = result.tdnMachineDetail;
+  if (result.TdnMachineDetail && !result.TDNMachineDetail) result.TDNMachineDetail = result.TdnMachineDetail;
+  if (result.tdnId !== undefined && result.TDNId === undefined) result.TDNId = result.tdnId;
+  if (result.arpNo !== undefined && result.ARPNo === undefined) result.ARPNo = result.arpNo;
+  if (result.pin !== undefined && result.PIN === undefined) result.PIN = result.pin;
+  if (result.tctNo !== undefined && result.TCTNo === undefined) result.TCTNo = result.tctNo;
+  if (result.tctDate !== undefined && result.TCTDate === undefined) result.TCTDate = result.tctDate;
+  if (result.landOwnerPIN !== undefined && result.LandOwnerPIN === undefined) result.LandOwnerPIN = result.landOwnerPIN;
+  if (result.buildingOwnerPIN !== undefined && result.BuildingOwnerPIN === undefined) result.BuildingOwnerPIN = result.buildingOwnerPIN;
+  return result;
+};
+
+// Strict guard: Only Property Assessment (RPA) and Field Inspection (RFI) transactions are synced in the mobile app
+export const isAllowedMobileTransaction = (rawItem) => {
+  if (!rawItem) return false;
+  const transItem = normalizeTransactionItem(rawItem);
+  const reqType = (transItem.RequestType || '').toLowerCase();
+  const tracking = (transItem.TrackingNo || '').toUpperCase();
+
+  // Explicitly block non-field-inspection / non-assessment modules
+  if (
+    reqType.includes('tax mapping') ||
+    reqType.includes('taxmapping') ||
+    reqType.includes('land holding') ||
+    reqType.includes('landholding') ||
+    reqType.includes('tax declaration') ||
+    reqType.includes('taxdeclaration') ||
+    tracking.startsWith('TMR-') ||
+    tracking.startsWith('TM-') ||
+    tracking.startsWith('LHR-') ||
+    tracking.startsWith('LH-') ||
+    tracking.startsWith('TDR-')
+  ) {
+    return false;
+  }
+
+  if (
+    reqType.includes('property assessment') ||
+    reqType.includes('propertyassessment') ||
+    reqType.includes('field inspection') ||
+    reqType.includes('request for inspection') ||
+    reqType.includes('requestforinspection') ||
+    reqType.includes('inspection') ||
+    tracking.startsWith('RPA-') ||
+    tracking.startsWith('RFI-')
+  ) {
+    return true;
+  }
+
+  return true;
+};
+
 export const SyncProvider = ({ children }) => {
   const [syncQueue, setSyncQueue] = useState([]);
   const [cachedForms, setCachedForms] = useState({});
@@ -29,14 +144,23 @@ export const SyncProvider = ({ children }) => {
       const storedDownloads = await AsyncStorage.getItem('@fairtrack_downloaded_forms');
       let downloadsMap = {};
       if (storedDownloads) {
-        downloadsMap = JSON.parse(storedDownloads);
+        const parsed = JSON.parse(storedDownloads);
+        for (const [k, v] of Object.entries(parsed)) {
+          const normItem = v?.transItem ? normalizeTransactionItem(v.transItem) : null;
+          if (!normItem || isAllowedMobileTransaction(normItem)) {
+            downloadsMap[k] = {
+              ...v,
+              transItem: normItem,
+              formData: v?.formData ? withPascalCaseKeys(v.formData) : v?.formData
+            };
+          }
+        }
         setDownloadedForms(downloadsMap);
       }
 
-      // Offline transactions are strictly derived from explicitly downloaded files
       const downloadedList = Object.values(downloadsMap)
         .map(d => d.transItem)
-        .filter(Boolean);
+        .filter(item => item && isAllowedMobileTransaction(item));
 
       setCachedTransactions(downloadedList);
 
@@ -53,8 +177,8 @@ export const SyncProvider = ({ children }) => {
       if (storedDownloads) {
         const downloadsMap = JSON.parse(storedDownloads);
         const downloadedList = Object.values(downloadsMap)
-          .map(d => d.transItem)
-          .filter(Boolean);
+          .map(d => d?.transItem ? normalizeTransactionItem(d.transItem) : null)
+          .filter(item => item && isAllowedMobileTransaction(item));
         return downloadedList;
       }
       return [];
@@ -73,21 +197,43 @@ export const SyncProvider = ({ children }) => {
     setDownloadedForms(newDownloads);
     await AsyncStorage.setItem('@fairtrack_downloaded_forms', JSON.stringify(newDownloads));
     const downloadedList = Object.values(newDownloads)
-      .map(d => d.transItem)
-      .filter(Boolean);
+      .map(d => d?.transItem ? normalizeTransactionItem(d.transItem) : null)
+      .filter(item => item && isAllowedMobileTransaction(item));
     setCachedTransactions(downloadedList);
   };
 
-  // Download a single transaction form details
-  const downloadSingleTransaction = async (transItem) => {
+  // Download a single transaction form details (strictly Property Assessment & Field Inspection)
+  const downloadSingleTransaction = async (rawItem) => {
+    const transItem = normalizeTransactionItem(rawItem);
+    if (!isAllowedMobileTransaction(transItem)) {
+      return {
+        success: false,
+        message: 'Only Property Assessment and Field Inspection transactions can be synced in the mobile app.'
+      };
+    }
+
+    if (!transItem.HasPartition) {
+      return {
+        success: false,
+        message: `Cannot download "${transItem.TrackingNo}": This transaction has no generated partitions. Partitions must be generated in the Office Web Portal before field inspection and editing.`
+      };
+    }
+
     try {
       const res = await MobileApi.downloadTransactionDetails(transItem.FormworkflowId, transItem.TrackingNo);
       if (res && res.success) {
+        if (!res.hasPartition) {
+          return {
+            success: false,
+            message: `Cannot download "${transItem.TrackingNo}": Server reports no partitions exist for this record.`
+          };
+        }
         const key = (transItem.TrackingNo || transItem.FormworkflowId).toString();
         const updated = {
           ...downloadedForms,
           [key]: {
             ...res,
+            formData: res.formData ? withPascalCaseKeys(res.formData) : res.formData,
             transItem,
             downloadedAt: new Date().toISOString()
           }
@@ -115,10 +261,25 @@ export const SyncProvider = ({ children }) => {
     }
   };
 
-  // Batch download multiple transactions
+  // Batch download multiple transactions (strictly Property Assessment & Field Inspection)
   const downloadAllTransactions = async (transactionsList) => {
-    if (!transactionsList || transactionsList.length === 0) {
-      return { success: false, message: 'No transactions available to download.' };
+    const allowedList = (transactionsList || [])
+      .map(normalizeTransactionItem)
+      .filter(isAllowedMobileTransaction);
+    if (allowedList.length === 0) {
+      return { success: false, message: 'No Property Assessment or Field Inspection transactions available to download.' };
+    }
+
+    const partitionAllowedList = allowedList.filter(t => t.HasPartition);
+    const unpartitionedCount = allowedList.length - partitionAllowedList.length;
+
+    if (partitionAllowedList.length === 0) {
+      return {
+        success: false,
+        message: unpartitionedCount > 0
+          ? `None of the ${unpartitionedCount} transaction(s) have generated partitions. Partitions must first be generated in the Office Web Portal before downloading.`
+          : 'No Property Assessment or Field Inspection transactions available to download.'
+      };
     }
 
     setIsDownloading(true);
@@ -126,13 +287,14 @@ export const SyncProvider = ({ children }) => {
     let failCount = 0;
     const currentDownloads = { ...downloadedForms };
 
-    for (const item of transactionsList) {
+    for (const item of partitionAllowedList) {
       try {
         const res = await MobileApi.downloadTransactionDetails(item.FormworkflowId, item.TrackingNo);
-        if (res && res.success) {
+        if (res && res.success && res.hasPartition) {
           const key = (item.TrackingNo || item.FormworkflowId).toString();
           currentDownloads[key] = {
             ...res,
+            formData: res.formData ? withPascalCaseKeys(res.formData) : res.formData,
             transItem: item,
             downloadedAt: new Date().toISOString()
           };
@@ -152,7 +314,8 @@ export const SyncProvider = ({ children }) => {
       success: successCount > 0,
       successCount,
       failCount,
-      total: transactionsList.length
+      skippedCount: unpartitionedCount,
+      total: partitionAllowedList.length
     };
   };
 
@@ -165,13 +328,19 @@ export const SyncProvider = ({ children }) => {
 
   // Retrieve downloaded form data
   const getDownloadedFormData = (trackingNo, formWorkflowId) => {
+    let found = null;
     if (trackingNo && downloadedForms[trackingNo]) {
-      return downloadedForms[trackingNo];
+      found = downloadedForms[trackingNo];
+    } else if (formWorkflowId && downloadedForms[formWorkflowId.toString()]) {
+      found = downloadedForms[formWorkflowId.toString()];
     }
-    if (formWorkflowId && downloadedForms[formWorkflowId.toString()]) {
-      return downloadedForms[formWorkflowId.toString()];
+    if (found && found.formData) {
+      return {
+        ...found,
+        formData: withPascalCaseKeys(found.formData)
+      };
     }
-    return null;
+    return found;
   };
 
   // Enqueue an offline update and auto-stage workflow forward

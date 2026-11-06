@@ -2,37 +2,38 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { COLORS } from '../constants/theme';
 
-export const StatusBadge = ({ statusId, isComplete, isDeferred, customLabel }) => {
-  let label = customLabel || `Step ${statusId}`;
+export const StatusBadge = ({ statusId, statusText, isComplete, isDeferred, customLabel }) => {
+  const cleanCustom = customLabel || statusText;
+  let label = cleanCustom ? String(cleanCustom).toUpperCase() : (statusId != null ? `STEP ${statusId}` : 'PENDING');
   let bgColor = COLORS.primaryLight;
   let textColor = COLORS.primary;
 
   if (isComplete) {
-    label = customLabel || 'COMPLETED';
+    label = cleanCustom ? String(cleanCustom).toUpperCase() : 'COMPLETED';
     bgColor = '#dcfce7';
     textColor = COLORS.accentGreen;
   } else if (isDeferred) {
-    label = customLabel || 'DEFERRED';
+    label = cleanCustom ? String(cleanCustom).toUpperCase() : 'DEFERRED';
     bgColor = '#fee2e2';
     textColor = COLORS.accentRed;
   } else if (statusId === 1) {
-    label = customLabel || 'RECEIVING';
+    label = cleanCustom ? String(cleanCustom).toUpperCase() : 'RECEIVING';
     bgColor = '#e0f2fe';
     textColor = COLORS.accentBlue;
   } else if (statusId === 3) {
-    label = customLabel || 'INSPECTION';
+    label = cleanCustom ? String(cleanCustom).toUpperCase() : 'INSPECTION';
     bgColor = '#fef3c7';
     textColor = COLORS.accentGold;
   } else if (statusId === 2) {
-    label = customLabel || 'TAX MAPPING';
+    label = cleanCustom ? String(cleanCustom).toUpperCase() : 'APPRAISAL REVIEW';
     bgColor = '#ede9fe';
     textColor = '#7c3aed';
   } else if (statusId === 4) {
-    label = customLabel || 'CHECK & REVIEW';
+    label = cleanCustom ? String(cleanCustom).toUpperCase() : 'CHECK & REVIEW';
     bgColor = '#f1f5f9';
     textColor = '#475569';
   } else if (statusId === 8) {
-    label = customLabel || 'APPROVAL';
+    label = cleanCustom ? String(cleanCustom).toUpperCase() : 'APPROVAL';
     bgColor = '#fef3c7';
     textColor = '#b45309';
   }
