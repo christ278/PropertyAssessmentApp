@@ -20,6 +20,8 @@ import { COLORS, SHADOWS } from '../constants/theme';
 export const MachineryFormScreen = ({ route, navigation }) => {
   const trackingNoParam = route?.params?.trackingNo || '';
   const formWorkflowIdParam = route?.params?.formWorkflowId || null;
+  const partitionIndexParam = route?.params?.partitionIndex ?? 0;
+  const partitionLetterParam = route?.params?.partitionLetter || String.fromCharCode(65 + (parseInt(partitionIndexParam, 10) || 0));
   const { queueOfflineUpdate, getDownloadedFormData, isTransactionDownloaded } = useContext(SyncContext);
 
   const [loading, setLoading] = useState(false);
@@ -91,7 +93,7 @@ export const MachineryFormScreen = ({ route, navigation }) => {
     setNotDownloadedError(false);
 
     // 1. Check if downloaded offline copy exists
-    const downloaded = getDownloadedFormData(trackingNoParam, formWorkflowIdParam);
+    const downloaded = getDownloadedFormData(trackingNoParam, formWorkflowIdParam, partitionIndexParam);
     if (downloaded) {
       if (downloaded.owner) setOwnerName(downloaded.owner);
       if (downloaded.arpNo) setArpNo(downloaded.arpNo);
@@ -181,10 +183,27 @@ export const MachineryFormScreen = ({ route, navigation }) => {
     }
   };
 
+    const handleCancel = () => {
+    Alert.alert(
+      'Discard Changes?',
+      'Are you sure you want to cancel? Any unsaved edits for this partition will be lost.',
+      [
+        { text: 'Keep Editing', style: 'cancel' },
+        {
+          text: 'Discard & Go Back',
+          style: 'destructive',
+          onPress: () => navigation.goBack()
+        }
+      ]
+    );
+  };
+
   const handleSave = async (forceOffline = false) => {
     const payload = {
       TDN: {
         TDNId: parseInt(tdnId) || 0,
+        PartitionItemIndex: parseInt(partitionIndexParam, 10) || 0,
+        PartitionIndex: partitionLetterParam,
         TrackingNo: trackingNo || trackingNoParam,
         FormWorkflowId: formWorkflowIdParam,
         DeclarationNo: declarationNo,
@@ -246,7 +265,7 @@ export const MachineryFormScreen = ({ route, navigation }) => {
       await queueOfflineUpdate(
         'UPDATE_MACHINERY',
         payload,
-        `Machinery FAAS: ${trackingNo || arpNo} (${ownerName || 'Company'})`,
+        `Machinery FAAS [Part ${partitionLetterParam}]: ${trackingNo || arpNo} (${ownerName || 'Company'})`,
         workflowForwardPayload
       );
       Alert.alert(
@@ -282,7 +301,7 @@ export const MachineryFormScreen = ({ route, navigation }) => {
       await queueOfflineUpdate(
         'UPDATE_MACHINERY',
         payload,
-        `Machinery FAAS: ${trackingNo || arpNo} (${ownerName || 'Company'})`,
+        `Machinery FAAS [Part ${partitionLetterParam}]: ${trackingNo || arpNo} (${ownerName || 'Company'})`,
         workflowForwardPayload
       );
       Alert.alert(
@@ -297,7 +316,10 @@ export const MachineryFormScreen = ({ route, navigation }) => {
 
   return (
     <View style={styles.container}>
-      <HeaderBar title="MACHINERY FAAS" subtitle={`Tracking No: ${trackingNo || 'N/A'}`} navigation={navigation} />
+      <HeaderBar title="MACHINERY FAAS" subtitle={`Tracking No: ${trackingNo || 'N/A'} • Partition ${partitionLetterParam}`} navigation={navigation}
+        showBack={true}
+        onBackPress={handleCancel}
+      />
 
       {/* Offline Status Ribbon */}
       <View style={[styles.ribbon, isDownloaded ? styles.ribbonDownloaded : styles.ribbonStandard]}>
@@ -836,6 +858,14 @@ export const MachineryFormScreen = ({ route, navigation }) => {
                 <Ionicons name="save-outline" size={18} color={COLORS.primary} />
                 <Text style={styles.saveBtnSecondaryText}>Save to Offline Queue Only</Text>
               </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.saveBtn, styles.cancelBtn]}
+                onPress={handleCancel}
+                disabled={saving}
+              >
+                <Ionicons name="close-circle-outline" size={18} color="#e11d48" />
+                <Text style={styles.cancelBtnText}>Cancel & Discard Changes</Text>
+              </TouchableOpacity>
             </View>
           </>
         )}
@@ -1014,7 +1044,18 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontSize: 13,
     fontWeight: '800'
+  }, 
+  cancelBtn: {
+    backgroundColor: '#fff1f2',
+    borderWidth: 1,
+    borderColor: '#fecdd3'
   },
+  cancelBtnText: {
+    color: '#e11d48',
+    fontSize: 13,
+    fontWeight: '800'
+  },
+
   notDownloadedBox: {
     alignItems: 'center',
     justifyContent: 'center',

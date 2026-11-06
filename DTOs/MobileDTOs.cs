@@ -28,6 +28,23 @@ public class MobileAttachmentDTO
     public DateTime UploadedAt { get; set; } = DateTime.Now;
 }
 
+public class MobilePartitionSummaryDTO
+{
+    public int Index { get; set; }
+    public string PartitionIndex { get; set; } = "A";
+    public string Kind { get; set; } = "Land";
+    public int TransactionTypeId { get; set; } // 1: Land, 2: Building, 3: Machinery
+    public string FormType { get; set; } = "LAND";
+    public string? SystemGeneratedTDN { get; set; }
+    public string? PIN { get; set; }
+    public string? OwnerName { get; set; }
+    public decimal AreaSqMeters { get; set; }
+    public decimal MarketValue { get; set; }
+    public decimal AssessedValue { get; set; }
+    public string? SketchUrl { get; set; }
+    public int PhotoCount { get; set; }
+}
+
 public class TransactionWorkFlowDTO
 {
     public long FormworkflowId { get; set; }
@@ -51,6 +68,7 @@ public class TransactionWorkFlowDTO
     public long? TdnId { get; set; }
     public bool HasPartition { get; set; }
     public int PartitionCount { get; set; }
+    public List<MobilePartitionSummaryDTO> Partitions { get; set; } = new();
 }
 
 public class CAST_TDNBuildingDTO

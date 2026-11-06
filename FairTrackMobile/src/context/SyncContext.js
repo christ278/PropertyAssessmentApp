@@ -14,7 +14,9 @@ export const normalizeTransactionItem = (raw) => {
   const owner = raw.Owner ?? raw.owner ?? raw.Requestor ?? raw.requestor ?? '';
   const requestor = raw.Requestor ?? raw.requestor ?? owner;
   const hasPartition = raw.HasPartition ?? raw.hasPartition ?? false;
-  const partitionCount = raw.PartitionCount ?? raw.partitionCount ?? (hasPartition ? 1 : 0);
+  const rawPartitions = raw.Partitions ?? raw.partitions ?? [];
+  const partitionList = Array.isArray(rawPartitions) ? rawPartitions : [];
+  const partitionCount = raw.PartitionCount ?? raw.partitionCount ?? (partitionList.length > 0 ? partitionList.length : (hasPartition ? 1 : 0));
 
   return {
     ...raw,
@@ -36,7 +38,8 @@ export const normalizeTransactionItem = (raw) => {
     ForwarderBy: raw.ForwarderBy ?? raw.forwarderBy ?? 'Office Staff',
     TdnId: raw.TdnId ?? raw.tdnId ?? null,
     HasPartition: hasPartition,
-    PartitionCount: partitionCount
+    PartitionCount: partitionCount,
+    Partitions: partitionList
   };
 };
 
@@ -234,7 +237,16 @@ export const SyncProvider = ({ children }) => {
           [key]: {
             ...res,
             formData: res.formData ? withPascalCaseKeys(res.formData) : res.formData,
-            transItem,
+            partitions: (res.partitions || []).map(p => ({
+              ...p,
+              formData: p.formData ? withPascalCaseKeys(p.formData) : null
+            })),
+            transItem: {
+              ...transItem,
+              HasPartition: res.hasPartition,
+              PartitionCount: res.partitionCount || (res.partitions?.length || 1),
+              Partitions: res.partitions || []
+            },
             downloadedAt: new Date().toISOString()
           }
         };
@@ -295,7 +307,16 @@ export const SyncProvider = ({ children }) => {
           currentDownloads[key] = {
             ...res,
             formData: res.formData ? withPascalCaseKeys(res.formData) : res.formData,
-            transItem: item,
+            partitions: (res.partitions || []).map(p => ({
+              ...p,
+              formData: p.formData ? withPascalCaseKeys(p.formData) : null
+            })),
+            transItem: {
+              ...item,
+              HasPartition: res.hasPartition,
+              PartitionCount: res.partitionCount || (res.partitions?.length || 1),
+              Partitions: res.partitions || []
+            },
             downloadedAt: new Date().toISOString()
           };
           successCount++;
@@ -327,13 +348,34 @@ export const SyncProvider = ({ children }) => {
   };
 
   // Retrieve downloaded form data
-  const getDownloadedFormData = (trackingNo, formWorkflowId) => {
+  const getDownloadedFormData = (trackingNo, formWorkflowId, partitionIndex = 0) => {
     let found = null;
     if (trackingNo && downloadedForms[trackingNo]) {
       found = downloadedForms[trackingNo];
     } else if (formWorkflowId && downloadedForms[formWorkflowId.toString()]) {
       found = downloadedForms[formWorkflowId.toString()];
     }
+    if (!found) return null;
+
+    const targetIdx = parseInt(partitionIndex, 10) || 0;
+    if (Array.isArray(found.partitions) && found.partitions.length > targetIdx && found.partitions[targetIdx]) {
+      const partObj = found.partitions[targetIdx];
+      const partFormData = partObj.formData ? withPascalCaseKeys(partObj.formData) : (found.formData ? withPascalCaseKeys(found.formData) : null);
+      return {
+        ...found,
+        selectedPartitionIndex: targetIdx,
+        formType: partObj.formType || found.formType,
+        transactionTypeId: partObj.transactionTypeId || found.transactionTypeId,
+        owner: partObj.ownerName || found.owner,
+        arpNo: partObj.systemGeneratedTDN || found.arpNo,
+        sketchUrl: partObj.sketchUrl || found.sketchUrl,
+        sketchFileName: partObj.sketchFileName || found.sketchFileName,
+        attachments: partObj.attachments || found.attachments || [],
+        formData: partFormData,
+        currentPartition: partObj
+      };
+    }
+
     if (found && found.formData) {
       return {
         ...found,
@@ -360,10 +402,35 @@ export const SyncProvider = ({ children }) => {
 
     // Update local cached form representation
     if (payload && payload.TDN && payload.TDN.TDNId) {
-      const formKey = `${type}_${payload.TDN.TDNId}`;
+      const partIdx = parseInt(payload.TDN.PartitionItemIndex, 10) || 0;
+      const formKey = `${type}_${payload.TDN.TDNId}_part_${partIdx}`;
       const newCachedForms = { ...cachedForms, [formKey]: payload };
       setCachedForms(newCachedForms);
       await AsyncStorage.setItem('@fairtrack_cached_forms', JSON.stringify(newCachedForms));
+
+      // Also update downloadedForms cache so switching partitions offline reflects latest edits
+      const tracking = payload.TDN.TrackingNo;
+      const wfId = payload.TDN.FormWorkflowId;
+      const dKey = (tracking || wfId || '').toString();
+      if (dKey && downloadedForms[dKey]) {
+        const itemRecord = { ...downloadedForms[dKey] };
+        if (Array.isArray(itemRecord.partitions) && itemRecord.partitions.length > partIdx) {
+          const updatedPartitions = [...itemRecord.partitions];
+          updatedPartitions[partIdx] = {
+            ...updatedPartitions[partIdx],
+            formData: payload,
+            sketchUrl: payload.TDN.FloorPlanSketchPath || updatedPartitions[partIdx].sketchUrl,
+            attachments: payload.TDN.Attachments || updatedPartitions[partIdx].attachments
+          };
+          itemRecord.partitions = updatedPartitions;
+        }
+        if (partIdx === 0) {
+          itemRecord.formData = payload;
+        }
+        const newDownloads = { ...downloadedForms, [dKey]: itemRecord };
+        setDownloadedForms(newDownloads);
+        await AsyncStorage.setItem('@fairtrack_downloaded_forms', JSON.stringify(newDownloads));
+      }
     }
 
     return queueItem;

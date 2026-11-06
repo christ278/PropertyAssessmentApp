@@ -89,6 +89,10 @@ public class TDNDTO
     public string? TrackingNo { get; set; }
     public long? FormWorkflowId { get; set; }
 
+    // Partition Support
+    public int? PartitionItemIndex { get; set; }
+    public string? PartitionIndex { get; set; }
+
     // Floor Plan / Site Sketch File & Attachments
     public string? FloorPlanSketchPath { get; set; }
     public string? AttachmentsJson { get; set; }

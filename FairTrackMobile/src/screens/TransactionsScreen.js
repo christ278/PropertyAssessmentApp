@@ -8,7 +8,9 @@ import {
   TextInput,
   RefreshControl,
   ActivityIndicator,
-  Alert
+  Alert,
+  Modal,
+  ScrollView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { MobileApi } from '../api/mobileApi';
@@ -48,6 +50,8 @@ export const TransactionsScreen = ({ navigation }) => {
   const [selectedType, setSelectedType] = useState(0); // 0 = All, 4 = Downloaded Only, 1 = Land, 2 = Building, 3 = Machinery
   const [downloadingId, setDownloadingId] = useState(null);
   const [isOffline, setIsOffline] = useState(false);
+  const [selectedTransactionForPartition, setSelectedTransactionForPartition] = useState(null);
+  const [showPartitionModal, setShowPartitionModal] = useState(false);
 
   useEffect(() => {
     fetchTransactions();
@@ -149,6 +153,33 @@ export const TransactionsScreen = ({ navigation }) => {
     );
   };
 
+  const navigateToPartitionForm = (transItem, partition) => {
+    setShowPartitionModal(false);
+    const pIdx = partition?.index ?? partition?.Index ?? 0;
+    const pLetter = partition?.partitionIndex ?? partition?.PartitionIndex ?? String.fromCharCode(65 + pIdx);
+    const pKind = partition?.kind ?? partition?.Kind ?? 'Building';
+    const pTypeId = partition?.transactionTypeId ?? partition?.TransactionTypeId ?? (
+      pKind === 'Land' ? 1 : pKind === 'Machinery' ? 3 : 2
+    );
+
+    const navParams = {
+      trackingNo: transItem.TrackingNo,
+      formWorkflowId: transItem.FormworkflowId,
+      tdnId: transItem.TdnId,
+      partitionIndex: pIdx,
+      partitionLetter: pLetter,
+      partitionKind: pKind
+    };
+
+    if (pTypeId === 1 || pKind === 'Land') {
+      navigation.navigate('LandForm', navParams);
+    } else if (pTypeId === 3 || pKind === 'Machinery') {
+      navigation.navigate('MachineryForm', navParams);
+    } else {
+      navigation.navigate('BuildingForm', navParams);
+    }
+  };
+
   const handleTransactionPress = (item) => {
     // Guard: Transactions without generated partitions cannot be edited on mobile
     if (!item.HasPartition) {
@@ -171,26 +202,29 @@ export const TransactionsScreen = ({ navigation }) => {
       return;
     }
 
-    // Route to appropriate form based on transaction type
-    if (item.TransactionTypeId === 1) {
-      navigation.navigate('LandForm', {
-        trackingNo: item.TrackingNo,
-        formWorkflowId: item.FormworkflowId,
-        tdnId: item.TdnId
+    // Check if transaction has multiple partitions to select from
+    const downloadedData = downloadedForms[(item.TrackingNo || item.FormworkflowId)?.toString()];
+    const partitions = (Array.isArray(item.Partitions) && item.Partitions.length > 0)
+      ? item.Partitions
+      : (downloadedData?.partitions || []);
+    const pCount = Math.max(item.PartitionCount || 0, partitions.length);
+
+    if (pCount > 1 && partitions.length > 0) {
+      setSelectedTransactionForPartition({
+        ...item,
+        resolvedPartitions: partitions
       });
-    } else if (item.TransactionTypeId === 3) {
-      navigation.navigate('MachineryForm', {
-        trackingNo: item.TrackingNo,
-        formWorkflowId: item.FormworkflowId,
-        tdnId: item.TdnId
-      });
-    } else {
-      navigation.navigate('BuildingForm', {
-        trackingNo: item.TrackingNo,
-        formWorkflowId: item.FormworkflowId,
-        tdnId: item.TdnId
-      });
+      setShowPartitionModal(true);
+      return;
     }
+
+    // Single partition fallback: open partition 0 (A)
+    navigateToPartitionForm(item, {
+      index: 0,
+      partitionIndex: 'A',
+      transactionTypeId: item.TransactionTypeId,
+      kind: item.TransactionTypeId === 1 ? 'Land' : item.TransactionTypeId === 3 ? 'Machinery' : 'Building'
+    });
   };
 
   const renderItem = ({ item: rawItem }) => {
@@ -230,6 +264,12 @@ export const TransactionsScreen = ({ navigation }) => {
                 <View style={styles.noPartitionBadge}>
                   <Ionicons name="lock-closed" size={10} color="#b91c1c" />
                   <Text style={styles.noPartitionBadgeText}>NO PARTITION</Text>
+                </View>
+              ) : null}
+              {item.HasPartition && item.PartitionCount > 1 ? (
+                <View style={styles.multiPartitionBadge}>
+                  <Ionicons name="layers-outline" size={10} color="#0369a1" />
+                  <Text style={styles.multiPartitionBadgeText}>{item.PartitionCount} PARTITIONS</Text>
                 </View>
               ) : null}
             </View>
@@ -541,6 +581,99 @@ export const TransactionsScreen = ({ navigation }) => {
           }
         />
       )}
+
+      {/* Partition Selection Modal */}
+      <Modal
+        visible={showPartitionModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowPartitionModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+            <View style={styles.modalHeader}>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="layers" size={20} color={colors.primary} />
+                  <Text style={[styles.modalTitle, { color: colors.textDark }]}>Select Partition</Text>
+                </View>
+                <Text style={[styles.modalSubtitle, { color: colors.textMuted }]}>
+                  {selectedTransactionForPartition?.TrackingNo} • {selectedTransactionForPartition?.Owner || 'Property Owner'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => setShowPartitionModal(false)}
+              >
+                <Ionicons name="close" size={20} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalBanner}>
+              <Ionicons name="information-circle-outline" size={16} color="#0369a1" />
+              <Text style={styles.modalBannerText}>
+                This transaction contains {selectedTransactionForPartition?.resolvedPartitions?.length || 0} partitions. Tap a partition below to inspect and edit its FAAS details.
+              </Text>
+            </View>
+
+            <ScrollView style={styles.partitionList} showsVerticalScrollIndicator={false}>
+              {(selectedTransactionForPartition?.resolvedPartitions || []).map((part, pIdx) => {
+                const pIndex = part.index ?? part.Index ?? pIdx;
+                const pLetter = part.partitionIndex ?? part.PartitionIndex ?? String.fromCharCode(65 + pIndex);
+                const pKind = part.kind ?? part.Kind ?? 'Land';
+                const pTypeId = part.transactionTypeId ?? part.TransactionTypeId ?? (pKind === 'Land' ? 1 : pKind === 'Machinery' ? 3 : 2);
+                const pTdn = part.systemGeneratedTDN ?? part.SystemGeneratedTDN ?? part.pin ?? part.PIN ?? 'N/A';
+                const pArea = part.areaSqMeters ?? part.AreaSqMeters ?? 0;
+                const pMarketVal = part.marketValue ?? part.MarketValue ?? 0;
+
+                const isLand = pTypeId === 1 || pKind === 'Land';
+                const isMach = pTypeId === 3 || pKind === 'Machinery';
+                const kindColor = isLand ? '#0d9488' : isMach ? '#d97706' : '#2563eb';
+                const kindBg = isLand ? '#ccfbf1' : isMach ? '#fef3c7' : '#dbeafe';
+
+                return (
+                  <TouchableOpacity
+                    key={`part_${pIndex}_${pLetter}`}
+                    style={[
+                      styles.partitionItemCard,
+                      { borderColor: colors.border, backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc' }
+                    ]}
+                    onPress={() => navigateToPartitionForm(selectedTransactionForPartition, part)}
+                  >
+                    <View style={styles.partitionItemLeft}>
+                      <View style={[styles.partitionLetterBadge, { backgroundColor: colors.primary }]}>
+                        <Text style={styles.partitionLetterText}>{pLetter}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                          <Text style={[styles.partitionTitle, { color: colors.textDark }]}>Partition {pLetter}</Text>
+                          <View style={[styles.partitionKindBadge, { backgroundColor: kindBg }]}>
+                            <Text style={[styles.partitionKindText, { color: kindColor }]}>{pKind}</Text>
+                          </View>
+                        </View>
+                        <Text style={[styles.partitionSubtext, { color: colors.textMuted }]}>
+                          TDN/PIN: {pTdn}
+                        </Text>
+                        <Text style={[styles.partitionSubtext, { color: colors.textMuted }]}>
+                          Area: {pArea > 0 ? `${Number(pArea).toLocaleString()} sq.m.` : 'N/A'} • Market Val: ₱${Number(pMarketVal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </Text>
+                      </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <TouchableOpacity
+              style={[styles.modalCancelBtn, { borderColor: colors.border }]}
+              onPress={() => setShowPartitionModal(false)}
+            >
+              <Text style={[styles.modalCancelBtnText, { color: colors.textMuted }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -822,5 +955,136 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textAlign: 'center',
     paddingHorizontal: 24
-  }
+  },
+  multiPartitionBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#e0f2fe',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#bae6fd'
+  },
+  multiPartitionBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#0369a1',
+    letterSpacing: 0.5
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20
+  },
+  modalCard: {
+    width: '100%',
+    maxHeight: '80%',
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 10
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 12
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800'
+  },
+  modalSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
+    fontWeight: '500'
+  },
+  modalCloseBtn: {
+    padding: 4
+  },
+  modalBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#f0f9ff',
+    borderWidth: 1,
+    borderColor: '#bae6fd',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 16
+  },
+  modalBannerText: {
+    fontSize: 12,
+    color: '#0369a1',
+    flex: 1,
+    lineHeight: 16
+  },
+  partitionList: {
+    maxHeight: 320,
+    marginBottom: 16
+  },
+  partitionItemCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 10
+  },
+  partitionItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1
+  },
+  partitionLetterBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  partitionLetterText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '800'
+  },
+  partitionTitle: {
+    fontSize: 14,
+    fontWeight: '700'
+  },
+  partitionKindBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6
+  },
+  partitionKindText: {
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase'
+  },
+  partitionSubtext: {
+    fontSize: 11,
+    marginTop: 2
+  },
+  modalCancelBtn: {
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  modalCancelBtnText: {
+    fontSize: 14,
+    fontWeight: '700'
+  },
 });

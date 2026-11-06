@@ -16,7 +16,7 @@ import { AuthContext } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { LogoutModal } from './LogoutModal';
 
-export const HeaderBar = ({ title, subtitle, onSyncPress, navigation }) => {
+export const HeaderBar = ({ title, subtitle, onSyncPress, navigation, showBack = false, onBackPress }) => {
   const insets = useSafeAreaInsets();
   const { pendingCount, isSyncing, syncAllToServer } = useContext(SyncContext);
   const { user, logout } = useContext(AuthContext);
@@ -60,11 +60,20 @@ export const HeaderBar = ({ title, subtitle, onSyncPress, navigation }) => {
       ]}
     >
       <View style={styles.leftSection}>
-        <Image
+        {showBack ? (
+          <TouchableOpacity
+            style={[styles.backButton, { backgroundColor: isDarkMode ? '#1e293b' : '#f1f5f9' }]}
+            onPress={onBackPress || (() => navigation && navigation.goBack && navigation.goBack())}
+            accessibilityLabel="Go back"
+          >
+            <Ionicons name="arrow-back" size={20} color={colors.textDark} />
+          </TouchableOpacity>
+        ) : (
+          <Image
           source={require('../../assets/logo.png')}
           style={styles.headerLogo}
-          resizeMode="cover"
-        />
+          resizeMode="cover" />
+        )}
         <View style={styles.titleContainer}>
           <Text
             style={[
@@ -334,6 +343,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     gap: 10
+  },
+  backButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   headerLogo: {
     width: 32,
