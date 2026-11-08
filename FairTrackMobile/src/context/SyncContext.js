@@ -273,8 +273,26 @@ export const SyncProvider = ({ children }) => {
     }
   };
 
+  // Check if a transaction has unsynced local edits waiting in syncQueue
+  const hasPendingEdits = (trackingNo, formWorkflowId) => {
+    if (!syncQueue || syncQueue.length === 0) return false;
+    const tNo = (trackingNo || '').toString().trim().toLowerCase();
+    const wfId = (formWorkflowId || '').toString().trim();
+
+    return syncQueue.some(item => {
+      const p = item.payload;
+      const tdn = p?.TDN || p?.tdn;
+      const itemTracking = (tdn?.TrackingNo || tdn?.trackingNo || p?.TrackingNo || p?.trackingNo || '').toString().trim().toLowerCase();
+      const itemWfId = (tdn?.FormWorkflowId || tdn?.formWorkflowId || p?.FormWorkflowId || p?.formWorkflowId || item.workflowForwardPayload?.FormWorkflowId || '').toString().trim();
+
+      if (tNo && itemTracking && tNo === itemTracking) return true;
+      if (wfId && itemWfId && wfId === itemWfId) return true;
+      return false;
+    });
+  };
+
   // Batch download multiple transactions (strictly Property Assessment & Field Inspection)
-  const downloadAllTransactions = async (transactionsList) => {
+  const downloadAllTransactions = async (transactionsList, skipPending = true) => {
     const allowedList = (transactionsList || [])
       .map(normalizeTransactionItem)
       .filter(isAllowedMobileTransaction);
@@ -294,12 +312,28 @@ export const SyncProvider = ({ children }) => {
       };
     }
 
+    // Protection: Exclude transactions with unsynced local edits if skipPending is active
+    const targetsToDownload = skipPending
+      ? partitionAllowedList.filter(t => !hasPendingEdits(t.TrackingNo, t.FormworkflowId))
+      : partitionAllowedList;
+    const skippedPendingCount = partitionAllowedList.length - targetsToDownload.length;
+
+    if (targetsToDownload.length === 0) {
+      return {
+        success: false,
+        skippedPendingCount,
+        message: skippedPendingCount > 0
+          ? `All ${skippedPendingCount} transaction(s) have unsynced local edits. Please sync your changes to the office first before re-downloading.`
+          : 'No transactions available to download.'
+      };
+    }
+
     setIsDownloading(true);
     let successCount = 0;
     let failCount = 0;
     const currentDownloads = { ...downloadedForms };
 
-    for (const item of partitionAllowedList) {
+    for (const item of targetsToDownload) {
       try {
         const res = await MobileApi.downloadTransactionDetails(item.FormworkflowId, item.TrackingNo);
         if (res && res.success && res.hasPartition) {
@@ -336,6 +370,7 @@ export const SyncProvider = ({ children }) => {
       successCount,
       failCount,
       skippedCount: unpartitionedCount,
+      skippedPendingCount,
       total: partitionAllowedList.length
     };
   };
@@ -555,6 +590,7 @@ export const SyncProvider = ({ children }) => {
         downloadAllTransactions,
         removeDownloadedTransaction,
         isTransactionDownloaded,
+        hasPendingEdits,
         getDownloadedFormData,
         queueOfflineUpdate,
         syncAllToServer,

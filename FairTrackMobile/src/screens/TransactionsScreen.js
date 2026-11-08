@@ -37,6 +37,7 @@ export const TransactionsScreen = ({ navigation }) => {
     downloadSingleTransaction,
     downloadAllTransactions,
     isTransactionDownloaded,
+    hasPendingEdits,
     getOfflineTransactions,
     downloadedForms,
     downloadedCount,
@@ -112,7 +113,7 @@ export const TransactionsScreen = ({ navigation }) => {
     return list;
   }, [transactions, selectedType, searchQuery, downloadedForms]);
 
-  const handleDownloadSingle = async (item) => {
+  const executeDownloadSingle = async (item) => {
     setDownloadingId(item.FormworkflowId);
     const res = await downloadSingleTransaction(item);
     setDownloadingId(null);
@@ -124,26 +125,58 @@ export const TransactionsScreen = ({ navigation }) => {
     }
   };
 
+  const handleDownloadSingle = async (item) => {
+    const hasPending = typeof hasPendingEdits === 'function' && hasPendingEdits(item.TrackingNo, item.FormworkflowId);
+    if (hasPending) {
+      Alert.alert(
+        'Unsynced Local Edits Detected',
+        `Transaction "${item.TrackingNo}" has offline edits queued that haven't been uploaded to the web portal yet.\n\nRe-downloading now will overwrite your local changes with the office version.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Sync First',
+            onPress: () => navigation.navigate('Sync')
+          },
+          {
+            text: 'Overwrite Anyway',
+            style: 'destructive',
+            onPress: () => executeDownloadSingle(item)
+          }
+        ]
+      );
+      return;
+    }
+
+    await executeDownloadSingle(item);
+  };
+
   const handleDownloadAll = async () => {
     if (transactions.length === 0) {
       Alert.alert('No Transactions', 'There are no assigned transactions in your list to download.');
       return;
     }
 
+    const pendingCountInList = transactions.filter(t => typeof hasPendingEdits === 'function' && hasPendingEdits(t.TrackingNo, t.FormworkflowId)).length;
+    let confirmMsg = `Download ${transactions.length} assigned property transactions to your phone storage for offline inspection?`;
+    if (pendingCountInList > 0) {
+      confirmMsg += `\n\n🛡️ Note: ${pendingCountInList} transaction(s) with unsynced local edits will be safely protected and skipped to prevent losing your work.`;
+    }
+
     Alert.alert(
       'Download All for Offline Field Work',
-      `Download ${transactions.length} assigned property transactions to your phone storage for offline inspection?`,
+      confirmMsg,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Download All',
           onPress: async () => {
-            const res = await downloadAllTransactions(transactions);
+            const res = await downloadAllTransactions(transactions, true);
             if (res.success) {
-              Alert.alert(
-                'Download Complete',
-                `Successfully downloaded ${res.successCount} of ${res.total} property forms to your phone. Ready for offline inspection!`
-              );
+              let msg = `Successfully downloaded ${res.successCount} of ${res.total} property forms to your phone. Ready for offline inspection!`;
+              if (res.skippedPendingCount > 0) {
+                msg += `\n\n🛡️ ${res.skippedPendingCount} transaction(s) with pending offline edits were preserved.`;
+              }
+              Alert.alert('Download Complete', msg);
             } else {
               Alert.alert('Download Incomplete', res.message || 'Some records failed to download.');
             }
@@ -230,6 +263,7 @@ export const TransactionsScreen = ({ navigation }) => {
   const renderItem = ({ item: rawItem }) => {
     const item = normalizeTransactionItem(rawItem);
     const isDownloaded = isTransactionDownloaded(item.TrackingNo, item.FormworkflowId);
+    const hasPending = typeof hasPendingEdits === 'function' && hasPendingEdits(item.TrackingNo, item.FormworkflowId);
     const isThisDownloading = downloadingId === item.FormworkflowId;
 
     const kindLabel = item.TransactionTypeId === 2 ? 'Building FAAS' :
@@ -270,6 +304,12 @@ export const TransactionsScreen = ({ navigation }) => {
                 <View style={styles.multiPartitionBadge}>
                   <Ionicons name="layers-outline" size={10} color="#0369a1" />
                   <Text style={styles.multiPartitionBadgeText}>{item.PartitionCount} PARTITIONS</Text>
+                </View>
+              ) : null}
+              {hasPending ? (
+                <View style={styles.pendingEditsBadge}>
+                  <Ionicons name="cloud-upload" size={10} color="#b45309" />
+                  <Text style={styles.pendingEditsBadgeText}>UNSYNCED EDITS</Text>
                 </View>
               ) : null}
             </View>
@@ -331,10 +371,47 @@ export const TransactionsScreen = ({ navigation }) => {
         {/* Download Indicator & Actions */}
         <View style={styles.cardFooter}>
           {item.HasPartition ? (
-            isDownloaded ? (
-              <View style={styles.downloadedBadge}>
-                <Ionicons name="checkmark-circle" size={14} color="#16a34a" />
-                <Text style={styles.downloadedBadgeText}>Downloaded (Offline Ready)</Text>
+            hasPending ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <TouchableOpacity
+                  style={styles.pendingFooterBadge}
+                  activeOpacity={0.8}
+                  onPress={() => navigation.navigate('Sync')}
+                >
+                  <Ionicons name="cloud-upload" size={14} color="#d97706" />
+                  <Text style={styles.pendingFooterBadgeText}>Unsynced (Sync)</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.redownloadIconBtn, isDarkMode && { backgroundColor: '#1e293b', borderColor: '#334155' }]}
+                  onPress={() => handleDownloadSingle(item)}
+                  disabled={isThisDownloading}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  {isThisDownloading ? (
+                    <ActivityIndicator size="small" color="#d97706" />
+                  ) : (
+                    <Ionicons name="sync-outline" size={13} color="#d97706" />
+                  )}
+                </TouchableOpacity>
+              </View>
+            ) : isDownloaded ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <View style={styles.downloadedBadge}>
+                  <Ionicons name="checkmark-circle" size={14} color="#16a34a" />
+                  <Text style={styles.downloadedBadgeText}>Downloaded</Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.redownloadIconBtn, isDarkMode && { backgroundColor: '#1e293b', borderColor: '#334155' }]}
+                  onPress={() => handleDownloadSingle(item)}
+                  disabled={isThisDownloading}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  {isThisDownloading ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <Ionicons name="sync-outline" size={13} color={colors.primary} />
+                  )}
+                </TouchableOpacity>
               </View>
             ) : (
               <TouchableOpacity
@@ -900,6 +977,48 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#15803d'
+  },
+  pendingFooterBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef3c7',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 4
+  },
+  pendingFooterBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#b45309'
+  },
+  pendingEditsBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef3c7',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    gap: 3
+  },
+  pendingEditsBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#b45309'
+  },
+  redownloadIconBtn: {
+    paddingHorizontal: 7,
+    paddingVertical: 5,
+    borderRadius: 6,
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   downloadBtn: {
     flexDirection: 'row',
