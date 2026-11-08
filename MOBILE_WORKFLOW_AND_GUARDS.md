@@ -148,3 +148,87 @@ When tapping **"Download All"** in the top action bar:
 | **Web Partition Editor** | [`Views/PropertyAssessmentRequest/EditPartition.cshtml`](file:///c:/Users/HP_06/sideHustle/PropertyAssessmentApp/Views/PropertyAssessmentRequest/EditPartition.cshtml) | Web multi-photo upload (`+ Add Photos`), gallery viewer, sketch floor plan editor, and FAAS partition appraisal. |
 | **Mobile REST API** | [`Controllers/Api/MobileApiController.cs`](file:///c:/Users/HP_06/sideHustle/PropertyAssessmentApp/Controllers/Api/MobileApiController.cs) | REST endpoints for transactions, download details, form updates, and workflow forwards. |
 | **Web RPA Controller** | [`Controllers/PropertyAssessmentRequestController.cs`](file:///c:/Users/HP_06/sideHustle/PropertyAssessmentApp/Controllers/PropertyAssessmentRequestController.cs) | Multi-photo endpoint `UploadPartitionInspectionPhotos` and `SavePartition` handler. |
+
+---
+
+## 6. How to Run the Mobile Application (`FairTrackMobile`)
+
+### Prerequisites
+- **Node.js** (v18 or higher installed on your computer).
+- **.NET 9 SDK** (for the backend server).
+- **Expo Go App** installed on an Android device (from Google Play Store), **OR** an Android Emulator (Android Studio), **OR** a modern Web Browser.
+
+---
+
+### Step 1: Start the ASP.NET Core Backend Server
+Before launching the mobile app, start the web API backend bound to `0.0.0.0` so devices on your Wi-Fi network can reach it:
+
+```bash
+# In the project root (PropertyAssessmentApp):
+dotnet run --urls http://0.0.0.0:5156
+```
+> [!NOTE]
+> `http://0.0.0.0:5156` allows incoming connections from both your local PC (`localhost`), physical Android phones on the same Wi-Fi, and Android emulators.
+
+---
+
+### Step 2: Install Mobile Dependencies (First-Time Only)
+Open a new terminal window and navigate into the mobile directory:
+
+```bash
+cd FairTrackMobile
+npm install
+```
+
+---
+
+### Step 3: Launch the Expo Development Server
+Run one of the following commands depending on how you want to test:
+
+#### Option A: Run on a Physical Android Phone via Expo Go (Recommended for Field Simulation)
+```bash
+npx expo start
+```
+- A large QR code will appear in your terminal.
+- Open the **Expo Go** app on your Android phone and scan the QR code.
+- *Requirement:* Your phone and your PC **must be connected to the same Wi-Fi router / network hotspot**.
+
+#### Option B: Run in a Web Browser (Quick Desktop Preview)
+```bash
+npm run web
+# OR: npx expo start --web
+```
+- Metro bundler will build the web bundle and open `http://localhost:8081` in your default browser.
+
+#### Option C: Run on an Android Emulator
+```bash
+npm run android
+# OR: Start an emulator in Android Studio, then press 'a' in the Expo terminal
+```
+
+---
+
+### Step 4: Configure the Server URL in Mobile App
+Once the app loads to the **Login Screen**:
+
+1. Tap the **⚙️ Settings** button at the top-right corner of the login screen.
+2. Set the **Server URL** according to your device type:
+   - **Physical Android Phone on Wi-Fi:**  
+     Set to your PC's local network IP address:  
+     `http://192.168.X.X:5156` *(e.g. `http://192.168.1.15:5156`)*  
+     *(You can find your PC IP by running `ipconfig` in a Windows terminal).*
+   - **Android Emulator (Android Studio):**  
+     Use the Android loopback IP:  
+     `http://10.0.2.2:5156`
+   - **Web Browser Preview:**  
+     `http://localhost:5156`
+3. Tap **"Save URL"**.
+
+---
+
+### Step 5: Sign In
+- Enter your LGU Staff Username and Password (e.g., your assigned Appraiser, Tax Mapper, or Administrator account).
+- Tap **"Sign In to FairTrack"**.
+- You will be redirected to the **Dashboard** displaying your assigned field transactions, pending partitions, and sync status!
+
+
