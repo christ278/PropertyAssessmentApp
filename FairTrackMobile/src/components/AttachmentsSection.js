@@ -29,6 +29,22 @@ export const AttachmentsSection = ({
   const [uploading, setUploading] = useState(false);
 
   // Resolve web sketch URL to full address
+  const [resolvedAttachmentUris, setResolvedAttachmentUris] = useState({});
+
+  useEffect(() => {
+    let isMounted = true;
+    const resolveAll = async () => {
+      const uris = {};
+      for (const att of (attachments || [])) {
+        if (att && att.fileUrl) {
+          uris[att.id || att.fileUrl] = await resolveServerUrl(att.fileUrl);
+        }
+      }
+      if (isMounted) setResolvedAttachmentUris(uris);
+    };
+    resolveAll();
+    return () => { isMounted = false; };
+  }, [attachments]);
   useEffect(() => {
     let isMounted = true;
     if (sketchUrl) {
@@ -330,17 +346,19 @@ export const AttachmentsSection = ({
           </View>
         ) : (
           <View style={styles.attachmentsList}>
-            {attachments.map((item, idx) => (
+            {attachments.map((item, idx) => {
+              const itemUri = resolvedAttachmentUris[item.id || item.fileUrl] || item.fileUrl;
+              return (
               <View key={item.id || idx} style={styles.attachmentCard}>
                 <View style={styles.attTopRow}>
                   {/* Photo Thumbnail */}
                   <TouchableOpacity
                     activeOpacity={0.8}
-                    onPress={() => setFullscreenImage(item.fileUrl)}
+                    onPress={() => setFullscreenImage(itemUri)}
                     style={styles.attThumbnailWrap}
                   >
                     <Image
-                      source={{ uri: item.fileUrl }}
+                      source={{ uri: itemUri }}
                       style={styles.attThumbnail}
                       resizeMode="cover"
                     />
@@ -384,7 +402,8 @@ export const AttachmentsSection = ({
                   />
                 </View>
               </View>
-            ))}
+            );
+            })}
           </View>
         )}
       </View>

@@ -6,6 +6,7 @@
     var returnUrl = ViewBag.ReturnUrl as string ?? (requestId.HasValue ? Url.Action("Edit", new { id = requestId.Value }) : Url.Action("Create"));
     var displayTdn = !string.IsNullOrWhiteSpace(Model.SystemGeneratedTDN) ? Model.SystemGeneratedTDN : "TDN System Pending";
     var registeredOwners = ViewBag.RegisteredOwners as IEnumerable<PropertyAssessmentApp.Models.Owner> ?? Enumerable.Empty<PropertyAssessmentApp.Models.Owner>();
+    var trackingNo = ViewBag.TrackingNumber as string ?? "";
     var jsonOptions = new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase };
 }
 
@@ -886,51 +887,25 @@
                 <partial name="_MachineryPartitionForm" model="Model" />
             </div> <!-- /#container-machinery-appraisal -->
 
-            <!-- FIELD INSPECTION ATTACHMENTS & PHOTOS (FROM FAIRTRACK MOBILE) -->
+            <!-- FIELD INSPECTION ATTACHMENTS & PHOTOS (FROM FAIRTRACK MOBILE & WEB) -->
             <div class="p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
                 <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-stone-800 pb-3">
                     <h3 class="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2">
                         <i data-lucide="camera" class="w-4 h-4 text-emerald-600"></i> Field Inspection Photo Attachments
                     </h3>
-                    <span class="text-xs text-slate-400 font-mono">FairTrack Mobile Sync</span>
+                    <div class="flex items-center gap-3">
+                        <input type="file" id="fileUploadInspectionPhotos" multiple accept="image/*" class="hidden" onchange="handleWebInspectionPhotos(event)" />
+                        <button type="button" onclick="document.getElementById('fileUploadInspectionPhotos').click()" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer">
+                            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                            <span id="btnUploadPhotosText">Add Photos</span>
+                        </button>
+                        <span class="text-xs text-slate-400 font-mono">FairTrack Mobile Sync</span>
+                    </div>
                 </div>
                 
-                @{
-                    List<PropertyAssessmentApp.DTOs.MobileAttachmentDTO> partitionAttachments = new();
-                    if (!string.IsNullOrWhiteSpace(Model.AttachmentsJson))
-                    {
-                        try
-                        {
-                            partitionAttachments = System.Text.Json.JsonSerializer.Deserialize<List<PropertyAssessmentApp.DTOs.MobileAttachmentDTO>>(Model.AttachmentsJson, jsonOptions) ?? new();
-                        }
-                        catch { }
-                    }
-                }
-
-                @if (partitionAttachments.Any())
-                {
-                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                        @foreach (var att in partitionAttachments)
-                        {
-                            <a href="@att.FileUrl" target="_blank" class="group relative block aspect-square rounded-xl overflow-hidden border border-slate-200 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-xs hover:border-emerald-600 transition-all">
-                                <img src="@att.FileUrl" alt="@att.FileName" class="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                                <div class="absolute inset-x-0 bottom-0 p-1.5 bg-slate-900/70 backdrop-blur-xs text-[10px] text-white truncate">
-                                    @(string.IsNullOrWhiteSpace(att.FileName) ? "Photo" : att.FileName)
-                                </div>
-                            </a>
-                        }
-                    </div>
-                }
-                else
-                {
-                    <div class="p-6 text-center text-slate-400 dark:text-stone-500 bg-white dark:bg-stone-900 rounded-xl border border-dashed border-slate-200 dark:border-stone-800">
-                        <i data-lucide="images" class="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-stone-600"></i>
-                        <p class="text-xs font-mono font-bold text-slate-600 dark:text-stone-400">No Inspection Photos Uploaded Yet</p>
-                        <p class="text-[11px] font-mono text-slate-400 dark:text-stone-500 mt-1">
-                            Field appraisers using the FairTrack Mobile app can capture and upload live site photos, structure views, and machine nameplates directly from the field.
-                        </p>
-                    </div>
-                }
+                <div id="inspectionPhotosContainer">
+                    <!-- Populated dynamically by renderInspectionPhotosGallery() -->
+                </div>
             </div>
 
             <!-- Submit Button Footer (Matches File Property Assessment Request standard) -->
@@ -3045,6 +3020,120 @@
             $('#BuildingFloorPlanSketchPath').val('');
         }
 
+        // =========================================================================
+        // FIELD INSPECTION PHOTOS LOGIC (MULTIPLE PHOTOS WEB & FAIRTRACK SYNC)
+        // =========================================================================
+        let partitionInspectionPhotos = [];
+        try {
+            const rawAtts = $('#AttachmentsJson').val();
+            if (rawAtts && rawAtts.trim()) {
+                partitionInspectionPhotos = JSON.parse(rawAtts);
+                if (!Array.isArray(partitionInspectionPhotos)) {
+                    partitionInspectionPhotos = [];
+                }
+            }
+        } catch (e) {
+            partitionInspectionPhotos = [];
+        }
+
+        function renderInspectionPhotosGallery() {
+            const container = document.getElementById('inspectionPhotosContainer');
+            if (!container) return;
+
+            if (!partitionInspectionPhotos || partitionInspectionPhotos.length === 0) {
+                container.innerHTML = `
+                    <div class="p-6 text-center text-slate-400 dark:text-stone-500 bg-white dark:bg-stone-900 rounded-xl border border-dashed border-slate-200 dark:border-stone-800">
+                        <i data-lucide="images" class="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-stone-600"></i>
+                        <p class="text-xs font-mono font-bold text-slate-600 dark:text-stone-400">No Inspection Photos Uploaded Yet</p>
+                        <p class="text-[11px] font-mono text-slate-400 dark:text-stone-500 mt-1">
+                            Click "+ Add Photos" above to upload inspection photos, or capture site photos via FairTrack Mobile app.
+                        </p>
+                    </div>`;
+            } else {
+                let html = '<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">';
+                partitionInspectionPhotos.forEach((item, index) => {
+                    const fileUrl = item.fileUrl || item.FileUrl || '';
+                    const fileName = item.fileName || item.FileName || `Photo ${index + 1}`;
+                    const itemId = item.id || item.Id || ('photo_' + index);
+                    html += `
+                        <div class="group relative aspect-square rounded-xl overflow-hidden border border-slate-200 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-xs hover:border-emerald-600 transition-all">
+                            <a href="${fileUrl}" target="_blank" class="block w-full h-full">
+                                <img src="${fileUrl}" alt="${fileName}" class="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                            </a>
+                            <div class="absolute inset-x-0 bottom-0 p-1.5 bg-slate-900/80 backdrop-blur-xs text-[10px] text-white flex items-center justify-between gap-1">
+                                <span class="truncate" title="${fileName}">${fileName}</span>
+                                <button type="button" onclick="removePartitionPhoto('${itemId}', event)" class="text-red-400 hover:text-red-300 p-0.5 shrink-0 transition-colors" title="Delete Photo">
+                                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                                </button>
+                            </div>
+                        </div>`;
+                });
+                html += '</div>';
+                container.innerHTML = html;
+            }
+
+            if (window.lucide) {
+                lucide.createIcons();
+            }
+        }
+
+        function removePartitionPhoto(id, e) {
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            if (!confirm('Are you sure you want to remove this inspection photo?')) return;
+
+            partitionInspectionPhotos = partitionInspectionPhotos.filter((p, idx) => {
+                const pid = p.id || p.Id || ('photo_' + idx);
+                return pid !== id;
+            });
+            $('#AttachmentsJson').val(JSON.stringify(partitionInspectionPhotos));
+            renderInspectionPhotosGallery();
+            if (window.toastr) toastr.info('Photo removed from partition.');
+        }
+
+        async function handleWebInspectionPhotos(event) {
+            const files = event.target.files;
+            if (!files || files.length === 0) return;
+
+            const btnText = document.getElementById('btnUploadPhotosText');
+            const originalText = btnText ? btnText.innerText : 'Add Photos';
+            if (btnText) btnText.innerText = 'Uploading...';
+
+            const formData = new FormData();
+            for (let i = 0; i < files.length; i++) {
+                formData.append('files', files[i]);
+            }
+            formData.append('trackingNo', '@trackingNo');
+
+            try {
+                const response = await fetch('/PropertyAssessmentRequest/UploadPartitionInspectionPhotos', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('Upload failed with status ' + response.status);
+                }
+
+                const newPhotos = await response.json();
+                if (Array.isArray(newPhotos) && newPhotos.length > 0) {
+                    partitionInspectionPhotos.push(...newPhotos);
+                    $('#AttachmentsJson').val(JSON.stringify(partitionInspectionPhotos));
+                    renderInspectionPhotosGallery();
+                    if (window.toastr) toastr.success(`Uploaded ${newPhotos.length} photo(s) successfully!`);
+                }
+            } catch (err) {
+                console.error('Error uploading photos:', err);
+                if (window.toastr) toastr.error('Failed to upload inspection photos. Please try again.');
+                else alert('Failed to upload inspection photos.');
+            } finally {
+                if (btnText) btnText.innerText = originalText;
+                event.target.value = '';
+            }
+        }
+
         // Save & Return Logic
         function submitPartitionForm() {
             const activeKind = (window.activeAppraisalKind || 'Land').toLowerCase();
@@ -3898,6 +3987,15 @@
                             $('#btnClearSketch').removeClass('hidden');
                             $('#BuildingFloorPlanSketchBase64').val(p.buildingFloorPlanSketchBase64);
                         }
+                        if (p.attachmentsJson || p.AttachmentsJson) {
+                            const raw = p.attachmentsJson || p.AttachmentsJson;
+                            $('#AttachmentsJson').val(raw);
+                            try {
+                                partitionInspectionPhotos = JSON.parse(raw);
+                                if (!Array.isArray(partitionInspectionPhotos)) partitionInspectionPhotos = [];
+                            } catch(e) {}
+                            renderInspectionPhotosGallery();
+                        }
                         if (p.buildingFloorPlanSketchPath) {
                             $('#BuildingFloorPlanSketchPath').val(p.buildingFloorPlanSketchPath);
                             $('#sketchFilenameDisplay').text(p.buildingFloorPlanSketchPath);
@@ -4040,6 +4138,7 @@
                 syncCastArpAndTdnLive();
             }
 
+            renderInspectionPhotosGallery();
             recalculateValuation();
         });
     </script>

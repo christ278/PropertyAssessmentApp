@@ -539,6 +539,60 @@ public class PropertyAssessmentRequestController : Controller
         }
     }
 
+    // POST: /PropertyAssessmentRequest/UploadPartitionInspectionPhotos
+    [HttpPost]
+    [IgnoreAntiforgeryToken]
+    public async Task<IActionResult> UploadPartitionInspectionPhotos(List<IFormFile> files, string? trackingNo = null)
+    {
+        if (files == null || files.Count == 0)
+        {
+            return Json(new { success = false, message = "No files received." });
+        }
+
+        try
+        {
+            string cleanTracking = string.IsNullOrWhiteSpace(trackingNo) ? "general" : trackingNo.Trim();
+            var uploadsDir = Path.Combine(_env.WebRootPath, "uploads", "InspectionAttachments", cleanTracking);
+            if (!Directory.Exists(uploadsDir))
+            {
+                Directory.CreateDirectory(uploadsDir);
+            }
+
+            var uploadedAttachments = new List<PropertyAssessmentApp.DTOs.MobileAttachmentDTO>();
+            foreach (var file in files)
+            {
+                if (file.Length == 0) continue;
+
+                var ext = Path.GetExtension(file.FileName);
+                if (string.IsNullOrWhiteSpace(ext)) ext = ".jpg";
+                var safeBase = System.Text.RegularExpressions.Regex.Replace(Path.GetFileNameWithoutExtension(file.FileName), @"[^a-zA-Z0-9_\-]", "_");
+                var fileName = $"{Guid.NewGuid():N}_{safeBase}{ext}";
+                var fullPath = Path.Combine(uploadsDir, fileName);
+
+                using (var stream = new FileStream(fullPath, FileMode.Create))
+                {
+                    await file.CopyToAsync(stream);
+                }
+
+                uploadedAttachments.Add(new PropertyAssessmentApp.DTOs.MobileAttachmentDTO
+                {
+                    Id = $"photo_{DateTime.UtcNow.Ticks}_{Guid.NewGuid():N}"[..24],
+                    FileName = file.FileName,
+                    FileUrl = $"/uploads/InspectionAttachments/{cleanTracking}/{fileName}",
+                    FileType = "image",
+                    FileSize = $"{Math.Round(file.Length / 1024.0)} KB",
+                    UploadedAt = DateTime.UtcNow
+                });
+            }
+
+            return Json(uploadedAttachments);
+        }
+        catch (Exception ex)
+        {
+            return Json(new { success = false, message = ex.Message });
+        }
+    }
+
     // POST: /PropertyAssessmentRequest/SavePartition
     [HttpPost]
     [ValidateAntiForgeryToken]
