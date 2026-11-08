@@ -1433,7 +1433,8 @@ public class MobileApiController : ControllerBase
             var partitions = PartitionJsonHelper.ParseList(rfi.GeneratedPartitionsJson);
             if (partitions.Count > 0)
             {
-                UpdatePartitionFromEntities(partitions[0], td, bldg, land, machine, dtoTdn, processedAttachments);
+                int targetIdx = ResolvePartitionTargetIndex(partitions, dtoTdn);
+                UpdatePartitionFromEntities(partitions[targetIdx], td, bldg, land, machine, dtoTdn, processedAttachments);
                 rfi.GeneratedPartitionsJson = JsonSerializer.Serialize(partitions, _jsonOptions);
             }
         }

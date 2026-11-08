@@ -65,6 +65,7 @@
             <input type="hidden" asp-for="BuildingTotalAdditionsValue" id="buildingTotalAdditionsValue" />
             <input type="hidden" asp-for="BuildingDepreciationAccumulated" id="buildingDepreciationAccumulated" />
             <input type="hidden" asp-for="BuildingDepreciatedMarketValue" id="buildingDepreciatedMarketValue" />
+            <input type="hidden" asp-for="AttachmentsJson" id="AttachmentsJson" />
 
             <!-- Tracking & Status Badge Header -->
             <div class="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 flex flex-wrap items-center justify-between gap-4">
@@ -884,6 +885,53 @@
             <div id="container-machinery-appraisal" class="space-y-6 @(Model.Kind == "Machinery" ? "" : "hidden")">
                 <partial name="_MachineryPartitionForm" model="Model" />
             </div> <!-- /#container-machinery-appraisal -->
+
+            <!-- FIELD INSPECTION ATTACHMENTS & PHOTOS (FROM FAIRTRACK MOBILE) -->
+            <div class="p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-stone-800 pb-3">
+                    <h3 class="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2">
+                        <i data-lucide="camera" class="w-4 h-4 text-emerald-600"></i> Field Inspection Photo Attachments
+                    </h3>
+                    <span class="text-xs text-slate-400 font-mono">FairTrack Mobile Sync</span>
+                </div>
+                
+                @{
+                    List<PropertyAssessmentApp.DTOs.MobileAttachmentDTO> partitionAttachments = new();
+                    if (!string.IsNullOrWhiteSpace(Model.AttachmentsJson))
+                    {
+                        try
+                        {
+                            partitionAttachments = System.Text.Json.JsonSerializer.Deserialize<List<PropertyAssessmentApp.DTOs.MobileAttachmentDTO>>(Model.AttachmentsJson, jsonOptions) ?? new();
+                        }
+                        catch { }
+                    }
+                }
+
+                @if (partitionAttachments.Any())
+                {
+                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                        @foreach (var att in partitionAttachments)
+                        {
+                            <a href="@att.FileUrl" target="_blank" class="group relative block aspect-square rounded-xl overflow-hidden border border-slate-200 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-xs hover:border-emerald-600 transition-all">
+                                <img src="@att.FileUrl" alt="@att.FileName" class="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                <div class="absolute inset-x-0 bottom-0 p-1.5 bg-slate-900/70 backdrop-blur-xs text-[10px] text-white truncate">
+                                    @(string.IsNullOrWhiteSpace(att.FileName) ? "Photo" : att.FileName)
+                                </div>
+                            </a>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="p-6 text-center text-slate-400 dark:text-stone-500 bg-white dark:bg-stone-900 rounded-xl border border-dashed border-slate-200 dark:border-stone-800">
+                        <i data-lucide="images" class="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-stone-600"></i>
+                        <p class="text-xs font-mono font-bold text-slate-600 dark:text-stone-400">No Inspection Photos Uploaded Yet</p>
+                        <p class="text-[11px] font-mono text-slate-400 dark:text-stone-500 mt-1">
+                            Field appraisers using the FairTrack Mobile app can capture and upload live site photos, structure views, and machine nameplates directly from the field.
+                        </p>
+                    </div>
+                }
+            </div>
 
             <!-- Submit Button Footer (Matches File Property Assessment Request standard) -->
             <div class="flex flex-col-reverse sm:flex-row sm:items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-stone-800">
@@ -3359,6 +3407,7 @@
             // Building Floor Plan Sketch Attachment (persist path; exclude giant base64 to avoid quota limits)
             updatedPartition.buildingFloorPlanSketchPath = $('#BuildingFloorPlanSketchPath').val();
             updatedPartition.buildingFloorPlanSketchBase64 = null;
+            updatedPartition.attachmentsJson = $('#AttachmentsJson').val();
 
             // Structural Specs
             updatedPartition.structuralType = $('select[name="StructuralType"]').val();

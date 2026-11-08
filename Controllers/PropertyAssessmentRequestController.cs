@@ -565,6 +565,7 @@ public class PropertyAssessmentRequestController : Controller
                         payloadItem.BuildingFloorPlanSketchBase64 = item.BuildingFloorPlanSketchBase64;
                     if (payloadItem.BasePropertyId == null) payloadItem.BasePropertyId = item.BasePropertyId;
                     if (string.IsNullOrWhiteSpace(payloadItem.BaseTDN)) payloadItem.BaseTDN = item.BaseTDN;
+                    if (string.IsNullOrWhiteSpace(payloadItem.AttachmentsJson)) payloadItem.AttachmentsJson = item.AttachmentsJson;
                     item = payloadItem;
                 }
             }
@@ -668,6 +669,10 @@ public class PropertyAssessmentRequestController : Controller
 
                     if (index >= 0 && index < list.Count)
                     {
+                        if (string.IsNullOrWhiteSpace(item.AttachmentsJson) && !string.IsNullOrWhiteSpace(list[index].AttachmentsJson))
+                        {
+                            item.AttachmentsJson = list[index].AttachmentsJson;
+                        }
                         list[index] = item;
                     }
                     else
@@ -694,7 +699,11 @@ public class PropertyAssessmentRequestController : Controller
 
                         if (index >= 0 && index < list.Count)
                         {
-                            list[index] = item;
+                            if (string.IsNullOrWhiteSpace(item.AttachmentsJson) && !string.IsNullOrWhiteSpace(list[index].AttachmentsJson))
+                        {
+                            item.AttachmentsJson = list[index].AttachmentsJson;
+                        }
+                        list[index] = item;
                         }
                         else
                         {
