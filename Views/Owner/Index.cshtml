@@ -1,4 +1,4 @@
-﻿@model IEnumerable<PropertyAssessmentApp.Models.Owner>
+@model IEnumerable<PropertyAssessmentApp.Models.Owner>
 @using PropertyAssessmentApp.Models
 
 @{
@@ -156,7 +156,7 @@
                                             <i data-lucide="more-vertical" class="w-4 h-4"></i>
                                         </button>
 
-                                        <div id="kebab-owner-@item.Id" class="kebab-dropdown hidden absolute right-0 mt-2 w-44 rounded-2xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-xl z-50 overflow-hidden divide-y divide-slate-100 dark:divide-stone-800/80 text-xs font-mono text-left">
+                                        <div id="kebab-owner-@item.Id" class="kebab-dropdown hidden absolute right-0 mt-2 w-48 rounded-2xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-xl z-50 overflow-hidden divide-y divide-slate-100 dark:divide-stone-800/80 text-xs font-mono text-left">
                                             <div class="py-1">
                                                 <a asp-action="Details" asp-route-id="@item.Id" class="flex items-center gap-2.5 px-3.5 py-2 text-slate-700 dark:text-stone-300 hover:bg-emerald-50 dark:hover:bg-stone-800 font-bold">
                                                     <i data-lucide="user-check" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
@@ -166,6 +166,16 @@
                                                     <i data-lucide="edit-3" class="w-3.5 h-3.5 text-teal-600 dark:text-teal-400"></i>
                                                     Edit Profile
                                                 </a>
+                                                <button type="button"
+                                                        data-owner-id="@item.Id"
+                                                        data-owner-name="@item.DisplayName"
+                                                        data-owner-phone="@(item.ContactNo ?? "")"
+                                                        data-owner-rptin="@(item.RptinNumber ?? "")"
+                                                        onclick="openPhilSmsModal(this)"
+                                                        class="w-full flex items-center gap-2.5 px-3.5 py-2 text-slate-700 dark:text-stone-300 hover:bg-sky-50 dark:hover:bg-stone-800 font-bold text-left">
+                                                    <i data-lucide="message-square" class="w-3.5 h-3.5 text-sky-600 dark:text-sky-400"></i>
+                                                    Send SMS (PhilSMS)
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -189,3 +199,229 @@
         </div>
     </div>
 </div>
+
+<!-- Send SMS via PhilSMS Modal -->
+<div id="philSmsModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm font-mono text-xs">
+    <div class="bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <!-- Modal Header -->
+        <div class="px-6 py-4 bg-slate-50 dark:bg-stone-950 border-b border-slate-200 dark:border-stone-800 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-sky-100 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 flex items-center justify-center border border-sky-200 dark:border-sky-500/30">
+                    <i data-lucide="message-square" class="w-4 h-4"></i>
+                </div>
+                <div>
+                    <h3 class="text-sm font-extrabold text-slate-900 dark:text-white tracking-tight">Send SMS via PhilSMS</h3>
+                    <p class="text-[11px] text-slate-500 dark:text-stone-400">City Assessor Notification Gateway</p>
+                </div>
+            </div>
+            <button type="button" onclick="closePhilSmsModal()" class="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-stone-800 transition-colors">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+
+        <!-- Modal Form Body -->
+        <form id="philSmsForm" onsubmit="submitPhilSms(event)" class="p-6 space-y-4">
+            @Html.AntiForgeryToken()
+            <input type="hidden" id="smsOwnerId" name="ownerId" />
+
+            <!-- Recipient Summary Banner -->
+            <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 flex items-center justify-between gap-3">
+                <div class="min-w-0">
+                    <span class="text-[10px] text-slate-400 dark:text-stone-500 uppercase font-bold block">Recipient Taxpayer / Owner</span>
+                    <div id="smsOwnerNameDisplay" class="font-bold text-slate-900 dark:text-white text-sm truncate">--</div>
+                </div>
+                <span id="smsOwnerRptinDisplay" class="px-2.5 py-1 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/30 text-[10px] font-bold shrink-0">
+                    RPTIN
+                </span>
+            </div>
+
+            <!-- Mobile Number Input -->
+            <div>
+                <label for="smsRecipientInput" class="block text-slate-600 dark:text-stone-400 mb-1.5 font-bold text-[11px] uppercase">
+                    Mobile Number <span class="text-rose-500">*</span>
+                </label>
+                <div class="relative">
+                    <input type="text" id="smsRecipientInput" name="recipient" required
+                           placeholder="e.g. 09171234567 or +639171234567"
+                           class="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono font-bold text-xs focus:outline-none focus:border-sky-500" />
+                </div>
+                <p class="text-[10px] text-slate-400 dark:text-stone-500 mt-1">Philippine mobile format (`09XXXXXXXXX` or `+639XXXXXXXXX`).</p>
+            </div>
+
+            <!-- Quick Message Templates -->
+            <div class="space-y-1.5">
+                <span class="block text-[10px] text-slate-400 dark:text-stone-500 uppercase font-bold">Quick Templates:</span>
+                <div class="flex flex-wrap gap-1.5">
+                    <button type="button" onclick="applySmsTemplate('assessment')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-sky-50 dark:bg-stone-800 dark:hover:bg-stone-700 text-slate-700 dark:text-stone-300 hover:text-sky-700 dark:hover:text-sky-300 border border-slate-200 dark:border-stone-700 text-[10px] font-bold transition-colors">
+                        Assessment Notice
+                    </button>
+                    <button type="button" onclick="applySmsTemplate('pickup')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-sky-50 dark:bg-stone-800 dark:hover:bg-stone-700 text-slate-700 dark:text-stone-300 hover:text-sky-700 dark:hover:text-sky-300 border border-slate-200 dark:border-stone-700 text-[10px] font-bold transition-colors">
+                        Document Ready
+                    </button>
+                    <button type="button" onclick="applySmsTemplate('verification')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-sky-50 dark:bg-stone-800 dark:hover:bg-stone-700 text-slate-700 dark:text-stone-300 hover:text-sky-700 dark:hover:text-sky-300 border border-slate-200 dark:border-stone-700 text-[10px] font-bold transition-colors">
+                        Record Verification
+                    </button>
+                </div>
+            </div>
+
+            <!-- SMS Message Body -->
+            <div>
+                <div class="flex items-center justify-between mb-1.5">
+                    <label for="smsMessageInput" class="text-slate-600 dark:text-stone-400 font-bold text-[11px] uppercase">
+                        SMS Message <span class="text-rose-500">*</span>
+                    </label>
+                    <span id="smsCharCount" class="text-[10px] text-slate-400 dark:text-stone-500 font-mono">0 / 160 chars</span>
+                </div>
+                <textarea id="smsMessageInput" name="message" rows="4" required
+                          oninput="updateSmsCharCounter()"
+                          placeholder="Type your SMS message to the property owner here..."
+                          class="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs focus:outline-none focus:border-sky-500 resize-y"></textarea>
+            </div>
+
+            <!-- Feedback Alert Box -->
+            <div id="smsFeedbackAlert" class="hidden p-3 rounded-xl text-xs font-bold"></div>
+
+            <!-- Modal Footer Actions -->
+            <div class="pt-3 border-t border-slate-200 dark:border-stone-800 flex items-center justify-end gap-2.5">
+                <button type="button" onclick="closePhilSmsModal()" class="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-900 hover:bg-slate-50 dark:hover:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold text-xs transition-colors">
+                    Cancel
+                </button>
+                <button type="submit" id="btnSendPhilSms" class="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs flex items-center gap-2 shadow-md shadow-sky-600/20 transition-all">
+                    <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                    <span id="btnSendPhilSmsText">Send SMS</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        let currentSmsOwnerName = '';
+
+        function openPhilSmsModal(btn) {
+            // Hide any open 3-dots kebab dropdowns
+            document.querySelectorAll('.kebab-dropdown').forEach(d => d.classList.add('hidden'));
+
+            const ownerId = btn.getAttribute('data-owner-id') || '';
+            const ownerName = btn.getAttribute('data-owner-name') || 'Property Owner';
+            const ownerPhone = btn.getAttribute('data-owner-phone') || '';
+            const ownerRptin = btn.getAttribute('data-owner-rptin') || 'N/A';
+
+            currentSmsOwnerName = ownerName;
+
+            document.getElementById('smsOwnerId').value = ownerId;
+            document.getElementById('smsOwnerNameDisplay').textContent = ownerName;
+            document.getElementById('smsOwnerRptinDisplay').textContent = ownerRptin;
+            document.getElementById('smsRecipientInput').value = ownerPhone;
+            document.getElementById('smsMessageInput').value = '';
+            updateSmsCharCounter();
+
+            const alertBox = document.getElementById('smsFeedbackAlert');
+            alertBox.className = 'hidden p-3 rounded-xl text-xs font-bold';
+            alertBox.textContent = '';
+
+            const modal = document.getElementById('philSmsModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+
+            if (window.lucide) lucide.createIcons();
+            setTimeout(() => {
+                const phoneField = document.getElementById('smsRecipientInput');
+                const msgField = document.getElementById('smsMessageInput');
+                if (!phoneField.value) phoneField.focus();
+                else msgField.focus();
+            }, 50);
+        }
+
+        function closePhilSmsModal() {
+            const modal = document.getElementById('philSmsModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function updateSmsCharCounter() {
+            const msg = document.getElementById('smsMessageInput').value || '';
+            const len = msg.length;
+            const segments = len === 0 ? 1 : Math.ceil(len / 160);
+            document.getElementById('smsCharCount').textContent = `${len} / 160 chars (${segments} SMS)`;
+        }
+
+        function applySmsTemplate(type) {
+            const name = currentSmsOwnerName || 'Taxpayer';
+            let text = '';
+            if (type === 'assessment') {
+                text = `Good day ${name}, your Real Property Tax Declaration assessment record at the City Assessor's Office has been updated. Thank you.`;
+            } else if (type === 'pickup') {
+                text = `Good day ${name}, your requested real property document/certification at the City Assessor's Office is now ready for release.`;
+            } else if (type === 'verification') {
+                text = `Good day ${name}, please visit the City Assessor's Office regarding the verification of your real property assessment record. Thank you.`;
+            }
+            const msgInput = document.getElementById('smsMessageInput');
+            msgInput.value = text;
+            updateSmsCharCounter();
+            msgInput.focus();
+        }
+
+        async function submitPhilSms(e) {
+            e.preventDefault();
+            const ownerId = document.getElementById('smsOwnerId').value;
+            const recipient = document.getElementById('smsRecipientInput').value.trim();
+            const message = document.getElementById('smsMessageInput').value.trim();
+            const alertBox = document.getElementById('smsFeedbackAlert');
+            const submitBtn = document.getElementById('btnSendPhilSms');
+            const submitText = document.getElementById('btnSendPhilSmsText');
+
+            if (!recipient || !message) {
+                alertBox.className = 'p-3 rounded-xl text-xs font-bold bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800';
+                alertBox.textContent = 'Please provide both a mobile number and a message.';
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.classList.add('opacity-60', 'cursor-not-allowed');
+            submitText.textContent = 'Sending...';
+            alertBox.className = 'hidden';
+
+            try {
+                const token = document.querySelector('#philSmsForm input[name="__RequestVerificationToken"]')?.value || '';
+                const formData = new FormData();
+                formData.append('ownerId', ownerId);
+                formData.append('recipient', recipient);
+                formData.append('message', message);
+                if (token) formData.append('__RequestVerificationToken', token);
+
+                const response = await fetch('@Url.Action("SendSms", "Owner")', {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    },
+                    body: formData
+                });
+
+                const res = await response.json();
+                if (res && res.success) {
+                    alertBox.className = 'p-3 rounded-xl text-xs font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800';
+                    alertBox.textContent = res.message || 'SMS sent successfully!';
+                    if (window.toastr) toastr.success(res.message || 'SMS sent successfully!');
+                    setTimeout(() => closePhilSmsModal(), 1200);
+                } else {
+                    const errMsg = (res && res.message) ? res.message : 'Failed to send SMS via PhilSMS.';
+                    alertBox.className = 'p-3 rounded-xl text-xs font-bold bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800';
+                    alertBox.textContent = errMsg;
+                    if (window.toastr) toastr.error(errMsg);
+                }
+            } catch (err) {
+                const errMsg = 'Network error while sending SMS. Please try again.';
+                alertBox.className = 'p-3 rounded-xl text-xs font-bold bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800';
+                alertBox.textContent = errMsg;
+                if (window.toastr) toastr.error(errMsg);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('opacity-60', 'cursor-not-allowed');
+                submitText.textContent = 'Send SMS';
+            }
+        }
+    </script>
+}

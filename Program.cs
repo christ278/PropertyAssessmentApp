@@ -51,6 +51,7 @@ builder.Services.AddScoped<IDataTransferService, DataTransferService>();
 builder.Services.AddScoped<ITaxDeclarationPdfService, TaxDeclarationPdfService>();
 builder.Services.AddScoped<IRPTCertificatePdfService, RPTCertificatePdfService>();
 builder.Services.AddScoped<IWorkflowNotifier, WorkflowNotifier>();
+builder.Services.AddScoped<IPhilSmsService, PhilSmsService>();
 
 builder.Services.AddCors(options =>
 {

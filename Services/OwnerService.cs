@@ -57,6 +57,25 @@ public class OwnerService : IOwnerService
             .FirstOrDefault(o => o.RptinNumber == clean);
     }
 
+    private void DetachGeographicNavigationProperties(Owner owner)
+    {
+        if (owner.Province != null)
+        {
+            owner.ProvinceName = owner.Province.Name;
+            owner.Province = null;
+        }
+        if (owner.CityMunicipality != null)
+        {
+            owner.CityMunicipalityName = owner.CityMunicipality.Name;
+            owner.CityMunicipality = null;
+        }
+        if (owner.Barangay != null)
+        {
+            owner.BarangayName = owner.Barangay.Name;
+            owner.Barangay = null;
+        }
+    }
+
     public void Add(Owner owner)
     {
         if (owner.Id == Guid.Empty)
@@ -65,6 +84,8 @@ public class OwnerService : IOwnerService
         }
         owner.CreatedDate = DateTime.Now;
         owner.UpdatedDate = DateTime.Now;
+
+        DetachGeographicNavigationProperties(owner);
 
         var existing = _context.TaxpayerOwners.Find(owner.Id);
         if (existing == null)
@@ -81,6 +102,8 @@ public class OwnerService : IOwnerService
 
     public void Update(Owner owner)
     {
+        DetachGeographicNavigationProperties(owner);
+
         var existing = _context.TaxpayerOwners.Find(owner.Id);
         if (existing != null)
         {

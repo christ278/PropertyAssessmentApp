@@ -8,11 +8,13 @@ public class OwnerController : Controller
 {
     private readonly IOwnerService _ownerService;
     private readonly IGeographicService _geoService;
+    private readonly IPhilSmsService _philSmsService;
 
-    public OwnerController(IOwnerService ownerService, IGeographicService geoService)
+    public OwnerController(IOwnerService ownerService, IGeographicService geoService, IPhilSmsService philSmsService)
     {
         _ownerService = ownerService;
         _geoService = geoService;
+        _philSmsService = philSmsService;
     }
 
     private void PopulateGeographicEntities(Owner owner)
@@ -207,5 +209,33 @@ public class OwnerController : Controller
             TempData["SuccessMessage"] = $"Owner '{owner.DisplayName}' was deleted successfully.";
         }
         return RedirectToAction(nameof(Index));
+    }
+
+    // POST: /Owner/SendSms
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SendSms(Guid ownerId, string recipient, string message)
+    {
+        var owner = ownerId != Guid.Empty ? _ownerService.GetById(ownerId) : null;
+        var targetNumber = !string.IsNullOrWhiteSpace(recipient)
+            ? recipient.Trim()
+            : (owner?.ContactNo ?? string.Empty);
+
+        var result = await _philSmsService.SendSmsAsync(targetNumber, message);
+        if (result.Success)
+        {
+            var ownerLabel = owner != null ? owner.DisplayName : result.NormalizedRecipient;
+            return Json(new
+            {
+                success = true,
+                message = $"SMS sent via PhilSMS to {ownerLabel} ({result.NormalizedRecipient})."
+            });
+        }
+
+        return Json(new
+        {
+            success = false,
+            message = result.Message
+        });
     }
 }
