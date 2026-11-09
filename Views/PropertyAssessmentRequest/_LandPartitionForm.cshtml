@@ -1,4 +1,4 @@
-@model PropertyAssessmentApp.Models.AssessmentPartitionItem
+﻿@model PropertyAssessmentApp.Models.AssessmentPartitionItem
 @{
     var classifications = ViewBag.LandClassifications as IEnumerable<PropertyAssessmentApp.Models.LandClassification> ?? Enumerable.Empty<PropertyAssessmentApp.Models.LandClassification>();
     var subClassifications = ViewBag.LandSubClassifications as IEnumerable<PropertyAssessmentApp.Models.LandSubClassification> ?? Enumerable.Empty<PropertyAssessmentApp.Models.LandSubClassification>();
@@ -138,108 +138,161 @@
 <!-- TAB 2: LOCATION & BOUNDARIES (CAST)        -->
 <!-- ========================================== -->
 <div id="land-tab-location" class="land-tab-content space-y-6 hidden">
-    <!-- Property Location -->
-    <div class="p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
-        <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
-            <i data-lucide="map-pin" class="w-4 h-4"></i>
-            Property Location Details (General Santos City Standard)
-        </h4>
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div class="md:col-span-2">
-                <label asp-for="StreetLocation" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BUILDING NO. / STREET / ROAD</label>
-                <input asp-for="StreetLocation" id="inputLandStreet" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white" placeholder="e.g. Pioneer Avenue, Corner Salazar St." />
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Left 2 Columns: Property Location & Boundaries -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Property Location -->
+            <div class="p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+                <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
+                    <i data-lucide="map-pin" class="w-4 h-4"></i>
+                    Property Location Details (General Santos City Standard)
+                </h4>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="md:col-span-2">
+                        <label asp-for="StreetLocation" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BUILDING NO. / STREET / ROAD</label>
+                        <input asp-for="StreetLocation" id="inputLandStreet" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white" placeholder="e.g. Pioneer Avenue, Corner Salazar St." />
+                    </div>
+                    <div>
+                        <label asp-for="Purok" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">PUROK / SITIO</label>
+                        <input asp-for="Purok" id="inputLandPurok" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white" placeholder="e.g. Purok Malakas" />
+                    </div>
+                    <div>
+                        <label asp-for="DistrictOrBarangay" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BARANGAY <span class="text-rose-500">*</span></label>
+                        <select asp-for="DistrictOrBarangay" id="selectLandBarangay" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold cursor-pointer">
+                            @if (barangays.Any())
+                            {
+                                foreach (var b in barangays)
+                                {
+                                    <option value="@b.Name">@b.Name</option>
+                                }
+                            }
+                            else
+                            {
+                                <option value="Brgy. Central">Brgy. Central</option>
+                                <option value="Brgy. Dadiangas East">Brgy. Dadiangas East</option>
+                                <option value="Brgy. Dadiangas North">Brgy. Dadiangas North</option>
+                                <option value="Brgy. Dadiangas South">Brgy. Dadiangas South</option>
+                                <option value="Brgy. Dadiangas West">Brgy. Dadiangas West</option>
+                                <option value="Brgy. Lagao">Brgy. Lagao</option>
+                                <option value="Brgy. San Isidro">Brgy. San Isidro</option>
+                                <option value="Brgy. Calumpang">Brgy. Calumpang</option>
+                                <option value="Brgy. City Heights">Brgy. City Heights</option>
+                                <option value="Brgy. Labangal">Brgy. Labangal</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label asp-for="CityMunicipality" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">CITY / MUNICIPALITY</label>
+                        <input asp-for="CityMunicipality" id="inputLandCity" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold" readonly value="General Santos City" />
+                    </div>
+                    <div class="md:col-span-2">
+                        <label asp-for="Province" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">PROVINCE</label>
+                        <input asp-for="Province" id="inputLandProvince" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold" readonly value="South Cotabato" />
+                    </div>
+                </div>
             </div>
-            <div>
-                <label asp-for="Purok" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">PUROK / SITIO</label>
-                <input asp-for="Purok" id="inputLandPurok" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white" placeholder="e.g. Purok Malakas" />
-            </div>
-            <div>
-                <label asp-for="DistrictOrBarangay" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BARANGAY <span class="text-rose-500">*</span></label>
-                <select asp-for="DistrictOrBarangay" id="selectLandBarangay" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold cursor-pointer">
-                    @if (barangays.Any())
-                    {
-                        foreach (var b in barangays)
-                        {
-                            <option value="@b.Name">@b.Name</option>
-                        }
-                    }
-                    else
-                    {
-                        <option value="Brgy. Central">Brgy. Central</option>
-                        <option value="Brgy. Dadiangas East">Brgy. Dadiangas East</option>
-                        <option value="Brgy. Dadiangas North">Brgy. Dadiangas North</option>
-                        <option value="Brgy. Dadiangas South">Brgy. Dadiangas South</option>
-                        <option value="Brgy. Dadiangas West">Brgy. Dadiangas West</option>
-                        <option value="Brgy. Lagao">Brgy. Lagao</option>
-                        <option value="Brgy. San Isidro">Brgy. San Isidro</option>
-                        <option value="Brgy. Calumpang">Brgy. Calumpang</option>
-                        <option value="Brgy. City Heights">Brgy. City Heights</option>
-                        <option value="Brgy. Labangal">Brgy. Labangal</option>
-                    }
-                </select>
-            </div>
-            <div class="md:col-span-2">
-                <label asp-for="CityMunicipality" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">CITY / MUNICIPALITY</label>
-                <input asp-for="CityMunicipality" id="inputLandCity" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold" readonly value="General Santos City" />
-            </div>
-            <div class="md:col-span-2">
-                <label asp-for="Province" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">PROVINCE</label>
-                <input asp-for="Province" id="inputLandProvince" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold" readonly value="South Cotabato" />
+
+            <!-- Boundaries & Boundary Remarks (CAST Reference) -->
+            <div class="p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+                <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
+                    <i data-lucide="compass" class="w-4 h-4"></i>
+                    Property Boundaries & Adjacent Lots (with Boundary Remarks)
+                </h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label asp-for="BoundaryNorth" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">NORTH BOUNDARY</label>
+                                <input asp-for="BoundaryNorth" id="inputLandBNorth" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="Lot 101" />
+                            </div>
+                            <div>
+                                <label asp-for="Nremarks" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">NORTH REMARKS</label>
+                                <input asp-for="Nremarks" id="inputLandNRemarks" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs" placeholder="e.g. Juan dela Cruz (Lot 101)" />
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label asp-for="BoundarySouth" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">SOUTH BOUNDARY</label>
+                                <input asp-for="BoundarySouth" id="inputLandBSouth" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="Lot 103" />
+                            </div>
+                            <div>
+                                <label asp-for="Sremarks" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">SOUTH REMARKS</label>
+                                <input asp-for="Sremarks" id="inputLandSRemarks" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs" placeholder="e.g. Existing Residential Lot" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label asp-for="BoundaryEast" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">EAST BOUNDARY</label>
+                                <input asp-for="BoundaryEast" id="inputLandBEast" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="Road Lot" />
+                            </div>
+                            <div>
+                                <label asp-for="Eremarks" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">EAST REMARKS</label>
+                                <input asp-for="Eremarks" id="inputLandERemarks" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs" placeholder="e.g. 10m Wide Concrete Road" />
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label asp-for="BoundaryWest" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">WEST BOUNDARY</label>
+                                <input asp-for="BoundaryWest" id="inputLandBWest" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="Creek / Lot 104" />
+                            </div>
+                            <div>
+                                <label asp-for="Wremarks" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">WEST REMARKS</label>
+                                <input asp-for="Wremarks" id="inputLandWRemarks" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs" placeholder="e.g. Natural Drainage Creek" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
 
-    <!-- Boundaries & Boundary Remarks (CAST Reference) -->
-    <div class="p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
-        <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
-            <i data-lucide="compass" class="w-4 h-4"></i>
-            Property Boundaries & Adjacent Lots (with Boundary Remarks)
-        </h4>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div class="space-y-4">
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label asp-for="BoundaryNorth" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">NORTH BOUNDARY</label>
-                        <input asp-for="BoundaryNorth" id="inputLandBNorth" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="Lot 101" />
-                    </div>
-                    <div>
-                        <label asp-for="Nremarks" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">NORTH REMARKS</label>
-                        <input asp-for="Nremarks" id="inputLandNRemarks" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs" placeholder="e.g. Juan dela Cruz (Lot 101)" />
-                    </div>
+        <!-- Right Column: Land Lot / Property Sketch Attachment (CAST Standard) -->
+        <div class="p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4 flex flex-col justify-between">
+            <div>
+                <div class="border-b border-slate-200 dark:border-stone-800 pb-2 flex items-center justify-between">
+                    <h3 class="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2">
+                        <i data-lucide="image" class="w-4 h-4 text-emerald-600"></i> Land Lot / Property Sketch
+                    </h3>
+                    <span class="text-xs text-slate-400 font-mono">Blueprint / Plan</span>
                 </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label asp-for="BoundarySouth" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">SOUTH BOUNDARY</label>
-                        <input asp-for="BoundarySouth" id="inputLandBSouth" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="Lot 103" />
-                    </div>
-                    <div>
-                        <label asp-for="Sremarks" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">SOUTH REMARKS</label>
-                        <input asp-for="Sremarks" id="inputLandSRemarks" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs" placeholder="e.g. Existing Residential Lot" />
-                    </div>
+                <p class="text-xs text-slate-500 dark:text-stone-400 mt-2 font-mono">
+                    Upload a digitized lot plan, cadastral sketch, or subdivision layout for this land parcel.
+                </p>
+
+                <div class="mt-4">
+                    <label class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">UPLOAD SKETCH / BLUEPRINT FILE</label>
+                    <input type="file" id="fileUploadLandSketch" name="sketchFile" accept="image/jpeg, image/png, image/webp, application/pdf"
+                           class="w-full px-3 py-2 text-xs font-mono rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-700 dark:text-stone-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-emerald-50 dark:file:bg-emerald-950/60 file:text-emerald-700 dark:file:text-emerald-300 hover:file:bg-emerald-100 cursor-pointer"
+                           onchange="previewLandSketchImage(event)" />
                 </div>
-            </div>
-            <div class="space-y-4">
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label asp-for="BoundaryEast" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">EAST BOUNDARY</label>
-                        <input asp-for="BoundaryEast" id="inputLandBEast" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="Road Lot" />
-                    </div>
-                    <div>
-                        <label asp-for="Eremarks" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">EAST REMARKS</label>
-                        <input asp-for="Eremarks" id="inputLandERemarks" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs" placeholder="e.g. 10m Wide Concrete Road" />
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label asp-for="BoundaryWest" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">WEST BOUNDARY</label>
-                        <input asp-for="BoundaryWest" id="inputLandBWest" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="Creek / Lot 104" />
-                    </div>
-                    <div>
-                        <label asp-for="Wremarks" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">WEST REMARKS</label>
-                        <input asp-for="Wremarks" id="inputLandWRemarks" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white text-xs" placeholder="e.g. Natural Drainage Creek" />
+
+                <!-- Preview Container Box -->
+                <div class="mt-4 border-2 border-dashed border-slate-200 dark:border-stone-800 rounded-xl p-3 text-center bg-white dark:bg-stone-900 flex flex-col items-center justify-center min-h-[260px] relative overflow-hidden">
+                    <img id="landSketchPreviewImg" src="@(!string.IsNullOrEmpty(Model.BuildingFloorPlanSketchBase64) ? Model.BuildingFloorPlanSketchBase64 : (!string.IsNullOrEmpty(Model.BuildingFloorPlanSketchPath) ? Model.BuildingFloorPlanSketchPath : ""))"
+                         class="max-h-60 max-w-full rounded-lg object-contain shadow-sm border border-slate-200 dark:border-stone-800 @(string.IsNullOrEmpty(Model.BuildingFloorPlanSketchBase64) && string.IsNullOrEmpty(Model.BuildingFloorPlanSketchPath) ? "hidden" : "")"
+                         alt="Land Lot Sketch Preview" />
+
+                    <div id="landSketchPlaceholder" class="p-6 text-center text-slate-400 dark:text-stone-500 @(!string.IsNullOrEmpty(Model.BuildingFloorPlanSketchBase64) || !string.IsNullOrEmpty(Model.BuildingFloorPlanSketchPath) ? "hidden" : "")">
+                        <i data-lucide="image" class="w-12 h-12 mx-auto mb-2 text-slate-300 dark:text-stone-600"></i>
+                        <p class="text-xs font-mono font-bold text-slate-600 dark:text-stone-400">No Land Sketch Attached</p>
+                        <p class="text-[11px] font-mono text-slate-400 dark:text-stone-500 mt-1">Upload a blueprint, lot plan, or boundary sketch</p>
+                        <p class="text-[10px] font-mono text-slate-400 dark:text-stone-500">Supports JPG, PNG, WebP</p>
                     </div>
                 </div>
             </div>
+
+            <!-- Sketch Footer & Actions -->
+            <div class="pt-3 border-t border-slate-200 dark:border-stone-800 flex items-center justify-between">
+                <span class="text-[11px] font-mono text-slate-400" id="landSketchFilenameDisplay">@(string.IsNullOrEmpty(Model.BuildingFloorPlanSketchPath) ? "No file chosen" : Model.BuildingFloorPlanSketchPath)</span>
+                <button type="button" id="btnClearLandSketch" onclick="clearLandSketchImage()" class="px-3 py-1.5 rounded-lg text-xs font-mono font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors flex items-center gap-1.5 @(string.IsNullOrEmpty(Model.BuildingFloorPlanSketchBase64) && string.IsNullOrEmpty(Model.BuildingFloorPlanSketchPath) ? "hidden" : "")">
+                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Clear Sketch
+                </button>
+            </div>
+
+            <!-- Hidden fields to preserve sketch path / base64 string -->
+            <input type="hidden" id="LandSketchPath" value="@Model.BuildingFloorPlanSketchPath" />
+            <input type="hidden" id="LandSketchBase64" value="@Model.BuildingFloorPlanSketchBase64" />
         </div>
     </div>
 </div>
@@ -606,6 +659,42 @@
                 <input asp-for="BackTaxesYearTo" id="inputLandBackTaxesTo" type="number" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="YYYY (Optional)" />
             </div>
         </div>
+    </div>
+
+    <!-- Property Photographs & Multiple Image Attachments (TDN Bound) -->
+    <div class="p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+        <input type="hidden" asp-for="PropertyImagesJson" id="propertyImagesJsonLand" class="property-images-json-input" />
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-stone-800 pb-2.5">
+            <div>
+                <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+                    <i data-lucide="images" class="w-4 h-4"></i>
+                    Property Photographs & Site Images (Bound to TDN)
+                </h4>
+                <p class="text-[11px] text-slate-500 dark:text-stone-400 mt-0.5">Upload multiple site photos, boundary markers, or inspection images linked to this Tax Declaration Number.</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="property-images-status-badge px-2.5 py-1 rounded-full text-[10px] font-bold font-mono bg-slate-200 dark:bg-stone-800 text-slate-700 dark:text-stone-300">0 IMAGES</span>
+                <label for="propertyImagesInputLand" class="cursor-pointer px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all">
+                    <i data-lucide="upload-cloud" class="w-3.5 h-3.5"></i>
+                    <span>Upload Multiple Images</span>
+                </label>
+                <button type="button" onclick="clearAllPropertyImages()" class="btn-clear-property-images hidden px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 font-bold text-xs flex items-center gap-1 transition-all">
+                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                    <span>Clear All</span>
+                </button>
+                <input type="file" id="propertyImagesInputLand" multiple accept="image/*" class="hidden" onchange="handlePropertyImagesUpload(event)" />
+            </div>
+        </div>
+
+        <div class="property-images-empty-state p-8 rounded-xl border-2 border-dashed border-slate-200 dark:border-stone-800 bg-white/60 dark:bg-stone-900/40 text-center space-y-2">
+            <div class="w-10 h-10 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto">
+                <i data-lucide="camera" class="w-5 h-5"></i>
+            </div>
+            <div class="text-xs font-bold text-slate-700 dark:text-stone-300">No Property Photographs Uploaded Yet</div>
+            <p class="text-[11px] text-slate-400 dark:text-stone-500">Click <span class="font-bold text-emerald-600">"Upload Multiple Images"</span> above to select one or more photos (JPG, PNG, WEBP).</p>
+        </div>
+
+        <div class="property-images-gallery-grid hidden grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 pt-1"></div>
     </div>
 
     <!-- Memoranda & Notes -->

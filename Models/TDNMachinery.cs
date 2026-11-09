@@ -13,7 +13,8 @@ public class TDNMachinery
     public Guid TaxDeclarationId { get; set; }
 
     [ForeignKey(nameof(TaxDeclarationId))]
-    public virtual TaxDeclaration TaxDeclaration { get; set; } = null!;
+    [Microsoft.AspNetCore.Mvc.ModelBinding.Validation.ValidateNever]
+    public virtual TaxDeclaration? TaxDeclaration { get; set; }
 
     // Machinery Registration Details (Outside the Philippines / Imported & Local Manufacturer)
     public bool IsLocallyManufactured { get; set; }

@@ -62,6 +62,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<MachineryActualUse> MachineryActualUses { get; set; } = null!;
     public DbSet<MachineryAssessmentLevel> MachineryAssessmentLevels { get; set; } = null!;
     public DbSet<RPTReport> RPTReports { get; set; } = null!;
+    public DbSet<TDNPropertyImage> TDNPropertyImages { get; set; } = null!;
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -216,6 +217,7 @@ public class ApplicationDbContext : DbContext
                   .HasForeignKey<TDNLand>(l => l.TaxDeclarationId)
                   .OnDelete(DeleteBehavior.Cascade);
 
+            entity.HasMany(t => t.PropertyImages).WithOne(i => i.TaxDeclaration).HasForeignKey(i => i.TaxDeclarationId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(t => t.MachineryDetails)
                   .WithOne(m => m.TaxDeclaration)
                   .HasForeignKey<TDNMachinery>(m => m.TaxDeclarationId)

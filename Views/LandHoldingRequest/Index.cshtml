@@ -98,7 +98,7 @@
                         <th class="hidden sm:table-cell px-4 py-3.5">TD NO. & PIN</th>
                         <th class="px-3 sm:px-4 py-3.5">OWNER & SPOUSE</th>
                         <th class="hidden lg:table-cell px-4 py-3.5">O.R. NO. & DATE</th>
-                        <th class="hidden md:table-cell px-4 py-3.5 text-right">TOTAL FEES (â‚±)</th>
+                        <th class="hidden md:table-cell px-4 py-3.5 text-right">TOTAL FEES (₱)</th>
                         <th class="px-2 sm:px-4 py-3.5 text-center">STATUS</th>
                         <th class="px-2 sm:px-4 py-3.5 text-center">ACTION</th>
                     </tr>
@@ -138,7 +138,7 @@
                                         <span class="text-[10px] text-slate-400 block">Spouse: @item.SpouseName</span>
                                     }
                                     <div class="md:hidden mt-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-                                        â‚±@item.TotalFeesAmount.ToString("N2")
+                                        ₱@item.TotalFeesAmount.ToString("N2")
                                     </div>
                                 </td>
                                 <td class="hidden lg:table-cell px-4 py-3.5 text-slate-700 dark:text-stone-300 font-mono">
@@ -146,7 +146,7 @@
                                     <span class="text-[10px] text-slate-400 block">@item.ORDateIssued?.ToString("MMM dd, yyyy")</span>
                                 </td>
                                 <td class="hidden md:table-cell px-4 py-3.5 text-right font-bold text-emerald-700 dark:text-emerald-400">
-                                    â‚±@item.TotalFeesAmount.ToString("N2")
+                                    ₱@item.TotalFeesAmount.ToString("N2")
                                 </td>
                                 <td class="px-2 sm:px-4 py-3.5 text-center">
                                     @switch (item.Status)

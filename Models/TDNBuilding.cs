@@ -13,7 +13,8 @@ public class TDNBuilding
     public Guid TaxDeclarationId { get; set; }
 
     [ForeignKey(nameof(TaxDeclarationId))]
-    public virtual TaxDeclaration TaxDeclaration { get; set; } = null!;
+    [Microsoft.AspNetCore.Mvc.ModelBinding.Validation.ValidateNever]
+    public virtual TaxDeclaration? TaxDeclaration { get; set; }
 
     // -------------------------------------------------------------
     // LOCATION OF PROPERTY

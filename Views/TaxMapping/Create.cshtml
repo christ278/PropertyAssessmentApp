@@ -274,9 +274,9 @@
                                 <th class="hidden sm:table-cell px-3 py-3 text-center w-10">#</th>
                                 <th class="px-3 sm:px-4 py-3">SELECT DOCUMENT / PARTICULAR</th>
                                 <th class="hidden md:table-cell px-4 py-3">CATEGORY</th>
-                                <th class="hidden sm:table-cell px-4 py-3 text-right">UNIT COST (â‚±)</th>
+                                <th class="hidden sm:table-cell px-4 py-3 text-right">UNIT COST (₱)</th>
                                 <th class="px-2 sm:px-4 py-3 text-center w-20 sm:w-24">QTY</th>
-                                <th class="px-3 sm:px-4 py-3 text-right">LINE TOTAL (â‚±)</th>
+                                <th class="px-3 sm:px-4 py-3 text-right">LINE TOTAL (₱)</th>
                                 <th class="px-2 sm:px-4 py-3 text-center w-12 sm:w-14">ACTION</th>
                             </tr>
                         </thead>
@@ -287,7 +287,7 @@
                             <tr>
                                 <td colspan="5" class="hidden sm:table-cell px-4 py-3 text-right font-semibold uppercase text-slate-700 dark:text-stone-300">TOTAL REQUEST FEES:</td>
                                 <td colspan="2" class="sm:hidden px-3 py-3 text-left font-semibold uppercase text-slate-700 dark:text-stone-300">TOTAL:</td>
-                                <td class="px-3 sm:px-4 py-3 text-right font-black text-emerald-700 dark:text-emerald-400 text-base" id="displayGrandTotal">â‚±0.00</td>
+                                <td class="px-3 sm:px-4 py-3 text-right font-black text-emerald-700 dark:text-emerald-400 text-base" id="displayGrandTotal">₱0.00</td>
                                 <td></td>
                             </tr>
                         </tfoot>
@@ -388,7 +388,7 @@
             var optionsHtml = '<option value="">-- Search / Select Order of Payment Item --</option>';
             orderPaymentOptions.forEach(function(opt) {
                 var selectedStr = (data && (data.feeId == opt.id || data.code == opt.code)) ? ' selected' : '';
-                optionsHtml += '<option value="' + opt.id + '" data-code="' + opt.code + '" data-particular="' + opt.particular + '" data-category="' + opt.category + '" data-unitcost="' + opt.unitCost + '"' + selectedStr + '>' + opt.code + ' - ' + opt.particular + ' (â‚±' + opt.unitCost.toFixed(2) + ')</option>';
+                optionsHtml += '<option value="' + opt.id + '" data-code="' + opt.code + '" data-particular="' + opt.particular + '" data-category="' + opt.category + '" data-unitcost="' + opt.unitCost + '"' + selectedStr + '>' + opt.code + ' - ' + opt.particular + ' (₱' + opt.unitCost.toFixed(2) + ')</option>';
             });
 
             var qtyVal = (data && data.quantity) ? data.quantity : 1;
@@ -397,10 +397,10 @@
                 '<td class="px-4 py-3 text-center font-bold text-slate-400 row-num">' + rowIndex + '</td>' +
                 '<td class="px-4 py-3"><select class="doc-fee-select w-full">' + optionsHtml + '</select></td>' +
                 '<td class="px-4 py-3"><span class="doc-category-badge px-2 py-0.5 rounded text-[10px] bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold">N/A</span></td>' +
-                '<td class="px-4 py-3 text-right font-bold text-emerald-700 dark:text-emerald-400 doc-unitcost">â‚±0.00</td>' +
+                '<td class="px-4 py-3 text-right font-bold text-emerald-700 dark:text-emerald-400 doc-unitcost">₱0.00</td>' +
                 '<td class="px-4 py-3 text-center"><input type="number" min="1" value="' + qtyVal + '" class="doc-qty w-16 px-2 py-1 rounded-lg bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-center font-bold text-slate-900 dark:text-white" /></td>' +
-                '<td class="px-4 py-3 text-right font-bold text-slate-900 dark:text-white doc-line-total">â‚±0.00</td>' +
-                '<td class="px-4 py-3 text-center"><button type="button" class="btn-remove-row p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 font-bold" title="Remove Row">âœ•</button></td>'
+                '<td class="px-4 py-3 text-right font-bold text-slate-900 dark:text-white doc-line-total">₱0.00</td>' +
+                '<td class="px-4 py-3 text-center"><button type="button" class="btn-remove-row p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 font-bold" title="Remove Row">✕</button></td>'
             );
 
             $('#docRequestsTbody').append($tr);
@@ -428,10 +428,10 @@
             var qty = parseInt($tr.find('.doc-qty').val()) || 1;
 
             $tr.find('.doc-category-badge').text(category);
-            $tr.find('.doc-unitcost').text('â‚±' + unitCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            $tr.find('.doc-unitcost').text('₱' + unitCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
             
             var lineTotal = unitCost * qty;
-            $tr.find('.doc-line-total').text('â‚±' + lineTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            $tr.find('.doc-line-total').text('₱' + lineTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
         }
 
         function recalculateOrderOfPaymentFees() {
@@ -467,7 +467,7 @@
                 }
             });
 
-            $('#displayGrandTotal').text('â‚±' + grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            $('#displayGrandTotal').text('₱' + grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
             $('#TotalFeesAmount').val(grandTotal);
             $('#RequestedDocumentsJson').val(JSON.stringify(selectedItems));
         }

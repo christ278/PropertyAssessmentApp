@@ -444,4 +444,5 @@ public class AssessmentPartitionItem
     public int? BackTaxesYearFrom { get; set; }
     public int? BackTaxesYearTo { get; set; }
     public string? Memoranda { get; set; }
+    public string? PropertyImagesJson { get; set; }
 }

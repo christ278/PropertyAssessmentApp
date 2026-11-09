@@ -87,14 +87,83 @@
         html.nav-layout-horizontal .sidebar-nav-only {
             display: none !important;
         }
+
+        /* Smooth Collapsible Sidebar Accordion & Horizontal Dropdown Animations */
+        .sidebar-collapse {
+            display: grid;
+            grid-template-rows: 0fr;
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+            transform: translateY(-6px);
+            margin-top: 0;
+            pointer-events: none;
+            transition: grid-template-rows 320ms cubic-bezier(0.22, 1, 0.36, 1),
+                        max-height 320ms cubic-bezier(0.22, 1, 0.36, 1),
+                        opacity 250ms cubic-bezier(0.22, 1, 0.36, 1),
+                        transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
+                        margin-top 320ms cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        .sidebar-collapse.open {
+            grid-template-rows: 1fr;
+            max-height: 500px;
+            opacity: 1;
+            transform: translateY(0);
+            margin-top: 0.375rem;
+            pointer-events: auto;
+        }
+        .sidebar-collapse-inner {
+            min-height: 0;
+            overflow: hidden;
+        }
+        .sidebar-collapse-inner > a {
+            opacity: 0;
+            transform: translateX(-6px);
+            transition: opacity 260ms cubic-bezier(0.22, 1, 0.36, 1),
+                        transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+                        background-color 150ms ease,
+                        color 150ms ease;
+        }
+        .sidebar-collapse.open .sidebar-collapse-inner > a {
+            opacity: 1;
+            transform: translateX(0);
+        }
+        .sidebar-collapse.open .sidebar-collapse-inner > a:nth-child(1) { transition-delay: 25ms; }
+        .sidebar-collapse.open .sidebar-collapse-inner > a:nth-child(2) { transition-delay: 55ms; }
+        .sidebar-collapse.open .sidebar-collapse-inner > a:nth-child(3) { transition-delay: 85ms; }
+        .sidebar-collapse.open .sidebar-collapse-inner > a:nth-child(4) { transition-delay: 115ms; }
+        .sidebar-collapse.open .sidebar-collapse-inner > a:nth-child(5) { transition-delay: 145ms; }
+        .sidebar-collapse.open .sidebar-collapse-inner > a:nth-child(6) { transition-delay: 175ms; }
+        .sidebar-collapse.open .sidebar-collapse-inner > a:nth-child(7) { transition-delay: 205ms; }
+
+        .horizontal-nav-dropdown-menu {
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-8px) scale(0.96);
+            transform-origin: top left;
+            pointer-events: none;
+            transition: opacity 240ms cubic-bezier(0.22, 1, 0.36, 1),
+                        transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
+                        visibility 240ms;
+        }
+        .horizontal-nav-dropdown-menu.open {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0) scale(1);
+            pointer-events: auto;
+        }
     </style>
 </head>
 @inject PropertyAssessmentApp.Services.IPermissionService PermissionService
 @{
     var currentController = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
     var currentAction = ViewContext.RouteData.Values["action"]?.ToString() ?? "";
-    bool isSettingsActive = currentController is "OrderPayment" or "UserAccount" or "UserRole" or "Workflow" or "FileLocation" or "DataTransferUtility";
-    bool isRequestsActive = currentController is "PropertyAssessmentRequest" or "RequestForInspection" or "LandHoldingRequest" or "TaxDeclarationRequest" or "TaxMapping";
+    bool isDashboardActive = currentController == "Dashboard";
+    bool isWorkflowActive = currentController == "Workflow" && currentAction != "Settings";
+    bool isAssessmentActive = currentController is "Assessment" or "Owner" or "PropertyAssessmentRequest" or "RequestForInspection";
+    bool isRequestsActive = currentController is "PropertyAssessmentRequest" or "RequestForInspection" or "LandHoldingRequest" or "TaxDeclarationRequest" or "TaxMapping" or "RPTReport";
+    bool isSidebarRequestsActive = currentController is "LandHoldingRequest" or "TaxDeclarationRequest" or "TaxMapping" or "RPTReport";
+    bool isSettingsActive = currentController is "OrderPayment" or "UserAccount" or "UserRole" or "FileLocation" or "DataTransferUtility" || (currentController == "Workflow" && currentAction == "Settings");
     var userPerms = PermissionService.GetUserPermissionSummary(User);
 
     // Dynamic Module Permission Flags
@@ -157,145 +226,214 @@
             </button>
         </div>
 
-        <!-- Navigation Links -->
-        <nav class="flex-1 p-4 space-y-1.5 overflow-y-auto">
+        <!-- Navigation Links (Grouped Collapsible Accordion Style) -->
+        <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
             @if (showDashboardGroup)
             {
-                <div class="px-3 pb-2 text-[10px] font-mono text-slate-400 dark:text-stone-500 font-bold uppercase tracking-wider">Dashboards</div>
-                @if (canDashAdmin)
-                {
-                <a asp-controller="Dashboard" asp-action="SystemOwner" class="nav-item flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Dashboard" && currentAction == "SystemOwner" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300")"><i data-lucide="server-cog" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i><span>System Owner</span></a>
-                }
-                @if (canDashHead)
-                {
-                <a asp-controller="Dashboard" asp-action="AssessorHead" class="nav-item flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Dashboard" && currentAction == "AssessorHead" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300")"><i data-lucide="gauge" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i><span>Assessor Head</span></a>
-                }
-                @if (canDashStaff)
-                {
-                <a asp-controller="Dashboard" asp-action="Staff" class="nav-item flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Dashboard" && currentAction == "Staff" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300")"><i data-lucide="layout-dashboard" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i><span>My Dashboard</span></a>
-                }
+                <!-- Collapsible Dashboards Section -->
+                <div>
+                    <button type="button" onclick="toggleSidebarGroup('sidebarDashboardMenu', 'sidebarDashboardChevron')" class="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-mono uppercase tracking-wider font-bold transition-all @(isDashboardActive ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800/80 dark:text-emerald-400 ring-1 ring-emerald-500/20" : "text-slate-600 dark:text-stone-300 hover:bg-slate-100 dark:hover:bg-stone-800/50")">
+                        <span class="flex items-center gap-2.5">
+                            <i data-lucide="layout-dashboard" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                            <span>Dashboards</span>
+                        </span>
+                        <i data-lucide="chevron-down" id="sidebarDashboardChevron" class="w-3.5 h-3.5 transition-transform duration-300 ease-out"></i>
+                    </button>
+
+                    <div id="sidebarDashboardMenu" class="sidebar-collapse">
+                        <div class="sidebar-collapse-inner pl-3 border-l-2 border-emerald-500/20 dark:border-stone-800 ml-3.5 space-y-1">
+                        @if (canDashAdmin)
+                        {
+                            <a asp-controller="Dashboard" asp-action="SystemOwner" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold text-xs transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Dashboard" && currentAction == "SystemOwner" ? "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold" : "text-slate-600 dark:text-stone-400 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                                <i data-lucide="server-cog" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
+                                <span>System Owner</span>
+                            </a>
+                        }
+                        @if (canDashHead)
+                        {
+                            <a asp-controller="Dashboard" asp-action="AssessorHead" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold text-xs transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Dashboard" && currentAction == "AssessorHead" ? "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold" : "text-slate-600 dark:text-stone-400 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                                <i data-lucide="gauge" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
+                                <span>Assessor Head</span>
+                            </a>
+                        }
+                        @if (canDashStaff)
+                        {
+                            <a asp-controller="Dashboard" asp-action="Staff" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold text-xs transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Dashboard" && currentAction == "Staff" ? "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold" : "text-slate-600 dark:text-stone-400 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                                <i data-lucide="layout-dashboard" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
+                                <span>My Dashboard</span>
+                            </a>
+                        }
+                        </div>
+                    </div>
+                </div>
             }
 
             @if (showWorkflowGroup)
             {
-                <div class="px-3 pb-2 text-[10px] font-mono text-slate-400 dark:text-stone-500 font-bold uppercase tracking-wider">Transaction Workflows</div>
+                <!-- Collapsible Transaction Workflows Section -->
+                <div>
+                    <button type="button" onclick="toggleSidebarGroup('sidebarWorkflowMenu', 'sidebarWorkflowChevron')" class="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-mono uppercase tracking-wider font-bold transition-all @(isWorkflowActive ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800/80 dark:text-emerald-400 ring-1 ring-emerald-500/20" : "text-slate-600 dark:text-stone-300 hover:bg-slate-100 dark:hover:bg-stone-800/50")">
+                        <span class="flex items-center gap-2.5">
+                            <i data-lucide="git-branch" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                            <span>Workflows</span>
+                        </span>
+                        <span class="flex items-center gap-1.5">
+                            @if (canPool)
+                            {
+                                <span class="px-1.5 py-0.5 rounded-md text-[10px] bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-black transition-all duration-300" data-signalr-pool-count>0</span>
+                            }
+                            <i data-lucide="chevron-down" id="sidebarWorkflowChevron" class="w-3.5 h-3.5 transition-transform duration-300 ease-out"></i>
+                        </span>
+                    </button>
 
-                @if (canPool)
-                {
-                    <a asp-controller="Workflow" asp-action="Pool" class="nav-item flex items-center justify-between px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Workflow" && currentAction == "Pool" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300 hover:text-emerald-700 dark:hover:text-emerald-400")">
-                        <div class="flex items-center gap-3">
-                            <i data-lucide="inbox" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
-                            <span>Pool Transactions</span>
-                        </div>
-                        <span class="px-2 py-0.5 rounded-lg text-[10px] bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-black transition-all duration-300" data-signalr-pool-count>0</span>
-                    </a>
-                }
+                    <div id="sidebarWorkflowMenu" class="sidebar-collapse">
+                        <div class="sidebar-collapse-inner pl-3 border-l-2 border-emerald-500/20 dark:border-stone-800 ml-3.5 space-y-1">
+                        @if (canPool)
+                        {
+                            <a asp-controller="Workflow" asp-action="Pool" class="nav-item flex items-center justify-between px-3 py-2 rounded-xl font-semibold text-xs transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Workflow" && currentAction == "Pool" ? "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold" : "text-slate-600 dark:text-stone-400 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                                <div class="flex items-center gap-2.5">
+                                    <i data-lucide="inbox" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
+                                    <span>Pool Transactions</span>
+                                </div>
+                                <span class="px-1.5 py-0.5 rounded-md text-[10px] bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-black transition-all duration-300" data-signalr-pool-count>0</span>
+                            </a>
+                        }
 
-                @if (canMyTransactions)
-                {
-                    <a asp-controller="Workflow" asp-action="MyTransactions" class="nav-item flex items-center justify-between px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Workflow" && currentAction == "MyTransactions" ? "bg-blue-50 text-blue-700 dark:bg-stone-800 dark:text-blue-400 font-bold" : "text-slate-700 dark:text-stone-300 hover:text-blue-700 dark:hover:text-blue-400")">
-                        <div class="flex items-center gap-3">
-                            <i data-lucide="user-check" class="w-4 h-4 text-blue-600 dark:text-blue-400"></i>
-                            <span>My Transactions</span>
+                        @if (canMyTransactions)
+                        {
+                            <a asp-controller="Workflow" asp-action="MyTransactions" class="nav-item flex items-center justify-between px-3 py-2 rounded-xl font-semibold text-xs transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Workflow" && currentAction == "MyTransactions" ? "bg-blue-100/70 text-blue-800 dark:bg-blue-500/20 dark:text-blue-300 font-bold" : "text-slate-600 dark:text-stone-400 hover:text-blue-700 dark:hover:text-blue-400")">
+                                <div class="flex items-center gap-2.5">
+                                    <i data-lucide="user-check" class="w-3.5 h-3.5 text-blue-600 dark:text-blue-400"></i>
+                                    <span>My Transactions</span>
+                                </div>
+                            </a>
+                        }
                         </div>
-                    </a>
-                }
+                    </div>
+                </div>
             }
 
             @if (showAssessmentGroup)
             {
-                <div class="px-3 pt-3 pb-2 text-[10px] font-mono text-slate-400 dark:text-stone-500 font-bold uppercase tracking-wider">Assessment Modules</div>
-                
-                @if (canAssessmentRoll)
-                {
-                    <a asp-controller="Assessment" asp-action="Index" class="nav-item flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Assessment" && currentAction != "Create" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300 hover:text-emerald-700 dark:hover:text-emerald-400")">
-                        <i data-lucide="layers" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
-                        <span>Assessment Records</span>
-                    </a>
-                }
+                <!-- Collapsible Assessment Modules Section -->
+                <div>
+                    <button type="button" onclick="toggleSidebarGroup('sidebarAssessmentMenu', 'sidebarAssessmentChevron')" class="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-mono uppercase tracking-wider font-bold transition-all @(isAssessmentActive ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800/80 dark:text-emerald-400 ring-1 ring-emerald-500/20" : "text-slate-600 dark:text-stone-300 hover:bg-slate-100 dark:hover:bg-stone-800/50")">
+                        <span class="flex items-center gap-2.5">
+                            <i data-lucide="layers" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                            <span>Assessment Modules</span>
+                        </span>
+                        <i data-lucide="chevron-down" id="sidebarAssessmentChevron" class="w-3.5 h-3.5 transition-transform duration-300 ease-out"></i>
+                    </button>
 
-                @if (canOwner)
-                {
-                    <a asp-controller="Owner" asp-action="Index" class="nav-item flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Owner" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300 hover:text-emerald-700 dark:hover:text-emerald-400")">
-                        <i data-lucide="users" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
-                        <span>Owner Registration</span>
-                    </a>
-                }
+                    <div id="sidebarAssessmentMenu" class="sidebar-collapse">
+                        <div class="sidebar-collapse-inner pl-3 border-l-2 border-emerald-500/20 dark:border-stone-800 ml-3.5 space-y-1">
+                        @if (canAssessmentRoll)
+                        {
+                            <a asp-controller="Assessment" asp-action="Index" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold text-xs transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Assessment" && currentAction != "Create" ? "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold" : "text-slate-600 dark:text-stone-400 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                                <i data-lucide="layers" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
+                                <span>Assessment Records</span>
+                            </a>
+                        }
 
-                @if (canRpa)
-                {
-                    <a asp-controller="PropertyAssessmentRequest" asp-action="Index" class="nav-item flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "PropertyAssessmentRequest" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300 hover:text-emerald-700 dark:hover:text-emerald-400")">
-                        <i data-lucide="clipboard-list" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
-                        <span>Property Assessment</span>
-                    </a>
-                }
+                        @if (canOwner)
+                        {
+                            <a asp-controller="Owner" asp-action="Index" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold text-xs transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Owner" ? "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold" : "text-slate-600 dark:text-stone-400 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                                <i data-lucide="users" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
+                                <span>Owner Registration</span>
+                            </a>
+                        }
 
-                @if (canRfi)
-                {
-                    <a asp-controller="RequestForInspection" asp-action="Index" class="nav-item flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "RequestForInspection" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300 hover:text-emerald-700 dark:hover:text-emerald-400")">
-                        <i data-lucide="clipboard-check" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
-                        <span>Inspection Requests</span>
-                    </a>
-                }
+                        @if (canRpa)
+                        {
+                            <a asp-controller="PropertyAssessmentRequest" asp-action="Index" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold text-xs transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "PropertyAssessmentRequest" ? "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold" : "text-slate-600 dark:text-stone-400 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                                <i data-lucide="clipboard-list" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
+                                <span>Property Assessment</span>
+                            </a>
+                        }
 
-                @if (canFaasCreate)
-                {
-                    <a asp-controller="Assessment" asp-action="Create" class="nav-item flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Assessment" && currentAction == "Create" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300 hover:text-emerald-700 dark:hover:text-emerald-400")">
-                        <i data-lucide="file-plus" class="w-4 h-4 text-teal-600 dark:text-teal-400"></i>
-                        <span>FAAS Encoding Wizard</span>
-                    </a>
-                }
+                        @if (canRfi)
+                        {
+                            <a asp-controller="RequestForInspection" asp-action="Index" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold text-xs transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "RequestForInspection" ? "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold" : "text-slate-600 dark:text-stone-400 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                                <i data-lucide="clipboard-check" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
+                                <span>Inspection Requests</span>
+                            </a>
+                        }
+
+                        @if (canFaasCreate)
+                        {
+                            <a asp-controller="Assessment" asp-action="Create" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold text-xs transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Assessment" && currentAction == "Create" ? "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold" : "text-slate-600 dark:text-stone-400 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                                <i data-lucide="file-plus" class="w-3.5 h-3.5 text-teal-600 dark:text-teal-400"></i>
+                                <span>FAAS Encoding Wizard</span>
+                            </a>
+                        }
+                        </div>
+                    </div>
+                </div>
             }
 
             @if (showRequestsGroup)
             {
-                <div class="px-3 pt-4 pb-2 text-[10px] font-mono text-slate-400 dark:text-stone-500 font-bold uppercase tracking-wider">Requests & Services</div>
+                <!-- Collapsible Requests & Services Section -->
+                <div>
+                    <button type="button" onclick="toggleSidebarGroup('sidebarRequestsMenu', 'sidebarRequestsChevron')" class="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-mono uppercase tracking-wider font-bold transition-all @(isSidebarRequestsActive ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800/80 dark:text-emerald-400 ring-1 ring-emerald-500/20" : "text-slate-600 dark:text-stone-300 hover:bg-slate-100 dark:hover:bg-stone-800/50")">
+                        <span class="flex items-center gap-2.5">
+                            <i data-lucide="folder-git-2" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                            <span>Requests & Services</span>
+                        </span>
+                        <i data-lucide="chevron-down" id="sidebarRequestsChevron" class="w-3.5 h-3.5 transition-transform duration-300 ease-out"></i>
+                    </button>
 
-                @if (canLandHolding)
-                {
-                    <a asp-controller="LandHoldingRequest" asp-action="Index" class="nav-item flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "LandHoldingRequest" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300 hover:text-emerald-700 dark:hover:text-emerald-400")">
-                        <i data-lucide="award" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
-                        <span>Land Holding Requests</span>
-                    </a>
-                }
+                    <div id="sidebarRequestsMenu" class="sidebar-collapse">
+                        <div class="sidebar-collapse-inner pl-3 border-l-2 border-emerald-500/20 dark:border-stone-800 ml-3.5 space-y-1">
+                        @if (canLandHolding)
+                        {
+                            <a asp-controller="LandHoldingRequest" asp-action="Index" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold text-xs transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "LandHoldingRequest" ? "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold" : "text-slate-600 dark:text-stone-400 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                                <i data-lucide="award" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
+                                <span>Land Holding Requests</span>
+                            </a>
+                        }
 
-                @if (canTaxDeclaration)
-                {
-                    <a asp-controller="TaxDeclarationRequest" asp-action="Index" class="nav-item flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "TaxDeclarationRequest" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300 hover:text-emerald-700 dark:hover:text-emerald-400")">
-                        <i data-lucide="file-text" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
-                        <span>Tax Declaration Requests</span>
-                    </a>
-                }
+                        @if (canTaxDeclaration)
+                        {
+                            <a asp-controller="TaxDeclarationRequest" asp-action="Index" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold text-xs transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "TaxDeclarationRequest" ? "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold" : "text-slate-600 dark:text-stone-400 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                                <i data-lucide="file-text" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
+                                <span>Tax Declaration Requests</span>
+                            </a>
+                        }
 
-                @if (canTaxMapping)
-                {
-                    <a asp-controller="TaxMapping" asp-action="Index" class="nav-item flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "TaxMapping" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300 hover:text-emerald-700 dark:hover:text-emerald-400")">
-                        <i data-lucide="map-pin" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
-                        <span>Tax Mapping Requests</span>
-                    </a>
-                }
-                @if (canRptReports)
-                {
-                    <a asp-controller="RPTReport" asp-action="Index" class="nav-item flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "RPTReport" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300 hover:text-emerald-700 dark:hover:text-emerald-400")">
-                        <i data-lucide="file-badge" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
-                        <span>RPT Reports & Certificates</span>
-                    </a>
-                }
+                        @if (canTaxMapping)
+                        {
+                            <a asp-controller="TaxMapping" asp-action="Index" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold text-xs transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "TaxMapping" ? "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold" : "text-slate-600 dark:text-stone-400 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                                <i data-lucide="map-pin" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
+                                <span>Tax Mapping Requests</span>
+                            </a>
+                        }
+                        @if (canRptReports)
+                        {
+                            <a asp-controller="RPTReport" asp-action="Index" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold text-xs transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "RPTReport" ? "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold" : "text-slate-600 dark:text-stone-400 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                                <i data-lucide="file-badge" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
+                                <span>RPT Reports & Certificates</span>
+                            </a>
+                        }
+                        </div>
+                    </div>
+                </div>
             }
 
             @if (showSettingsGroup)
             {
                 <!-- Collapsible Settings & Admin Navigation Section in Sidebar -->
-                <div class="pt-4">
-                    <button type="button" onclick="toggleSidebarSettings()" class="w-full flex items-center justify-between px-3.5 py-2 rounded-xl text-[11px] font-mono uppercase tracking-wider font-bold transition-all @(isSettingsActive ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800/80 dark:text-emerald-400" : "text-slate-500 dark:text-stone-400 hover:bg-slate-100 dark:hover:bg-stone-800/40")">
-                        <span class="flex items-center gap-2">
-                            <i data-lucide="settings-2" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
-                            <span>File Maintenance & Admin</span>
+                <div>
+                    <button type="button" onclick="toggleSidebarGroup('sidebarSettingsMenu', 'sidebarSettingsChevron')" class="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-mono uppercase tracking-wider font-bold transition-all @(isSettingsActive ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800/80 dark:text-emerald-400 ring-1 ring-emerald-500/20" : "text-slate-600 dark:text-stone-300 hover:bg-slate-100 dark:hover:bg-stone-800/50")">
+                        <span class="flex items-center gap-2.5">
+                            <i data-lucide="settings-2" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                            <span>File Maintenance</span>
                         </span>
-                        <i data-lucide="chevron-down" id="sidebarSettingsChevron" class="w-3 h-3 transition-transform duration-200 @(isSettingsActive ? "rotate-180" : "")"></i>
+                        <i data-lucide="chevron-down" id="sidebarSettingsChevron" class="w-3.5 h-3.5 transition-transform duration-300 ease-out"></i>
                     </button>
 
-                    <div id="sidebarSettingsMenu" class="@(isSettingsActive ? "" : "hidden") pl-2 space-y-1 mt-1.5 transition-all">
+                    <div id="sidebarSettingsMenu" class="sidebar-collapse">
+                        <div class="sidebar-collapse-inner pl-3 border-l-2 border-emerald-500/20 dark:border-stone-800 ml-3.5 space-y-1">
                         @if (canOrderPayment)
                         {
                             <a asp-controller="OrderPayment" asp-action="Index" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold text-xs transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "OrderPayment" ? "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold" : "text-slate-600 dark:text-stone-400 hover:text-emerald-700 dark:hover:text-emerald-400")">
@@ -330,7 +468,7 @@
 
                         @if (canWorkflowSettings)
                         {
-                            <a asp-controller="Workflow" asp-action="Settings" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold text-xs transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Workflow" ? "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold" : "text-slate-600 dark:text-stone-400 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                            <a asp-controller="Workflow" asp-action="Settings" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold text-xs transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Workflow" && currentAction == "Settings" ? "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold" : "text-slate-600 dark:text-stone-400 hover:text-emerald-700 dark:hover:text-emerald-400")">
                                 <i data-lucide="git-pull-request" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
                                 <span>Workflow Pipeline</span>
                             </a>
@@ -351,6 +489,7 @@
                                 <span>Data Transfer Utility</span>
                             </a>
                         }
+                        </div>
                     </div>
                 </div>
             }
@@ -405,66 +544,187 @@
                     <span class="hidden md:inline">LGU Status: <strong class="text-emerald-700 dark:text-emerald-400 font-bold">RA 7160 Compliant</strong></span>
                 </div>
 
-                <!-- Horizontal Navigation Items (Appears ONLY in Horizontal Nav Mode) -->
+                <!-- Horizontal Navigation Items (Appears ONLY in Horizontal Nav Mode - Grouped Collapsible Dropdowns) -->
                 <nav class="horizontal-nav-only items-center gap-1.5 ml-2">
-                    @if (canDashAdmin)
+                    @if (showDashboardGroup)
                     {
-                        <a asp-controller="Dashboard" asp-action="SystemOwner" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold text-xs font-mono transition-all @(currentController == "Dashboard" && currentAction == "SystemOwner" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold ring-1 ring-emerald-500/30" : "text-slate-700 dark:text-stone-300 hover:bg-slate-100 dark:hover:bg-stone-800/60 hover:text-emerald-700 dark:hover:text-emerald-400")"><i data-lucide="server-cog" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i><span>Owner Dashboard</span></a>
-                    }
-                    @if (canDashHead)
-                    {
-                        <a asp-controller="Dashboard" asp-action="AssessorHead" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold text-xs font-mono transition-all @(currentController == "Dashboard" && currentAction == "AssessorHead" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold ring-1 ring-emerald-500/30" : "text-slate-700 dark:text-stone-300 hover:bg-slate-100 dark:hover:bg-stone-800/60 hover:text-emerald-700 dark:hover:text-emerald-400")"><i data-lucide="gauge" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i><span>Head Dashboard</span></a>
-                    }
-                    @if (canDashStaff)
-                    {
-                        <a asp-controller="Dashboard" asp-action="Staff" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold text-xs font-mono transition-all @(currentController == "Dashboard" && currentAction == "Staff" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold ring-1 ring-emerald-500/30" : "text-slate-700 dark:text-stone-300 hover:bg-slate-100 dark:hover:bg-stone-800/60 hover:text-emerald-700 dark:hover:text-emerald-400")"><i data-lucide="layout-dashboard" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i><span>Dashboard</span></a>
-                    }
-                    @if (canPool)
-                    {
-                        <a asp-controller="Workflow" asp-action="Pool" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold text-xs font-mono transition-all @(currentController == "Workflow" && currentAction == "Pool" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold ring-1 ring-emerald-500/30" : "text-slate-700 dark:text-stone-300 hover:bg-slate-100 dark:hover:bg-stone-800/60 hover:text-emerald-700 dark:hover:text-emerald-400")">
-                            <i data-lucide="inbox" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
-                            <span>Pool</span>
-                            <span class="px-1.5 py-0.5 rounded-md text-[9px] bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-black transition-all duration-300" data-signalr-pool-count>0</span>
-                        </a>
+                        <!-- Horizontal Dashboards Dropdown Menu -->
+                        <div class="relative horizontal-nav-dropdown-container">
+                            <button type="button" onclick="toggleHorizontalNavDropdown(event, 'horizontalDashboardDropdownMenu', 'horizontalDashboardChevron')" 
+                                    class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all @(isDashboardActive ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 ring-1 ring-emerald-500/30" : "text-slate-700 dark:text-stone-300 hover:bg-slate-100 dark:hover:bg-stone-800/60")">
+                                <i data-lucide="layout-dashboard" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
+                                <span>Dashboard</span>
+                                <i data-lucide="chevron-down" id="horizontalDashboardChevron" class="horizontal-nav-chevron w-3 h-3 text-slate-400 transition-transform duration-200"></i>
+                            </button>
+
+                            <div id="horizontalDashboardDropdownMenu" class="horizontal-nav-dropdown-menu absolute left-0 mt-2 w-64 bg-white dark:bg-till-900 border border-slate-200/90 dark:border-stone-800 rounded-2xl shadow-2xl p-2 z-50 backdrop-blur-xl space-y-1">
+                                <div class="px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-stone-500 border-b border-slate-100 dark:border-stone-800 mb-1">Select Dashboard View</div>
+
+                                @if (canDashAdmin)
+                                {
+                                    <a asp-controller="Dashboard" asp-action="SystemOwner" class="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 text-xs @(currentController == "Dashboard" && currentAction == "SystemOwner" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300")">
+                                        <i data-lucide="server-cog" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                                        <div>
+                                            <div class="font-bold">System Owner</div>
+                                            <div class="text-[10px] text-slate-500 dark:text-stone-400 font-normal">System-wide analytics & audit</div>
+                                        </div>
+                                    </a>
+                                }
+                                @if (canDashHead)
+                                {
+                                    <a asp-controller="Dashboard" asp-action="AssessorHead" class="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 text-xs @(currentController == "Dashboard" && currentAction == "AssessorHead" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300")">
+                                        <i data-lucide="gauge" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                                        <div>
+                                            <div class="font-bold">Assessor Head</div>
+                                            <div class="text-[10px] text-slate-500 dark:text-stone-400 font-normal">Executive & approval metrics</div>
+                                        </div>
+                                    </a>
+                                }
+                                @if (canDashStaff)
+                                {
+                                    <a asp-controller="Dashboard" asp-action="Staff" class="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 text-xs @(currentController == "Dashboard" && currentAction == "Staff" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300")">
+                                        <i data-lucide="layout-dashboard" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                                        <div>
+                                            <div class="font-bold">My Dashboard</div>
+                                            <div class="text-[10px] text-slate-500 dark:text-stone-400 font-normal">Personal tasks & daily queue</div>
+                                        </div>
+                                    </a>
+                                }
+                            </div>
+                        </div>
                     }
 
-                    @if (canMyTransactions)
+                    @if (showWorkflowGroup)
                     {
-                        <a asp-controller="Workflow" asp-action="MyTransactions" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold text-xs font-mono transition-all @(currentController == "Workflow" && currentAction == "MyTransactions" ? "bg-blue-50 text-blue-700 dark:bg-stone-800 dark:text-blue-400 font-bold ring-1 ring-blue-500/30" : "text-slate-700 dark:text-stone-300 hover:bg-slate-100 dark:hover:bg-stone-800/60 hover:text-blue-700 dark:hover:text-blue-400")">
-                            <i data-lucide="user-check" class="w-3.5 h-3.5 text-blue-600 dark:text-blue-400"></i>
-                            <span>My Trans</span>
-                        </a>
+                        <!-- Horizontal Workflows Dropdown Menu -->
+                        <div class="relative horizontal-nav-dropdown-container">
+                            <button type="button" onclick="toggleHorizontalNavDropdown(event, 'horizontalWorkflowDropdownMenu', 'horizontalWorkflowChevron')" 
+                                    class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all @(isWorkflowActive ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 ring-1 ring-emerald-500/30" : "text-slate-700 dark:text-stone-300 hover:bg-slate-100 dark:hover:bg-stone-800/60")">
+                                <i data-lucide="git-branch" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
+                                <span>Workflows</span>
+                                @if (canPool)
+                                {
+                                    <span class="px-1.5 py-0.5 rounded-md text-[9px] bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-black transition-all duration-300" data-signalr-pool-count>0</span>
+                                }
+                                <i data-lucide="chevron-down" id="horizontalWorkflowChevron" class="horizontal-nav-chevron w-3 h-3 text-slate-400 transition-transform duration-200"></i>
+                            </button>
+
+                            <div id="horizontalWorkflowDropdownMenu" class="horizontal-nav-dropdown-menu absolute left-0 mt-2 w-64 bg-white dark:bg-till-900 border border-slate-200/90 dark:border-stone-800 rounded-2xl shadow-2xl p-2 z-50 backdrop-blur-xl space-y-1">
+                                <div class="px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-stone-500 border-b border-slate-100 dark:border-stone-800 mb-1">Transaction Workflows</div>
+
+                                @if (canPool)
+                                {
+                                    <a asp-controller="Workflow" asp-action="Pool" class="flex items-center justify-between px-3 py-2 rounded-xl transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 text-xs @(currentController == "Workflow" && currentAction == "Pool" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300")">
+                                        <div class="flex items-center gap-2.5">
+                                            <i data-lucide="inbox" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                                            <div>
+                                                <div class="font-bold">Pool Transactions</div>
+                                                <div class="text-[10px] text-slate-500 dark:text-stone-400 font-normal">Available department queue</div>
+                                            </div>
+                                        </div>
+                                        <span class="px-1.5 py-0.5 rounded-md text-[10px] bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-black" data-signalr-pool-count>0</span>
+                                    </a>
+                                }
+
+                                @if (canMyTransactions)
+                                {
+                                    <a asp-controller="Workflow" asp-action="MyTransactions" class="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 text-xs @(currentController == "Workflow" && currentAction == "MyTransactions" ? "bg-blue-50 text-blue-700 dark:bg-stone-800 dark:text-blue-400 font-bold" : "text-slate-700 dark:text-stone-300")">
+                                        <i data-lucide="user-check" class="w-4 h-4 text-blue-600 dark:text-blue-400"></i>
+                                        <div>
+                                            <div class="font-bold">My Transactions</div>
+                                            <div class="text-[10px] text-slate-500 dark:text-stone-400 font-normal">Claimed & active workload</div>
+                                        </div>
+                                    </a>
+                                }
+                            </div>
+                        </div>
                     }
 
-                    @if (canAssessmentRoll)
+                    @if (showAssessmentGroup)
                     {
-                        <a asp-controller="Assessment" asp-action="Index" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold text-xs font-mono transition-all @(currentController == "Assessment" && currentAction != "Create" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold ring-1 ring-emerald-500/30" : "text-slate-700 dark:text-stone-300 hover:bg-slate-100 dark:hover:bg-stone-800/60 hover:text-emerald-700 dark:hover:text-emerald-400")">
-                            <i data-lucide="layers" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
-                            <span>Records</span>
-                        </a>
-                    }
+                        <!-- Horizontal Assessment Modules Dropdown Menu -->
+                        <div class="relative horizontal-nav-dropdown-container">
+                            <button type="button" onclick="toggleHorizontalNavDropdown(event, 'horizontalAssessmentDropdownMenu', 'horizontalAssessmentChevron')" 
+                                    class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all @(isAssessmentActive ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 ring-1 ring-emerald-500/30" : "text-slate-700 dark:text-stone-300 hover:bg-slate-100 dark:hover:bg-stone-800/60")">
+                                <i data-lucide="layers" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
+                                <span>Assessment</span>
+                                <i data-lucide="chevron-down" id="horizontalAssessmentChevron" class="horizontal-nav-chevron w-3 h-3 text-slate-400 transition-transform duration-200"></i>
+                            </button>
 
-                    @if (canOwner)
-                    {
-                        <a asp-controller="Owner" asp-action="Index" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold text-xs font-mono transition-all @(currentController == "Owner" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold ring-1 ring-emerald-500/30" : "text-slate-700 dark:text-stone-300 hover:bg-slate-100 dark:hover:bg-stone-800/60 hover:text-emerald-700 dark:hover:text-emerald-400")">
-                            <i data-lucide="users" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
-                            <span>Owners</span>
-                        </a>
+                            <div id="horizontalAssessmentDropdownMenu" class="horizontal-nav-dropdown-menu absolute left-0 mt-2 w-72 bg-white dark:bg-till-900 border border-slate-200/90 dark:border-stone-800 rounded-2xl shadow-2xl p-2 z-50 backdrop-blur-xl space-y-1">
+                                <div class="px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-stone-500 border-b border-slate-100 dark:border-stone-800 mb-1">Assessment Modules</div>
+
+                                @if (canAssessmentRoll)
+                                {
+                                    <a asp-controller="Assessment" asp-action="Index" class="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 text-xs @(currentController == "Assessment" && currentAction != "Create" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300")">
+                                        <i data-lucide="layers" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                                        <div>
+                                            <div class="font-bold">Assessment Records</div>
+                                            <div class="text-[10px] text-slate-500 dark:text-stone-400 font-normal">Master FAAS & Tax Declarations</div>
+                                        </div>
+                                    </a>
+                                }
+
+                                @if (canOwner)
+                                {
+                                    <a asp-controller="Owner" asp-action="Index" class="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 text-xs @(currentController == "Owner" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300")">
+                                        <i data-lucide="users" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                                        <div>
+                                            <div class="font-bold">Owner Registration</div>
+                                            <div class="text-[10px] text-slate-500 dark:text-stone-400 font-normal">Taxpayer directory & profiles</div>
+                                        </div>
+                                    </a>
+                                }
+
+                                @if (canRpa)
+                                {
+                                    <a asp-controller="PropertyAssessmentRequest" asp-action="Index" class="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 text-xs @(currentController == "PropertyAssessmentRequest" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300")">
+                                        <i data-lucide="clipboard-list" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                                        <div>
+                                            <div class="font-bold">Property Assessment (RPA)</div>
+                                            <div class="text-[10px] text-slate-500 dark:text-stone-400 font-normal">Real property assessment flow</div>
+                                        </div>
+                                    </a>
+                                }
+
+                                @if (canRfi)
+                                {
+                                    <a asp-controller="RequestForInspection" asp-action="Index" class="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 text-xs @(currentController == "RequestForInspection" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300")">
+                                        <i data-lucide="clipboard-check" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                                        <div>
+                                            <div class="font-bold">Inspection Requests (RFI)</div>
+                                            <div class="text-[10px] text-slate-500 dark:text-stone-400 font-normal">Field ocular inspection tasks</div>
+                                        </div>
+                                    </a>
+                                }
+
+                                @if (canFaasCreate)
+                                {
+                                    <a asp-controller="Assessment" asp-action="Create" class="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 text-xs @(currentController == "Assessment" && currentAction == "Create" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300")">
+                                        <i data-lucide="file-plus" class="w-4 h-4 text-teal-600 dark:text-teal-400"></i>
+                                        <div>
+                                            <div class="font-bold">FAAS Encoding Wizard</div>
+                                            <div class="text-[10px] text-slate-500 dark:text-stone-400 font-normal">Encode new tax declaration</div>
+                                        </div>
+                                    </a>
+                                }
+                            </div>
+                        </div>
                     }
 
                     @if (showRequestsGroup || canRpa || canRfi)
                     {
                         <!-- Horizontal Requests Dropdown Menu -->
-                        <div class="relative" id="horizontalRequestsDropdownContainer">
-                            <button id="horizontalRequestsDropdownBtn" type="button" onclick="toggleHorizontalRequestsDropdown(event)" 
+                        <div class="relative horizontal-nav-dropdown-container" id="horizontalRequestsDropdownContainer">
+                            <button id="horizontalRequestsDropdownBtn" type="button" onclick="toggleHorizontalNavDropdown(event, 'horizontalRequestsDropdownMenu', 'horizontalRequestsChevron')" 
                                     class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all @(isRequestsActive ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 ring-1 ring-emerald-500/30" : "text-slate-700 dark:text-stone-300 hover:bg-slate-100 dark:hover:bg-stone-800/60")">
                                 <i data-lucide="folder-git-2" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
                                 <span>Requests</span>
-                                <i data-lucide="chevron-down" id="horizontalRequestsChevron" class="w-3 h-3 text-slate-400 transition-transform duration-200"></i>
+                                <i data-lucide="chevron-down" id="horizontalRequestsChevron" class="horizontal-nav-chevron w-3 h-3 text-slate-400 transition-transform duration-200"></i>
                             </button>
                             
-                            <div id="horizontalRequestsDropdownMenu" class="hidden absolute left-0 mt-2 w-72 bg-white dark:bg-till-900 border border-slate-200/90 dark:border-stone-800 rounded-2xl shadow-2xl p-2 z-50 backdrop-blur-xl">
-                                <div class="px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-stone-500 border-b border-slate-100 dark:border-stone-800 mb-1">Assessor Requests & Field Inspections</div>
+                            <div id="horizontalRequestsDropdownMenu" class="horizontal-nav-dropdown-menu absolute left-0 mt-2 w-72 bg-white dark:bg-till-900 border border-slate-200/90 dark:border-stone-800 rounded-2xl shadow-2xl p-2 z-50 backdrop-blur-xl space-y-1">
+                                <div class="px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-stone-500 border-b border-slate-100 dark:border-stone-800 mb-1">Assessor Requests & Services</div>
                                 
                                 @if (canRpa)
                                 {
@@ -1167,7 +1427,7 @@
         updateNavLayoutUI();
 
         // ---------------------------------------------------------------------
-        // SETTINGS & REQUESTS DROPDOWNS
+        // SETTINGS & GROUPED NAVIGATION DROPDOWNS / COLLAPSES
         // ---------------------------------------------------------------------
         function toggleSettingsDropdown(event) {
             event.stopPropagation();
@@ -1188,22 +1448,26 @@
             }
         }
 
-        function toggleHorizontalRequestsDropdown(event) {
+        function toggleHorizontalNavDropdown(event, menuId, chevronId) {
             event.stopPropagation();
-            var menu = document.getElementById('horizontalRequestsDropdownMenu');
-            var chevron = document.getElementById('horizontalRequestsChevron');
+            var menu = document.getElementById(menuId);
+            var chevron = document.getElementById(chevronId);
             if (!menu) return;
 
-            var isHidden = menu.classList.contains('hidden');
+            var isOpen = menu.classList.contains('open');
             closeAllDropdowns(menu);
 
-            if (isHidden) {
-                menu.classList.remove('hidden');
+            if (!isOpen) {
+                menu.classList.add('open');
                 if (chevron) chevron.classList.add('rotate-180');
             } else {
-                menu.classList.add('hidden');
+                menu.classList.remove('open');
                 if (chevron) chevron.classList.remove('rotate-180');
             }
+        }
+
+        function toggleHorizontalRequestsDropdown(event) {
+            toggleHorizontalNavDropdown(event, 'horizontalRequestsDropdownMenu', 'horizontalRequestsChevron');
         }
 
         function closeAllDropdowns(exceptMenu) {
@@ -1216,21 +1480,47 @@
                 sMenu.classList.add('hidden');
                 if (sChevron) sChevron.classList.remove('rotate-180');
             }
-            var rMenu = document.getElementById('horizontalRequestsDropdownMenu');
-            var rChevron = document.getElementById('horizontalRequestsChevron');
-            if (rMenu && rMenu !== exceptMenu) {
-                rMenu.classList.add('hidden');
-                if (rChevron) rChevron.classList.remove('rotate-180');
+            document.querySelectorAll('.horizontal-nav-dropdown-menu').forEach(m => {
+                if (m !== exceptMenu) {
+                    m.classList.remove('open');
+                    var container = m.closest('.horizontal-nav-dropdown-container');
+                    if (container) {
+                        var chev = container.querySelector('.horizontal-nav-chevron');
+                        if (chev) chev.classList.remove('rotate-180');
+                    }
+                }
+            });
+        }
+
+        // Sidebar Collapsible Group Toggle (Smooth Accordion with exact height animation)
+        function toggleSidebarGroup(menuId, chevronId) {
+            var menu = document.getElementById(menuId);
+            var chevron = document.getElementById(chevronId);
+            if (!menu) return;
+
+            var inner = menu.querySelector('.sidebar-collapse-inner');
+            var isOpen = menu.classList.contains('open');
+
+            if (!isOpen) {
+                menu.classList.add('open');
+                if (inner) {
+                    menu.style.maxHeight = (inner.scrollHeight + 16) + 'px';
+                }
+                if (chevron) chevron.classList.add('rotate-180');
+            } else {
+                if (inner) {
+                    menu.style.maxHeight = inner.scrollHeight + 'px';
+                    // Force reflow so browser animates from exact height down to 0
+                    void menu.offsetHeight;
+                }
+                menu.classList.remove('open');
+                menu.style.maxHeight = '0px';
+                if (chevron) chevron.classList.remove('rotate-180');
             }
         }
 
-        // Sidebar Collapsible Settings Toggle
         function toggleSidebarSettings() {
-            var menu = document.getElementById('sidebarSettingsMenu');
-            var chevron = document.getElementById('sidebarSettingsChevron');
-            if (!menu) return;
-            menu.classList.toggle('hidden');
-            if (chevron) chevron.classList.toggle('rotate-180');
+            toggleSidebarGroup('sidebarSettingsMenu', 'sidebarSettingsChevron');
         }
 
         function toggleKebabMenu(event, menuId) {
@@ -1280,15 +1570,18 @@
                 }
             }
 
-            // Close horizontal requests dropdown if clicking outside
-            var rContainer = document.getElementById('horizontalRequestsDropdownContainer');
-            if (rContainer && !rContainer.contains(e.target)) {
-                var rMenu = document.getElementById('horizontalRequestsDropdownMenu');
-                var rChevron = document.getElementById('horizontalRequestsChevron');
-                if (rMenu && !rMenu.classList.contains('hidden')) {
-                    rMenu.classList.add('hidden');
-                    if (rChevron) rChevron.classList.remove('rotate-180');
-                }
+            // Close horizontal nav dropdowns if clicking outside
+            if (!e.target.closest('.horizontal-nav-dropdown-container')) {
+                document.querySelectorAll('.horizontal-nav-dropdown-menu').forEach(function (m) {
+                    if (m.classList.contains('open')) {
+                        m.classList.remove('open');
+                        var container = m.closest('.horizontal-nav-dropdown-container');
+                        if (container) {
+                            var chev = container.querySelector('.horizontal-nav-chevron');
+                            if (chev) chev.classList.remove('rotate-180');
+                        }
+                    }
+                });
             }
         });
 

@@ -7,6 +7,11 @@
 ## Purpose
 This application (`PropertyAssessmentApp`) is an ASP.NET Core 9 MVC web application built for Local Government Unit (LGU) City/Municipal Assessor's Offices (e.g., General Santos City Assessor's Office).
 
+## Architecture & Database Paradigm
+- **Database Approach:** **EF Core Code-First strictly.**
+  - All database schema management, table creation, and foreign keys MUST be driven by C# Models and EF Core Migrations (`dotnet ef migrations add`, `dotnet ef database update`).
+  - Do not use manual/database-first SQL scripts as the primary migration tool. All schema changes and relational model definitions must be in C# entities and EF Core Migration files.
+
 ## Core Modules & Architecture
 - **Real Property Appraisal & Tax Assessment (FAAS / TD):**
   - Encodes and manages Tax Declarations for Land, Buildings & Structures, and Machinery & Equipment (`Models/TaxDeclaration.cs`).

@@ -8208,6 +8208,52 @@ namespace PropertyAssessmentApp.Migrations
                     b.ToTable("TDNMachineryPropertyAssessments");
                 });
 
+            modelBuilder.Entity("PropertyAssessmentApp.Models.TDNPropertyImage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Caption")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("ImagePath")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("OriginalFileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("PropertyKind")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TaxDeclarationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("TaxDeclarationNumber")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TaxDeclarationId");
+
+                    b.ToTable("TDNPropertyImages");
+                });
+
             modelBuilder.Entity("PropertyAssessmentApp.Models.TaxDeclaration", b =>
                 {
                     b.Property<Guid>("Id")
@@ -9059,6 +9105,17 @@ namespace PropertyAssessmentApp.Migrations
                     b.Navigation("TDNMachinery");
                 });
 
+            modelBuilder.Entity("PropertyAssessmentApp.Models.TDNPropertyImage", b =>
+                {
+                    b.HasOne("PropertyAssessmentApp.Models.TaxDeclaration", "TaxDeclaration")
+                        .WithMany("PropertyImages")
+                        .HasForeignKey("TaxDeclarationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("TaxDeclaration");
+                });
+
             modelBuilder.Entity("PropertyAssessmentApp.Models.TaxDeclaration", b =>
                 {
                     b.HasOne("PropertyAssessmentApp.Models.Owner", "Owner")
@@ -9129,6 +9186,8 @@ namespace PropertyAssessmentApp.Migrations
                     b.Navigation("LandDetails");
 
                     b.Navigation("MachineryDetails");
+
+                    b.Navigation("PropertyImages");
                 });
 #pragma warning restore 612, 618
         }

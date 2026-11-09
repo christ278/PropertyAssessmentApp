@@ -98,7 +98,7 @@ public class TaxDeclaration
 
     [EmailAddress]
     [Display(Name = "Email Address")]
-    public string OwnerEmail { get; set; } = string.Empty;
+    public string? OwnerEmail { get; set; } = string.Empty;
 
     [Display(Name = "Mailing Address")]
     public string OwnerAddress { get; set; } = string.Empty;
@@ -244,9 +244,43 @@ public class TaxDeclaration
     // -------------------------------------------------------------
     // NAVIGATION PROPERTIES TO NORMALIZED CHILD TABLES
     // -------------------------------------------------------------
+    [ValidateNever]
     public virtual TDNBuilding? BuildingDetails { get; set; }
+    [ValidateNever]
     public virtual TDNLand? LandDetails { get; set; }
+    [ValidateNever]
     public virtual TDNMachinery? MachineryDetails { get; set; }
+    [ValidateNever]
+    public virtual ICollection<TDNPropertyImage> PropertyImages { get; set; } = new List<TDNPropertyImage>();
+
+    [NotMapped]
+    public string? PropertyImagesJson
+    {
+        get
+        {
+            if (_propertyImagesJson != null) return _propertyImagesJson;
+            if (PropertyImages != null && PropertyImages.Any())
+            {
+                var items = PropertyImages
+                    .OrderBy(i => i.SortOrder)
+                    .Select(i => new
+                    {
+                        id = i.Id,
+                        taxDeclarationId = i.TaxDeclarationId,
+                        taxDeclarationNumber = i.TaxDeclarationNumber,
+                        propertyKind = i.PropertyKind,
+                        imagePath = i.ImagePath,
+                        originalFileName = i.OriginalFileName,
+                        caption = i.Caption ?? string.Empty,
+                        sortOrder = i.SortOrder
+                    });
+                return System.Text.Json.JsonSerializer.Serialize(items);
+            }
+            return null;
+        }
+        set => _propertyImagesJson = value;
+    }
+    private string? _propertyImagesJson;
 
     public TDNBuilding EnsureBuildingDetails()
     {
@@ -925,7 +959,7 @@ public class TaxDeclaration
     [NotMapped] public string StructuralFinishLeft { get; set; } = "Cement Plaster (CP)";
     [NotMapped] public string StructuralFinishRight { get; set; } = "Cement Plaster (CP)";
     [NotMapped] public string StructuralInsideFinish { get; set; } = "Cement Plaster (CP)";
-    [NotMapped] public string StructuralFloorFinish { get; set; } = "Tiles (T)";
+    [NotMapped] public string? StructuralFloorFinish { get; set; } = "Tiles (T)";
     [NotMapped] public string DoorRoom { get; set; } = "Flush Door (FD)";
     [NotMapped] public string DoorOthers { get; set; } = "PVC door for indoor use (PVC)";
     [NotMapped] public string Paintings { get; set; } = "Acrytex Paint";

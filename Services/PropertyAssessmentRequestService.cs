@@ -195,11 +195,11 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                                 : (string.Equals(request.TransactionTypeCode, "SD", StringComparison.OrdinalIgnoreCase)
                                     ? $"Segregated Lot {p.PartitionIndex} ({p.LotNumber ?? "Lot"}) resulting from Subdivision (SD) of Mother TD #{refTd?.TaxDeclarationNumber ?? request.PrevTDN} (PIN: {refTd?.PropertyIndexNumber ?? request.PrevPIN}) pursuant to LRA/DENR-approved plan under Assessment Request #{request.TrackingNumber}. Tax liabilities and delinquencies apportioned independently."
                                     : (string.Equals(request.TransactionTypeCode, "CS", StringComparison.OrdinalIgnoreCase)
-                                        ? $"Consolidated Parcel resulting from Consolidation (CS) · Lot Integration of constituent Parent TDs #{request.PrevTDN ?? refTd?.TaxDeclarationNumber} (PIN: {request.PrevPIN ?? refTd?.PropertyIndexNumber}) pursuant to field inspection and LRA/DENR-approved consolidation plan under Assessment Request #{request.TrackingNumber}. Real property tax receivables in the Treasury are collapsed from multiple ledgers into a unified bill."
+                                        ? $"Consolidated Parcel resulting from Consolidation (CS) Â· Lot Integration of constituent Parent TDs #{request.PrevTDN ?? refTd?.TaxDeclarationNumber} (PIN: {request.PrevPIN ?? refTd?.PropertyIndexNumber}) pursuant to field inspection and LRA/DENR-approved consolidation plan under Assessment Request #{request.TrackingNumber}. Real property tax receivables in the Treasury are collapsed from multiple ledgers into a unified bill."
                                         : (string.Equals(request.TransactionTypeCode, "DC", StringComparison.OrdinalIgnoreCase)
                                             ? $"Original Assessment under Discovery / New Declaration (DC) pursuant to Sec. 222 of R.A. 7160 under Assessment Request #{request.TrackingNumber}. Initial declaration of {p.Kind ?? request.Kind ?? "Property"}.{((p.BackTaxesYearFrom.HasValue && p.BackTaxesYearTo.HasValue) ? $" Back taxes assessed for years {p.BackTaxesYearFrom.Value} to {p.BackTaxesYearTo.Value} (up to 10 preceding years under Sec. 222, RA 7160)." : "")}"
                                             : (string.Equals(request.TransactionTypeCode, "PC", StringComparison.OrdinalIgnoreCase)
-                                                ? $"Reassessed due to Physical Change (PC) · Renovation / Expansion under Assessment Request #{request.TrackingNumber}. Supersedes prior TD #{refTd?.TaxDeclarationNumber ?? request.PrevTDN} (PIN: #{refTd?.PropertyIndexNumber ?? request.PrevPIN}) with upward adjustment in Fair Market Value and Assessed Value following structural renovation/expansion."
+                                                ? $"Reassessed due to Physical Change (PC) Â· Renovation / Expansion under Assessment Request #{request.TrackingNumber}. Supersedes prior TD #{refTd?.TaxDeclarationNumber ?? request.PrevTDN} (PIN: #{refTd?.PropertyIndexNumber ?? request.PrevPIN}) with upward adjustment in Fair Market Value and Assessed Value following structural renovation/expansion."
                                                 : $"Created from Assessment Partition Request {request.TrackingNumber} (Partition {p.PartitionIndex}, Duplicated from {p.BaseTDN}).")))),
                             Status = (request.Status >= PropertyAssessmentStatus.Approved && request.Status != PropertyAssessmentStatus.Deferred) ? AssessmentStatus.Active : AssessmentStatus.Pending,
                             DateEncoded = DateTime.Now,
@@ -325,7 +325,8 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                             OrNoAndDate = p.OrNoAndDate ?? string.Empty,
                             LocalDateIssued = p.LocalDateIssued,
                             MachineryAppraisalDetailsJson = p.MachineryAppraisalDetailsJson,
-                            MachineryPropertyAssessmentsJson = p.MachineryPropertyAssessmentsJson
+                            MachineryPropertyAssessmentsJson = p.MachineryPropertyAssessmentsJson,
+                            PropertyImagesJson = p.PropertyImagesJson
                         };
                         _assessmentService.Add(newTd);
                         p.SystemGeneratedTDN = newTd.TaxDeclarationNumber;
@@ -579,6 +580,16 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                     }
                 }
 
+                if (!string.IsNullOrWhiteSpace(matchingPartition.BuildingFloorPlanSketchPath))
+                {
+                    td.FloorPlanSketchPath = matchingPartition.BuildingFloorPlanSketchPath;
+                }
+                if (matchingPartition.PropertyImagesJson != null)
+                {
+                    td.PropertyImagesJson = matchingPartition.PropertyImagesJson;
+                    if ( td.Kind != PropertyKind.Machinery ) _assessmentService.Update(td);
+                }
+
                 // Sync Machinery & Land Appraisal JSONs if updated via EditPartition
                 if (td.Kind == PropertyKind.Machinery)
                 {
@@ -605,8 +616,8 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                     if (!string.IsNullOrWhiteSpace(matchingPartition.MachineryAppraisalDetailsJson)) td.MachineryAppraisalDetailsJson = matchingPartition.MachineryAppraisalDetailsJson;
                     if (!string.IsNullOrWhiteSpace(matchingPartition.MachineryPropertyAssessmentsJson)) td.MachineryPropertyAssessmentsJson = matchingPartition.MachineryPropertyAssessmentsJson;
                     if (matchingPartition.MarketValue > 0) td.MarketValue = matchingPartition.MarketValue;
-                    if (matchingPartition.AssessmentLevelPercent > 0) td.AssessmentLevelPercent = matchingPartition.AssessmentLevelPercent;
-                    _assessmentService.Update(td);
+                    if (matchingPartition.AssessmentLevelPercent > 0) td.AssessmentLevelPercent = matchingPartition.AssessmentLevelPercent; _assessmentService.Update(td);
+                    if ( td.Kind != PropertyKind.Machinery ) _assessmentService.Update(td);
                 }
                 partitionsModified = true;
             }
@@ -700,15 +711,15 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                     motherTd.Status = AssessmentStatus.Cancelled;
                     motherTd.IsCancelledAndSuperseded = true;
                     motherTd.CancellationReason = isSubdivision 
-                        ? "Subdivision (SD) · Segregation of Land" 
+                        ? "Subdivision (SD) Â· Segregation of Land" 
                         : (isConsolidation 
-                            ? "Consolidation (CS) · Lot Integration" 
+                            ? "Consolidation (CS) Â· Lot Integration" 
                             : (isPhysicalChange 
-                                ? "Reassessment Due to Physical Change (PC) · Renovation / Expansion" 
+                                ? "Reassessment Due to Physical Change (PC) Â· Renovation / Expansion" 
                                 : (isTransfer
-                                    ? "Transfer (TR) · Administrative Title Conveyance"
+                                    ? "Transfer (TR) Â· Administrative Title Conveyance"
                                     : (isReclassification
-                                        ? "Reclassification (RC) · Actual Ground Use Conversion"
+                                        ? "Reclassification (RC) Â· Actual Ground Use Conversion"
                                         : "Cancelled & Superseded"))));
                     motherTd.DateCancelled = DateTime.Now;
                     motherTd.SupersededByTdns = newLotsDisplay;
@@ -719,29 +730,29 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                     {
                         var cancelStamp = isSubdivision
                             ? $"\n\n*** CANCELLED & SUPERSEDED ***\n" +
-                              $"Cancelled by Subdivision (SD) · Segregation of Land under Assessment Request #{request.TrackingNumber} " +
+                              $"Cancelled by Subdivision (SD) Â· Segregation of Land under Assessment Request #{request.TrackingNumber} " +
                               $"pursuant to LRA/DENR-approved plan on {DateTime.Now:MMMM dd, yyyy}.\n" +
                               $"Superseded by New Segregated Lot TDs: {newLotsDisplay}.\n" +
                               $"Tax liabilities and delinquencies apportioned independently."
                             : (isConsolidation
                                 ? $"\n\n*** CANCELLED & SUPERSEDED ***\n" +
-                                  $"Cancelled by Consolidation (CS) · Lot Integration under Assessment Request #{request.TrackingNumber} " +
+                                  $"Cancelled by Consolidation (CS) Â· Lot Integration under Assessment Request #{request.TrackingNumber} " +
                                   $"pursuant to field inspection and LRA/DENR-approved consolidation plan on {DateTime.Now:MMMM dd, yyyy}.\n" +
                                   $"Superseded by Consolidated TD: {newLotsDisplay}.\n" +
                                   $"Real property tax receivables in the Treasury are collapsed from multiple ledgers into a unified bill."
                                 : (isPhysicalChange
                                     ? $"\n\n*** CANCELLED & SUPERSEDED ***\n" +
-                                      $"Cancelled due to Reassessment Due to Physical Change (PC) · Renovation / Expansion under Assessment Request #{request.TrackingNumber} on {DateTime.Now:MMMM dd, yyyy}.\n" +
+                                      $"Cancelled due to Reassessment Due to Physical Change (PC) Â· Renovation / Expansion under Assessment Request #{request.TrackingNumber} on {DateTime.Now:MMMM dd, yyyy}.\n" +
                                       $"Superseded by New Reassessed TD: {newLotsDisplay}.\n" +
                                       $"Structural renovation/expansion logged with upward Fair Market Value and Assessed Value adjustment."
                                     : (isTransfer
                                         ? $"\n\n*** CANCELLED & SUPERSEDED ***\n" +
-                                          $"Cancelled due to Transfer (TR) · Administrative Title Conveyance under Assessment Request #{request.TrackingNumber} on {DateTime.Now:MMMM dd, yyyy}.\n" +
+                                          $"Cancelled due to Transfer (TR) Â· Administrative Title Conveyance under Assessment Request #{request.TrackingNumber} on {DateTime.Now:MMMM dd, yyyy}.\n" +
                                           $"Superseded by Replacement TD: {newLotsDisplay} issued to Transferee: {request.NewOwnerName ?? "New Owner"}.\n" +
                                           $"Executed upon presentation of TCT, BIR CAR/eCAR, and Transfer Tax Receipt. Billing ledgers redirected to transferee."
                                         : (isReclassification
                                             ? $"\n\n*** CANCELLED & SUPERSEDED ***\n" +
-                                              $"Cancelled due to Reclassification (RC) · Actual Ground Use Conversion under Assessment Request #{request.TrackingNumber} on {DateTime.Now:MMMM dd, yyyy}.\n" +
+                                              $"Cancelled due to Reclassification (RC) Â· Actual Ground Use Conversion under Assessment Request #{request.TrackingNumber} on {DateTime.Now:MMMM dd, yyyy}.\n" +
                                               $"Superseded by Reclassified TD: {newLotsDisplay}.\n" +
                                               $"Ground physical use converted pursuant to field inspection under Sec. 217, RA 7160. Statutory assessment level adjusted without requiring title re-titling."
                                             : $"\n\n*** CANCELLED & SUPERSEDED ***\nCancelled under Assessment Request #{request.TrackingNumber} on {DateTime.Now:MMMM dd, yyyy}.\nSuperseded by: {newLotsDisplay}."))));
@@ -944,13 +955,13 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                     : (string.Equals(request.TransactionTypeCode, "SD", StringComparison.OrdinalIgnoreCase)
                         ? $"Segregated Lot {letterSuffix} resulting from Subdivision (SD) of Mother TD #{refTd?.TaxDeclarationNumber ?? request.PrevTDN} (PIN: {refTd?.PropertyIndexNumber ?? request.PrevPIN}) pursuant to LRA/DENR-approved plan under Assessment Request #{request.TrackingNumber}. Tax liabilities and delinquencies apportioned independently."
                         : (string.Equals(request.TransactionTypeCode, "CS", StringComparison.OrdinalIgnoreCase)
-                            ? $"Consolidated Parcel resulting from Consolidation (CS) · Lot Integration of constituent Parent TDs #{request.PrevTDN ?? refTd?.TaxDeclarationNumber} (PIN: {request.PrevPIN ?? refTd?.PropertyIndexNumber}) pursuant to field inspection and LRA/DENR-approved consolidation plan under Assessment Request #{request.TrackingNumber}. Real property tax receivables in the Treasury are collapsed from multiple ledgers into a unified bill."
+                            ? $"Consolidated Parcel resulting from Consolidation (CS) Â· Lot Integration of constituent Parent TDs #{request.PrevTDN ?? refTd?.TaxDeclarationNumber} (PIN: {request.PrevPIN ?? refTd?.PropertyIndexNumber}) pursuant to field inspection and LRA/DENR-approved consolidation plan under Assessment Request #{request.TrackingNumber}. Real property tax receivables in the Treasury are collapsed from multiple ledgers into a unified bill."
                             : (string.Equals(request.TransactionTypeCode, "DC", StringComparison.OrdinalIgnoreCase)
                                 ? $"Original Assessment under Discovery / New Declaration (DC) pursuant to Sec. 222 of R.A. 7160 under Assessment Request #{request.TrackingNumber}. Initial declaration of {conf?.Kind ?? request.Kind ?? "Property"}.{((conf?.BackTaxesYearFrom.HasValue == true && conf?.BackTaxesYearTo.HasValue == true) ? $" Back taxes assessed for years {conf.BackTaxesYearFrom.Value} to {conf.BackTaxesYearTo.Value} (up to 10 preceding years under Sec. 222, RA 7160)." : "")}"
                                 : (string.Equals(request.TransactionTypeCode, "PC", StringComparison.OrdinalIgnoreCase)
-                                    ? $"Reassessed due to Physical Change (PC) · Renovation / Expansion under Assessment Request #{request.TrackingNumber}. Structural renovation/expansion logged with upward adjustment in Fair Market Value and Assessed Value. Previous TD #{refTd?.TaxDeclarationNumber ?? request.PrevTDN} cancelled and superseded."
+                                    ? $"Reassessed due to Physical Change (PC) Â· Renovation / Expansion under Assessment Request #{request.TrackingNumber}. Structural renovation/expansion logged with upward adjustment in Fair Market Value and Assessed Value. Previous TD #{refTd?.TaxDeclarationNumber ?? request.PrevTDN} cancelled and superseded."
                                     : (string.Equals(request.TransactionTypeCode, "TR", StringComparison.OrdinalIgnoreCase)
-                                        ? $"Transferred under Transfer (TR) · Administrative Title Conveyance pursuant to Transfer Certificate of Title (TCT), BIR CAR/eCAR, and Transfer Tax Receipt under Assessment Request #{request.TrackingNumber}. Retains identical land area, building classification, and PIN ({refTd?.PropertyIndexNumber ?? request.PrevPIN}). Prior owner's TD #{refTd?.TaxDeclarationNumber ?? request.PrevTDN} cancelled and superseded. Billing ledgers redirected to transferee {request.NewOwnerName}."
+                                        ? $"Transferred under Transfer (TR) Â· Administrative Title Conveyance pursuant to Transfer Certificate of Title (TCT), BIR CAR/eCAR, and Transfer Tax Receipt under Assessment Request #{request.TrackingNumber}. Retains identical land area, building classification, and PIN ({refTd?.PropertyIndexNumber ?? request.PrevPIN}). Prior owner's TD #{refTd?.TaxDeclarationNumber ?? request.PrevTDN} cancelled and superseded. Billing ledgers redirected to transferee {request.NewOwnerName}."
                                         : (string.Equals(request.TransactionTypeCode, "RC", StringComparison.OrdinalIgnoreCase)
                                             ? $"Reclassified due to Actual Ground Use Conversion (RC) pursuant to field inspection under Sec. 217 of R.A. 7160 under Assessment Request #{request.TrackingNumber}. Converted statutory assessment level ({refTd?.AssessmentLevelPercent ?? 20:0.#}% to {assessLevel:0.#}%) altering annual property tax dues without title re-titling. Prior TD #{refTd?.TaxDeclarationNumber ?? request.PrevTDN} cancelled and superseded."
                                             : $"Created from Partition Request {request.TrackingNumber} (Partition {letterSuffix} of {partitionCount}). Previous TD: {request.PrevTDN}")))))),
@@ -967,6 +978,7 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                 AssessmentBasis = !string.IsNullOrWhiteSpace(conf?.AssessmentBasis) ? conf.AssessmentBasis : (string.Equals(request.TransactionTypeCode, "DC", StringComparison.OrdinalIgnoreCase) ? "Sec. 222 RA 7160" : "Sec. 217 RA 7160"),
                 BackTaxesYearFrom = conf?.BackTaxesYearFrom,
                 BackTaxesYearTo = conf?.BackTaxesYearTo,
+                FloorPlanSketchPath = conf?.BuildingFloorPlanSketchPath,
 
                 // CAST Land Appraisal & Registration (CAST Standard)
                 RegistrationStatus = !string.IsNullOrWhiteSpace(conf?.RegistrationStatus) ? conf.RegistrationStatus : "Titled",
@@ -1020,7 +1032,8 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                 OrNoAndDate = conf?.OrNoAndDate ?? string.Empty,
                 LocalDateIssued = conf?.LocalDateIssued,
                 MachineryAppraisalDetailsJson = conf?.MachineryAppraisalDetailsJson,
-                MachineryPropertyAssessmentsJson = conf?.MachineryPropertyAssessmentsJson
+                MachineryPropertyAssessmentsJson = conf?.MachineryPropertyAssessmentsJson,
+                PropertyImagesJson = conf?.PropertyImagesJson
             };
 
             _assessmentService.Add(newTd);

@@ -1,4 +1,4 @@
-@model PropertyAssessmentApp.Models.OfficialCertificateViewModel
+﻿@model PropertyAssessmentApp.Models.OfficialCertificateViewModel
 @{
     var firstItem = Model.Details.Items.FirstOrDefault();
     var tdnParam = firstItem?.TaxDeclarationNo ?? Model.AssessmentDetails?.TaxDeclarationNo ?? Model.NoImprovementDetails?.ArpNo ?? "";

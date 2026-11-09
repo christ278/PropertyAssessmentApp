@@ -124,7 +124,7 @@
                             <th class="hidden sm:table-cell px-4 py-3">Property Reference</th>
                             <th class="px-3 sm:px-4 py-3">Declared Owner</th>
                             <th class="hidden lg:table-cell px-4 py-3">Inspection Reason</th>
-                            <th class="hidden xl:table-cell px-4 py-3 text-right">Fee (â‚±)</th>
+                            <th class="hidden xl:table-cell px-4 py-3 text-right">Fee (₱)</th>
                             <th class="px-2 sm:px-4 py-3">Workflow Stage</th>
                             <th class="hidden xl:table-cell px-4 py-3">Attachment</th>
                             <th class="px-2 sm:px-4 py-3 text-center">Action</th>
@@ -174,7 +174,7 @@
                                             <span class="block text-[10px] text-slate-400">Rep: @item.ContactPerson</span>
                                         }
                                         <div class="lg:hidden mt-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-                                            â‚±@item.TotalFeesAmount.ToString("N2")
+                                            ₱@item.TotalFeesAmount.ToString("N2")
                                         </div>
                                     </td>
                                     <td class="hidden md:table-cell px-4 py-3">
@@ -184,7 +184,7 @@
                                         @if (item.IsOther) { <span class="inline-block px-1.5 py-0.5 rounded bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 text-[10px]">Other</span> }
                                     </td>
                                     <td class="hidden lg:table-cell px-4 py-3 text-right font-bold text-slate-900 dark:text-white">
-                                        â‚±@item.TotalFeesAmount.ToString("N2")
+                                        ₱@item.TotalFeesAmount.ToString("N2")
                                     </td>
                                     <td class="px-2 sm:px-4 py-3">
                                         <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold 

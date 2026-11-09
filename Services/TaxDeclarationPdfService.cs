@@ -1228,17 +1228,29 @@ public class TaxDeclarationPdfService : ITaxDeclarationPdfService
                 var deprPct = bldg?.BuildingDepreciationPercent ?? 0m;
                 var deprMv = bldg?.DepreciatedMarketValue > 0 ? bldg.DepreciatedMarketValue : Math.Max(0m, baseRcn - (bldg?.BuildingDepreciationAccumulated ?? 0m));
 
-                fp.Item().MinHeight(38).PaddingTop(4).Row(r =>
+                var sketchImages = GetSketchAndPropertyImageBytes(td);
+                if (sketchImages.Count > 0)
+                {
+                    fp.Item().PaddingTop(4).AlignCenter().MaxHeight(150).Image(sketchImages[0]).FitArea();
+                    if (sketchImages.Count > 1)
+                    {
+                        fp.Item().PaddingTop(4).Row(imgRow =>
+                        {
+                            foreach (var extraImg in sketchImages.Skip(1).Take(3))
+                            {
+                                imgRow.RelativeItem().Padding(2).MaxHeight(75).AlignCenter().Image(extraImg).FitArea();
+                            }
+                        });
+                    }
+                }
+
+                fp.Item().MinHeight(sketchImages.Count > 0 ? 20 : 38).PaddingTop(4).Row(r =>
                 {
                     r.RelativeItem().Column(c1 =>
                     {
                         c1.Item().Text("Apply Depreciation: Market Val = (Total Area x Unit Cost) x (1 - Depreciation Rate)").FontSize(7f).Italic().FontColor(Colors.Grey.Darken2);
                         c1.Item().Text($"Base RCN: PHP {baseRcn:N2}  |  Depreciation Rate: {deprPct:N1}%  |  Depreciated Core MV: PHP {deprMv:N2}").FontSize(7.5f).Bold();
                     });
-                    if (!string.IsNullOrWhiteSpace(td.FloorPlanSketchPath))
-                    {
-                        r.AutoItem().Text($"Attached Sketch: {td.FloorPlanSketchPath}").FontSize(7f).FontColor(Colors.Teal.Darken3);
-                    }
                 });
             });
 
@@ -1787,9 +1799,20 @@ public class TaxDeclarationPdfService : ITaxDeclarationPdfService
                         txt.Span("LAND SKETCH: ").FontSize(7.5f).Bold();
                         txt.Span("(Not necessarily drawn to scale)").FontSize(7f).Italic();
                     });
-                    if (!string.IsNullOrWhiteSpace(td.FloorPlanSketchPath))
+                    var sketchImages = GetSketchAndPropertyImageBytes(td);
+                    if (sketchImages.Count > 0)
                     {
-                        sc.Item().PaddingTop(6).Text($"Attached Sketch: {td.FloorPlanSketchPath}").FontSize(7.5f).FontColor(Colors.Teal.Darken3);
+                        sc.Item().PaddingTop(4).AlignCenter().MaxHeight(130).Image(sketchImages[0]).FitArea();
+                        if (sketchImages.Count > 1)
+                        {
+                            sc.Item().PaddingTop(4).Row(imgRow =>
+                            {
+                                foreach (var extraImg in sketchImages.Skip(1).Take(3))
+                                {
+                                    imgRow.RelativeItem().Padding(2).MaxHeight(65).AlignCenter().Image(extraImg).FitArea();
+                                }
+                            });
+                        }
                     }
                 });
             });
@@ -3147,6 +3170,106 @@ public class TaxDeclarationPdfService : ITaxDeclarationPdfService
 
     private static string ValueOr(string? val, string fallback) =>
         string.IsNullOrWhiteSpace(val) ? fallback : val.Trim();
+
+    private static List<byte[]> GetSketchAndPropertyImageBytes(TaxDeclaration td)
+    {
+        var results = new List<byte[]>();
+
+        if (!string.IsNullOrWhiteSpace(td.FloorPlanSketchPath))
+        {
+            var bytes = TryLoadImageBytes(td.FloorPlanSketchPath.Trim());
+            if (bytes != null && bytes.Length > 0)
+            {
+                results.Add(bytes);
+            }
+        }
+
+        return results;
+    }
+
+    private static byte[]? TryLoadImageBytes(string? pathOrBase64)
+    {
+        if (string.IsNullOrWhiteSpace(pathOrBase64))
+            return null;
+
+        try
+        {
+            var trimmed = pathOrBase64.Trim();
+
+            // 1. Base64 data URI
+            if (trimmed.StartsWith("data:image", StringComparison.OrdinalIgnoreCase))
+            {
+                int commaIdx = trimmed.IndexOf(',');
+                if (commaIdx >= 0 && commaIdx + 1 < trimmed.Length)
+                {
+                    var bytes = Convert.FromBase64String(trimmed[(commaIdx + 1)..]);
+                    return IsSupportedRasterImage(bytes) ? bytes : null;
+                }
+                return null;
+            }
+
+            // 2. File path on disk (web-relative e.g. "/uploads/..." or full path)
+            int qIdx = trimmed.IndexOf('?');
+            if (qIdx >= 0) trimmed = trimmed[..qIdx];
+
+            var cleanRelative = trimmed.TrimStart('~', '/', '\\').Replace('/', Path.DirectorySeparatorChar).Replace('\\', Path.DirectorySeparatorChar);
+
+            var searchCandidates = new[]
+            {
+                Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", cleanRelative),
+                Path.Combine(AppContext.BaseDirectory, "wwwroot", cleanRelative),
+                Path.Combine(Directory.GetCurrentDirectory(), cleanRelative),
+                trimmed
+            };
+
+            foreach (var fullPath in searchCandidates)
+            {
+                if (!string.IsNullOrWhiteSpace(fullPath) && File.Exists(fullPath))
+                {
+                    var bytes = File.ReadAllBytes(fullPath);
+                    if (IsSupportedRasterImage(bytes))
+                    {
+                        return bytes;
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // Ignore unreadable image files so PDF generation never fails
+        }
+
+        return null;
+    }
+
+    private static bool IsSupportedRasterImage(byte[]? bytes)
+    {
+        if (bytes == null || bytes.Length < 12)
+            return false;
+
+        // PNG: 89 50 4E 47
+        if (bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47)
+            return true;
+
+        // JPEG: FF D8 FF
+        if (bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF)
+            return true;
+
+        // WEBP: "RIFF"...."WEBP"
+        if (bytes[0] == 0x52 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x46 &&
+            bytes[8] == 0x57 && bytes[9] == 0x45 && bytes[10] == 0x42 && bytes[11] == 0x50)
+            return true;
+
+        // GIF: "GIF8"
+        if (bytes[0] == 0x47 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x38)
+            return true;
+
+        // BMP: "BM"
+        if (bytes[0] == 0x42 && bytes[1] == 0x4D)
+            return true;
+
+        return false;
+    }
 
     private static string AmountToWords(decimal amount)
     {

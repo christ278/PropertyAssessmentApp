@@ -502,6 +502,56 @@ public class PropertyAssessmentRequestController : Controller
         return View(partition);
     }
 
+    // POST: /PropertyAssessmentRequest/UploadPartitionPropertyImages
+    [HttpPost]
+    [IgnoreAntiforgeryToken]
+    public async Task<IActionResult> UploadPartitionPropertyImages(List<IFormFile>? propertyImages)
+    {
+        if (propertyImages == null || propertyImages.Count == 0)
+        {
+            return Json(new { success = false, message = "No image files received." });
+        }
+
+        try
+        {
+            var uploadsDir = Path.Combine(_env.WebRootPath, "uploads", "PropertyAssessment");
+            if (!Directory.Exists(uploadsDir))
+            {
+                Directory.CreateDirectory(uploadsDir);
+            }
+
+            var uploadedList = new List<object>();
+            foreach (var file in propertyImages)
+            {
+                if (file == null || file.Length == 0) continue;
+
+                var ext = Path.GetExtension(file.FileName);
+                if (string.IsNullOrWhiteSpace(ext)) ext = ".jpg";
+                var fileName = $"propimg_{DateTime.UtcNow:yyyyMMdd_HHmmss}_{Guid.NewGuid().ToString("N")[..6]}{ext}";
+                var fullPath = Path.Combine(uploadsDir, fileName);
+
+                using (var stream = new FileStream(fullPath, FileMode.Create))
+                {
+                    await file.CopyToAsync(stream);
+                }
+
+                var webPath = $"/uploads/PropertyAssessment/{fileName}";
+                uploadedList.Add(new
+                {
+                    imagePath = webPath,
+                    originalFileName = file.FileName,
+                    uploadedAt = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
+                });
+            }
+
+            return Json(new { success = true, files = uploadedList });
+        }
+        catch (Exception ex)
+        {
+            return Json(new { success = false, message = ex.Message });
+        }
+    }
+
     // POST: /PropertyAssessmentRequest/UploadPartitionSketch
     [HttpPost]
     [IgnoreAntiforgeryToken]
@@ -620,6 +670,7 @@ public class PropertyAssessmentRequestController : Controller
                     if (payloadItem.BasePropertyId == null) payloadItem.BasePropertyId = item.BasePropertyId;
                     if (string.IsNullOrWhiteSpace(payloadItem.BaseTDN)) payloadItem.BaseTDN = item.BaseTDN;
                     if (string.IsNullOrWhiteSpace(payloadItem.AttachmentsJson)) payloadItem.AttachmentsJson = item.AttachmentsJson;
+                    if (string.IsNullOrWhiteSpace(payloadItem.PropertyImagesJson)) payloadItem.PropertyImagesJson = item.PropertyImagesJson;
                     item = payloadItem;
                 }
             }
@@ -779,7 +830,7 @@ public class PropertyAssessmentRequestController : Controller
         else
         {
             // Draft / Create Workflow: Pass serialized partition back via TempData for guaranteed persistence
-            TempData["LastUpdatedPartitionJson"] = System.Text.Json.JsonSerializer.Serialize(item, _jsonOptions);
+            var compactJson = System.Text.Json.JsonSerializer.Serialize(item, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase, DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull }); if (compactJson.Length <= 2000) TempData["LastUpdatedPartitionJson"] = compactJson;
             TempData["LastUpdatedPartitionIndex"] = index;
             TempData["SuccessMessage"] = $"Partition appraisal updated successfully!";
         }

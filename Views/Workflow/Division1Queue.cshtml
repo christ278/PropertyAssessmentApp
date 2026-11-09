@@ -132,7 +132,7 @@
                         <th class="px-3 sm:px-4 py-3.5">OWNER & REF NO</th>
                         <th class="hidden sm:table-cell px-4 py-3.5 text-center">CURRENT STAGE</th>
                         <th class="hidden md:table-cell px-4 py-3.5">ASSIGNED OWNER / POOL</th>
-                        <th class="hidden lg:table-cell px-4 py-3.5 text-right">FEES (â‚±)</th>
+                        <th class="hidden lg:table-cell px-4 py-3.5 text-right">FEES (₱)</th>
                         <th class="px-2 sm:px-4 py-3.5 text-center">ACTION / WORKFLOW</th>
                     </tr>
                 </thead>
@@ -174,7 +174,7 @@
                                         <span class="px-2 py-0.5 rounded text-[9px] bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-bold uppercase">
                                             @item.CurrentStage
                                         </span>
-                                        <span class="text-[10px] font-bold text-slate-600 dark:text-stone-400">â‚±@item.TotalAmount.ToString("N2")</span>
+                                        <span class="text-[10px] font-bold text-slate-600 dark:text-stone-400">₱@item.TotalAmount.ToString("N2")</span>
                                     </div>
                                 </td>
                                 <td class="hidden sm:table-cell px-4 py-3.5 text-center">
@@ -201,7 +201,7 @@
                                     }
                                 </td>
                                 <td class="hidden lg:table-cell px-4 py-3.5 text-right font-bold text-emerald-700 dark:text-emerald-400">
-                                    â‚±@item.TotalAmount.ToString("N2")
+                                    ₱@item.TotalAmount.ToString("N2")
                                 </td>
                                 <td class="px-2 sm:px-4 py-3.5 text-center">
                                     <div class="flex items-center justify-center gap-1.5 flex-wrap">
@@ -393,7 +393,7 @@
             <div>
                 <label class="block text-rose-700 dark:text-rose-400 font-bold mb-1">REASON FOR DEFERRAL / AUDIT REMARKS *</label>
                 <textarea name="remarks" required rows="4" class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-stone-950 text-slate-900 dark:text-white border border-slate-200 dark:border-stone-800 focus:outline-none focus:border-rose-600" placeholder="Specify missing requirements, data inaccuracies, or reasons for returning to originator..."></textarea>
-                <span class="text-[10px] text-slate-400 block mt-1">ðŸ”’ Mandatory field required for audit history logging.</span>
+                <span class="text-[10px] text-slate-400 block mt-1">🔒 Mandatory field required for audit history logging.</span>
             </div>
 
             <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-200 dark:border-stone-800">

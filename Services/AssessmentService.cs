@@ -71,6 +71,7 @@ public class AssessmentService : IAssessmentService
                 .ThenInclude(m => m!.TDNMachineryDetails)
             .Include(t => t.MachineryDetails)
                 .ThenInclude(m => m!.TDNMachineryPropertyAssessments)
+            .Include(t => t.PropertyImages)
             .FirstOrDefault(t => t.Id == id);
     }
 
@@ -99,6 +100,8 @@ public class AssessmentService : IAssessmentService
                 .ThenInclude(m => m!.TDNMachineryDetails)
             .Include(t => t.MachineryDetails)
                 .ThenInclude(m => m!.TDNMachineryPropertyAssessments)
+            .AsNoTracking()
+            .Include(t => t.PropertyImages)
             .AsNoTracking()
             .FirstOrDefault(r => r.TaxDeclarationNumber == clean);
     }
@@ -450,7 +453,7 @@ public class AssessmentService : IAssessmentService
             }
             else
             {
-                _context.Entry(existingBldg).CurrentValues.SetValues(bldg);
+                if (!ReferenceEquals(existingBldg, bldg)) { _context.Entry(existingBldg).CurrentValues.SetValues(bldg); if (bldg.FloorLevels.Any()) { existingBldg.FloorLevels.Clear(); foreach (var fl in bldg.FloorLevels) existingBldg.FloorLevels.Add(fl); } if (bldg.AdditionalItems.Any()) { existingBldg.AdditionalItems.Clear(); foreach (var ai in bldg.AdditionalItems) existingBldg.AdditionalItems.Add(ai); } if (bldg.StructuralMaterials.Any()) { existingBldg.StructuralMaterials.Clear(); foreach (var sm in bldg.StructuralMaterials) existingBldg.StructuralMaterials.Add(sm); } } SyncPropertyImages(declaration); return;
                 if (bldg.FloorLevels.Any())
                 {
                     existingBldg.FloorLevels.Clear();
@@ -633,7 +636,7 @@ public class AssessmentService : IAssessmentService
             }
             else
             {
-                _context.Entry(existingLand).CurrentValues.SetValues(land);
+                if (!ReferenceEquals(existingLand, land)) { _context.Entry(existingLand).CurrentValues.SetValues(land); if (land.TDNLandDetails.Any()) { existingLand.TDNLandDetails.Clear(); foreach (var d in land.TDNLandDetails) existingLand.TDNLandDetails.Add(d); } if (land.TDNLandImprovements.Any()) { existingLand.TDNLandImprovements.Clear(); foreach (var imp in land.TDNLandImprovements) existingLand.TDNLandImprovements.Add(imp); } if (land.TDNLandBaseMarkets.Any()) { existingLand.TDNLandBaseMarkets.Clear(); foreach (var b in land.TDNLandBaseMarkets) existingLand.TDNLandBaseMarkets.Add(b); } if (land.TDNLandPropertyAssessments.Any()) { existingLand.TDNLandPropertyAssessments.Clear(); foreach (var p in land.TDNLandPropertyAssessments) existingLand.TDNLandPropertyAssessments.Add(p); } } SyncPropertyImages(declaration); return;
 
                 // Update details
                 if (land.TDNLandDetails.Any())
@@ -819,7 +822,7 @@ public class AssessmentService : IAssessmentService
             }
             else
             {
-                _context.Entry(existingMach).CurrentValues.SetValues(mach);
+                if (!ReferenceEquals(existingMach, mach)) { _context.Entry(existingMach).CurrentValues.SetValues(mach); if (mach.TDNMachineryDetails.Any()) { existingMach.TDNMachineryDetails.Clear(); foreach (var d in mach.TDNMachineryDetails) existingMach.TDNMachineryDetails.Add(d); } if (mach.TDNMachineryPropertyAssessments.Any()) { existingMach.TDNMachineryPropertyAssessments.Clear(); foreach (var p in mach.TDNMachineryPropertyAssessments) existingMach.TDNMachineryPropertyAssessments.Add(p); } } SyncPropertyImages(declaration); return;
 
                 if (mach.TDNMachineryDetails.Any())
                 {
@@ -832,6 +835,110 @@ public class AssessmentService : IAssessmentService
                     foreach (var p in mach.TDNMachineryPropertyAssessments) existingMach.TDNMachineryPropertyAssessments.Add(p);
                 }
             }
+        }
+
+        SyncPropertyImages(declaration);
+    }
+
+    private void SyncPropertyImages(TaxDeclaration declaration)
+    {
+        if (declaration == null || declaration.Id == Guid.Empty) return;
+
+        // Only modify if PropertyImagesJson was explicitly provided or PropertyImages collection was populated
+        if (declaration.PropertyImagesJson == null && (declaration.PropertyImages == null || !declaration.PropertyImages.Any()))
+        {
+            return;
+        }
+
+        var existingImages = _context.TDNPropertyImages
+            .Where(img => img.TaxDeclarationId == declaration.Id)
+            .ToList();
+
+        if (existingImages.Any())
+        {
+            _context.TDNPropertyImages.RemoveRange(existingImages);
+        }
+
+        var newImages = new List<TDNPropertyImage>();
+        int sortOrder = 0;
+
+        if (!string.IsNullOrWhiteSpace(declaration.PropertyImagesJson))
+        {
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(declaration.PropertyImagesJson);
+                if (doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Array)
+                {
+                    foreach (var elem in doc.RootElement.EnumerateArray())
+                    {
+                        string imagePath = string.Empty;
+                        string? originalFileName = null;
+                        string? caption = null;
+
+                        if (elem.ValueKind == System.Text.Json.JsonValueKind.String)
+                        {
+                            imagePath = elem.GetString() ?? string.Empty;
+                        }
+                        else if (elem.ValueKind == System.Text.Json.JsonValueKind.Object)
+                        {
+                            if (elem.TryGetProperty("imagePath", out var ip)) imagePath = ip.GetString() ?? string.Empty;
+                            else if (elem.TryGetProperty("ImagePath", out var ip2)) imagePath = ip2.GetString() ?? string.Empty;
+                            else if (elem.TryGetProperty("url", out var u)) imagePath = u.GetString() ?? string.Empty;
+
+                            if (elem.TryGetProperty("originalFileName", out var fn)) originalFileName = fn.GetString();
+                            else if (elem.TryGetProperty("OriginalFileName", out var fn2)) originalFileName = fn2.GetString();
+                            else if (elem.TryGetProperty("fileName", out var fn3)) originalFileName = fn3.GetString();
+
+                            if (elem.TryGetProperty("caption", out var cap)) caption = cap.GetString();
+                            else if (elem.TryGetProperty("Caption", out var cap2)) caption = cap2.GetString();
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(imagePath))
+                        {
+                            newImages.Add(new TDNPropertyImage
+                            {
+                                Id = Guid.NewGuid(),
+                                TaxDeclarationId = declaration.Id,
+                                TaxDeclarationNumber = declaration.TaxDeclarationNumber ?? string.Empty,
+                                PropertyKind = declaration.Kind.ToString(),
+                                ImagePath = imagePath.Trim(),
+                                OriginalFileName = originalFileName ?? Path.GetFileName(imagePath.Trim()),
+                                Caption = caption,
+                                SortOrder = sortOrder++,
+                                UploadedAt = DateTime.UtcNow
+                            });
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // Ignore malformed JSON
+            }
+        }
+        else if (declaration.PropertyImages != null && declaration.PropertyImages.Any())
+        {
+            foreach (var img in declaration.PropertyImages.OrderBy(i => i.SortOrder))
+            {
+                if (string.IsNullOrWhiteSpace(img.ImagePath)) continue;
+                newImages.Add(new TDNPropertyImage
+                {
+                    Id = img.Id == Guid.Empty ? Guid.NewGuid() : img.Id,
+                    TaxDeclarationId = declaration.Id,
+                    TaxDeclarationNumber = declaration.TaxDeclarationNumber ?? string.Empty,
+                    PropertyKind = declaration.Kind.ToString(),
+                    ImagePath = img.ImagePath,
+                    OriginalFileName = img.OriginalFileName ?? Path.GetFileName(img.ImagePath),
+                    Caption = img.Caption,
+                    SortOrder = sortOrder++,
+                    UploadedAt = img.UploadedAt == default ? DateTime.UtcNow : img.UploadedAt
+                });
+            }
+        }
+
+        if (newImages.Any())
+        {
+            _context.TDNPropertyImages.AddRange(newImages);
         }
     }
 
