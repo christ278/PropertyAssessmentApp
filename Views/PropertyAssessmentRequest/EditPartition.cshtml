@@ -2109,6 +2109,69 @@
             $('#BuildingFloorPlanSketchPath').val('');
         }
 
+        function previewLandSketchImage(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const base64Data = e.target.result;
+                $('#landSketchPreviewImg').attr('src', base64Data).removeClass('hidden');
+                $('#landSketchPlaceholder').addClass('hidden');
+                $('#btnClearLandSketch').removeClass('hidden');
+                $('#landSketchFilenameDisplay').text(file.name + ' (Uploading...)');
+                if (window.lucide) lucide.createIcons();
+            };
+            reader.readAsDataURL(file);
+
+            const formData = new FormData();
+            formData.append('sketchFile', file);
+            const token = $('input[name="__RequestVerificationToken"]').val();
+            if (token) formData.append('__RequestVerificationToken', token);
+
+            fetch('/PropertyAssessmentRequest/UploadPartitionSketch', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    $('#LandSketchPath').val(data.filePath);
+                    $('#LandSketchBase64').val('');
+                    $('#BuildingFloorPlanSketchPath').val(data.filePath);
+                    $('#BuildingFloorPlanSketchBase64').val('');
+                    $('#landSketchFilenameDisplay').text(file.name + ' (Saved to server)');
+                    if (window.toastr) toastr.success('Land lot sketch uploaded and attached!');
+                } else {
+                    $('#landSketchFilenameDisplay').text(file.name + ' (Will save on submit)');
+                }
+            })
+            .catch(err => {
+                console.warn('AJAX land sketch upload fallback to form submit:', err);
+                $('#landSketchFilenameDisplay').text(file.name + ' (Will save on submit)');
+            });
+        }
+
+        function clearLandSketchImage() {
+            $('#fileUploadLandSketch').val('');
+            $('#landSketchPreviewImg').attr('src', '').addClass('hidden');
+            $('#landSketchPlaceholder').removeClass('hidden');
+            $('#btnClearLandSketch').addClass('hidden');
+            $('#landSketchFilenameDisplay').text('No file chosen');
+            $('#LandSketchBase64').val('');
+            $('#LandSketchPath').val('');
+            $('#BuildingFloorPlanSketchBase64').val('');
+            $('#BuildingFloorPlanSketchPath').val('');
+        }
+
+        function handlePropertyImagesUpload(event) {
+            if (typeof handleWebInspectionPhotos === 'function') {
+                handleWebInspectionPhotos(event);
+            }
+        }
+
+        function clearAllPropertyImages() {}
+
         // =========================================================================
         // FIELD INSPECTION PHOTOS LOGIC (MULTIPLE PHOTOS WEB & FAIRTRACK SYNC)
         // =========================================================================
@@ -2461,6 +2524,9 @@
                 updatedPartition.backTaxesYearFrom = parseInt($('#inputLandBackTaxesFrom').val()) || null;
                 updatedPartition.backTaxesYearTo = parseInt($('#inputLandBackTaxesTo').val()) || null;
                 updatedPartition.memoranda = $('#textareaLandMemoranda').val() || '';
+                updatedPartition.buildingFloorPlanSketchPath = $('#LandSketchPath').val() || $('#BuildingFloorPlanSketchPath').val() || '';
+                updatedPartition.buildingFloorPlanSketchBase64 = null;
+                updatedPartition.attachmentsJson = $('#AttachmentsJson').val() || '';
 
                 // Client Storage Sync for Create / Draft workflows
                 try {
@@ -2868,6 +2934,18 @@
                     if (p.backTaxesYearFrom) $('#inputLandBackTaxesFrom').val(p.backTaxesYearFrom);
                     if (p.backTaxesYearTo) $('#inputLandBackTaxesTo').val(p.backTaxesYearTo);
                     if (p.memoranda) $('#textareaLandMemoranda').val(p.memoranda);
+                    const existingLandSketchPath = p.buildingFloorPlanSketchPath || p.BuildingFloorPlanSketchPath || '';
+                    const existingLandSketchBase64 = p.buildingFloorPlanSketchBase64 || p.BuildingFloorPlanSketchBase64 || '';
+                    if (existingLandSketchPath || existingLandSketchBase64) {
+                        $('#LandSketchPath').val(existingLandSketchPath);
+                        $('#BuildingFloorPlanSketchPath').val(existingLandSketchPath);
+                        $('#landSketchPreviewImg').attr('src', existingLandSketchBase64 || existingLandSketchPath).removeClass('hidden');
+                        $('#landSketchPlaceholder').addClass('hidden');
+                        $('#btnClearLandSketch').removeClass('hidden');
+                        if (existingLandSketchPath) {
+                            $('#landSketchFilenameDisplay').text(existingLandSketchPath);
+                        }
+                    }
                 }
 
                 $('#isLandAdminSwitch, #isLandBeneficialSwitch, #isLandPossessorSwitch').on('change', function() {
@@ -3231,5 +3309,4 @@
             recalculateValuation();
         });
     </script>
-    <partial name="_PartitionAppraisalScripts" model="Model" />
 }

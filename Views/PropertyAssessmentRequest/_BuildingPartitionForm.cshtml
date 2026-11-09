@@ -1,4 +1,4 @@
-﻿@model PropertyAssessmentApp.Models.AssessmentPartitionItem
+@model PropertyAssessmentApp.Models.AssessmentPartitionItem
 @{
     var registeredOwners = ViewBag.RegisteredOwners as IEnumerable<PropertyAssessmentApp.Models.Owner> ?? Enumerable.Empty<PropertyAssessmentApp.Models.Owner>();
 }
@@ -769,42 +769,6 @@
             <div>
                 <strong class="font-bold">Sec. 222, R.A. 7160 (Back Taxes on Newly Declared Property):</strong> Real property declared for the first time shall be assessed for back taxes for up to ten (10) preceding years if unassessed since completion.
             </div>
-        </div>
-
-        <!-- Property Photographs & Multiple Image Attachments (TDN Bound) -->
-        <div class="p-5 rounded-2xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 space-y-4">
-            <input type="hidden" asp-for="PropertyImagesJson" id="propertyImagesJsonBuilding" class="property-images-json-input" />
-            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-stone-800 pb-2.5">
-                <div>
-                    <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
-                        <i data-lucide="images" class="w-4 h-4"></i>
-                        Property Photographs & Building Images (Bound to TDN)
-                    </h4>
-                    <p class="text-[11px] text-slate-500 dark:text-stone-400 mt-0.5">Upload multiple front/side elevation photos, structural views, or inspection images linked to this Tax Declaration Number.</p>
-                </div>
-                <div class="flex items-center gap-2">
-                    <span class="property-images-status-badge px-2.5 py-1 rounded-full text-[10px] font-bold font-mono bg-slate-200 dark:bg-stone-800 text-slate-700 dark:text-stone-300">0 IMAGES</span>
-                    <label for="propertyImagesInputBuilding" class="cursor-pointer px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all">
-                        <i data-lucide="upload-cloud" class="w-3.5 h-3.5"></i>
-                        <span>Upload Multiple Images</span>
-                    </label>
-                    <button type="button" onclick="clearAllPropertyImages()" class="btn-clear-property-images hidden px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 font-bold text-xs flex items-center gap-1 transition-all">
-                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                        <span>Clear All</span>
-                    </button>
-                    <input type="file" id="propertyImagesInputBuilding" multiple accept="image/*" class="hidden" onchange="handlePropertyImagesUpload(event)" />
-                </div>
-            </div>
-
-            <div class="property-images-empty-state p-8 rounded-xl border-2 border-dashed border-slate-200 dark:border-stone-800 bg-slate-50/70 dark:bg-stone-950/40 text-center space-y-2">
-                <div class="w-10 h-10 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto">
-                    <i data-lucide="camera" class="w-5 h-5"></i>
-                </div>
-                <div class="text-xs font-bold text-slate-700 dark:text-stone-300">No Building Photographs Uploaded Yet</div>
-                <p class="text-[11px] text-slate-400 dark:text-stone-500">Click <span class="font-bold text-emerald-600">"Upload Multiple Images"</span> above to select one or more photos (JPG, PNG, WEBP).</p>
-            </div>
-
-            <div class="property-images-gallery-grid hidden grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 pt-1"></div>
         </div>
 
         <div>
