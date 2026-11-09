@@ -31,6 +31,8 @@ public class TDNDTO
     public string? TDN1 { get; set; }
     public string? ARPNo { get; set; }
     public string? PIN { get; set; }
+    public string? PropertyTypeAccordUse { get; set; }
+    public string? OtherPropertyTypeAccordUse { get; set; }
     public string? DisplayName { get; set; }
     public string? OwnerAddress { get; set; }
     public string? PropAdminName { get; set; }
@@ -92,6 +94,15 @@ public class TDNDTO
     // Partition Support
     public int? PartitionItemIndex { get; set; }
     public string? PartitionIndex { get; set; }
+
+    // Extended CAST Fields (Location, Basis & Back Taxes)
+    public string? DistrictOrBarangay { get; set; }
+    public string? CityMunicipality { get; set; }
+    public string? Province { get; set; }
+    public string? AssessmentBasis { get; set; }
+    public int? BackTaxesYearFrom { get; set; }
+    public int? BackTaxesYearTo { get; set; }
+    public decimal? UnitValue { get; set; }
 
     // Floor Plan / Site Sketch File & Attachments
     public string? FloorPlanSketchPath { get; set; }

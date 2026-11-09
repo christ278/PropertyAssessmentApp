@@ -99,7 +99,7 @@ export const HeaderBar = ({ title, subtitle, onSyncPress, navigation, showBack =
           ]}
           onPress={() => {
             if (onSyncPress) onSyncPress();
-            else if (navigation) navigation.navigate('SyncCenter');
+            else if (navigation) navigation.navigate('Main', { screen: 'SyncCenter' });
           }}
           disabled={isSyncing}
           accessibilityLabel="Office Sync"

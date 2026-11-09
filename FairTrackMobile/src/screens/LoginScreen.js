@@ -7,7 +7,6 @@ import {
   StyleSheet,
   ActivityIndicator,
   Modal,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -17,8 +16,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { AuthContext } from '../context/AuthContext';
 import { COLORS, SHADOWS } from '../constants/theme';
+import { useTheme } from '../context/ThemeContext';
+import { ActionModal } from '../components/ActionModal';
 
 export const LoginScreen = () => {
+  const { colors, shadows } = useTheme();
   const insets = useSafeAreaInsets();
   const topInset = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 47 : 20);
   const { login, serverUrl, updateServerUrl } = useContext(AuthContext);
@@ -29,10 +31,26 @@ export const LoginScreen = () => {
   // Server Settings Modal
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [tempUrl, setTempUrl] = useState(serverUrl);
+  const [modalConfig, setModalConfig] = useState({ visible: false });
+
+  const showInfoModal = (title, message, icon = 'information-circle', iconColor = colors.primary) => {
+    setModalConfig({
+      visible: true,
+      title,
+      message,
+      icon,
+      iconColor,
+      singleButton: true,
+      confirmText: 'OK',
+      confirmColor: colors.primary,
+      onConfirm: () => setModalConfig({ visible: false }),
+      onCancel: () => setModalConfig({ visible: false })
+    });
+  };
 
   const handleLogin = async () => {
     if (!username.trim() || !password.trim()) {
-      Alert.alert('Required Fields', 'Please enter your username and password.');
+      showInfoModal('Required Fields', 'Please enter your username and password.', 'alert-circle', colors.warning);
       return;
     }
 
@@ -41,32 +59,40 @@ export const LoginScreen = () => {
     setIsLoggingIn(false);
 
     if (!res.success) {
-      Alert.alert('Login Failed', res.message || 'Please check your credentials and server connection.');
+      showInfoModal(
+        'Login Failed',
+        res.message || 'Please check your credentials and server connection.',
+        'close-circle',
+        colors.danger
+      );
     }
   };
 
   const handleSaveSettings = async () => {
     await updateServerUrl(tempUrl);
     setSettingsVisible(false);
-    Alert.alert('Settings Saved', `Server URL updated to: ${tempUrl}`);
+    showInfoModal('Settings Saved', `Server URL updated to: ${tempUrl}`, 'checkmark-circle', colors.success);
   };
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.bgLight }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Top Server Settings Button */}
         <TouchableOpacity
-          style={[styles.settingsBtn, { top: topInset + 8 }]}
+          style={[
+            styles.settingsBtn,
+            { top: topInset + 8, backgroundColor: colors.cardBg, borderColor: colors.border }
+          ]}
           onPress={() => {
             setTempUrl(serverUrl);
             setSettingsVisible(true);
           }}
         >
-          <Ionicons name="server-outline" size={18} color={COLORS.textMuted} />
-          <Text style={styles.settingsBtnText}>Server Config</Text>
+          <Ionicons name="server-outline" size={18} color={colors.textMuted} />
+          <Text style={[styles.settingsBtnText, { color: colors.textMuted }]}>Server Config</Text>
         </TouchableOpacity>
 
         {/* Brand Section */}
@@ -76,26 +102,32 @@ export const LoginScreen = () => {
             style={styles.appLogo}
             resizeMode="cover"
           />
-          <Text style={styles.brandTitle}>FAIRTRACK</Text>
-          <Text style={styles.brandSubtitle}>City Assessor's Mobile Field Portal</Text>
-          <View style={styles.tagBadge}>
-            <Text style={styles.tagBadgeText}>Koronadal City &bull; JWT Secured</Text>
+          <Text style={[styles.brandTitle, { color: colors.primaryDark }]}>FAIRTRACK</Text>
+          <Text style={[styles.brandSubtitle, { color: colors.textMuted }]}>
+            City Assessor's Mobile Field Portal
+          </Text>
+          <View style={[styles.tagBadge, { backgroundColor: colors.primaryLight }]}>
+            <Text style={[styles.tagBadgeText, { color: colors.primary }]}>
+              Koronadal City &bull; Offline &amp; JWT Secured
+            </Text>
           </View>
         </View>
 
         {/* Login Card */}
-        <View style={[styles.card, SHADOWS.card]}>
-          <Text style={styles.cardTitle}>Staff Sign In</Text>
-          <Text style={styles.cardSubtitle}>Enter your assessor credentials to start</Text>
+        <View style={[styles.card, shadows.card, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+          <Text style={[styles.cardTitle, { color: colors.textDark }]}>Staff Sign In</Text>
+          <Text style={[styles.cardSubtitle, { color: colors.textMuted }]}>
+            Enter your assessor credentials to start (works online &amp; offline)
+          </Text>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Username</Text>
-            <View style={styles.inputWrapper}>
-              <Ionicons name="person-outline" size={20} color={COLORS.textMuted} style={styles.inputIcon} />
+            <Text style={[styles.inputLabel, { color: colors.textDark }]}>Username</Text>
+            <View style={[styles.inputWrapper, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+              <Ionicons name="person-outline" size={20} color={colors.textMuted} style={styles.inputIcon} />
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: colors.textDark }]}
                 placeholder="Enter username"
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor={colors.placeholder}
                 value={username}
                 onChangeText={setUsername}
                 autoCapitalize="none"
@@ -105,13 +137,13 @@ export const LoginScreen = () => {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Password</Text>
-            <View style={styles.inputWrapper}>
-              <Ionicons name="lock-closed-outline" size={20} color={COLORS.textMuted} style={styles.inputIcon} />
+            <Text style={[styles.inputLabel, { color: colors.textDark }]}>Password</Text>
+            <View style={[styles.inputWrapper, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+              <Ionicons name="lock-closed-outline" size={20} color={colors.textMuted} style={styles.inputIcon} />
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: colors.textDark }]}
                 placeholder="Enter password"
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor={colors.placeholder}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
@@ -120,7 +152,7 @@ export const LoginScreen = () => {
           </View>
 
           <TouchableOpacity
-            style={[styles.loginBtn, isLoggingIn && styles.loginBtnDisabled]}
+            style={[styles.loginBtn, { backgroundColor: colors.primary }, isLoggingIn && styles.loginBtnDisabled]}
             onPress={handleLogin}
             disabled={isLoggingIn}
           >
@@ -135,7 +167,7 @@ export const LoginScreen = () => {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.footerText}>
+        <Text style={[styles.footerText, { color: colors.textMuted }]}>
           &copy; {new Date().getFullYear()} City Assessor's Office &bull; Offline-Ready
         </Text>
       </ScrollView>
@@ -143,33 +175,41 @@ export const LoginScreen = () => {
       {/* Server URL Config Modal */}
       <Modal visible={settingsVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Server Connection Settings</Text>
-            <Text style={styles.modalSubtitle}>
+          <View style={[styles.modalCard, { backgroundColor: colors.cardBg }]}>
+            <Text style={[styles.modalTitle, { color: colors.textDark }]}>Server Connection Settings</Text>
+            <Text style={[styles.modalSubtitle, { color: colors.textMuted }]}>
               Configure the backend API server IP/domain for Android connection:
             </Text>
 
             <TextInput
-              style={styles.serverInput}
+              style={[
+                styles.serverInput,
+                { borderColor: colors.primary, color: colors.textDark, backgroundColor: colors.inputBg }
+              ]}
               value={tempUrl}
               onChangeText={setTempUrl}
               placeholder="http://192.168.50.9:5156"
+              placeholderTextColor={colors.placeholder}
               autoCapitalize="none"
               autoCorrect={false}
             />
 
             <View style={styles.quickUrls}>
               <TouchableOpacity
-                style={styles.quickTag}
+                style={[styles.quickTag, { backgroundColor: colors.primaryLight }]}
                 onPress={() => setTempUrl('http://192.168.50.9:5156')}
               >
-                <Text style={styles.quickTagText}>LAN Wi-Fi (192.168.50.9:5156)</Text>
+                <Text style={[styles.quickTagText, { color: colors.primary }]}>
+                  LAN Wi-Fi (192.168.50.9:5156)
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.quickTag, { marginTop: 6 }]}
+                style={[styles.quickTag, { marginTop: 6, backgroundColor: colors.primaryLight }]}
                 onPress={() => setTempUrl('http://10.0.2.2:5156')}
               >
-                <Text style={styles.quickTagText}>Android Emulator (10.0.2.2:5156)</Text>
+                <Text style={[styles.quickTagText, { color: colors.primary }]}>
+                  Android Emulator (10.0.2.2:5156)
+                </Text>
               </TouchableOpacity>
             </View>
 
@@ -178,11 +218,11 @@ export const LoginScreen = () => {
                 style={styles.modalCancelBtn}
                 onPress={() => setSettingsVisible(false)}
               >
-                <Text style={styles.modalCancelText}>Cancel</Text>
+                <Text style={[styles.modalCancelText, { color: colors.textMuted }]}>Cancel</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.modalSaveBtn}
+                style={[styles.modalSaveBtn, { backgroundColor: colors.primary }]}
                 onPress={handleSaveSettings}
               >
                 <Text style={styles.modalSaveText}>Save URL</Text>
@@ -191,6 +231,8 @@ export const LoginScreen = () => {
           </View>
         </View>
       </Modal>
+
+      <ActionModal {...modalConfig} />
     </KeyboardAvoidingView>
   );
 };

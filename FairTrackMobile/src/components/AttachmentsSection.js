@@ -15,7 +15,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { MobileApi } from '../api/mobileApi';
 import { resolveServerUrl } from '../api/apiClient';
-import { COLORS, SHADOWS } from '../constants/theme';
+import { useTheme } from '../context/ThemeContext';
+import { ActionModal } from './ActionModal';
 
 export const AttachmentsSection = ({
   trackingNo,
@@ -24,9 +25,13 @@ export const AttachmentsSection = ({
   onAttachmentsChange,
   propertyKind = 'Building' // 'Building' | 'Land' | 'Machinery'
 }) => {
+  const { isDarkMode, colors, shadows } = useTheme();
+  const styles = React.useMemo(() => getStyles(colors, isDarkMode), [colors, isDarkMode]);
+
   const [resolvedSketchUri, setResolvedSketchUri] = useState('');
   const [fullscreenImage, setFullscreenImage] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [photoToDelete, setPhotoToDelete] = useState(null);
 
   // Resolve web sketch URL to full address
   const [resolvedAttachmentUris, setResolvedAttachmentUris] = useState({});
@@ -45,6 +50,7 @@ export const AttachmentsSection = ({
     resolveAll();
     return () => { isMounted = false; };
   }, [attachments]);
+
   useEffect(() => {
     let isMounted = true;
     if (sketchUrl) {
@@ -198,21 +204,7 @@ export const AttachmentsSection = ({
 
   // Delete photo attachment
   const handleDeletePhoto = (id) => {
-    Alert.alert(
-      'Remove Photo',
-      'Are you sure you want to remove this photo?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: () => {
-            const updated = (attachments || []).filter(a => a.id !== id);
-            if (onAttachmentsChange) onAttachmentsChange(updated);
-          }
-        }
-      ]
-    );
+    setPhotoToDelete(id);
   };
 
   // Update caption
@@ -229,10 +221,10 @@ export const AttachmentsSection = ({
       {/* =========================================================================
           SECTION 1: WEB-UPLOADED SITE SKETCH / FLOOR PLAN BLUEPRINT
           ========================================================================= */}
-      <View style={[styles.card, SHADOWS.card]}>
+      <View style={[styles.card, shadows.card]}>
         <View style={styles.headerRow}>
           <View style={styles.headerIconBox}>
-            <Ionicons name="map-outline" size={20} color={COLORS.primary} />
+            <Ionicons name="map-outline" size={20} color={colors.primary} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.cardTitle}>Site Sketch & Floor Plan Blueprint</Text>
@@ -272,14 +264,14 @@ export const AttachmentsSection = ({
                 style={styles.viewFullBtn}
                 onPress={() => setFullscreenImage(resolvedSketchUri)}
               >
-                <Ionicons name="expand-outline" size={16} color={COLORS.primary} />
+                <Ionicons name="expand-outline" size={16} color={colors.primary} />
                 <Text style={styles.viewFullBtnText}>Full View</Text>
               </TouchableOpacity>
             </View>
           </View>
         ) : (
           <View style={styles.emptySketchBox}>
-            <Ionicons name="document-text-outline" size={38} color="#94a3b8" />
+            <Ionicons name="document-text-outline" size={38} color={colors.textMuted} />
             <Text style={styles.emptySketchTitle}>No Blueprint Sketch Uploaded</Text>
             <Text style={styles.emptySketchText}>
               No Site Sketch or Floor Plan blueprint has been attached from the Office Web Portal for this partition yet.
@@ -291,10 +283,10 @@ export const AttachmentsSection = ({
       {/* =========================================================================
           SECTION 2: MULTIPLE FIELD INSPECTION PHOTOS (CAMERA & GALLERY ONLY)
           ========================================================================= */}
-      <View style={[styles.card, SHADOWS.card, { marginTop: 14 }]}>
+      <View style={[styles.card, shadows.card, { marginTop: 14 }]}>
         <View style={styles.headerRow}>
-          <View style={[styles.headerIconBox, { backgroundColor: '#ecfdf5' }]}>
-            <Ionicons name="camera-outline" size={20} color="#059669" />
+          <View style={[styles.headerIconBox, { backgroundColor: isDarkMode ? '#064e3b' : '#ecfdf5' }]}>
+            <Ionicons name="camera-outline" size={20} color={isDarkMode ? '#34d399' : '#059669'} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.cardTitle}>Field Inspection Photos</Text>
@@ -330,7 +322,7 @@ export const AttachmentsSection = ({
 
         {uploading && (
           <View style={styles.uploadingBar}>
-            <ActivityIndicator size="small" color={COLORS.primary} />
+            <ActivityIndicator size="small" color={colors.primary} />
             <Text style={styles.uploadingText}>Saving inspection photo...</Text>
           </View>
         )}
@@ -338,7 +330,7 @@ export const AttachmentsSection = ({
         {/* Inspection Photos List */}
         {attachments.length === 0 ? (
           <View style={styles.emptyFilesBox}>
-            <Ionicons name="camera-reverse-outline" size={36} color="#cbd5e1" />
+            <Ionicons name="camera-reverse-outline" size={36} color={colors.textMuted} />
             <Text style={styles.emptyFilesTitle}>No Field Photos Added</Text>
             <Text style={styles.emptyFilesText}>
               Tap Take Photo or Add Photos above to capture site evidence for this {propertyKind} inspection.
@@ -349,60 +341,60 @@ export const AttachmentsSection = ({
             {attachments.map((item, idx) => {
               const itemUri = resolvedAttachmentUris[item.id || item.fileUrl] || item.fileUrl;
               return (
-              <View key={item.id || idx} style={styles.attachmentCard}>
-                <View style={styles.attTopRow}>
-                  {/* Photo Thumbnail */}
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    onPress={() => setFullscreenImage(itemUri)}
-                    style={styles.attThumbnailWrap}
-                  >
-                    <Image
-                      source={{ uri: itemUri }}
-                      style={styles.attThumbnail}
-                      resizeMode="cover"
-                    />
-                    <View style={styles.thumbZoomPill}>
-                      <Ionicons name="search" size={10} color="#ffffff" />
-                    </View>
-                  </TouchableOpacity>
+                <View key={item.id || idx} style={styles.attachmentCard}>
+                  <View style={styles.attTopRow}>
+                    {/* Photo Thumbnail */}
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={() => setFullscreenImage(itemUri)}
+                      style={styles.attThumbnailWrap}
+                    >
+                      <Image
+                        source={{ uri: itemUri }}
+                        style={styles.attThumbnail}
+                        resizeMode="cover"
+                      />
+                      <View style={styles.thumbZoomPill}>
+                        <Ionicons name="search" size={10} color="#ffffff" />
+                      </View>
+                    </TouchableOpacity>
 
-                  {/* Photo Meta */}
-                  <View style={styles.attMetaWrap}>
-                    <Text style={styles.attFileName} numberOfLines={1}>
-                      {item.fileName || `Photo ${idx + 1}`}
-                    </Text>
-                    <View style={styles.attSubMeta}>
-                      <Text style={styles.attSizeText}>{item.fileSize || 'Image'}</Text>
-                      <Text style={styles.attDot}>•</Text>
-                      <Text style={styles.attTimeText}>
-                        {item.uploadedAt ? new Date(item.uploadedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Local'}
+                    {/* Photo Meta */}
+                    <View style={styles.attMetaWrap}>
+                      <Text style={styles.attFileName} numberOfLines={1}>
+                        {item.fileName || `Photo ${idx + 1}`}
                       </Text>
+                      <View style={styles.attSubMeta}>
+                        <Text style={styles.attSizeText}>{item.fileSize || 'Image'}</Text>
+                        <Text style={styles.attDot}>•</Text>
+                        <Text style={styles.attTimeText}>
+                          {item.uploadedAt ? new Date(item.uploadedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Local'}
+                        </Text>
+                      </View>
                     </View>
+
+                    {/* Delete Photo Button */}
+                    <TouchableOpacity
+                      style={styles.deleteAttBtn}
+                      onPress={() => handleDeletePhoto(item.id)}
+                    >
+                      <Ionicons name="trash-outline" size={18} color={colors.accentRed} />
+                    </TouchableOpacity>
                   </View>
 
-                  {/* Delete Photo Button */}
-                  <TouchableOpacity
-                    style={styles.deleteAttBtn}
-                    onPress={() => handleDeletePhoto(item.id)}
-                  >
-                    <Ionicons name="trash-outline" size={18} color="#ef4444" />
-                  </TouchableOpacity>
+                  {/* Caption input */}
+                  <View style={styles.captionRow}>
+                    <Ionicons name="pencil-outline" size={14} color={colors.textMuted} style={{ marginRight: 6 }} />
+                    <TextInput
+                      style={styles.captionInput}
+                      value={item.caption || ''}
+                      onChangeText={(txt) => handleUpdateCaption(item.id, txt)}
+                      placeholder="Add photo notes / caption (e.g. Front View, Defects)..."
+                      placeholderTextColor={colors.placeholder}
+                    />
+                  </View>
                 </View>
-
-                {/* Caption input */}
-                <View style={styles.captionRow}>
-                  <Ionicons name="pencil-outline" size={14} color="#64748b" style={{ marginRight: 6 }} />
-                  <TextInput
-                    style={styles.captionInput}
-                    value={item.caption || ''}
-                    onChangeText={(txt) => handleUpdateCaption(item.id, txt)}
-                    placeholder="Add photo notes / caption (e.g. Front View, Defects)..."
-                    placeholderTextColor="#94a3b8"
-                  />
-                </View>
-              </View>
-            );
+              );
             })}
           </View>
         )}
@@ -437,20 +429,42 @@ export const AttachmentsSection = ({
           )}
         </View>
       </Modal>
+
+      <ActionModal
+        visible={!!photoToDelete}
+        title="Remove Photo"
+        message="Are you sure you want to remove this inspection photo?"
+        icon="trash-outline"
+        iconType="danger"
+        onClose={() => setPhotoToDelete(null)}
+        buttons={[
+          {
+            text: 'Remove',
+            style: 'danger',
+            icon: 'trash-outline',
+            onPress: () => {
+              const updated = (attachments || []).filter(a => a.id !== photoToDelete);
+              if (onAttachmentsChange) onAttachmentsChange(updated);
+              setPhotoToDelete(null);
+            }
+          },
+          { text: 'Cancel', style: 'cancel', onPress: () => setPhotoToDelete(null) }
+        ]}
+      />
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors, isDarkMode) => StyleSheet.create({
   container: {
     marginBottom: 16
   },
   card: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
+    backgroundColor: colors.cardBg,
+    borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#e2e8f0'
+    borderColor: colors.border
   },
   headerRow: {
     flexDirection: 'row',
@@ -461,7 +475,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 10,
-    backgroundColor: '#e0f2fe',
+    backgroundColor: colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12
@@ -469,15 +483,15 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#0f172a'
+    color: colors.textDark
   },
   cardSubtitle: {
     fontSize: 12,
-    color: '#64748b',
+    color: colors.textMuted,
     marginTop: 2
   },
   badgeWeb: {
-    backgroundColor: '#ede9fe',
+    backgroundColor: isDarkMode ? '#3b0764' : '#ede9fe',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6
@@ -485,10 +499,10 @@ const styles = StyleSheet.create({
   badgeWebText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#6d28d9'
+    color: isDarkMode ? '#d8b4fe' : '#6d28d9'
   },
   countBadge: {
-    backgroundColor: '#f1f5f9',
+    backgroundColor: colors.surfaceSecondary,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12
@@ -496,15 +510,15 @@ const styles = StyleSheet.create({
   countBadgeText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#334155'
+    color: colors.textDark
   },
 
   // Sketch container
   sketchContainer: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.surfaceSecondary,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: colors.border,
     overflow: 'hidden'
   },
   sketchImageWrap: {
@@ -540,22 +554,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#ffffff'
+    backgroundColor: colors.cardBg
   },
   sketchFileName: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#1e293b'
+    color: colors.textDark
   },
   sketchHint: {
     fontSize: 11,
-    color: '#64748b',
+    color: colors.textMuted,
     marginTop: 2
   },
   viewFullBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#eff6ff',
+    backgroundColor: colors.primaryLight,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 6,
@@ -564,27 +578,27 @@ const styles = StyleSheet.create({
   viewFullBtnText: {
     fontSize: 12,
     fontWeight: '600',
-    color: COLORS.primary
+    color: colors.primary
   },
   emptySketchBox: {
     padding: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.surfaceSecondary,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: colors.border,
     borderStyle: 'dashed'
   },
   emptySketchTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#475569',
+    color: colors.textDark,
     marginTop: 8
   },
   emptySketchText: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: colors.textMuted,
     textAlign: 'center',
     marginTop: 4,
     maxWidth: 280
@@ -622,13 +636,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 8,
-    backgroundColor: '#eff6ff',
+    backgroundColor: colors.primaryLight,
     borderRadius: 6,
     marginBottom: 12
   },
   uploadingText: {
     fontSize: 12,
-    color: COLORS.primary,
+    color: colors.primary,
     fontWeight: '500'
   },
 
@@ -637,21 +651,21 @@ const styles = StyleSheet.create({
     padding: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.surfaceSecondary,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: colors.border,
     borderStyle: 'dashed'
   },
   emptyFilesTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#64748b',
+    color: colors.textDark,
     marginTop: 6
   },
   emptyFilesText: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: colors.textMuted,
     textAlign: 'center',
     marginTop: 3,
     maxWidth: 260
@@ -662,10 +676,10 @@ const styles = StyleSheet.create({
     gap: 10
   },
   attachmentCard: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.surfaceSecondary,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: colors.border,
     padding: 10
   },
   attTopRow: {
@@ -699,7 +713,7 @@ const styles = StyleSheet.create({
   attFileName: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#1e293b'
+    color: colors.textDark
   },
   attSubMeta: {
     flexDirection: 'row',
@@ -708,16 +722,16 @@ const styles = StyleSheet.create({
   },
   attSizeText: {
     fontSize: 11,
-    color: '#64748b'
+    color: colors.textMuted
   },
   attDot: {
     marginHorizontal: 5,
     fontSize: 11,
-    color: '#94a3b8'
+    color: colors.textMuted
   },
   attTimeText: {
     fontSize: 11,
-    color: '#94a3b8'
+    color: colors.textMuted
   },
   deleteAttBtn: {
     padding: 8
@@ -726,9 +740,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 8,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.inputBg,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: colors.inputBorder,
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 4
@@ -736,7 +750,7 @@ const styles = StyleSheet.create({
   captionInput: {
     flex: 1,
     fontSize: 12,
-    color: '#1e293b',
+    color: colors.inputText,
     padding: 0
   },
 

@@ -18,6 +18,7 @@ import { SyncContext, isAllowedMobileTransaction, normalizeTransactionItem } fro
 import { useTheme } from '../context/ThemeContext';
 import { HeaderBar } from '../components/HeaderBar';
 import { StatusBadge } from '../components/StatusBadge';
+import { ActionModal } from '../components/ActionModal';
 import { COLORS } from '../constants/theme';
 
 const formatSubmittedDate = (dateValue) => {
@@ -53,6 +54,10 @@ export const TransactionsScreen = ({ navigation }) => {
   const [isOffline, setIsOffline] = useState(false);
   const [selectedTransactionForPartition, setSelectedTransactionForPartition] = useState(null);
   const [showPartitionModal, setShowPartitionModal] = useState(false);
+  const [actionModal, setActionModal] = useState({ visible: false, title: '', message: '', icon: 'information-circle-outline', iconType: 'primary', buttons: [] });
+
+  const showModal = (config) => setActionModal({ visible: true, icon: 'information-circle-outline', iconType: 'primary', buttons: [], ...config });
+  const closeModal = () => setActionModal(prev => ({ ...prev, visible: false }));
 
   useEffect(() => {
     fetchTransactions();
@@ -119,31 +124,46 @@ export const TransactionsScreen = ({ navigation }) => {
     setDownloadingId(null);
 
     if (res.success) {
-      Alert.alert('Downloaded', res.message);
+      showModal({
+        title: 'Downloaded',
+        message: res.message,
+        icon: 'checkmark-circle-outline',
+        iconType: 'success'
+      });
     } else {
-      Alert.alert('Download Failed', res.message);
+      showModal({
+        title: 'Download Failed',
+        message: res.message,
+        icon: 'alert-circle-outline',
+        iconType: 'danger'
+      });
     }
   };
 
   const handleDownloadSingle = async (item) => {
     const hasPending = typeof hasPendingEdits === 'function' && hasPendingEdits(item.TrackingNo, item.FormworkflowId);
     if (hasPending) {
-      Alert.alert(
-        'Unsynced Local Edits Detected',
-        `Transaction "${item.TrackingNo}" has offline edits queued that haven't been uploaded to the web portal yet.\n\nRe-downloading now will overwrite your local changes with the office version.`,
-        [
-          { text: 'Cancel', style: 'cancel' },
+      showModal({
+        title: 'Unsynced Local Edits Detected',
+        message: `Transaction "${item.TrackingNo}" has offline edits queued that haven't been uploaded to the web portal yet.\n\nRe-downloading now will overwrite your local changes with the office version.`,
+        icon: 'warning-outline',
+        iconType: 'warning',
+        buttons: [
           {
             text: 'Sync First',
-            onPress: () => navigation.navigate('Sync')
+            style: 'primary',
+            icon: 'cloud-upload-outline',
+            onPress: () => navigation.navigate('Main', { screen: 'SyncCenter' })
           },
           {
             text: 'Overwrite Anyway',
-            style: 'destructive',
+            style: 'danger',
+            icon: 'refresh-outline',
             onPress: () => executeDownloadSingle(item)
-          }
+          },
+          { text: 'Cancel', style: 'cancel' }
         ]
-      );
+      });
       return;
     }
 
@@ -152,7 +172,12 @@ export const TransactionsScreen = ({ navigation }) => {
 
   const handleDownloadAll = async () => {
     if (transactions.length === 0) {
-      Alert.alert('No Transactions', 'There are no assigned transactions in your list to download.');
+      showModal({
+        title: 'No Transactions',
+        message: 'There are no assigned transactions in your list to download.',
+        icon: 'documents-outline',
+        iconType: 'warning'
+      });
       return;
     }
 
@@ -162,13 +187,16 @@ export const TransactionsScreen = ({ navigation }) => {
       confirmMsg += `\n\n🛡️ Note: ${pendingCountInList} transaction(s) with unsynced local edits will be safely protected and skipped to prevent losing your work.`;
     }
 
-    Alert.alert(
-      'Download All for Offline Field Work',
-      confirmMsg,
-      [
-        { text: 'Cancel', style: 'cancel' },
+    showModal({
+      title: 'Download All for Offline Field Work',
+      message: confirmMsg,
+      icon: 'cloud-download-outline',
+      iconType: 'primary',
+      buttons: [
         {
           text: 'Download All',
+          style: 'primary',
+          icon: 'download-outline',
           onPress: async () => {
             const res = await downloadAllTransactions(transactions, true);
             if (res.success) {
@@ -176,14 +204,25 @@ export const TransactionsScreen = ({ navigation }) => {
               if (res.skippedPendingCount > 0) {
                 msg += `\n\n🛡️ ${res.skippedPendingCount} transaction(s) with pending offline edits were preserved.`;
               }
-              Alert.alert('Download Complete', msg);
+              showModal({
+                title: 'Download Complete',
+                message: msg,
+                icon: 'checkmark-circle-outline',
+                iconType: 'success'
+              });
             } else {
-              Alert.alert('Download Incomplete', res.message || 'Some records failed to download.');
+              showModal({
+                title: 'Download Incomplete',
+                message: res.message || 'Some records failed to download.',
+                icon: 'alert-circle-outline',
+                iconType: 'warning'
+              });
             }
           }
-        }
+        },
+        { text: 'Cancel', style: 'cancel' }
       ]
-    );
+    });
   };
 
   const navigateToPartitionForm = (transItem, partition) => {
@@ -216,11 +255,12 @@ export const TransactionsScreen = ({ navigation }) => {
   const handleTransactionPress = (item) => {
     // Guard: Transactions without generated partitions cannot be edited on mobile
     if (!item.HasPartition) {
-      Alert.alert(
-        'Cannot Edit Transaction',
-        `Transaction "${item.TrackingNo}" has no generated partitions.\n\nPartitions must first be generated and configured in the Office Web Portal before field appraisal and inspection can be edited.`,
-        [{ text: 'OK' }]
-      );
+      showModal({
+        title: 'Cannot Edit Transaction',
+        message: `Transaction "${item.TrackingNo}" has no generated partitions.\n\nPartitions must first be generated and configured in the Office Web Portal before field appraisal and inspection can be edited.`,
+        icon: 'lock-closed-outline',
+        iconType: 'warning'
+      });
       return;
     }
 
@@ -228,10 +268,12 @@ export const TransactionsScreen = ({ navigation }) => {
 
     // If offline and NOT downloaded, prevent opening and inform user
     if (isOffline && !downloaded) {
-      Alert.alert(
-        'File Not Downloaded',
-        `Transaction "${item.TrackingNo}" has not been downloaded to your device.\n\nPlease connect to the internet and tap Download to make this form available offline.`
-      );
+      showModal({
+        title: 'File Not Downloaded',
+        message: `Transaction "${item.TrackingNo}" has not been downloaded to your device.\n\nPlease connect to the internet and tap Download to make this form available offline.`,
+        icon: 'cloud-offline-outline',
+        iconType: 'warning'
+      });
       return;
     }
 
@@ -376,7 +418,7 @@ export const TransactionsScreen = ({ navigation }) => {
                 <TouchableOpacity
                   style={styles.pendingFooterBadge}
                   activeOpacity={0.8}
-                  onPress={() => navigation.navigate('Sync')}
+                  onPress={() => navigation.navigate('Main', { screen: 'SyncCenter' })}
                 >
                   <Ionicons name="cloud-upload" size={14} color="#d97706" />
                   <Text style={styles.pendingFooterBadgeText}>Unsynced (Sync)</Text>
@@ -751,6 +793,15 @@ export const TransactionsScreen = ({ navigation }) => {
           </View>
         </View>
       </Modal>
+      <ActionModal
+        visible={actionModal.visible}
+        title={actionModal.title}
+        message={actionModal.message}
+        icon={actionModal.icon}
+        iconType={actionModal.iconType}
+        buttons={actionModal.buttons}
+        onClose={closeModal}
+      />
     </View>
   );
 };

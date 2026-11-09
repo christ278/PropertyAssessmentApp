@@ -18,6 +18,7 @@ export const LIGHT_COLORS = {
   inputBg: '#ffffff',
   inputText: '#0f172a',
   inputBorder: '#cbd5e1',
+  placeholder: '#94a3b8',
   modalOverlay: 'rgba(15, 23, 42, 0.45)'
 };
 
@@ -41,6 +42,7 @@ export const DARK_COLORS = {
   inputBg: '#0b1120',
   inputText: '#f8fafc',
   inputBorder: '#334155',
+  placeholder: '#64748b',
   modalOverlay: 'rgba(0, 0, 0, 0.75)'
 };
 

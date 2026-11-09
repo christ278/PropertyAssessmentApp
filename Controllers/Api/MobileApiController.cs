@@ -155,9 +155,16 @@ public class MobileApiController : ControllerBase
                 TransactionTypeId = pKindId,
                 FormType = fType,
                 SystemGeneratedTDN = p.SystemGeneratedTDN,
+                ARPNo = !string.IsNullOrWhiteSpace(p.ARPNo) ? p.ARPNo : p.SystemGeneratedTDN,
                 PIN = p.PIN,
+                PropertyTypeAccordUse = p.PropertyTypeAccordUse,
+                OtherPropertyTypeAccordUse = p.OtherPropertyTypeAccordUse,
+                SurveyNo = p.SurveyNumber,
+                LotNo = p.LotNumber,
+                TitleNo = p.TitleNo,
+                SectionNo = p.SectionNo,
                 OwnerName = !string.IsNullOrWhiteSpace(p.NewOwnerName) ? p.NewOwnerName : defaultOwner,
-                AreaSqMeters = p.AreaSqMeters,
+                AreaSqMeters = p.AreaSqMeters > 0 ? p.AreaSqMeters : p.TotalBuildingAreaSqm,
                 MarketValue = p.MarketValue,
                 AssessedValue = p.AssessedValue,
                 SketchUrl = p.BuildingFloorPlanSketchPath,
@@ -430,7 +437,9 @@ public class MobileApiController : ControllerBase
             SectionNo = !string.IsNullOrWhiteSpace(part.SectionNo) ? part.SectionNo : baseTd.SectionNo,
             ParcelNo = !string.IsNullOrWhiteSpace(part.ParcelNo) ? part.ParcelNo : baseTd.ParcelNo,
             TitleNo = !string.IsNullOrWhiteSpace(part.TitleNo) ? part.TitleNo : baseTd.TitleNo,
-            AreaSqMeters = part.AreaSqMeters > 0 ? part.AreaSqMeters : baseTd.AreaSqMeters,
+            ARPNo = !string.IsNullOrWhiteSpace(part.ARPNo) ? part.ARPNo : baseTd.ARPNo,
+            AreaSqMeters = part.AreaSqMeters > 0 ? part.AreaSqMeters : (part.TotalBuildingAreaSqm > 0 ? part.TotalBuildingAreaSqm : baseTd.AreaSqMeters),
+            BuildingUseType = !string.IsNullOrWhiteSpace(part.PropertyTypeAccordUse) ? part.PropertyTypeAccordUse : baseTd.BuildingUseType,
             MarketValue = part.MarketValue > 0 ? part.MarketValue : baseTd.MarketValue,
             AssessedValue = part.AssessedValue > 0 ? part.AssessedValue : baseTd.AssessedValue,
             FloorPlanSketchPath = part.BuildingFloorPlanSketchPath ?? baseTd.FloorPlanSketchPath,
@@ -473,7 +482,13 @@ public class MobileApiController : ControllerBase
         else // Building
         {
             var b = partTd.EnsureBuildingDetails();
-            b.TotalFloorArea = part.TotalBuildingAreaSqm > 0 ? part.TotalBuildingAreaSqm : (baseTd.BuildingDetails?.TotalFloorArea ?? 0);
+            b.TotalFloorArea = part.TotalBuildingAreaSqm > 0 ? part.TotalBuildingAreaSqm : (part.AreaSqMeters > 0 ? part.AreaSqMeters : (baseTd.BuildingDetails?.TotalFloorArea ?? 0));
+            b.BuildingUseType = !string.IsNullOrWhiteSpace(part.PropertyTypeAccordUse) ? part.PropertyTypeAccordUse : (baseTd.BuildingDetails?.BuildingUseType ?? "Residential Condominium");
+            b.OtherBuildingUseType = part.OtherPropertyTypeAccordUse ?? baseTd.BuildingDetails?.OtherBuildingUseType;
+            b.LandSurveyNo = !string.IsNullOrWhiteSpace(part.SurveyNumber) ? part.SurveyNumber : baseTd.BuildingDetails?.LandSurveyNo;
+            b.LandLotNo = !string.IsNullOrWhiteSpace(part.LotNumber) ? part.LotNumber : baseTd.BuildingDetails?.LandLotNo;
+            b.LandTitleNo = !string.IsNullOrWhiteSpace(part.TitleNo) ? part.TitleNo : baseTd.BuildingDetails?.LandTitleNo;
+            b.LandAreaSqm = part.AreaSqMeters > 0 ? part.AreaSqMeters : (baseTd.BuildingDetails?.LandAreaSqm ?? 0);
             b.NoOfStoreys = part.NoOfStoreys > 0 ? part.NoOfStoreys : (baseTd.BuildingDetails?.NoOfStoreys ?? 1);
             b.BuildingPermitNo = part.BuildingPermitNo ?? baseTd.BuildingDetails?.BuildingPermitNo;
             b.BuildingAgeYears = part.BuildingAgeYears > 0 ? part.BuildingAgeYears : (baseTd.BuildingDetails?.BuildingAgeYears ?? 0);
@@ -565,9 +580,16 @@ public class MobileApiController : ControllerBase
                 transactionTypeId = pKindId,
                 formType = pFormType,
                 systemGeneratedTDN = p.SystemGeneratedTDN,
+                arpNo = !string.IsNullOrWhiteSpace(p.ARPNo) ? p.ARPNo : (p.SystemGeneratedTDN ?? td.TaxDeclarationNumber),
                 pin = p.PIN,
+                propertyTypeAccordUse = p.PropertyTypeAccordUse,
+                otherPropertyTypeAccordUse = p.OtherPropertyTypeAccordUse,
+                surveyNo = p.SurveyNumber,
+                lotNo = p.LotNumber,
+                titleNo = p.TitleNo,
+                sectionNo = p.SectionNo,
                 ownerName = !string.IsNullOrWhiteSpace(p.NewOwnerName) ? p.NewOwnerName : td.OwnerName,
-                areaSqMeters = p.AreaSqMeters,
+                areaSqMeters = p.AreaSqMeters > 0 ? p.AreaSqMeters : p.TotalBuildingAreaSqm,
                 marketValue = p.MarketValue,
                 assessedValue = p.AssessedValue,
                 sketchUrl = pSketch,
@@ -618,7 +640,7 @@ public class MobileApiController : ControllerBase
             transactionTypeId = selectedPart != null ? selectedPart.transactionTypeId : transactionTypeId,
             formType = selectedPart != null ? selectedPart.formType : formType,
             owner = selectedPart != null ? selectedPart.ownerName : td.OwnerName,
-            arpNo = selectedPart != null ? (selectedPart.systemGeneratedTDN ?? td.TaxDeclarationNumber) : td.TaxDeclarationNumber,
+            arpNo = selectedPart != null ? (!string.IsNullOrWhiteSpace(selectedPart.arpNo) ? selectedPart.arpNo : (selectedPart.systemGeneratedTDN ?? td.TaxDeclarationNumber)) : (!string.IsNullOrWhiteSpace(td.ARPNo) ? td.ARPNo : td.TaxDeclarationNumber),
             tdnId = resolvedTdnId,
             sketchUrl = selectedPart != null ? selectedPart.sketchUrl : td.FloorPlanSketchPath,
             sketchFileName = selectedPart != null ? selectedPart.sketchFileName : (string.IsNullOrWhiteSpace(td.FloorPlanSketchPath) ? null : Path.GetFileName(td.FloorPlanSketchPath)),
@@ -728,7 +750,7 @@ public class MobileApiController : ControllerBase
                 td = new TaxDeclaration
                 {
                     Kind = PropertyKind.Building,
-                    TaxDeclarationNumber = dto.TDN.ARPNo ?? dto.TDN.DeclarationNo ?? matchedRpa?.PrevTDN ?? matchedRfi?.TaxDeclarationNumber ?? "TDN-BLDG-" + DateTime.Now.Ticks,
+                    TaxDeclarationNumber = dto.TDN.DeclarationNo ?? dto.TDN.ARPNo ?? matchedRpa?.PrevTDN ?? matchedRfi?.TaxDeclarationNumber ?? "TDN-BLDG-" + DateTime.Now.Ticks,
                     PropertyIndexNumber = dto.TDN.PIN ?? matchedRpa?.PrevPIN ?? matchedRfi?.PropertyIndexNumber ?? "PIN-" + DateTime.Now.Ticks
                 };
                 _context.TaxDeclarations.Add(td);
@@ -759,6 +781,16 @@ public class MobileApiController : ControllerBase
                 bldg.LandOwnerPhone = b.MobileNo ?? bldg.LandOwnerPhone;
                 bldg.LandOwnerEmail = b.EmailAddress ?? bldg.LandOwnerEmail;
                 bldg.LandOwnerAddress = b.MailingAddress ?? bldg.LandOwnerAddress;
+                if (!string.IsNullOrWhiteSpace(b.PropertyTypeAccordUse))
+                {
+                    bldg.BuildingUseType = b.PropertyTypeAccordUse;
+                    td.BuildingUseType = b.PropertyTypeAccordUse;
+                }
+                if (!string.IsNullOrWhiteSpace(b.OtherPropertyTypeAccordUse)) bldg.OtherBuildingUseType = b.OtherPropertyTypeAccordUse;
+                if (!string.IsNullOrWhiteSpace(b.LotNo)) td.LotNo = b.LotNo;
+                if (!string.IsNullOrWhiteSpace(b.SurveyNo)) td.SurveyNo = b.SurveyNo;
+                if (!string.IsNullOrWhiteSpace(b.TCTNo)) td.TitleNo = b.TCTNo;
+                if (!string.IsNullOrWhiteSpace(b.ARPNo)) td.ARPNo = b.ARPNo;
             }
 
             // Sync updates directly into the parent PropertyAssessmentRequest or RequestForInspection
@@ -839,7 +871,7 @@ public class MobileApiController : ControllerBase
                 td = new TaxDeclaration
                 {
                     Kind = PropertyKind.Land,
-                    TaxDeclarationNumber = dto.TDN.ARPNo ?? dto.TDN.DeclarationNo ?? matchedRpa?.PrevTDN ?? matchedRfi?.TaxDeclarationNumber ?? "TDN-LAND-" + DateTime.Now.Ticks,
+                    TaxDeclarationNumber = dto.TDN.DeclarationNo ?? dto.TDN.ARPNo ?? matchedRpa?.PrevTDN ?? matchedRfi?.TaxDeclarationNumber ?? "TDN-LAND-" + DateTime.Now.Ticks,
                     PropertyIndexNumber = dto.TDN.PIN ?? matchedRpa?.PrevPIN ?? matchedRfi?.PropertyIndexNumber ?? "PIN-" + DateTime.Now.Ticks
                 };
                 _context.TaxDeclarations.Add(td);
@@ -939,7 +971,7 @@ public class MobileApiController : ControllerBase
                 td = new TaxDeclaration
                 {
                     Kind = PropertyKind.Machinery,
-                    TaxDeclarationNumber = dto.TDN.ARPNo ?? dto.TDN.DeclarationNo ?? matchedRpa?.PrevTDN ?? matchedRfi?.TaxDeclarationNumber ?? "TDN-MACH-" + DateTime.Now.Ticks,
+                    TaxDeclarationNumber = dto.TDN.DeclarationNo ?? dto.TDN.ARPNo ?? matchedRpa?.PrevTDN ?? matchedRfi?.TaxDeclarationNumber ?? "TDN-MACH-" + DateTime.Now.Ticks,
                     PropertyIndexNumber = dto.TDN.PIN ?? matchedRpa?.PrevPIN ?? matchedRfi?.PropertyIndexNumber ?? "PIN-" + DateTime.Now.Ticks
                 };
                 _context.TaxDeclarations.Add(td);
@@ -1356,6 +1388,7 @@ public class MobileApiController : ControllerBase
 
     private static void OverlayPartitionOntoTaxDeclaration(AssessmentPartitionItem part, TaxDeclaration td)
     {
+        if (!string.IsNullOrWhiteSpace(part.SystemGeneratedTDN)) td.TaxDeclarationNumber = part.SystemGeneratedTDN;
         if (!string.IsNullOrWhiteSpace(part.NewOwnerName)) td.OwnerName = part.NewOwnerName;
         if (!string.IsNullOrWhiteSpace(part.OwnerAddress)) td.OwnerAddress = part.OwnerAddress;
         if (!string.IsNullOrWhiteSpace(part.StreetLocation)) td.StreetNo = part.StreetLocation;
@@ -1455,18 +1488,48 @@ public class MobileApiController : ControllerBase
         if (!string.IsNullOrWhiteSpace(td.LotNo)) part.LotNumber = td.LotNo;
         if (!string.IsNullOrWhiteSpace(td.SurveyNo)) part.SurveyNumber = td.SurveyNo;
         if (!string.IsNullOrWhiteSpace(td.TitleNo)) part.TitleNo = td.TitleNo;
+        if (!string.IsNullOrWhiteSpace(td.PropertyIndexNumber)) part.PIN = td.PropertyIndexNumber;
+        if (!string.IsNullOrWhiteSpace(td.ARPNo)) part.ARPNo = td.ARPNo;
+        if (!string.IsNullOrWhiteSpace(td.SectionNo)) part.SectionNo = td.SectionNo;
+        if (!string.IsNullOrWhiteSpace(td.BuildingUseType)) part.PropertyTypeAccordUse = td.BuildingUseType;
         if (td.AreaSqMeters > 0) part.AreaSqMeters = td.AreaSqMeters;
         if (td.MarketValue > 0) part.MarketValue = td.MarketValue;
         if (td.AssessedValue > 0) part.AssessedValue = td.AssessedValue;
         if (!string.IsNullOrWhiteSpace(td.Memoranda)) part.Memoranda = td.Memoranda;
+        if (!string.IsNullOrWhiteSpace(td.StructuralFoundation)) part.StructuralFoundation = td.StructuralFoundation;
+        if (!string.IsNullOrWhiteSpace(td.StructuralColumns)) part.StructuralColumns = td.StructuralColumns;
+        if (!string.IsNullOrWhiteSpace(td.StructuralBeams)) part.StructuralBeams = td.StructuralBeams;
+        if (!string.IsNullOrWhiteSpace(td.StructuralTrussRoof)) part.StructuralTrussRoof = td.StructuralTrussRoof;
+        if (!string.IsNullOrWhiteSpace(td.StructuralRoof)) part.StructuralRoof = td.StructuralRoof;
+        if (!string.IsNullOrWhiteSpace(td.StructuralExteriorWalls)) part.StructuralExteriorWalls = td.StructuralExteriorWalls;
+        if (!string.IsNullOrWhiteSpace(td.StructuralFlooring)) part.StructuralFlooring = td.StructuralFlooring;
+        if (!string.IsNullOrWhiteSpace(td.DoorMain)) part.DoorMain = td.DoorMain;
+        if (!string.IsNullOrWhiteSpace(td.Ceiling)) part.Ceiling = td.Ceiling;
+        if (!string.IsNullOrWhiteSpace(td.StructuralWindows)) part.StructuralWindows = td.StructuralWindows;
+        if (!string.IsNullOrWhiteSpace(td.StructuralStairs)) part.StructuralStairs = td.StructuralStairs;
+        if (!string.IsNullOrWhiteSpace(td.StructuralPartitionWalls)) part.StructuralPartitionWalls = td.StructuralPartitionWalls;
+        if (!string.IsNullOrWhiteSpace(td.StructuralFloorFinish)) part.StructuralFloorFinish = td.StructuralFloorFinish;
+        if (!string.IsNullOrWhiteSpace(td.StructuralFinishFront)) part.StructuralFinishFront = td.StructuralFinishFront;
+        if (!string.IsNullOrWhiteSpace(td.ElectricalSystem)) part.ElectricalSystem = td.ElectricalSystem;
+        if (!string.IsNullOrWhiteSpace(td.ToiletAndBathroom)) part.ToiletAndBathroom = td.ToiletAndBathroom;
+        if (!string.IsNullOrWhiteSpace(td.PlumbingSewer)) part.PlumbingSewer = td.PlumbingSewer;
 
         if (bldg != null)
         {
             if (bldg.NoOfStoreys > 0) part.NoOfStoreys = bldg.NoOfStoreys;
-            if (bldg.TotalFloorArea > 0) part.TotalBuildingAreaSqm = bldg.TotalFloorArea;
+            if (bldg.TotalFloorArea > 0)
+            {
+                part.TotalBuildingAreaSqm = bldg.TotalFloorArea;
+                part.AreaSqMeters = bldg.TotalFloorArea;
+            }
             if (!string.IsNullOrWhiteSpace(bldg.BuildingPermitNo)) part.BuildingPermitNo = bldg.BuildingPermitNo;
             if (bldg.BuildingAgeYears > 0) part.BuildingAgeYears = bldg.BuildingAgeYears;
             if (!string.IsNullOrWhiteSpace(bldg.StructuralType)) part.StructuralType = bldg.StructuralType;
+            if (!string.IsNullOrWhiteSpace(bldg.BuildingUseType)) part.PropertyTypeAccordUse = bldg.BuildingUseType;
+            if (!string.IsNullOrWhiteSpace(bldg.OtherBuildingUseType)) part.OtherPropertyTypeAccordUse = bldg.OtherBuildingUseType;
+            if (!string.IsNullOrWhiteSpace(bldg.LandLotNo)) part.LotNumber = bldg.LandLotNo;
+            if (!string.IsNullOrWhiteSpace(bldg.LandSurveyNo)) part.SurveyNumber = bldg.LandSurveyNo;
+            if (!string.IsNullOrWhiteSpace(bldg.LandTitleNo)) part.TitleNo = bldg.LandTitleNo;
             if (bldg.BuildingDepreciationPercent > 0) part.BuildingDepreciationPercent = bldg.BuildingDepreciationPercent;
             if (bldg.BuildingDepreciationAccumulated > 0) part.BuildingDepreciationAccumulated = bldg.BuildingDepreciationAccumulated;
             if (bldg.DepreciatedMarketValue > 0) part.BuildingDepreciatedMarketValue = bldg.DepreciatedMarketValue;
@@ -1495,6 +1558,28 @@ public class MobileApiController : ControllerBase
 
         if (dtoTdn != null)
         {
+            if (!string.IsNullOrWhiteSpace(dtoTdn.PIN)) part.PIN = dtoTdn.PIN;
+            if (!string.IsNullOrWhiteSpace(dtoTdn.ARPNo)) part.ARPNo = dtoTdn.ARPNo;
+            if (!string.IsNullOrWhiteSpace(dtoTdn.SectionNo)) part.SectionNo = dtoTdn.SectionNo;
+            if (!string.IsNullOrWhiteSpace(dtoTdn.SurveyNo)) part.SurveyNumber = dtoTdn.SurveyNo;
+            if (!string.IsNullOrWhiteSpace(dtoTdn.CadastralSurveyNo) && string.IsNullOrWhiteSpace(part.SurveyNumber)) part.SurveyNumber = dtoTdn.CadastralSurveyNo;
+            if (!string.IsNullOrWhiteSpace(dtoTdn.LotNo)) part.LotNumber = dtoTdn.LotNo;
+            if (!string.IsNullOrWhiteSpace(dtoTdn.TitleNo)) part.TitleNo = dtoTdn.TitleNo;
+            if (!string.IsNullOrWhiteSpace(dtoTdn.TCTNo) && string.IsNullOrWhiteSpace(part.TitleNo)) part.TitleNo = dtoTdn.TCTNo;
+            if (!string.IsNullOrWhiteSpace(dtoTdn.PropertyTypeAccordUse)) part.PropertyTypeAccordUse = dtoTdn.PropertyTypeAccordUse;
+            if (!string.IsNullOrWhiteSpace(dtoTdn.OtherPropertyTypeAccordUse)) part.OtherPropertyTypeAccordUse = dtoTdn.OtherPropertyTypeAccordUse;
+            if (!string.IsNullOrWhiteSpace(dtoTdn.DistrictOrBarangay)) part.DistrictOrBarangay = dtoTdn.DistrictOrBarangay;
+            if (!string.IsNullOrWhiteSpace(dtoTdn.CityMunicipality)) part.CityMunicipality = dtoTdn.CityMunicipality;
+            if (!string.IsNullOrWhiteSpace(dtoTdn.Province)) part.Province = dtoTdn.Province;
+            if (!string.IsNullOrWhiteSpace(dtoTdn.AssessmentBasis)) part.AssessmentBasis = dtoTdn.AssessmentBasis;
+            if (dtoTdn.BackTaxesYearFrom.HasValue) part.BackTaxesYearFrom = dtoTdn.BackTaxesYearFrom.Value;
+            if (dtoTdn.BackTaxesYearTo.HasValue) part.BackTaxesYearTo = dtoTdn.BackTaxesYearTo.Value;
+            if (dtoTdn.UnitValue.HasValue && dtoTdn.UnitValue.Value > 0) part.UnitValue = dtoTdn.UnitValue.Value;
+            if (dtoTdn.TotalArea.HasValue && dtoTdn.TotalArea.Value > 0)
+            {
+                part.AreaSqMeters = dtoTdn.TotalArea.Value;
+                part.TotalBuildingAreaSqm = dtoTdn.TotalArea.Value;
+            }
             if (!string.IsNullOrWhiteSpace(dtoTdn.FloorPlanSketchPath))
             {
                 part.BuildingFloorPlanSketchPath = dtoTdn.FloorPlanSketchPath;
@@ -1632,6 +1717,14 @@ public class MobileApiController : ControllerBase
         if (!string.IsNullOrWhiteSpace(dto.LotNo)) td.LotNo = dto.LotNo;
         if (!string.IsNullOrWhiteSpace(dto.PropLocationStreet)) td.StreetNo = dto.PropLocationStreet;
         td.Taxability = dto.Taxability ? "Taxable" : "Exempt";
+        if (!string.IsNullOrWhiteSpace(dto.PIN)) td.PropertyIndexNumber = dto.PIN;
+        if (!string.IsNullOrWhiteSpace(dto.ARPNo)) td.ARPNo = dto.ARPNo;
+        if (!string.IsNullOrWhiteSpace(dto.SectionNo)) td.SectionNo = dto.SectionNo;
+        if (!string.IsNullOrWhiteSpace(dto.SurveyNo)) td.SurveyNo = dto.SurveyNo;
+        if (!string.IsNullOrWhiteSpace(dto.CadastralSurveyNo) && string.IsNullOrWhiteSpace(td.SurveyNo)) td.SurveyNo = dto.CadastralSurveyNo;
+        if (!string.IsNullOrWhiteSpace(dto.TitleNo)) td.TitleNo = dto.TitleNo;
+        if (!string.IsNullOrWhiteSpace(dto.TCTNo) && string.IsNullOrWhiteSpace(td.TitleNo)) td.TitleNo = dto.TCTNo;
+        if (!string.IsNullOrWhiteSpace(dto.PropertyTypeAccordUse)) td.BuildingUseType = dto.PropertyTypeAccordUse;
     }
 
     private TDNDTO BuildTDNDTO(TaxDeclaration td, string? trackingNo = null, long? formWorkflowId = null, string? sketchPath = null, List<MobileAttachmentDTO>? attachments = null, int? partitionItemIndex = null, string? partitionIndex = null)
@@ -1651,7 +1744,7 @@ public class MobileApiController : ControllerBase
             PartitionItemIndex = partitionItemIndex,
             PartitionIndex = partitionIndex,
             DeclarationNo = td.TaxDeclarationNumber,
-            ARPNo = td.TaxDeclarationNumber,
+            ARPNo = !string.IsNullOrWhiteSpace(td.ARPNo) ? td.ARPNo : td.TaxDeclarationNumber,
             PIN = td.PropertyIndexNumber,
             DisplayName = td.OwnerName,
             OwnerAddress = td.OwnerAddress,
@@ -1666,6 +1759,15 @@ public class MobileApiController : ControllerBase
             SectionNo = td.SectionNo,
             ParcelNo = td.ParcelNo,
             TCTNo = td.TitleNo,
+            TitleNo = td.TitleNo,
+            DistrictOrBarangay = td.DistrictOrBarangay,
+            CityMunicipality = td.Municipality,
+            Province = "South Cotabato",
+            AssessmentBasis = td.AssessmentBasis,
+            BackTaxesYearFrom = td.BackTaxesYearFrom,
+            BackTaxesYearTo = td.BackTaxesYearTo,
+            PropertyTypeAccordUse = td.BuildingDetails?.BuildingUseType ?? td.BuildingUseType,
+            OtherPropertyTypeAccordUse = td.BuildingDetails?.OtherBuildingUseType,
             TransactionCode = td.TransactionCode,
             YearEffectivity = td.EffectivityYear,
             QuarterEffectivity = effQtrInt,
@@ -1673,7 +1775,7 @@ public class MobileApiController : ControllerBase
             Taxability = string.Equals(td.Taxability, "Taxable", StringComparison.OrdinalIgnoreCase),
             TotalMarketValue = td.MarketValue,
             TotalAssessedValue = td.AssessedValue,
-            TotalArea = td.AreaSqMeters,
+            TotalArea = td.BuildingDetails?.TotalFloorArea > 0 ? td.BuildingDetails.TotalFloorArea : td.AreaSqMeters,
             Unit = "sq.m.",
             FloorPlanSketchPath = sketchPath ?? td.FloorPlanSketchPath,
             Attachments = attachments ?? new()
@@ -1692,15 +1794,15 @@ public class MobileApiController : ControllerBase
                 TDNId = GuidToNumericId(td.Id),
                 STREET = b.StreetNo ?? td.StreetNo,
                 LotNo = b.LandLotNo ?? td.LotNo,
-                SurveyNo = b.LandSurveyNo ?? td.SurveyNo,
+                SurveyNo = b.LandSurveyNo ?? td.SurveyNo ?? td.CadastralSurveyNo,
                 TCTNo = b.LandTitleNo ?? td.TitleNo,
                 LandArea = b.LandAreaSqm > 0 ? b.LandAreaSqm.ToString("F2") : td.AreaSqMeters.ToString("F2"),
-                ARPNo = td.TaxDeclarationNumber,
+                ARPNo = !string.IsNullOrWhiteSpace(td.ARPNo) ? td.ARPNo : td.TaxDeclarationNumber,
                 PermitNo = b.BuildingPermitNo,
                 Age = b.BuildingAgeYears,
                 StoreyNo = b.NoOfStoreys,
                 AreaPerFloor = b.NoOfStoreys > 0 ? Math.Round(b.TotalFloorArea / b.NoOfStoreys, 2) : b.TotalFloorArea,
-                TotalbldgArea = b.TotalFloorArea,
+                TotalbldgArea = b.TotalFloorArea > 0 ? b.TotalFloorArea : td.AreaSqMeters,
                 SubtotalValCompArea = b.ReplacementCostNew,
                 TotalAddItem = b.TotalAdditionalItemsValue,
                 DepreciationRate = b.BuildingDepreciationPercent,
@@ -1710,6 +1812,8 @@ public class MobileApiController : ControllerBase
                 TotalAssessedVal = b.AssessedValue > 0 ? b.AssessedValue : td.AssessedValue,
                 StucturalType = b.StructuralType,
                 OtherStructure = b.StructuralType,
+                PropertyTypeAccordUse = b.BuildingUseType ?? td.BuildingUseType,
+                OtherPropertyTypeAccordUse = b.OtherBuildingUseType,
                 MailingAddress = b.LandOwnerAddress ?? td.OwnerAddress,
                 TIN = b.LandOwnerTin ?? td.OwnerTin,
                 MobileNo = b.LandOwnerPhone ?? td.OwnerPhone,

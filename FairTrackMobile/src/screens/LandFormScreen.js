@@ -8,16 +8,21 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  Platform,
   Switch
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SyncContext } from '../context/SyncContext';
+import { useTheme } from '../context/ThemeContext';
 import { MobileApi } from '../api/mobileApi';
 import { HeaderBar } from '../components/HeaderBar';
+import { DiscardChangesModal } from '../components/DiscardChangesModal';
 import { AttachmentsSection } from '../components/AttachmentsSection';
 import { COLORS, SHADOWS } from '../constants/theme';
 
 export const LandFormScreen = ({ route, navigation }) => {
+  const { isDarkMode, colors, shadows } = useTheme();
+  const styles = React.useMemo(() => getStyles(colors, isDarkMode), [colors, isDarkMode]);
   const trackingNoParam = route?.params?.trackingNo || '';
   const formWorkflowIdParam = route?.params?.formWorkflowId || null;
   const partitionIndexParam = route?.params?.partitionIndex ?? 0;
@@ -27,6 +32,7 @@ export const LandFormScreen = ({ route, navigation }) => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [notDownloadedError, setNotDownloadedError] = useState(false);
+  const [discardModalVisible, setDiscardModalVisible] = useState(false);
   const isDownloaded = isTransactionDownloaded(trackingNoParam, formWorkflowIdParam);
 
   // Active section tab (0: Identification & Owner, 1: Boundaries, 2: Appraisal & Valuation, 3: Memoranda & Transfer)
@@ -106,6 +112,7 @@ export const LandFormScreen = ({ route, navigation }) => {
 
       if (downloaded.formData) {
         populateFieldsFromDTO(downloaded.formData);
+        if (downloaded.currentPartition?.systemGeneratedTDN) setDeclarationNo(downloaded.currentPartition.systemGeneratedTDN);
       }
       return;
     }
@@ -193,19 +200,46 @@ export const LandFormScreen = ({ route, navigation }) => {
     }
   };
 
-    const handleCancel = () => {
-    Alert.alert(
-      'Discard Changes?',
-      'Are you sure you want to cancel? Any unsaved edits for this partition will be lost.',
-      [
-        { text: 'Keep Editing', style: 'cancel' },
-        {
-          text: 'Discard & Go Back',
-          style: 'destructive',
-          onPress: () => navigation.goBack()
-        }
-      ]
-    );
+      const handleGenerateCastArp = () => {
+    // CAST Combination #1: {LGUCode}-{DistrictMunicipalityCode}-{BarangayCode:D4}-{SectionNo:D3}-{LotOrParcelNo:D3}
+    const secClean = (sectionNo || '').replace(/\D/g, '') || '0';
+    const sec3 = secClean.padStart(3, '0').slice(-3);
+    const lotClean = (lotNo || parcelNo || '').replace(/\D/g, '') || '0';
+    const lot3 = lotClean.padStart(3, '0').slice(-3);
+
+    let brgy4 = '0000';
+    if (arpNo && arpNo.includes('-')) {
+      const parts = arpNo.split('-');
+      if (parts.length >= 3 && parts[2]) {
+        brgy4 = parts[2].padStart(4, '0').slice(-4);
+      }
+    }
+    const formatted = `187-00-${brgy4}-${sec3}-${lot3}`;
+    setArpNo(formatted);
+  };
+
+  const navigateBack = () => {
+    setDiscardModalVisible(false);
+    if (navigation && typeof navigation.navigate === 'function') {
+      navigation.navigate('Main', { screen: 'Feed' });
+    } else if (navigation && typeof navigation.goBack === 'function') {
+      navigation.goBack();
+    }
+  };
+
+  const showCompleteAlertAndGoBack = (title, message) => {
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+        window.alert(`${title}\n\n${message}`);
+      }
+      navigateBack();
+    } else {
+      Alert.alert(title, message, [{ text: 'OK', onPress: navigateBack }]);
+    }
+  };
+
+  const handleCancel = () => {
+    setDiscardModalVisible(true);
   };
 
   const handleSave = async (forceOffline = false) => {
@@ -271,11 +305,7 @@ export const LandFormScreen = ({ route, navigation }) => {
         `Land Appraisal [Part ${partitionLetterParam}]: ${trackingNo || arpNo} (${ownerName || 'Owner'})`,
         workflowForwardPayload
       );
-      Alert.alert(
-        'Queued for Office Sync',
-        'Your land inspection changes are safely saved locally on this phone. It will automatically upload and transfer to the next step when you return to the office.',
-        [{ text: 'OK', onPress: () => navigation.goBack() }]
-      );
+      showCompleteAlertAndGoBack('Queued for Office Sync', 'Your land inspection changes are safely saved locally on this phone. It will automatically upload and transfer to the next step when you return to the office.');
       return;
     }
 
@@ -294,9 +324,7 @@ export const LandFormScreen = ({ route, navigation }) => {
             console.warn('Forward workflow warning:', fwdErr);
           }
         }
-        Alert.alert('Saved to Server', 'Land appraisal updated and transferred successfully.', [
-          { text: 'OK', onPress: () => navigation.goBack() }
-        ]);
+        showCompleteAlertAndGoBack('Saved to Server', 'Land appraisal updated and transferred successfully.');
       } else {
         throw new Error(res?.message || 'Server error');
       }
@@ -308,11 +336,7 @@ export const LandFormScreen = ({ route, navigation }) => {
         `Land Appraisal [Part ${partitionLetterParam}]: ${trackingNo || arpNo} (${ownerName || 'Owner'})`,
         workflowForwardPayload
       );
-      Alert.alert(
-        'Saved Offline',
-        'Network disconnected. Your changes and next-step transfer are safely queued on this phone. Tap Sync All when you return to the office.',
-        [{ text: 'OK', onPress: () => navigation.goBack() }]
-      );
+      showCompleteAlertAndGoBack('Saved Offline', 'Network disconnected. Your changes and next-step transfer are safely queued on this phone. Tap Sync All when you return to the office.');
     } finally {
       setSaving(false);
     }
@@ -320,20 +344,21 @@ export const LandFormScreen = ({ route, navigation }) => {
 
   return (
     <View style={styles.container}>
-      <HeaderBar title="LAND APPRAISAL" subtitle={`Tracking No: ${trackingNo || 'N/A'} • Partition ${partitionLetterParam}`} navigation={navigation}
+      <HeaderBar title="LAND APPRAISAL" subtitle={`Tracking No: ${trackingNo || 'N/A'} • Partition ${partitionLetterParam}${declarationNo ? ` • TDN: ${declarationNo}` : ''}`} navigation={navigation}
         showBack={true}
         onBackPress={handleCancel}
       />
 
       {/* Offline Status Ribbon */}
       <View style={[styles.ribbon, isDownloaded ? styles.ribbonDownloaded : styles.ribbonStandard]}>
-        <Ionicons name={isDownloaded ? "shield-checkmark" : "cloud-outline"} size={16} color={isDownloaded ? "#15803d" : COLORS.primary} />
-        <Text style={[styles.ribbonText, isDownloaded && { color: '#15803d' }]}>
+        <Ionicons name={isDownloaded ? "shield-checkmark" : "cloud-outline"} size={16} color={isDownloaded ? (isDarkMode ? "#34d399" : "#15803d") : colors.primary} />
+        <Text style={[styles.ribbonText, isDownloaded && { color: isDarkMode ? '#34d399' : '#15803d' }]}>
           {isDownloaded ? "Downloaded Form • 100% Offline Field Ready" : "Live Online Form"}
         </Text>
       </View>
 
-            {/* Form Navigation Tabs */}
+
+      {/* Form Navigation Tabs */}
       <View style={styles.sectionTabs}>
         <TouchableOpacity
           style={[styles.sectionTabBtn, activeTab === 0 && styles.sectionTabBtnActive]}
@@ -369,7 +394,7 @@ export const LandFormScreen = ({ route, navigation }) => {
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {loading ? (
-          <ActivityIndicator color={COLORS.primary} size="large" style={{ marginVertical: 30 }} />
+          <ActivityIndicator color={colors.primary} size="large" style={{ marginVertical: 30 }} />
         ) : notDownloadedError ? (
           <View style={styles.notDownloadedBox}>
             <Ionicons name="cloud-offline-outline" size={56} color="#d97706" />
@@ -377,7 +402,7 @@ export const LandFormScreen = ({ route, navigation }) => {
             <Text style={styles.notDownloadedText}>
               This land appraisal data has not been downloaded to your device storage. To view and inspect this form in offline mode, please connect to Wi-Fi/Mobile Data and tap "Download" in the transactions list.
             </Text>
-            <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <TouchableOpacity style={styles.backBtn} onPress={navigateBack}>
               <Ionicons name="arrow-back" size={18} color="#ffffff" />
               <Text style={styles.backBtnText}>Return to Transactions</Text>
             </TouchableOpacity>
@@ -387,13 +412,14 @@ export const LandFormScreen = ({ route, navigation }) => {
             {/* TAB 0: PROPERTY IDENTIFICATION & OWNERSHIP */}
             {activeTab === 0 && (
               <View style={styles.tabContentBlock}>
-                <View style={[styles.card, SHADOWS.card]}>
+                <View style={[styles.card, shadows.card]}>
                   <Text style={styles.cardHeaderTitle}>Property Numbers & Cadastral Reference</Text>
 
                   <View style={styles.rowInputs}>
                     <View style={[styles.inputGroup, { flex: 1 }]}>
                       <Text style={styles.inputLabel}>ARP No.</Text>
                       <TextInput
+                        placeholderTextColor={colors.placeholder}
                         style={styles.input}
                         value={arpNo}
                         onChangeText={setArpNo}
@@ -403,6 +429,7 @@ export const LandFormScreen = ({ route, navigation }) => {
                     <View style={[styles.inputGroup, { flex: 1 }]}>
                       <Text style={styles.inputLabel}>PIN</Text>
                       <TextInput
+                        placeholderTextColor={colors.placeholder}
                         style={styles.input}
                         value={pin}
                         onChangeText={setPin}
@@ -415,15 +442,17 @@ export const LandFormScreen = ({ route, navigation }) => {
                     <View style={[styles.inputGroup, { flex: 1 }]}>
                       <Text style={styles.inputLabel}>Declaration No.</Text>
                       <TextInput
+                        placeholderTextColor={colors.placeholder}
                         style={styles.input}
                         value={declarationNo}
-                        onChangeText={setDeclarationNo}
-                        placeholder="Declaration No."
+                        editable={false}
+                        placeholder="Generated by Web Portal"
                       />
                     </View>
                     <View style={[styles.inputGroup, { flex: 1 }]}>
                       <Text style={styles.inputLabel}>Transaction Code</Text>
                       <TextInput
+                        placeholderTextColor={colors.placeholder}
                         style={styles.input}
                         value={transactionCode}
                         onChangeText={setTransactionCode}
@@ -436,6 +465,7 @@ export const LandFormScreen = ({ route, navigation }) => {
                     <View style={[styles.inputGroup, { flex: 1 }]}>
                       <Text style={styles.inputLabel}>OCT/TCT/CLOA No.</Text>
                       <TextInput
+                        placeholderTextColor={colors.placeholder}
                         style={styles.input}
                         value={tctNo}
                         onChangeText={setTctNo}
@@ -445,6 +475,7 @@ export const LandFormScreen = ({ route, navigation }) => {
                     <View style={[styles.inputGroup, { flex: 1 }]}>
                       <Text style={styles.inputLabel}>Title Date</Text>
                       <TextInput
+                        placeholderTextColor={colors.placeholder}
                         style={styles.input}
                         value={tctDate}
                         onChangeText={setTctDate}
@@ -457,6 +488,7 @@ export const LandFormScreen = ({ route, navigation }) => {
                     <View style={[styles.inputGroup, { flex: 1 }]}>
                       <Text style={styles.inputLabel}>Cadastral Survey No.</Text>
                       <TextInput
+                        placeholderTextColor={colors.placeholder}
                         style={styles.input}
                         value={cadastralSurveyNo}
                         onChangeText={setCadastralSurveyNo}
@@ -466,6 +498,7 @@ export const LandFormScreen = ({ route, navigation }) => {
                     <View style={[styles.inputGroup, { flex: 1 }]}>
                       <Text style={styles.inputLabel}>Lot No.</Text>
                       <TextInput
+                        placeholderTextColor={colors.placeholder}
                         style={styles.input}
                         value={lotNo}
                         onChangeText={setLotNo}
@@ -478,6 +511,7 @@ export const LandFormScreen = ({ route, navigation }) => {
                     <View style={[styles.inputGroup, { flex: 1 }]}>
                       <Text style={styles.inputLabel}>Section No.</Text>
                       <TextInput
+                        placeholderTextColor={colors.placeholder}
                         style={styles.input}
                         value={sectionNo}
                         onChangeText={setSectionNo}
@@ -487,6 +521,7 @@ export const LandFormScreen = ({ route, navigation }) => {
                     <View style={[styles.inputGroup, { flex: 1 }]}>
                       <Text style={styles.inputLabel}>Parcel No.</Text>
                       <TextInput
+                        placeholderTextColor={colors.placeholder}
                         style={styles.input}
                         value={parcelNo}
                         onChangeText={setParcelNo}
@@ -498,6 +533,7 @@ export const LandFormScreen = ({ route, navigation }) => {
                   <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>Property Location / Street</Text>
                     <TextInput
+                        placeholderTextColor={colors.placeholder}
                       style={styles.input}
                       value={streetLocation}
                       onChangeText={setStreetLocation}
@@ -506,12 +542,13 @@ export const LandFormScreen = ({ route, navigation }) => {
                   </View>
                 </View>
 
-                <View style={[styles.card, SHADOWS.card]}>
+                <View style={[styles.card, shadows.card]}>
                   <Text style={styles.cardHeaderTitle}>Owner & Administrator Details</Text>
 
                   <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>Owner / Declared Name</Text>
                     <TextInput
+                        placeholderTextColor={colors.placeholder}
                       style={styles.input}
                       value={ownerName}
                       onChangeText={setOwnerName}
@@ -522,6 +559,7 @@ export const LandFormScreen = ({ route, navigation }) => {
                   <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>Owner Mailing Address</Text>
                     <TextInput
+                        placeholderTextColor={colors.placeholder}
                       style={styles.input}
                       value={ownerAddress}
                       onChangeText={setOwnerAddress}
@@ -533,6 +571,7 @@ export const LandFormScreen = ({ route, navigation }) => {
                     <View style={[styles.inputGroup, { flex: 1 }]}>
                       <Text style={styles.inputLabel}>Owner TIN</Text>
                       <TextInput
+                        placeholderTextColor={colors.placeholder}
                         style={styles.input}
                         value={ownerTin}
                         onChangeText={setOwnerTin}
@@ -542,6 +581,7 @@ export const LandFormScreen = ({ route, navigation }) => {
                     <View style={[styles.inputGroup, { flex: 1 }]}>
                       <Text style={styles.inputLabel}>Contact No.</Text>
                       <TextInput
+                        placeholderTextColor={colors.placeholder}
                         style={styles.input}
                         value={ownerContact}
                         onChangeText={setOwnerContact}
@@ -553,6 +593,7 @@ export const LandFormScreen = ({ route, navigation }) => {
                   <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>Administrator / Representative Name</Text>
                     <TextInput
+                        placeholderTextColor={colors.placeholder}
                       style={styles.input}
                       value={adminName}
                       onChangeText={setAdminName}
@@ -564,6 +605,7 @@ export const LandFormScreen = ({ route, navigation }) => {
                     <View style={[styles.inputGroup, { flex: 2 }]}>
                       <Text style={styles.inputLabel}>Administrator Address</Text>
                       <TextInput
+                        placeholderTextColor={colors.placeholder}
                         style={styles.input}
                         value={adminAddress}
                         onChangeText={setAdminAddress}
@@ -573,6 +615,7 @@ export const LandFormScreen = ({ route, navigation }) => {
                     <View style={[styles.inputGroup, { flex: 1 }]}>
                       <Text style={styles.inputLabel}>Admin Contact</Text>
                       <TextInput
+                        placeholderTextColor={colors.placeholder}
                         style={styles.input}
                         value={adminContact}
                         onChangeText={setAdminContact}
@@ -587,19 +630,21 @@ export const LandFormScreen = ({ route, navigation }) => {
             {/* TAB 1: BOUNDARIES */}
             {activeTab === 1 && (
               <View style={styles.tabContentBlock}>
-                <View style={[styles.card, SHADOWS.card]}>
+                <View style={[styles.card, shadows.card]}>
                   <Text style={styles.cardHeaderTitle}>Parcel Boundaries & Adjoining Lots</Text>
 
                   {/* North */}
                   <View style={styles.boundarySection}>
                     <Text style={styles.boundaryTitle}>NORTH BOUNDARY</Text>
                     <TextInput
+                        placeholderTextColor={colors.placeholder}
                       style={styles.input}
                       value={northBoundary}
                       onChangeText={setNorthBoundary}
                       placeholder="North adjacent owner / Lot No."
                     />
                     <TextInput
+                        placeholderTextColor={colors.placeholder}
                       style={[styles.input, { marginTop: 4 }]}
                       value={nRemarks}
                       onChangeText={setNRemarks}
@@ -611,12 +656,14 @@ export const LandFormScreen = ({ route, navigation }) => {
                   <View style={styles.boundarySection}>
                     <Text style={styles.boundaryTitle}>SOUTH BOUNDARY</Text>
                     <TextInput
+                        placeholderTextColor={colors.placeholder}
                       style={styles.input}
                       value={southBoundary}
                       onChangeText={setSouthBoundary}
                       placeholder="South adjacent owner / Lot No."
                     />
                     <TextInput
+                        placeholderTextColor={colors.placeholder}
                       style={[styles.input, { marginTop: 4 }]}
                       value={sRemarks}
                       onChangeText={setSRemarks}
@@ -628,12 +675,14 @@ export const LandFormScreen = ({ route, navigation }) => {
                   <View style={styles.boundarySection}>
                     <Text style={styles.boundaryTitle}>EAST BOUNDARY</Text>
                     <TextInput
+                        placeholderTextColor={colors.placeholder}
                       style={styles.input}
                       value={eastBoundary}
                       onChangeText={setEastBoundary}
                       placeholder="East adjacent owner / Road / Lot No."
                     />
                     <TextInput
+                        placeholderTextColor={colors.placeholder}
                       style={[styles.input, { marginTop: 4 }]}
                       value={eRemarks}
                       onChangeText={setERemarks}
@@ -645,12 +694,14 @@ export const LandFormScreen = ({ route, navigation }) => {
                   <View style={styles.boundarySection}>
                     <Text style={styles.boundaryTitle}>WEST BOUNDARY</Text>
                     <TextInput
+                        placeholderTextColor={colors.placeholder}
                       style={styles.input}
                       value={westBoundary}
                       onChangeText={setWestBoundary}
                       placeholder="West adjacent owner / Creek / Lot No."
                     />
                     <TextInput
+                        placeholderTextColor={colors.placeholder}
                       style={[styles.input, { marginTop: 4 }]}
                       value={wRemarks}
                       onChangeText={setWRemarks}
@@ -664,13 +715,14 @@ export const LandFormScreen = ({ route, navigation }) => {
             {/* TAB 2: APPRAISAL & VALUATION */}
             {activeTab === 2 && (
               <View style={styles.tabContentBlock}>
-                <View style={[styles.card, SHADOWS.card]}>
+                <View style={[styles.card, shadows.card]}>
                   <Text style={styles.cardHeaderTitle}>Classification & Dimensions</Text>
 
                   <View style={styles.rowInputs}>
                     <View style={[styles.inputGroup, { flex: 1 }]}>
                       <Text style={styles.inputLabel}>Classification</Text>
                       <TextInput
+                        placeholderTextColor={colors.placeholder}
                         style={styles.input}
                         value={classification}
                         onChangeText={setClassification}
@@ -680,6 +732,7 @@ export const LandFormScreen = ({ route, navigation }) => {
                     <View style={[styles.inputGroup, { flex: 1 }]}>
                       <Text style={styles.inputLabel}>Actual Use</Text>
                       <TextInput
+                        placeholderTextColor={colors.placeholder}
                         style={styles.input}
                         value={actualUse}
                         onChangeText={setActualUse}
@@ -692,6 +745,7 @@ export const LandFormScreen = ({ route, navigation }) => {
                     <View style={[styles.inputGroup, { flex: 2 }]}>
                       <Text style={styles.inputLabel}>Land Area</Text>
                       <TextInput
+                        placeholderTextColor={colors.placeholder}
                         style={styles.input}
                         value={area}
                         onChangeText={setArea}
@@ -702,6 +756,7 @@ export const LandFormScreen = ({ route, navigation }) => {
                     <View style={[styles.inputGroup, { flex: 1 }]}>
                       <Text style={styles.inputLabel}>Unit</Text>
                       <TextInput
+                        placeholderTextColor={colors.placeholder}
                         style={styles.input}
                         value={unit}
                         onChangeText={setUnit}
@@ -714,6 +769,7 @@ export const LandFormScreen = ({ route, navigation }) => {
                   <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>Base Market Value / Rate (PHP per Unit)</Text>
                     <TextInput
+                        placeholderTextColor={colors.placeholder}
                       style={[styles.input, styles.valuationInput]}
                       value={baseMarketValue}
                       onChangeText={setBaseMarketValue}
@@ -723,12 +779,13 @@ export const LandFormScreen = ({ route, navigation }) => {
                   </View>
                 </View>
 
-                <View style={[styles.card, SHADOWS.card]}>
+                <View style={[styles.card, shadows.card]}>
                   <Text style={styles.cardHeaderTitle}>Market Value & Assessed Value</Text>
 
                   <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>Total Market Value (PHP)</Text>
                     <TextInput
+                        placeholderTextColor={colors.placeholder}
                       style={[styles.input, styles.valuationInput]}
                       value={marketValue}
                       onChangeText={setMarketValue}
@@ -740,6 +797,7 @@ export const LandFormScreen = ({ route, navigation }) => {
                     <View style={[styles.inputGroup, { flex: 1 }]}>
                       <Text style={styles.inputLabel}>Assessment Level (%)</Text>
                       <TextInput
+                        placeholderTextColor={colors.placeholder}
                         style={styles.input}
                         value={assessmentLevel}
                         onChangeText={setAssessmentLevel}
@@ -750,6 +808,7 @@ export const LandFormScreen = ({ route, navigation }) => {
                     <View style={[styles.inputGroup, { flex: 2 }]}>
                       <Text style={styles.inputLabel}>Total Assessed Value (PHP)</Text>
                       <TextInput
+                        placeholderTextColor={colors.placeholder}
                         style={[styles.input, styles.valuationInput]}
                         value={assessedValue}
                         onChangeText={setAssessedValue}
@@ -766,7 +825,7 @@ export const LandFormScreen = ({ route, navigation }) => {
                     <Switch
                       value={taxability}
                       onValueChange={setTaxability}
-                      trackColor={{ false: '#cbd5e1', true: COLORS.primary }}
+                      trackColor={{ false: colors.borderDark, true: colors.primary }}
                     />
                   </View>
                 </View>
@@ -789,13 +848,14 @@ export const LandFormScreen = ({ route, navigation }) => {
             {/* TAB 4: EFFECTIVITY, MEMORANDA & WORKFLOW */}
             {activeTab === 4 && (
               <View style={styles.tabContentBlock}>
-                <View style={[styles.card, SHADOWS.card]}>
+                <View style={[styles.card, shadows.card]}>
                   <Text style={styles.cardHeaderTitle}>Tax Effectivity & Memoranda</Text>
 
                   <View style={styles.rowInputs}>
                     <View style={[styles.inputGroup, { flex: 1 }]}>
                       <Text style={styles.inputLabel}>Year Effectivity</Text>
                       <TextInput
+                        placeholderTextColor={colors.placeholder}
                         style={styles.input}
                         value={yearEffectivity}
                         onChangeText={setYearEffectivity}
@@ -805,6 +865,7 @@ export const LandFormScreen = ({ route, navigation }) => {
                     <View style={[styles.inputGroup, { flex: 1 }]}>
                       <Text style={styles.inputLabel}>Quarter Effectivity (1-4)</Text>
                       <TextInput
+                        placeholderTextColor={colors.placeholder}
                         style={styles.input}
                         value={quarterEffectivity}
                         onChangeText={setQuarterEffectivity}
@@ -816,6 +877,7 @@ export const LandFormScreen = ({ route, navigation }) => {
                   <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>Memoranda</Text>
                     <TextInput
+                        placeholderTextColor={colors.placeholder}
                       style={[styles.input, { height: 60, textAlignVertical: 'top' }]}
                       value={memoranda}
                       onChangeText={setMemoranda}
@@ -827,6 +889,7 @@ export const LandFormScreen = ({ route, navigation }) => {
                   <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>Inspector Field Remarks</Text>
                     <TextInput
+                        placeholderTextColor={colors.placeholder}
                       style={[styles.input, { height: 60, textAlignVertical: 'top' }]}
                       value={remarks}
                       onChangeText={setRemarks}
@@ -836,7 +899,7 @@ export const LandFormScreen = ({ route, navigation }) => {
                   </View>
                 </View>
 
-                <View style={[styles.card, SHADOWS.card]}>
+                <View style={[styles.card, shadows.card]}>
                   <Text style={styles.cardHeaderTitle}>Office Workflow Transfer</Text>
 
                   <View style={styles.switchRow}>
@@ -847,7 +910,7 @@ export const LandFormScreen = ({ route, navigation }) => {
                     <Switch
                       value={autoForward}
                       onValueChange={setAutoForward}
-                      trackColor={{ false: '#cbd5e1', true: COLORS.primary }}
+                      trackColor={{ false: colors.borderDark, true: colors.primary }}
                     />
                   </View>
 
@@ -855,7 +918,7 @@ export const LandFormScreen = ({ route, navigation }) => {
                     <View style={styles.nextStepBox}>
                       <Text style={styles.nextStepLabel}>Target Next Stage:</Text>
                       <View style={styles.nextStepBadge}>
-                        <Ionicons name="checkmark-circle-outline" size={16} color={COLORS.primary} />
+                        <Ionicons name="checkmark-circle-outline" size={16} color={colors.primary} />
                         <Text style={styles.nextStepBadgeText}>Inspection Checked / Recommend Approval</Text>
                       </View>
                     </View>
@@ -885,7 +948,7 @@ export const LandFormScreen = ({ route, navigation }) => {
                 style={[styles.saveBtn, styles.saveBtnSecondary]}
                 onPress={() => handleSave(true)}
               >
-                <Ionicons name="save-outline" size={18} color={COLORS.primary} />
+                <Ionicons name="save-outline" size={18} color={colors.primary} />
                 <Text style={styles.saveBtnSecondaryText}>Save to Offline Queue Only</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -900,14 +963,20 @@ export const LandFormScreen = ({ route, navigation }) => {
           </>
         )}
       </ScrollView>
+          <DiscardChangesModal
+        visible={discardModalVisible}
+        onClose={() => setDiscardModalVisible(false)}
+        onConfirmDiscard={navigateBack}
+        partitionLetter={partitionLetterParam}
+      />
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors, isDarkMode) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.bgLight
+    backgroundColor: colors.bgLight
   },
   ribbon: {
     flexDirection: 'row',
@@ -918,23 +987,23 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1
   },
   ribbonDownloaded: {
-    backgroundColor: '#dcfce7',
-    borderBottomColor: '#bbf7d0'
+    backgroundColor: isDarkMode ? '#064e3b' : '#dcfce7',
+    borderBottomColor: isDarkMode ? '#065f46' : '#bbf7d0'
   },
   ribbonStandard: {
-    backgroundColor: '#e0f2fe',
-    borderBottomColor: '#bae6fd'
+    backgroundColor: isDarkMode ? '#0c4a6e' : '#e0f2fe',
+    borderBottomColor: isDarkMode ? '#075985' : '#bae6fd'
   },
   ribbonText: {
     fontSize: 12,
     fontWeight: '800',
-    color: COLORS.primaryDark
+    color: isDarkMode ? '#38bdf8' : colors.primaryDark
   },
   sectionTabs: {
     flexDirection: 'row',
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.cardBg,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    borderBottomColor: colors.border,
     paddingHorizontal: 8,
     paddingVertical: 6,
     gap: 6
@@ -946,15 +1015,15 @@ const styles = StyleSheet.create({
     borderRadius: 8
   },
   sectionTabBtnActive: {
-    backgroundColor: COLORS.primaryLight
+    backgroundColor: colors.primaryLight
   },
   sectionTabText: {
     fontSize: 11,
     fontWeight: '700',
-    color: COLORS.textMuted
+    color: colors.textMuted
   },
   sectionTabTextActive: {
-    color: COLORS.primaryDark,
+    color: isDarkMode ? colors.primary : colors.primaryDark,
     fontWeight: '800'
   },
   scrollContent: {
@@ -966,23 +1035,23 @@ const styles = StyleSheet.create({
     gap: 14
   },
   card: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.cardBg,
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: colors.border,
     gap: 12
   },
   cardHeaderTitle: {
     fontSize: 14,
     fontWeight: '800',
-    color: COLORS.primaryDark,
+    color: isDarkMode ? colors.primary : colors.primaryDark,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: colors.border,
     paddingBottom: 8
   },
   boundarySection: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.surfaceSecondary,
     padding: 10,
     borderRadius: 10,
     gap: 4
@@ -990,7 +1059,7 @@ const styles = StyleSheet.create({
   boundaryTitle: {
     fontSize: 11,
     fontWeight: '800',
-    color: COLORS.primaryDark,
+    color: isDarkMode ? colors.primary : colors.primaryDark,
     letterSpacing: 0.5
   },
   inputGroup: {
@@ -999,22 +1068,22 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 12,
     fontWeight: '700',
-    color: COLORS.textDark
+    color: colors.textDark
   },
   input: {
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: colors.inputBorder,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
     fontSize: 13,
-    color: COLORS.textDark,
-    backgroundColor: '#f8fafc'
+    color: colors.inputText,
+    backgroundColor: isDarkMode ? colors.inputBg : '#f8fafc'
   },
   valuationInput: {
     fontWeight: '800',
-    color: COLORS.primaryDark,
-    backgroundColor: '#f0fdf4'
+    color: isDarkMode ? '#34d399' : colors.primaryDark,
+    backgroundColor: isDarkMode ? '#064e3b' : '#f0fdf4'
   },
   rowInputs: {
     flexDirection: 'row',
@@ -1029,15 +1098,15 @@ const styles = StyleSheet.create({
   switchTitle: {
     fontSize: 13,
     fontWeight: '800',
-    color: COLORS.textDark
+    color: colors.textDark
   },
   switchSubtitle: {
     fontSize: 11,
-    color: COLORS.textMuted,
+    color: colors.textMuted,
     marginTop: 2
   },
   nextStepBox: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.surfaceSecondary,
     padding: 10,
     borderRadius: 10,
     gap: 4
@@ -1045,7 +1114,7 @@ const styles = StyleSheet.create({
   nextStepLabel: {
     fontSize: 11,
     fontWeight: '700',
-    color: COLORS.textMuted
+    color: colors.textMuted
   },
   nextStepBadge: {
     flexDirection: 'row',
@@ -1055,7 +1124,7 @@ const styles = StyleSheet.create({
   nextStepBadgeText: {
     fontSize: 12,
     fontWeight: '800',
-    color: COLORS.primary
+    color: colors.primary
   },
   buttonContainer: {
     gap: 10,
@@ -1070,7 +1139,7 @@ const styles = StyleSheet.create({
     gap: 8
   },
   saveBtnPrimary: {
-    backgroundColor: COLORS.primary
+    backgroundColor: colors.primary
   },
   saveBtnText: {
     color: '#ffffff',
@@ -1078,46 +1147,45 @@ const styles = StyleSheet.create({
     fontWeight: '800'
   },
   saveBtnSecondary: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.cardBg,
     borderWidth: 1,
-    borderColor: COLORS.primary
+    borderColor: colors.primary
   },
   saveBtnSecondaryText: {
-    color: COLORS.primary,
+    color: colors.primary,
     fontSize: 13,
     fontWeight: '800'
-  }, 
+  },
   cancelBtn: {
-    backgroundColor: '#fff1f2',
+    backgroundColor: isDarkMode ? '#4c0519' : '#fff1f2',
     borderWidth: 1,
-    borderColor: '#fecdd3'
+    borderColor: isDarkMode ? '#881337' : '#fecdd3'
   },
   cancelBtnText: {
-    color: '#e11d48',
+    color: isDarkMode ? '#fda4af' : '#e11d48',
     fontSize: 13,
     fontWeight: '800'
   },
-
   notDownloadedBox: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.cardBg,
     borderRadius: 18,
     padding: 24,
     marginTop: 20,
     borderWidth: 1,
-    borderColor: COLORS.border
+    borderColor: colors.border
   },
   notDownloadedTitle: {
     fontSize: 17,
     fontWeight: '800',
-    color: COLORS.textDark,
+    color: colors.textDark,
     marginTop: 12,
     marginBottom: 8
   },
   notDownloadedText: {
     fontSize: 13,
-    color: COLORS.textMuted,
+    color: colors.textMuted,
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 20
@@ -1126,7 +1194,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: COLORS.primary,
+    backgroundColor: colors.primary,
     paddingHorizontal: 18,
     paddingVertical: 12,
     borderRadius: 12

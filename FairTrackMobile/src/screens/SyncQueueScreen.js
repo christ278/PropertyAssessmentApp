@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import React, { useState, useContext } from 'react';
 import {
   View,
   Text,
@@ -12,10 +12,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { SyncContext } from '../context/SyncContext';
 import { useTheme } from '../context/ThemeContext';
 import { HeaderBar } from '../components/HeaderBar';
+import { ActionModal } from '../components/ActionModal';
 import { COLORS, SHADOWS } from '../constants/theme';
 
 export const SyncQueueScreen = ({ navigation }) => {
   const { isDarkMode, colors, shadows } = useTheme();
+  const [actionModal, setActionModal] = useState({ visible: false, title: '', message: '', icon: 'information-circle-outline', iconType: 'primary', buttons: [] });
+  const showModal = (config) => setActionModal({ visible: true, icon: 'information-circle-outline', iconType: 'primary', buttons: [], ...config });
+  const closeModal = () => setActionModal(prev => ({ ...prev, visible: false }));
   const {
     syncQueue,
     pendingCount,
@@ -30,30 +34,34 @@ export const SyncQueueScreen = ({ navigation }) => {
 
   const handleSyncAll = async () => {
     if (pendingCount === 0) {
-      Alert.alert('Queue Empty', 'There are no pending offline changes to sync.');
+      showModal({ title: 'Queue Empty', message: 'There are no pending offline changes to sync.', icon: 'checkmark-circle-outline', iconType: 'primary' });
       return;
     }
 
     const result = await syncAllToServer();
     if (result.success) {
-      Alert.alert('Office Sync Complete', `Successfully synchronized ${result.successCount} updates to the live database!`);
+      showModal({ title: 'Office Sync Complete', message: `Successfully synchronized ${result.successCount} updates to the live database!`, icon: 'checkmark-circle-outline', iconType: 'success' });
     } else {
-      Alert.alert(
-        'Sync Completed with Warnings',
-        `Synced: ${result.successCount}, Failed: ${result.failureCount}. Unsynced items remain in your offline queue for retry.`
-      );
+      showModal({
+        title: 'Sync Completed with Warnings',
+        message: `Synced: ${result.successCount}, Failed: ${result.failureCount}. Unsynced items remain in your offline queue for retry.`,
+        icon: 'warning-outline',
+        iconType: 'warning'
+      });
     }
   };
 
   const handleRemove = (item) => {
-    Alert.alert(
-      'Remove Queued Item',
-      `Are you sure you want to discard offline edit for "${item.title}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Discard', style: 'destructive', onPress: () => removeQueueItem(item.id) }
+    showModal({
+      title: 'Remove Queued Item',
+      message: `Are you sure you want to discard offline edit for "${item.title}"?`,
+      icon: 'trash-outline',
+      iconType: 'danger',
+      buttons: [
+        { text: 'Discard', style: 'danger', icon: 'trash-outline', onPress: () => removeQueueItem(item.id) },
+        { text: 'Cancel', style: 'cancel' }
       ]
-    );
+    });
   };
 
   const renderQueueItem = ({ item }) => {
@@ -176,6 +184,15 @@ export const SyncQueueScreen = ({ navigation }) => {
           }
         />
       </View>
+      <ActionModal
+        visible={actionModal.visible}
+        title={actionModal.title}
+        message={actionModal.message}
+        icon={actionModal.icon}
+        iconType={actionModal.iconType}
+        buttons={actionModal.buttons}
+        onClose={closeModal}
+      />
     </View>
   );
 };

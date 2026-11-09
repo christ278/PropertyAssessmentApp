@@ -36,7 +36,14 @@ public class MobilePartitionSummaryDTO
     public int TransactionTypeId { get; set; } // 1: Land, 2: Building, 3: Machinery
     public string FormType { get; set; } = "LAND";
     public string? SystemGeneratedTDN { get; set; }
+    public string? ARPNo { get; set; }
     public string? PIN { get; set; }
+    public string? PropertyTypeAccordUse { get; set; }
+    public string? OtherPropertyTypeAccordUse { get; set; }
+    public string? SurveyNo { get; set; }
+    public string? LotNo { get; set; }
+    public string? TitleNo { get; set; }
+    public string? SectionNo { get; set; }
     public string? OwnerName { get; set; }
     public decimal AreaSqMeters { get; set; }
     public decimal MarketValue { get; set; }
@@ -101,11 +108,34 @@ public class CAST_TDNBuildingDTO
     public decimal? TotalAssessedVal { get; set; }
     public string? StucturalType { get; set; }
     public string? OtherStructure { get; set; }
+    public string? PropertyTypeAccordUse { get; set; }
+    public string? OtherPropertyTypeAccordUse { get; set; }
     public string? MailingAddress { get; set; }
     public string? TIN { get; set; }
     public string? MobileNo { get; set; }
     public string? EmailAddress { get; set; }
     public string? TransactionCode { get; set; }
+
+    // 17 Structural Parts & Materials (CAST Reference)
+    public string? StructuralFoundation { get; set; }
+    public string? StructuralColumns { get; set; }
+    public string? StructuralBeams { get; set; }
+    public string? StructuralTrussRoof { get; set; }
+    public string? StructuralRoof { get; set; }
+    public string? StructuralExteriorWalls { get; set; }
+    public string? StructuralFlooring { get; set; }
+    public string? DoorMain { get; set; }
+    public string? Ceiling { get; set; }
+    public string? StructuralWindows { get; set; }
+    public string? StructuralStairs { get; set; }
+    public string? StructuralPartitionWalls { get; set; }
+    public string? StructuralFloorFinish { get; set; }
+    public string? StructuralFinishFront { get; set; }
+    public string? ElectricalSystem { get; set; }
+    public string? ToiletAndBathroom { get; set; }
+    public string? PlumbingSewer { get; set; }
+    public string? BuildingClassification { get; set; }
+    public string? OccupancyPermitNo { get; set; }
 }
 
 public class TDNBuildingDTO

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useMemo } from 'react';
 import {
   View,
   Text,
@@ -19,14 +19,48 @@ import { COLORS, SHADOWS } from '../constants/theme';
 
 export const DashboardScreen = ({ navigation }) => {
   const { user, logout } = useContext(AuthContext);
-  const { pendingCount, isSyncing, syncAllToServer, lastSyncTime, downloadedCount } = useContext(SyncContext);
+  const {
+    pendingCount,
+    isSyncing,
+    syncAllToServer,
+    lastSyncTime,
+    downloadedCount,
+    downloadedForms,
+    cachedTransactions
+  } = useContext(SyncContext);
   const { colors, isDarkMode, shadows } = useTheme();
 
   const [dashboardData, setDashboardData] = useState(null);
-
+  const [isOffline, setIsOffline] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+
+  // Compute counts from currently downloaded offline transactions
+  const offlineMetrics = useMemo(() => {
+    const entries = Object.values(downloadedForms || {});
+    let inspectionRequestCount = 0;
+    let propertyAssessmentCount = 0;
+
+    entries.forEach((entry) => {
+      const item = entry?.transItem || entry || {};
+      const tracking = (item.TrackingNo || item.trackingNo || entry?.trackingNo || '').toString().toUpperCase();
+      const reqType = (item.RequestType || item.requestType || '').toString().toLowerCase();
+
+      const isInspection = tracking.startsWith('RFI-') || reqType.includes('inspection');
+      if (isInspection) {
+        inspectionRequestCount += 1;
+      } else {
+        propertyAssessmentCount += 1;
+      }
+    });
+
+    return {
+      totalDownloaded: entries.length,
+      propertyAssessmentCount,
+      inspectionRequestCount
+    };
+  }, [downloadedForms, cachedTransactions]);
 
   useEffect(() => {
     fetchDashboard();
@@ -38,9 +72,11 @@ export const DashboardScreen = ({ navigation }) => {
       const res = await MobileApi.getDashboard();
       if (res && res.success) {
         setDashboardData(res.data);
+        setIsOffline(false);
       }
     } catch (err) {
-      console.warn('Dashboard fetch offline fallback:', err);
+      // Offline mode: automatically falls back to offlineMetrics from downloaded storage
+      setIsOffline(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -48,9 +84,20 @@ export const DashboardScreen = ({ navigation }) => {
   };
 
   const handleSyncPress = async () => {
-    const result = await syncAllToServer();
+    await syncAllToServer();
     fetchDashboard();
   };
+
+  // Use online counts when connected, or downloaded offline counts when offline
+  const propertyAssessmentDisplayCount =
+    !isOffline && dashboardData?.pendingAssessmentsCount !== undefined
+      ? dashboardData.pendingAssessmentsCount
+      : offlineMetrics.propertyAssessmentCount;
+
+  const inspectionRequestDisplayCount =
+    !isOffline && dashboardData?.pendingInspectionsCount !== undefined
+      ? dashboardData.pendingInspectionsCount
+      : offlineMetrics.inspectionRequestCount;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bgLight }]}>
@@ -63,7 +110,14 @@ export const DashboardScreen = ({ navigation }) => {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchDashboard(); }} colors={[colors.primary]} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              fetchDashboard();
+            }}
+            colors={[colors.primary]}
+          />
         }
       >
         {/* Sync Alert Banner if edits are waiting */}
@@ -117,7 +171,7 @@ export const DashboardScreen = ({ navigation }) => {
             shadows.card
           ]}
           activeOpacity={0.8}
-          onPress={() => navigation.navigate('Profile')}
+          onPress={() => navigation.navigate('Main', { screen: 'ProfileTab' })}
         >
           <View style={styles.welcomeInfo}>
             <Text style={[styles.greetingText, { color: colors.textMuted }]}>Welcome,</Text>
@@ -131,38 +185,49 @@ export const DashboardScreen = ({ navigation }) => {
             ]}
           >
             <Ionicons name="person" size={28} color={colors.primary} />
-            <View style={styles.avatarOnlineDot} />
+            <View
+              style={[
+                styles.avatarOnlineDot,
+                { backgroundColor: isOffline ? colors.accentGold : COLORS.accentGreen }
+              ]}
+            />
           </View>
         </TouchableOpacity>
 
-        {/* Metrics Grid */}
-        <Text style={[styles.sectionTitle, { color: colors.textDark }]}>Overview & Metrics</Text>
-        <View style={styles.metricsGrid}>
+        {/* Overview & Metrics (4 Proper Mobile Field Metrics) */}
+        <View style={styles.sectionHeaderRow}>
+          <Text style={[styles.sectionTitle, { color: colors.textDark, marginBottom: 0 }]}>
+            Overview &amp; Metrics
+          </Text>
           <View
             style={[
-              styles.metricCard,
+              styles.modeBadge,
               {
-                backgroundColor: colors.cardBg,
-                borderColor: colors.border
-              },
-              shadows.card
+                backgroundColor: isOffline
+                  ? isDarkMode ? '#78350f' : '#fef3c7'
+                  : isDarkMode ? '#064e3b' : '#dcfce7'
+              }
             ]}
           >
-            <View
+            <Ionicons
+              name={isOffline ? 'cloud-offline-outline' : 'wifi-outline'}
+              size={12}
+              color={isOffline ? colors.accentGold : colors.accentGreen}
+            />
+            <Text
               style={[
-                styles.metricIconBox,
-                { backgroundColor: isDarkMode ? '#1e3a8a' : '#e0f2fe' }
+                styles.modeBadgeText,
+                { color: isOffline ? colors.accentGold : colors.accentGreen }
               ]}
             >
-              <Ionicons name="clipboard-outline" size={20} color={colors.accentBlue} />
-            </View>
-            <Text style={[styles.metricNumber, { color: colors.textDark }]}>
-              {dashboardData?.pendingInspectionsCount ?? '--'}
+              {isOffline ? 'Offline Mode (Local Data)' : 'Online Mode'}
             </Text>
-            <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Pending Inspections</Text>
           </View>
+        </View>
 
-          <View
+        <View style={styles.metricsGrid}>
+          {/* 1. Property Assessment (RPA) */}
+          <TouchableOpacity
             style={[
               styles.metricCard,
               {
@@ -171,6 +236,8 @@ export const DashboardScreen = ({ navigation }) => {
               },
               shadows.card
             ]}
+            activeOpacity={0.8}
+            onPress={() => navigation.navigate('Main', { screen: 'Feed' })}
           >
             <View
               style={[
@@ -181,12 +248,18 @@ export const DashboardScreen = ({ navigation }) => {
               <Ionicons name="home-outline" size={20} color={colors.accentGold} />
             </View>
             <Text style={[styles.metricNumber, { color: colors.textDark }]}>
-              {dashboardData?.pendingAssessmentsCount ?? '--'}
+              {propertyAssessmentDisplayCount}
             </Text>
-            <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Pending FAAS</Text>
-          </View>
+            <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Property Assessment</Text>
+            {!isOffline && offlineMetrics.propertyAssessmentCount > 0 ? (
+              <Text style={[styles.metricSubLabel, { color: colors.primary }]}>
+                {offlineMetrics.propertyAssessmentCount} downloaded
+              </Text>
+            ) : null}
+          </TouchableOpacity>
 
-          <View
+          {/* 2. Inspection Request (RFI) */}
+          <TouchableOpacity
             style={[
               styles.metricCard,
               {
@@ -195,6 +268,67 @@ export const DashboardScreen = ({ navigation }) => {
               },
               shadows.card
             ]}
+            activeOpacity={0.8}
+            onPress={() => navigation.navigate('Main', { screen: 'Feed' })}
+          >
+            <View
+              style={[
+                styles.metricIconBox,
+                { backgroundColor: isDarkMode ? '#1e3a8a' : '#e0f2fe' }
+              ]}
+            >
+              <Ionicons name="clipboard-outline" size={20} color={colors.accentBlue} />
+            </View>
+            <Text style={[styles.metricNumber, { color: colors.textDark }]}>
+              {inspectionRequestDisplayCount}
+            </Text>
+            <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Inspection Request</Text>
+            {!isOffline && offlineMetrics.inspectionRequestCount > 0 ? (
+              <Text style={[styles.metricSubLabel, { color: colors.primary }]}>
+                {offlineMetrics.inspectionRequestCount} downloaded
+              </Text>
+            ) : null}
+          </TouchableOpacity>
+
+          {/* 3. Downloaded Offline */}
+          <TouchableOpacity
+            style={[
+              styles.metricCard,
+              {
+                backgroundColor: colors.cardBg,
+                borderColor: colors.border
+              },
+              shadows.card
+            ]}
+            activeOpacity={0.8}
+            onPress={() => navigation.navigate('Main', { screen: 'Feed' })}
+          >
+            <View
+              style={[
+                styles.metricIconBox,
+                { backgroundColor: isDarkMode ? '#134e4a' : colors.primaryLight }
+              ]}
+            >
+              <Ionicons name="cloud-download-outline" size={20} color={colors.primary} />
+            </View>
+            <Text style={[styles.metricNumber, { color: colors.textDark }]}>
+              {offlineMetrics.totalDownloaded}
+            </Text>
+            <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Downloaded Offline</Text>
+          </TouchableOpacity>
+
+          {/* 4. Pending Sync */}
+          <TouchableOpacity
+            style={[
+              styles.metricCard,
+              {
+                backgroundColor: colors.cardBg,
+                borderColor: colors.border
+              },
+              shadows.card
+            ]}
+            activeOpacity={0.8}
+            onPress={() => navigation.navigate('Main', { screen: 'SyncCenter' })}
           >
             <View
               style={[
@@ -202,13 +336,13 @@ export const DashboardScreen = ({ navigation }) => {
                 { backgroundColor: isDarkMode ? '#064e3b' : '#dcfce7' }
               ]}
             >
-              <Ionicons name="checkmark-circle-outline" size={20} color={colors.accentGreen} />
+              <Ionicons name="cloud-upload-outline" size={20} color={colors.accentGreen} />
             </View>
             <Text style={[styles.metricNumber, { color: colors.textDark }]}>
-              {dashboardData?.completedTodayCount ?? '--'}
+              {pendingCount || 0}
             </Text>
-            <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Completed Today</Text>
-          </View>
+            <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Pending Sync</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Quick Access Grid */}
@@ -223,7 +357,7 @@ export const DashboardScreen = ({ navigation }) => {
               },
               shadows.card
             ]}
-            onPress={() => navigation.navigate('Transactions')}
+            onPress={() => navigation.navigate('Main', { screen: 'Feed' })}
           >
             <View
               style={[
@@ -235,7 +369,11 @@ export const DashboardScreen = ({ navigation }) => {
             </View>
             <View style={styles.actionDetails}>
               <Text style={[styles.actionTitle, { color: colors.textDark }]}>Transaction Feed</Text>
-              <Text style={[styles.actionSubtitle, { color: colors.textMuted }]}>View assigned inspection queue & workflow</Text>
+              <Text style={[styles.actionSubtitle, { color: colors.textMuted }]}>
+                {offlineMetrics.totalDownloaded > 0
+                  ? `${offlineMetrics.totalDownloaded} transaction(s) downloaded for offline use`
+                  : 'View assigned inspection queue & workflow'}
+              </Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
           </TouchableOpacity>
@@ -327,7 +465,7 @@ export const DashboardScreen = ({ navigation }) => {
               },
               shadows.card
             ]}
-            onPress={() => navigation.navigate('SyncQueue')}
+            onPress={() => navigation.navigate('Main', { screen: 'SyncCenter' })}
           >
             <View
               style={[
@@ -496,6 +634,24 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#ffffff'
   },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12
+  },
+  modeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12
+  },
+  modeBadgeText: {
+    fontSize: 11,
+    fontWeight: '800'
+  },
   sectionTitle: {
     fontSize: 14,
     fontWeight: '800',
@@ -507,37 +663,44 @@ const styles = StyleSheet.create({
   },
   metricsGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 10,
     marginBottom: 24
   },
   metricCard: {
-    flex: 1,
+    flexBasis: '47%',
+    flexGrow: 1,
     backgroundColor: '#ffffff',
     borderRadius: 14,
-    padding: 12,
+    padding: 14,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: COLORS.border
   },
   metricIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8
   },
   metricNumber: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '900',
     color: COLORS.textDark
   },
   metricLabel: {
-    fontSize: 10,
+    fontSize: 11,
     color: COLORS.textMuted,
     textAlign: 'center',
-    fontWeight: '600',
+    fontWeight: '700',
     marginTop: 2
+  },
+  metricSubLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    marginTop: 3
   },
   actionList: {
     gap: 10,

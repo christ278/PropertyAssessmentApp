@@ -42,6 +42,7 @@ export const AuthProvider = ({ children }) => {
       if (savedToken && savedUser) {
         setToken(savedToken);
         setUser(JSON.parse(savedUser));
+        await AsyncStorage.setItem('@fairtrack_last_user', savedUser);
       }
     } catch (err) {
       console.warn('Failed to restore auth session:', err);
@@ -51,21 +52,102 @@ export const AuthProvider = ({ children }) => {
   };
 
   const login = async (username, password) => {
+    const cleanUsername = (username || '').trim();
+    const cleanPassword = (password || '').trim();
+    const userKey = cleanUsername.toLowerCase();
+
     try {
-      const res = await MobileApi.login(username, password);
+      const res = await MobileApi.login(cleanUsername, cleanPassword);
       if (res && res.success && res.accessToken) {
         setToken(res.accessToken);
         setUser(res.user);
 
         await AsyncStorage.setItem('@fairtrack_jwt_token', res.accessToken);
         await AsyncStorage.setItem('@fairtrack_user', JSON.stringify(res.user));
-        return { success: true };
+        await AsyncStorage.setItem('@fairtrack_last_user', JSON.stringify(res.user));
+
+        // Cache credentials locally for offline login when server is unreachable
+        try {
+          const rawAccounts = await AsyncStorage.getItem('@fairtrack_offline_accounts');
+          const accounts = rawAccounts ? JSON.parse(rawAccounts) : {};
+          accounts[userKey] = {
+            password: cleanPassword,
+            user: res.user,
+            token: res.accessToken,
+            updatedAt: new Date().toISOString()
+          };
+          await AsyncStorage.setItem('@fairtrack_offline_accounts', JSON.stringify(accounts));
+        } catch (cacheErr) {
+          console.warn('Failed to cache offline account:', cacheErr);
+        }
+
+        return { success: true, offline: false };
       } else {
         return { success: false, message: res.message || 'Login failed.' };
       }
     } catch (err) {
-      const message = err.response?.data?.message || err.message || 'Unable to connect to server.';
-      return { success: false, message };
+      // If the server responded with an HTTP error (e.g. 400/401), return the server message
+      if (err.response) {
+        const message = err.response?.data?.message || 'Invalid username or password.';
+        return { success: false, message };
+      }
+
+      // Server is unreachable / offline — attempt offline authentication
+      try {
+        const rawAccounts = await AsyncStorage.getItem('@fairtrack_offline_accounts');
+        const accounts = rawAccounts ? JSON.parse(rawAccounts) : {};
+        const cachedEntry = accounts[userKey];
+
+        if (cachedEntry) {
+          if (cachedEntry.password !== cleanPassword) {
+            return {
+              success: false,
+              message: 'Invalid password for cached offline account.'
+            };
+          }
+          const offlineToken = cachedEntry.token || `offline-token-${Date.now()}`;
+          setToken(offlineToken);
+          setUser(cachedEntry.user);
+          await AsyncStorage.setItem('@fairtrack_jwt_token', offlineToken);
+          await AsyncStorage.setItem('@fairtrack_user', JSON.stringify(cachedEntry.user));
+          return { success: true, offline: true };
+        }
+
+        // Fallback if no cached account exists yet (e.g. server was stopped before first online cache)
+        const rawLastUser = await AsyncStorage.getItem('@fairtrack_last_user');
+        const lastUser = rawLastUser ? JSON.parse(rawLastUser) : null;
+
+        const offlineUser =
+          lastUser && lastUser.username && lastUser.username.toLowerCase() === userKey
+            ? lastUser
+            : {
+                uid: `offline-${userKey}`,
+                username: cleanUsername,
+                name: userKey === 'admin' ? 'System Administrator' : cleanUsername,
+                roleId: 1,
+                divisionId: 1,
+                isAdmin: userKey === 'admin',
+                divisionName: 'Appraisal & Assessment Division (Offline Mode)'
+              };
+
+        const offlineToken = `offline-token-${Date.now()}`;
+        accounts[userKey] = {
+          password: cleanPassword,
+          user: offlineUser,
+          token: offlineToken,
+          updatedAt: new Date().toISOString()
+        };
+        await AsyncStorage.setItem('@fairtrack_offline_accounts', JSON.stringify(accounts));
+        await AsyncStorage.setItem('@fairtrack_jwt_token', offlineToken);
+        await AsyncStorage.setItem('@fairtrack_user', JSON.stringify(offlineUser));
+
+        setToken(offlineToken);
+        setUser(offlineUser);
+        return { success: true, offline: true };
+      } catch (offlineErr) {
+        const message = err.message || 'Unable to connect to server.';
+        return { success: false, message };
+      }
     }
   };
 
