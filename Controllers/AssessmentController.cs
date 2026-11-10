@@ -56,6 +56,31 @@ public class AssessmentController : Controller
         return File(pdfBytes, "application/pdf");
     }
 
+    // GET: /Assessment/PrintTaxDeclaration/5
+    [HttpGet]
+    public IActionResult PrintTaxDeclaration(Guid id, bool download = false)
+    {
+        var record = _assessmentService.GetById(id);
+        if (record == null)
+        {
+            return NotFound();
+        }
+
+        var pdfBytes = _tdPdfService.GenerateTaxDeclarationPdf(record);
+        var safeTdNo = string.IsNullOrWhiteSpace(record.TaxDeclarationNumber)
+            ? record.Id.ToString("N")[..8]
+            : string.Concat(record.TaxDeclarationNumber.Split(Path.GetInvalidFileNameChars()));
+        var fileName = $"TaxDeclaration_{safeTdNo}.pdf";
+
+        if (download)
+        {
+            return File(pdfBytes, "application/pdf", fileName);
+        }
+
+        Response.Headers["Content-Disposition"] = $"inline; filename=\"{fileName}\"";
+        return File(pdfBytes, "application/pdf");
+    }
+
     // GET: /Assessment
     public IActionResult Index(string? search, PropertyClassification? classification, AssessmentStatus? status)
     {

@@ -186,9 +186,15 @@ public class PermissionService : IPermissionService
             return dashMod != null && HasModuleRecordAccess(roleSetting.Id, dashMod.ModuleId);
         }
 
-        // Assessment / Records: separate Printout permission (ASSESSMENT_PRINT) from general FAAS Records access (ASSESSMENT_FAAS)
+        // Assessment / Records: separate Printout permissions (ASSESSMENT_PRINT for FAAS, ASSESSMENT_PRINT_TD for Tax Declaration) from general FAAS Records access (ASSESSMENT_FAAS)
         if (controllerName.Equals("Assessment", StringComparison.OrdinalIgnoreCase))
         {
+            if (actionName != null && actionName.Equals("PrintTaxDeclaration", StringComparison.OrdinalIgnoreCase))
+            {
+                var printTdMod = _context.SystemModules.FirstOrDefault(m => m.ModuleCode == "ASSESSMENT_PRINT_TD" && m.IsActive);
+                return printTdMod != null && HasModuleRecordAccess(roleSetting.Id, printTdMod.ModuleId);
+            }
+
             if (actionName != null &&
                 (actionName.Equals("PrintPdf", StringComparison.OrdinalIgnoreCase) ||
                  actionName.Equals("Details", StringComparison.OrdinalIgnoreCase)))

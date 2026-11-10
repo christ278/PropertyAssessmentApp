@@ -34,7 +34,7 @@ VALUES
     ('INSPECTION',          'Field Inspection Requests',                'FAAS & Transaction Requests', 'RequestForInspection',     'Index',          'clipboard-check',  10, 1),
     ('PROPERTY_ASSESSMENT', 'Property Assessment Requests',             'FAAS & Transaction Requests', 'PropertyAssessmentRequest', 'Index',          'building',         11, 1),
     ('ASSESSMENT_FAAS',     'Real Property Appraisal & Tax Dec (FAAS)', 'FAAS & Transaction Requests', 'Assessment',                'Index',          'file-spreadsheet', 12, 1),
-    ('ASSESSMENT_PRINT',    'Print Tax Declaration (Records Printout)', 'FAAS & Transaction Requests', 'Assessment',                'PrintPdf',       'printer',          13, 1),
+    ('ASSESSMENT_PRINT',    'Print Tax Faas (Records Printout)', 'FAAS & Transaction Requests', 'Assessment',                'PrintPdf',       'printer',          13, 1),
     ('TAX_MAPPING',         'GIS Spatial & Tax Mapping',                'GIS & Spatial Mapping',       'TaxMapping',               'Index',          'map-pin',          14, 1),
     ('TAX_DECLARATION',     'Tax Declaration Certification Requests',   'FAAS & Transaction Requests', 'TaxDeclarationRequest',     'Index',          'file-text',        15, 1),
     ('LAND_HOLDINGS',       'Certificate of Land Holdings',             'FAAS & Transaction Requests', 'LandHoldingRequest',       'Index',          'map',              16, 1),

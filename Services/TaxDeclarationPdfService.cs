@@ -2288,475 +2288,501 @@ public class TaxDeclarationPdfService : ITaxDeclarationPdfService
     }
 
     // =========================================================================
-    // PART 2: 1-PAGE OFFICIAL TAX DECLARATION CERTIFICATE (FOR REQUESTS)
+    // PART 2: ANNEX I-H. TAX DECLARATION OF REAL PROPERTY (LOCAL ASSESSMENT MANUAL)
     // =========================================================================
     private static void ComposeCertificateHeader(IContainer container, TaxDeclaration td, string? trackingNo, string? transactionLabel)
     {
-        container.Column(col =>
+        container.PaddingBottom(4).Column(col =>
         {
-            if (!string.IsNullOrWhiteSpace(trackingNo))
+            col.Item().BorderBottom(0.5f).BorderColor(Colors.Grey.Darken1).PaddingBottom(2).Row(r =>
             {
-                col.Item().PaddingBottom(3).Row(r =>
+                r.RelativeItem().Text("Local Assessment Manual").FontSize(7.5f).FontColor(Colors.Grey.Darken3);
+                if (!string.IsNullOrWhiteSpace(trackingNo))
                 {
-                    r.RelativeItem().Text($"Request Ref: {trackingNo}").FontSize(7.5f).Bold().FontColor(Colors.Grey.Darken2);
-                    if (!string.IsNullOrWhiteSpace(transactionLabel))
-                    {
-                        r.AutoItem().Text(transactionLabel).FontSize(7.5f).Bold().FontColor(Colors.Teal.Darken3);
-                    }
-                });
-            }
+                    var refLabel = string.IsNullOrWhiteSpace(transactionLabel)
+                        ? $"Ref: {trackingNo}"
+                        : $"Ref: {trackingNo} ({transactionLabel})";
+                    r.AutoItem().Text(refLabel).FontSize(7f).FontColor(Colors.Grey.Darken2);
+                }
+            });
 
-            col.Item().AlignCenter().Text("REPUBLIC OF THE PHILIPPINES").FontSize(8).Bold().FontColor(Colors.Grey.Darken2);
-            col.Item().AlignCenter().Text($"City / Municipality of {ValueOr(td.Municipality, "General Santos City")}").FontSize(8.5f).SemiBold();
-            col.Item().AlignCenter().Text("OFFICE OF THE CITY ASSESSOR").FontSize(12).ExtraBold().FontColor(Colors.Black);
-            col.Item().PaddingTop(2).AlignCenter().Text("TAX DECLARATION OF REAL PROPERTY").FontSize(13).Black().FontColor(Colors.Teal.Darken3);
-            col.Item().PaddingBottom(6).AlignCenter().Text("(Issued pursuant to Section 222 of Republic Act No. 7160)").FontSize(7.5f).Italic().FontColor(Colors.Grey.Darken1);
+            col.Item().PaddingTop(4).PaddingBottom(2).AlignCenter()
+                .Text("Annex I-H. Tax Declaration of Real Property")
+                .FontSize(10.5f).Bold().FontColor(Colors.Black);
 
             if (td.IsCancelledAndSuperseded || td.Status == AssessmentStatus.Cancelled)
             {
-                col.Item().PaddingBottom(6).Border(1.5f).BorderColor(Colors.Red.Medium).Background(Colors.Red.Lighten5).Padding(6).Column(cCol =>
+                col.Item().PaddingTop(2).Border(1).BorderColor(Colors.Red.Medium).Background(Colors.Red.Lighten5).Padding(3).Row(r =>
                 {
-                    cCol.Item().AlignCenter().Text("*** CANCELLED & SUPERSEDED ***").FontSize(10).Black().FontColor(Colors.Red.Darken3);
                     var reason = string.IsNullOrWhiteSpace(td.CancellationReason) ? "" : $" due to {td.CancellationReason}";
                     var dateStr = (td.DateCancelled ?? td.DateAssessed).ToString("MMMM dd, yyyy");
-                    var supStr = string.IsNullOrWhiteSpace(td.SupersededByTdns) ? "" : $" Superseded by TD(s): {td.SupersededByTdns}.";
-                    cCol.Item().AlignCenter().Text($"This Tax Declaration was cancelled on {dateStr}{reason}.{supStr}").FontSize(8).SemiBold().FontColor(Colors.Red.Darken2);
+                    var supStr = string.IsNullOrWhiteSpace(td.SupersededByTdns) ? "" : $" | Superseded by TD(s): {td.SupersededByTdns}";
+                    r.RelativeItem().AlignCenter().Text($"*** CANCELLED & SUPERSEDED on {dateStr}{reason}{supStr} ***").FontSize(7.5f).Bold().FontColor(Colors.Red.Darken3);
                 });
             }
+        });
+    }
 
-            col.Item().Border(1).BorderColor(Colors.Grey.Darken2).Background(Colors.Grey.Lighten4).Padding(6).Row(row =>
+    private sealed record AnnexIhAssessmentRow(
+        string Classification,
+        string SubClassOrDescription,
+        string AreaOrCapacity,
+        decimal MarketValue,
+        string ActualUse,
+        decimal AssessmentLevel,
+        decimal AssessedValue);
+
+    private static List<AnnexIhAssessmentRow> BuildAnnexIhAssessmentRows(TaxDeclaration td)
+    {
+        var list = new List<AnnexIhAssessmentRow>();
+
+        if (td.Kind == PropertyKind.Land)
+        {
+            var landRows = BuildAssessmentRows(td);
+            var subClass = ValueOr(td.SubClassification, "");
+            foreach (var r in landRows)
             {
-                row.RelativeItem(3).Column(c =>
-                {
-                    c.Item().Text("TD No.").FontSize(7).Bold().FontColor(Colors.Grey.Darken2);
-                    c.Item().Text(ValueOr(td.TaxDeclarationNumber, "N/A")).FontSize(11).Black().FontColor(Colors.Black);
-                });
-                row.RelativeItem(3).Column(c =>
-                {
-                    c.Item().Text("Property Identification No. (PIN)").FontSize(7).Bold().FontColor(Colors.Grey.Darken2);
-                    c.Item().Text(ValueOr(td.PropertyIndexNumber, "N/A")).FontSize(10).ExtraBold().FontColor(Colors.Black);
-                });
-                row.RelativeItem(3).Column(c =>
-                {
-                    c.Item().Text("ARP No.").FontSize(7).Bold().FontColor(Colors.Grey.Darken2);
-                    c.Item().Text(ValueOr(td.ARPNo, "N/A")).FontSize(9.5f).Bold();
-                });
-                row.RelativeItem(3).Column(c =>
-                {
-                    c.Item().Text("Transaction Code").FontSize(7).Bold().FontColor(Colors.Grey.Darken2);
-                    c.Item().Text(ValueOr(td.TransactionCodeDisplay, td.TransactionCode)).FontSize(8.5f).Bold();
-                });
-            });
+                list.Add(new AnnexIhAssessmentRow(
+                    r.Classification,
+                    subClass,
+                    r.AreaSqm > 0 ? $"{r.AreaSqm:N2} sq.m." : "",
+                    r.MarketValue,
+                    r.ActualUse,
+                    r.AssessmentLevel,
+                    r.AssessedValue));
+            }
+        }
+        else if (td.Kind == PropertyKind.Building)
+        {
+            var area = td.TotalBuildingAreaSqm > 0 ? td.TotalBuildingAreaSqm : td.AreaSqMeters;
+            var structDesc = string.Join(" / ", new[] { td.StructuralType, td.BuildingClassification }.Where(s => !string.IsNullOrWhiteSpace(s)));
+            list.Add(new AnnexIhAssessmentRow(
+                td.Classification.ToString().ToUpperInvariant(),
+                structDesc,
+                area > 0 ? $"{area:N2} sq.m." : "",
+                td.AdjustedMarketValue > 0 ? td.AdjustedMarketValue : td.MarketValue,
+                ValueOr(td.ActualUse, td.Classification.ToString().ToUpperInvariant()),
+                td.AssessmentLevelPercent,
+                td.AssessedValue));
+        }
+        else if (td.Kind == PropertyKind.Machinery)
+        {
+            var machDesc = ValueOr(td.DescriptionBrand, "Machinery & Equipment");
+            var cap = ValueOr(td.RatedCapacity, "");
+            list.Add(new AnnexIhAssessmentRow(
+                td.Classification.ToString().ToUpperInvariant(),
+                machDesc,
+                cap,
+                td.AdjustedMarketValue > 0 ? td.AdjustedMarketValue : td.MarketValue,
+                ValueOr(td.ActualUse, td.Classification.ToString().ToUpperInvariant()),
+                td.AssessmentLevelPercent,
+                td.AssessedValue));
+        }
+        else
+        {
+            list.Add(new AnnexIhAssessmentRow(
+                td.Classification.ToString().ToUpperInvariant(),
+                ValueOr(td.SubClassification, ""),
+                td.AreaSqMeters > 0 ? $"{td.AreaSqMeters:N2} sq.m." : "",
+                td.AdjustedMarketValue > 0 ? td.AdjustedMarketValue : td.MarketValue,
+                ValueOr(td.ActualUse, td.Classification.ToString().ToUpperInvariant()),
+                td.AssessmentLevelPercent,
+                td.AssessedValue));
+        }
+
+        return list;
+    }
+
+    private static void DrawSquareCheckbox(IContainer container, bool isChecked, string label, float fontSize = 8f)
+    {
+        container.Row(r =>
+        {
+            r.AutoItem().PaddingTop(1f).Width(8.5f).Height(8.5f).Border(0.75f).BorderColor(Colors.Black).AlignCenter().AlignMiddle()
+                .Text(isChecked ? "✓" : "").FontSize(6.5f).Bold().FontColor(Colors.Black);
+            r.AutoItem().PaddingLeft(3.5f).Text(label).FontSize(fontSize).FontColor(Colors.Black);
         });
     }
 
     private static void ComposeCertificateContent(IContainer container, TaxDeclaration td)
     {
-        container.PaddingTop(6).Column(col =>
+        const float fs = 8f;
+
+        string ownerSex = (td.OwnerSex ?? "").Trim();
+        bool ownerMale = string.Equals(ownerSex, "Male", StringComparison.OrdinalIgnoreCase) || string.Equals(ownerSex, "M", StringComparison.OrdinalIgnoreCase);
+        bool ownerFemale = string.Equals(ownerSex, "Female", StringComparison.OrdinalIgnoreCase) || string.Equals(ownerSex, "F", StringComparison.OrdinalIgnoreCase);
+        string ownerOtherSex = (!ownerMale && !ownerFemale && !string.IsNullOrWhiteSpace(ownerSex)) ? ownerSex : "";
+
+        string adminSex = (td.AdministratorGender ?? "").Trim();
+        bool adminMale = string.Equals(adminSex, "Male", StringComparison.OrdinalIgnoreCase) || string.Equals(adminSex, "M", StringComparison.OrdinalIgnoreCase);
+        bool adminFemale = string.Equals(adminSex, "Female", StringComparison.OrdinalIgnoreCase) || string.Equals(adminSex, "F", StringComparison.OrdinalIgnoreCase);
+        string adminOtherSex = (!adminMale && !adminFemale && !string.IsNullOrWhiteSpace(adminSex)) ? adminSex : "";
+
+        string titleTypeRaw = (td.TitleType ?? "").Trim();
+        bool isOct = titleTypeRaw.Contains("OCT", StringComparison.OrdinalIgnoreCase);
+        bool isTct = titleTypeRaw.Contains("TCT", StringComparison.OrdinalIgnoreCase);
+        bool isCloa = titleTypeRaw.Contains("CLOA", StringComparison.OrdinalIgnoreCase);
+        bool isCct = td.IsCct || titleTypeRaw.Contains("CCT", StringComparison.OrdinalIgnoreCase);
+
+        string titleNoVal = !string.IsNullOrWhiteSpace(td.TitleNo)
+            ? td.TitleNo
+            : (!string.IsNullOrWhiteSpace(td.CctTitleNo) ? td.CctTitleNo : (td.LandTitleNo ?? ""));
+        DateTime? dateIssuedVal = td.DateRegistered ?? td.CctDateRegistered;
+        string surveyNoVal = !string.IsNullOrWhiteSpace(td.SurveyNo)
+            ? td.SurveyNo
+            : (!string.IsNullOrWhiteSpace(td.CadastralSurveyNo) ? td.CadastralSurveyNo : (td.LandSurveyNo ?? ""));
+        string lotNoVal = !string.IsNullOrWhiteSpace(td.LotNo) ? td.LotNo : (td.LandLotNo ?? "");
+        string blockNoVal = !string.IsNullOrWhiteSpace(td.BlockNo) ? td.BlockNo : (td.LandBlockNo ?? "");
+
+        bool isTaxable = !string.Equals(td.Taxability, "Exempt", StringComparison.OrdinalIgnoreCase);
+
+        container.PaddingTop(2).Column(col =>
         {
-            col.Spacing(6);
+            col.Spacing(3.5f);
 
-            // 1. Owner & Administrator Information
-            col.Item().Border(0.75f).BorderColor(Colors.Grey.Medium).Table(table =>
+            // -----------------------------------------------------------------
+            // TOP IDENTIFICATION FIELDS
+            // -----------------------------------------------------------------
+            col.Item().Row(r =>
             {
-                table.ColumnsDefinition(columns =>
-                {
-                    columns.RelativeColumn(3);
-                    columns.RelativeColumn(1.5f);
-                });
-
-                table.Cell().BorderBottom(0.5f).BorderRight(0.5f).BorderColor(Colors.Grey.Lighten1).Padding(4).Column(c =>
-                {
-                    c.Item().Text("Owner:").FontSize(7).Bold().FontColor(Colors.Grey.Darken2);
-                    c.Item().Text(ValueOr(td.OwnerName, "N/A")).FontSize(9.5f).Bold();
-                });
-                table.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten1).Padding(4).Column(c =>
-                {
-                    c.Item().Text("TIN:").FontSize(7).Bold().FontColor(Colors.Grey.Darken2);
-                    c.Item().Text(ValueOr(td.OwnerTin, "N/A")).FontSize(8.5f).SemiBold();
-                });
-
-                table.Cell().BorderBottom(0.5f).BorderRight(0.5f).BorderColor(Colors.Grey.Lighten1).Padding(4).Column(c =>
-                {
-                    c.Item().Text("Address:").FontSize(7).Bold().FontColor(Colors.Grey.Darken2);
-                    c.Item().Text(ValueOr(td.OwnerAddress, "N/A")).FontSize(8.5f);
-                });
-                table.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten1).Padding(4).Column(c =>
-                {
-                    c.Item().Text("Telephone No.:").FontSize(7).Bold().FontColor(Colors.Grey.Darken2);
-                    c.Item().Text(ValueOr(td.OwnerPhone, "N/A")).FontSize(8.5f);
-                });
-
-                table.Cell().BorderBottom(0.5f).BorderRight(0.5f).BorderColor(Colors.Grey.Lighten1).Padding(4).Column(c =>
-                {
-                    c.Item().Text("Administrator / Beneficial User:").FontSize(7).Bold().FontColor(Colors.Grey.Darken2);
-                    c.Item().Text(ValueOr(td.AdministratorName, "N/A")).FontSize(8.5f).SemiBold();
-                });
-                table.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten1).Padding(4).Column(c =>
-                {
-                    c.Item().Text("TIN:").FontSize(7).Bold().FontColor(Colors.Grey.Darken2);
-                    c.Item().Text(ValueOr(td.AdministratorTin, "N/A")).FontSize(8.5f);
-                });
-
-                table.Cell().BorderRight(0.5f).BorderColor(Colors.Grey.Lighten1).Padding(4).Column(c =>
-                {
-                    c.Item().Text("Address:").FontSize(7).Bold().FontColor(Colors.Grey.Darken2);
-                    c.Item().Text(ValueOr(td.AdministratorAddress, "N/A")).FontSize(8.5f);
-                });
-                table.Cell().Padding(4).Column(c =>
-                {
-                    c.Item().Text("Telephone No.:").FontSize(7).Bold().FontColor(Colors.Grey.Darken2);
-                    c.Item().Text(ValueOr(td.AdministratorContactNo, "N/A")).FontSize(8.5f);
-                });
+                r.RelativeItem(1.55f).Element(c => UnderlinedField(c, "Tax Declaration (TD) No.:", td.TaxDeclarationNumber, fs));
+                r.ConstantItem(14);
+                r.RelativeItem(1f).Element(c => UnderlinedField(c, "Transaction Code:", td.TransactionCode, fs));
             });
 
-            // 2. Location of Property
-            col.Item().Border(0.75f).BorderColor(Colors.Grey.Medium).Column(locCol =>
+            col.Item().Row(r =>
             {
-                locCol.Item().Background(Colors.Grey.Lighten3).PaddingHorizontal(5).PaddingVertical(2.5f)
-                    .Text("LOCATION OF PROPERTY").FontSize(7.5f).ExtraBold().FontColor(Colors.Grey.Darken3);
-
-                locCol.Item().Table(t =>
-                {
-                    t.ColumnsDefinition(c =>
-                    {
-                        c.RelativeColumn(1.5f);
-                        c.RelativeColumn(1.5f);
-                        c.RelativeColumn(2f);
-                    });
-
-                    t.Cell().BorderRight(0.5f).BorderColor(Colors.Grey.Lighten1).Padding(4).Column(c =>
-                    {
-                        c.Item().Text(ValueOr(td.StreetNo, "N/A")).FontSize(8.5f).Bold();
-                        c.Item().Text("(Number and Street)").FontSize(6.5f).Italic().FontColor(Colors.Grey.Darken1);
-                    });
-                    t.Cell().BorderRight(0.5f).BorderColor(Colors.Grey.Lighten1).Padding(4).Column(c =>
-                    {
-                        c.Item().Text(ValueOr(td.DistrictOrBarangay, "N/A")).FontSize(8.5f).Bold();
-                        c.Item().Text("(Barangay / District)").FontSize(6.5f).Italic().FontColor(Colors.Grey.Darken1);
-                    });
-                    t.Cell().Padding(4).Column(c =>
-                    {
-                        var munProv = string.Join(", ", new[] { td.Municipality, td.ProvinceCity }.Where(s => !string.IsNullOrWhiteSpace(s)));
-                        c.Item().Text(ValueOr(munProv, "General Santos City")).FontSize(8.5f).Bold();
-                        c.Item().Text("(Municipality & Province/City)").FontSize(6.5f).Italic().FontColor(Colors.Grey.Darken1);
-                    });
-                });
+                r.RelativeItem(1.55f).Element(c => UnderlinedField(c, "Property Identification No. (PIN):", td.PropertyIndexNumber, fs));
+                r.ConstantItem(14);
+                r.RelativeItem(1f).Text("");
             });
 
-            // 3. Title, Survey, Cadastral & Lot Info
-            col.Item().Border(0.75f).BorderColor(Colors.Grey.Medium).Table(t =>
+            // -----------------------------------------------------------------
+            // OWNER INFORMATION (as reflected in the OCT/TCT/CLOA/CCT)
+            // -----------------------------------------------------------------
+            col.Item().PaddingTop(3).Text(txt =>
             {
-                t.ColumnsDefinition(c =>
-                {
-                    c.RelativeColumn();
-                    c.RelativeColumn();
-                    c.RelativeColumn();
-                    c.RelativeColumn();
-                });
-
-                t.Cell().BorderBottom(0.5f).BorderRight(0.5f).BorderColor(Colors.Grey.Lighten1).Padding(4).Column(c =>
-                {
-                    c.Item().Text("OCT/TCT/CLOA No.:").FontSize(7).Bold().FontColor(Colors.Grey.Darken2);
-                    var titleLabel = string.IsNullOrWhiteSpace(td.TitleNo) ? "N/A" : $"{td.TitleType}: {td.TitleNo}";
-                    c.Item().Text(titleLabel).FontSize(8.5f).SemiBold();
-                });
-                t.Cell().BorderBottom(0.5f).BorderRight(0.5f).BorderColor(Colors.Grey.Lighten1).Padding(4).Column(c =>
-                {
-                    c.Item().Text("CCT:").FontSize(7).Bold().FontColor(Colors.Grey.Darken2);
-                    c.Item().Text(td.IsCct ? ValueOr(td.CctTitleNo, "Yes") : "N/A").FontSize(8.5f);
-                });
-                t.Cell().BorderBottom(0.5f).BorderRight(0.5f).BorderColor(Colors.Grey.Lighten1).Padding(4).Column(c =>
-                {
-                    c.Item().Text("Dated:").FontSize(7).Bold().FontColor(Colors.Grey.Darken2);
-                    c.Item().Text(td.DateRegistered?.ToString("MMM dd, yyyy") ?? "N/A").FontSize(8.5f);
-                });
-                t.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten1).Padding(4).Column(c =>
-                {
-                    c.Item().Text("Survey No.:").FontSize(7).Bold().FontColor(Colors.Grey.Darken2);
-                    c.Item().Text(ValueOr(td.SurveyNo, td.CadastralSurveyNo ?? "N/A")).FontSize(8.5f).SemiBold();
-                });
-
-                t.Cell().BorderRight(0.5f).BorderColor(Colors.Grey.Lighten1).Padding(4).Column(c =>
-                {
-                    c.Item().Text("Lot No.:").FontSize(7).Bold().FontColor(Colors.Grey.Darken2);
-                    c.Item().Text(ValueOr(td.LotNo, td.LandLotNo ?? "N/A")).FontSize(8.5f).SemiBold();
-                });
-                t.Cell().BorderRight(0.5f).BorderColor(Colors.Grey.Lighten1).Padding(4).Column(c =>
-                {
-                    c.Item().Text("Block No.:").FontSize(7).Bold().FontColor(Colors.Grey.Darken2);
-                    c.Item().Text(ValueOr(td.BlockNo, td.LandBlockNo ?? "N/A")).FontSize(8.5f).SemiBold();
-                });
-                t.Cell().BorderRight(0.5f).BorderColor(Colors.Grey.Lighten1).Padding(4).Column(c =>
-                {
-                    c.Item().Text("Section / Parcel:").FontSize(7).Bold().FontColor(Colors.Grey.Darken2);
-                    c.Item().Text($"{ValueOr(td.SectionNo, "-")} / {ValueOr(td.ParcelNo, "-")}").FontSize(8.5f);
-                });
-                t.Cell().Padding(4).Column(c =>
-                {
-                    c.Item().Text("Registration Status:").FontSize(7).Bold().FontColor(Colors.Grey.Darken2);
-                    c.Item().Text(ValueOr(td.RegistrationStatus, "Titled")).FontSize(8.5f);
-                });
+                txt.Span("OWNER INFORMATION ").FontSize(fs).Bold().FontColor(Colors.Black);
+                txt.Span("(as reflected in the OCT/TCT/CLOA/CCT)").FontSize(fs).FontColor(Colors.Black);
             });
 
-            // 4. Boundaries
-            col.Item().Border(0.75f).BorderColor(Colors.Grey.Medium).Column(bCol =>
+            col.Item().Row(r =>
             {
-                bCol.Item().Background(Colors.Grey.Lighten3).PaddingHorizontal(5).PaddingVertical(2.5f)
-                    .Text("BOUNDARIES").FontSize(7.5f).ExtraBold().FontColor(Colors.Grey.Darken3);
-
-                bCol.Item().Table(t =>
-                {
-                    t.ColumnsDefinition(c =>
-                    {
-                        c.RelativeColumn();
-                        c.RelativeColumn();
-                    });
-
-                    t.Cell().BorderBottom(0.5f).BorderRight(0.5f).BorderColor(Colors.Grey.Lighten1).Padding(4)
-                        .Text(txt =>
-                        {
-                            txt.Span("North: ").FontSize(7.5f).Bold().FontColor(Colors.Grey.Darken2);
-                            txt.Span(ValueOr(td.BoundaryNorth, "N/A")).FontSize(8.5f);
-                        });
-                    t.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten1).Padding(4)
-                        .Text(txt =>
-                        {
-                            txt.Span("East: ").FontSize(7.5f).Bold().FontColor(Colors.Grey.Darken2);
-                            txt.Span(ValueOr(td.BoundaryEast, "N/A")).FontSize(8.5f);
-                        });
-                    t.Cell().BorderRight(0.5f).BorderColor(Colors.Grey.Lighten1).Padding(4)
-                        .Text(txt =>
-                        {
-                            txt.Span("South: ").FontSize(7.5f).Bold().FontColor(Colors.Grey.Darken2);
-                            txt.Span(ValueOr(td.BoundarySouth, "N/A")).FontSize(8.5f);
-                        });
-                    t.Cell().Padding(4)
-                        .Text(txt =>
-                        {
-                            txt.Span("West: ").FontSize(7.5f).Bold().FontColor(Colors.Grey.Darken2);
-                            txt.Span(ValueOr(td.BoundaryWest, "N/A")).FontSize(8.5f);
-                        });
-                });
+                r.RelativeItem(1.55f).Element(c => UnderlinedField(c, "Name:", td.OwnerName, fs));
+                r.ConstantItem(10);
+                r.RelativeItem(1f).Element(c => UnderlinedField(c, "TIN:", td.OwnerTin, fs));
             });
 
-            // 5. Kind of Property Assessed
-            col.Item().Border(0.75f).BorderColor(Colors.Grey.Medium).Column(kCol =>
+            col.Item().Row(r =>
             {
-                kCol.Item().Background(Colors.Grey.Lighten3).PaddingHorizontal(5).PaddingVertical(2.5f)
-                    .Text("KIND OF PROPERTY ASSESSED").FontSize(7.5f).ExtraBold().FontColor(Colors.Grey.Darken3);
-
-                kCol.Item().Padding(5).Column(inner =>
+                r.RelativeItem(1.55f).Row(sr =>
                 {
-                    inner.Spacing(4);
-                    inner.Item().Row(r =>
-                    {
-                        r.RelativeItem().Text(td.Kind == PropertyKind.Land ? "[ X ] LAND" : "[   ] LAND").FontSize(8.5f).Bold();
-                        r.RelativeItem().Text(td.Kind == PropertyKind.Building ? "[ X ] BUILDING" : "[   ] BUILDING").FontSize(8.5f).Bold();
-                        r.RelativeItem().Text(td.Kind == PropertyKind.Machinery ? "[ X ] MACHINERY" : "[   ] MACHINERY").FontSize(8.5f).Bold();
-                        r.RelativeItem().Text("[   ] OTHERS").FontSize(8.5f).Bold();
-                    });
-
-                    if (td.Kind == PropertyKind.Building)
-                    {
-                        inner.Item().PaddingTop(2).Row(r =>
-                        {
-                            r.RelativeItem().Text($"No. of Storeys: {td.NoOfStoreys}").FontSize(8);
-                            r.RelativeItem(2).Text($"Structural Type / Class: {td.StructuralType} ({td.BuildingClassification})").FontSize(8);
-                            r.RelativeItem().Text($"Land TD No.: {ValueOr(td.LandTdNo, "N/A")}").FontSize(8);
-                        });
-                    }
-                    else if (td.Kind == PropertyKind.Machinery)
-                    {
-                        inner.Item().PaddingTop(2).Row(r =>
-                        {
-                            r.RelativeItem(2).Text($"Description / Brand: {ValueOr(td.DescriptionBrand, "Industrial Machinery")}").FontSize(8);
-                            r.RelativeItem().Text($"Capacity: {ValueOr(td.RatedCapacity, "N/A")}").FontSize(8);
-                            r.RelativeItem().Text($"Land TD No.: {ValueOr(td.LandTdNo, "N/A")}").FontSize(8);
-                        });
-                    }
+                    sr.AutoItem().PaddingRight(8).Text("Sex:").FontSize(fs).FontColor(Colors.Black);
+                    sr.AutoItem().PaddingRight(14).Element(c => DrawSquareCheckbox(c, ownerMale, "Male", fs));
+                    sr.AutoItem().PaddingRight(14).Element(c => DrawSquareCheckbox(c, ownerFemale, "Female", fs));
+                    sr.RelativeItem().Element(c => UnderlinedField(c, "Others:", ownerOtherSex, fs));
                 });
+                r.ConstantItem(10);
+                r.RelativeItem(1f).Element(c => UnderlinedField(c, "Contact No.:", td.OwnerPhone, fs));
             });
 
-            // 6. Valuation & Assessment Breakdown Table
-            var rows = BuildAssessmentRows(td);
-            col.Item().Border(0.75f).BorderColor(Colors.Grey.Medium).Column(vCol =>
+            col.Item().Row(r =>
             {
-                vCol.Item().Background(Colors.Grey.Lighten3).PaddingHorizontal(5).PaddingVertical(2.5f)
-                    .Text("PROPERTY APPRAISAL & ASSESSMENT SUMMARY").FontSize(7.5f).ExtraBold().FontColor(Colors.Grey.Darken3);
-
-                vCol.Item().Table(t =>
-                {
-                    t.ColumnsDefinition(c =>
-                    {
-                        c.RelativeColumn(2f);
-                        c.RelativeColumn(1.4f);
-                        c.RelativeColumn(1.8f);
-                        c.RelativeColumn(1.8f);
-                        c.RelativeColumn(1.2f);
-                        c.RelativeColumn(1.8f);
-                    });
-
-                    t.Header(h =>
-                    {
-                        h.Cell().BorderBottom(1).BorderColor(Colors.Grey.Darken1).Background(Colors.Grey.Lighten4).Padding(4).Text("Classification").FontSize(7).Bold();
-                        h.Cell().BorderBottom(1).BorderColor(Colors.Grey.Darken1).Background(Colors.Grey.Lighten4).Padding(4).AlignRight().Text("Area (sq.m.)").FontSize(7).Bold();
-                        h.Cell().BorderBottom(1).BorderColor(Colors.Grey.Darken1).Background(Colors.Grey.Lighten4).Padding(4).AlignRight().Text("Market Value").FontSize(7).Bold();
-                        h.Cell().BorderBottom(1).BorderColor(Colors.Grey.Darken1).Background(Colors.Grey.Lighten4).Padding(4).AlignCenter().Text("Actual Use").FontSize(7).Bold();
-                        h.Cell().BorderBottom(1).BorderColor(Colors.Grey.Darken1).Background(Colors.Grey.Lighten4).Padding(4).AlignCenter().Text("Ass. Level").FontSize(7).Bold();
-                        h.Cell().BorderBottom(1).BorderColor(Colors.Grey.Darken1).Background(Colors.Grey.Lighten4).Padding(4).AlignRight().Text("Assessed Value").FontSize(7).Bold();
-                    });
-
-                    foreach (var r in rows)
-                    {
-                        t.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text(r.Classification).FontSize(8).SemiBold();
-                        t.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).Padding(4).AlignRight().Text(r.AreaSqm > 0 ? $"{r.AreaSqm:N2}" : "-").FontSize(8);
-                        t.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).Padding(4).AlignRight().Text($"PHP {r.MarketValue:N2}").FontSize(8);
-                        t.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).Padding(4).AlignCenter().Text(r.ActualUse).FontSize(8);
-                        t.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).Padding(4).AlignCenter().Text($"{r.AssessmentLevel:N0}%").FontSize(8);
-                        t.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).Padding(4).AlignRight().Text($"PHP {r.AssessedValue:N2}").FontSize(8).Bold();
-                    }
-
-                    t.Cell().Background(Colors.Grey.Lighten4).Padding(4).Text("TOTAL").FontSize(8).ExtraBold();
-                    t.Cell().Background(Colors.Grey.Lighten4).Padding(4).AlignRight().Text(td.AreaSqMeters > 0 ? $"{td.AreaSqMeters:N2} sq.m." : "-").FontSize(8).Bold();
-                    t.Cell().Background(Colors.Grey.Lighten4).Padding(4).AlignRight().Text($"PHP {td.AdjustedMarketValue:N2}").FontSize(8.5f).ExtraBold();
-                    t.Cell().Background(Colors.Grey.Lighten4).Padding(4).Text("");
-                    t.Cell().Background(Colors.Grey.Lighten4).Padding(4).Text("");
-                    t.Cell().Background(Colors.Grey.Lighten4).Padding(4).AlignRight().Text($"PHP {td.AssessedValue:N2}").FontSize(9).Black().FontColor(Colors.Teal.Darken3);
-                });
-
-                vCol.Item().BorderTop(0.5f).BorderColor(Colors.Grey.Medium).Padding(4).Row(r =>
-                {
-                    r.AutoItem().Text("Total Assessed Value (Amount in Words): ").FontSize(7.5f).Bold().FontColor(Colors.Grey.Darken2);
-                    r.RelativeItem().Text(AmountToWords(td.AssessedValue)).FontSize(8).Bold().Italic();
-                });
+                r.RelativeItem(1.55f).Element(c => UnderlinedField(c, "Mailing Address:", td.OwnerAddress, fs));
+                r.ConstantItem(10);
+                r.RelativeItem(1f).Element(c => UnderlinedField(c, "Email:", td.OwnerEmail, fs));
             });
 
-            // 7. Taxability, Effectivity & Annual Tax Liability
-            col.Item().Border(0.75f).BorderColor(Colors.Grey.Medium).Row(row =>
-            {
-                var isTaxable = !string.Equals(td.Taxability, "Exempt", StringComparison.OrdinalIgnoreCase);
-                row.RelativeItem(1.2f).BorderRight(0.5f).BorderColor(Colors.Grey.Lighten1).Padding(5).Column(c =>
-                {
-                    c.Spacing(3);
-                    c.Item().Text("TAXABILITY & EFFECTIVITY").FontSize(7.5f).ExtraBold().FontColor(Colors.Grey.Darken3);
-                    c.Item().Row(r =>
-                    {
-                        r.RelativeItem().Text(isTaxable ? "[ X ] Taxable" : "[   ] Taxable").FontSize(8.5f).Bold();
-                        r.RelativeItem().Text(!isTaxable ? "[ X ] Exempt" : "[   ] Exempt").FontSize(8.5f).Bold();
-                    });
-                    c.Item().PaddingTop(2).Text($"Effectivity of Assessment/Reassessment: {ValueOr(td.EffectivityQuarter, "1st Quarter")} {td.EffectivityYear}").FontSize(8).SemiBold();
-                    c.Item().Text($"Legal Basis: {ValueOr(td.TaxabilityBasis, "RA 7160 Local Government Code")}").FontSize(7.5f).FontColor(Colors.Grey.Darken2);
-                });
+            // -----------------------------------------------------------------
+            // OTHER INFORMANT INFORMATION
+            // -----------------------------------------------------------------
+            col.Item().PaddingTop(3).Text("Other Informant Information:").FontSize(fs).FontColor(Colors.Black);
 
-                var basicTax = Math.Round(td.AssessedValue * (td.BasicTaxRate / 100m), 2);
-                var sefTax = Math.Round(td.AssessedValue * (td.SefTaxRate / 100m), 2);
-                row.RelativeItem(1f).Padding(5).Column(c =>
-                {
-                    c.Spacing(2);
-                    c.Item().Text("ESTIMATED ANNUAL RPT LIABILITY").FontSize(7.5f).ExtraBold().FontColor(Colors.Grey.Darken3);
-                    c.Item().Row(r =>
-                    {
-                        r.RelativeItem().Text($"Basic RPT ({td.BasicTaxRate:N1}%):").FontSize(8);
-                        r.AutoItem().Text($"PHP {basicTax:N2}").FontSize(8).SemiBold();
-                    });
-                    c.Item().Row(r =>
-                    {
-                        r.RelativeItem().Text($"Special Education Fund - SEF ({td.SefTaxRate:N1}%):").FontSize(8);
-                        r.AutoItem().Text($"PHP {sefTax:N2}").FontSize(8).SemiBold();
-                    });
-                    c.Item().PaddingTop(2).BorderTop(0.5f).BorderColor(Colors.Grey.Lighten1).Row(r =>
-                    {
-                        r.RelativeItem().Text("Total Annual Tax Due:").FontSize(8.5f).ExtraBold().FontColor(Colors.Teal.Darken3);
-                        r.AutoItem().Text($"PHP {td.AnnualTaxDue:N2}").FontSize(9).Black().FontColor(Colors.Teal.Darken3);
-                    });
-                });
+            col.Item().PaddingLeft(36).Row(r =>
+            {
+                r.AutoItem().PaddingRight(28).Element(c => DrawSquareCheckbox(c, td.IsAdministrator, "Administrator", fs));
+                r.AutoItem().PaddingRight(28).Element(c => DrawSquareCheckbox(c, td.IsBeneficialUser, "Beneficial User", fs));
+                r.AutoItem().Element(c => DrawSquareCheckbox(c, td.IsPossessor, "Possessor", fs));
             });
 
-            // 8. Signatories
-            col.Item().Border(0.75f).BorderColor(Colors.Grey.Medium).Table(t =>
+            col.Item().Row(r =>
+            {
+                r.RelativeItem(1.55f).Element(c => UnderlinedField(c, "Name:", td.AdministratorName, fs));
+                r.ConstantItem(10);
+                r.RelativeItem(1f).Element(c => UnderlinedField(c, "TIN:", td.AdministratorTin, fs));
+            });
+
+            col.Item().Row(r =>
+            {
+                r.RelativeItem(1.55f).Row(sr =>
+                {
+                    sr.AutoItem().PaddingRight(8).Text("Sex:").FontSize(fs).FontColor(Colors.Black);
+                    sr.AutoItem().PaddingRight(14).Element(c => DrawSquareCheckbox(c, adminMale, "Male", fs));
+                    sr.AutoItem().PaddingRight(14).Element(c => DrawSquareCheckbox(c, adminFemale, "Female", fs));
+                    sr.RelativeItem().Element(c => UnderlinedField(c, "Others:", adminOtherSex, fs));
+                });
+                r.ConstantItem(10);
+                r.RelativeItem(1f).Element(c => UnderlinedField(c, "Contact No.:", td.AdministratorContactNo, fs));
+            });
+
+            col.Item().Row(r =>
+            {
+                r.RelativeItem(1.55f).Element(c => UnderlinedField(c, "Mailing Address:", td.AdministratorAddress, fs));
+                r.ConstantItem(10);
+                r.RelativeItem(1f).Element(c => UnderlinedField(c, "Email:", td.AdministratorEmail, fs));
+            });
+
+            // -----------------------------------------------------------------
+            // PROPERTY INFORMATION
+            // -----------------------------------------------------------------
+            col.Item().PaddingTop(3).Text("PROPERTY INFORMATION").FontSize(fs).Bold().FontColor(Colors.Black);
+
+            col.Item().Row(r =>
+            {
+                r.AutoItem().PaddingRight(24).Text("Title Type:").FontSize(fs).FontColor(Colors.Black);
+                r.AutoItem().PaddingRight(32).Element(c => DrawSquareCheckbox(c, isOct, "OCT", fs));
+                r.AutoItem().PaddingRight(32).Element(c => DrawSquareCheckbox(c, isTct, "TCT", fs));
+                r.AutoItem().PaddingRight(32).Element(c => DrawSquareCheckbox(c, isCloa, "CLOA", fs));
+                r.AutoItem().Element(c => DrawSquareCheckbox(c, isCct, "CCT", fs));
+            });
+
+            col.Item().Row(r =>
+            {
+                r.RelativeItem(1.55f).Element(c => UnderlinedField(c, "Title Number:", titleNoVal, fs));
+                r.ConstantItem(10);
+                r.RelativeItem(1f).Element(c => UnderlinedField(c, "Date Issued:", dateIssuedVal?.ToString("MM/dd/yyyy"), fs));
+            });
+
+            col.Item().Row(r =>
+            {
+                r.RelativeItem(1.35f).Element(c => UnderlinedField(c, "Survey No.:", surveyNoVal, fs));
+                r.ConstantItem(8);
+                r.RelativeItem(0.85f).Element(c => UnderlinedField(c, "Lot No.:", lotNoVal, fs));
+                r.ConstantItem(8);
+                r.RelativeItem(0.8f).Element(c => UnderlinedField(c, "Block No.:", blockNoVal, fs));
+            });
+
+            var locationSummary = string.Join(", ", new[] { td.StreetNo, td.Purok, td.DistrictOrBarangay, td.Municipality, td.ProvinceCity }
+                .Where(s => !string.IsNullOrWhiteSpace(s)));
+            col.Item().Element(c => UnderlinedField(c, "Boundaries:", locationSummary, fs));
+
+            col.Item().PaddingLeft(36).Row(r =>
+            {
+                r.RelativeItem().Element(c => UnderlinedField(c, "North:", td.BoundaryNorth, fs));
+                r.ConstantItem(12);
+                r.RelativeItem().Element(c => UnderlinedField(c, "South:", td.BoundarySouth, fs));
+            });
+
+            col.Item().PaddingLeft(36).Row(r =>
+            {
+                r.RelativeItem().Element(c => UnderlinedField(c, "East:", td.BoundaryEast, fs));
+                r.ConstantItem(12);
+                r.RelativeItem().Element(c => UnderlinedField(c, "West:", td.BoundaryWest, fs));
+            });
+
+            // -----------------------------------------------------------------
+            // KIND OF PROPERTY ASSESSED
+            // -----------------------------------------------------------------
+            col.Item().PaddingTop(3).Text("KIND OF PROPERTY ASSESSED:").FontSize(fs).Bold().FontColor(Colors.Black);
+
+            col.Item().PaddingLeft(36).Row(r =>
+            {
+                r.RelativeItem().Element(c => DrawSquareCheckbox(c, td.Kind == PropertyKind.Land, "LAND", fs));
+                r.RelativeItem().Element(c => DrawSquareCheckbox(c, td.Kind == PropertyKind.Building, "BUILDING", fs));
+                r.RelativeItem().Element(c => DrawSquareCheckbox(c, td.Kind == PropertyKind.Machinery, "MACHINERY", fs));
+                r.RelativeItem().Element(c => DrawSquareCheckbox(c, false, "OTHERS", fs));
+            });
+
+            var rows = BuildAnnexIhAssessmentRows(td);
+            decimal totalMv = rows.Sum(x => x.MarketValue);
+            decimal totalAv = rows.Sum(x => x.AssessedValue);
+            if (totalMv <= 0) totalMv = td.AdjustedMarketValue > 0 ? td.AdjustedMarketValue : td.MarketValue;
+            if (totalAv <= 0) totalAv = td.AssessedValue;
+
+            col.Item().PaddingTop(2).Border(0.75f).BorderColor(Colors.Black).Table(t =>
             {
                 t.ColumnsDefinition(c =>
                 {
-                    c.RelativeColumn();
-                    c.RelativeColumn();
+                    c.RelativeColumn(1.25f); // Property Classification
+                    c.RelativeColumn(1.9f);  // Sub-Class/ Structural Type/ Machinery Description and Brand
+                    c.RelativeColumn(1.1f);  // Area/ Machinery Capacity
+                    c.RelativeColumn(1.35f); // Market Value (Php)
+                    c.RelativeColumn(1.05f); // Actual Use
+                    c.RelativeColumn(1.05f); // Assessment Level (%)
+                    c.RelativeColumn(1.35f); // Total Assessed Value
                 });
 
-                t.Cell().BorderBottom(0.5f).BorderRight(0.5f).BorderColor(Colors.Grey.Lighten1).Padding(5).Column(c =>
+                static IContainer HeaderCell(IContainer c, bool rightBorder = true) =>
+                    c.BorderBottom(0.75f).BorderRight(rightBorder ? 0.75f : 0f).BorderColor(Colors.Black)
+                     .PaddingHorizontal(3).PaddingVertical(3).AlignCenter().AlignMiddle();
+
+                t.Cell().Element(c => HeaderCell(c)).Text("Property\nClassification").FontSize(7f).FontColor(Colors.Black);
+                t.Cell().Element(c => HeaderCell(c)).Text("Sub-Class/ Structural\nType/ Machinery\nDescription and Brand").FontSize(7f).FontColor(Colors.Black);
+                t.Cell().Element(c => HeaderCell(c)).Text("Area/\nMachinery\nCapacity").FontSize(7f).FontColor(Colors.Black);
+                t.Cell().Element(c => HeaderCell(c)).Text("Market Value\n(Php)").FontSize(7f).FontColor(Colors.Black);
+                t.Cell().Element(c => HeaderCell(c)).Text("Actual\nUse").FontSize(7f).FontColor(Colors.Black);
+                t.Cell().Element(c => HeaderCell(c)).Text("Assessment\nLevel\n(%)").FontSize(7f).FontColor(Colors.Black);
+                t.Cell().Element(c => HeaderCell(c, false)).Text("Total Assessed Value").FontSize(7f).FontColor(Colors.Black);
+
+                int displayRowCount = Math.Max(4, rows.Count);
+                for (int i = 0; i < displayRowCount; i++)
                 {
-                    c.Item().Text("Appraised / Assessed By:").FontSize(7).Bold().FontColor(Colors.Grey.Darken2);
-                    c.Item().PaddingTop(14).Row(r =>
-                    {
-                        r.RelativeItem(2).Column(sc =>
-                        {
-                            sc.Item().BorderBottom(0.5f).BorderColor(Colors.Grey.Darken1).AlignCenter().Text(ValueOr(td.AssessedByName, td.AppraisedByName)).FontSize(8.5f).Bold();
-                            sc.Item().AlignCenter().Text("Assessment Officer / Appraiser").FontSize(6.5f).FontColor(Colors.Grey.Darken1);
-                        });
-                        r.ConstantItem(8);
-                        r.RelativeItem(1).Column(sc =>
-                        {
-                            sc.Item().BorderBottom(0.5f).BorderColor(Colors.Grey.Darken1).AlignCenter().Text(td.DateAssessed.ToString("MM/dd/yyyy")).FontSize(8);
-                            sc.Item().AlignCenter().Text("Date").FontSize(6.5f).FontColor(Colors.Grey.Darken1);
-                        });
-                    });
+                    var r = i < rows.Count ? rows[i] : null;
+
+                    t.Cell().BorderBottom(0.5f).BorderRight(0.75f).BorderColor(Colors.Black).MinHeight(14).PaddingHorizontal(3).PaddingVertical(2).AlignMiddle()
+                        .Text(r?.Classification ?? "").FontSize(7.5f).FontColor(Colors.Black);
+                    t.Cell().BorderBottom(0.5f).BorderRight(0.75f).BorderColor(Colors.Black).MinHeight(14).PaddingHorizontal(3).PaddingVertical(2).AlignMiddle()
+                        .Text(r?.SubClassOrDescription ?? "").FontSize(7.5f).FontColor(Colors.Black);
+                    t.Cell().BorderBottom(0.5f).BorderRight(0.75f).BorderColor(Colors.Black).MinHeight(14).PaddingHorizontal(3).PaddingVertical(2).AlignCenter().AlignMiddle()
+                        .Text(r?.AreaOrCapacity ?? "").FontSize(7.5f).FontColor(Colors.Black);
+                    t.Cell().BorderBottom(0.5f).BorderRight(0.75f).BorderColor(Colors.Black).MinHeight(14).PaddingHorizontal(3).PaddingVertical(2).AlignRight().AlignMiddle()
+                        .Text(r != null ? $"{r.MarketValue:N2}" : "").FontSize(7.5f).FontColor(Colors.Black);
+                    t.Cell().BorderBottom(0.5f).BorderRight(0.75f).BorderColor(Colors.Black).MinHeight(14).PaddingHorizontal(3).PaddingVertical(2).AlignCenter().AlignMiddle()
+                        .Text(r?.ActualUse ?? "").FontSize(7.5f).FontColor(Colors.Black);
+                    t.Cell().BorderBottom(0.5f).BorderRight(0.75f).BorderColor(Colors.Black).MinHeight(14).PaddingHorizontal(3).PaddingVertical(2).AlignCenter().AlignMiddle()
+                        .Text(r != null ? $"{r.AssessmentLevel:N0}%" : "").FontSize(7.5f).FontColor(Colors.Black);
+                    t.Cell().BorderBottom(0.5f).BorderColor(Colors.Black).MinHeight(14).PaddingHorizontal(3).PaddingVertical(2).AlignRight().AlignMiddle()
+                        .Text(r != null ? $"{r.AssessedValue:N2}" : "").FontSize(7.5f).Bold().FontColor(Colors.Black);
+                }
+
+                // Total Row
+                t.Cell().ColumnSpan(3).BorderRight(0.75f).BorderColor(Colors.Black).PaddingHorizontal(5).PaddingVertical(3).AlignRight().AlignMiddle()
+                    .Text("Total").FontSize(8f).FontColor(Colors.Black);
+
+                t.Cell().BorderRight(0.75f).BorderColor(Colors.Black).PaddingHorizontal(3).PaddingVertical(3).AlignMiddle().Row(r =>
+                {
+                    r.AutoItem().Text("P").FontSize(8f).Bold().FontColor(Colors.Black);
+                    r.RelativeItem().AlignRight().Text($"{totalMv:N2}").FontSize(8f).Bold().FontColor(Colors.Black);
                 });
 
-                t.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten1).Padding(5).Column(c =>
-                {
-                    c.Item().Text("Recommending Approval:").FontSize(7).Bold().FontColor(Colors.Grey.Darken2);
-                    c.Item().PaddingTop(14).Row(r =>
-                    {
-                        r.RelativeItem(2).Column(sc =>
-                        {
-                            sc.Item().BorderBottom(0.5f).BorderColor(Colors.Grey.Darken1).AlignCenter().Text(ValueOr(td.RecommendingApprovalName, "Assistant City Assessor")).FontSize(8.5f).Bold();
-                            sc.Item().AlignCenter().Text("Assistant City Assessor").FontSize(6.5f).FontColor(Colors.Grey.Darken1);
-                        });
-                        r.ConstantItem(8);
-                        r.RelativeItem(1).Column(sc =>
-                        {
-                            sc.Item().BorderBottom(0.5f).BorderColor(Colors.Grey.Darken1).AlignCenter().Text((td.DateRecommended ?? td.DateAssessed).ToString("MM/dd/yyyy")).FontSize(8);
-                            sc.Item().AlignCenter().Text("Date").FontSize(6.5f).FontColor(Colors.Grey.Darken1);
-                        });
-                    });
-                });
+                t.Cell().Background(Colors.Grey.Darken4).BorderRight(0.75f).BorderColor(Colors.Black).Padding(3).Text("");
+                t.Cell().Background(Colors.Grey.Darken4).BorderRight(0.75f).BorderColor(Colors.Black).Padding(3).Text("");
 
-                t.Cell().ColumnSpan(2).Padding(6).Column(c =>
+                t.Cell().PaddingHorizontal(3).PaddingVertical(3).AlignMiddle().Row(r =>
                 {
-                    c.Item().Text("APPROVED BY:").FontSize(7).Bold().FontColor(Colors.Grey.Darken2);
-                    c.Item().PaddingTop(16).AlignCenter().Width(280).Row(r =>
-                    {
-                        r.RelativeItem(2).Column(sc =>
-                        {
-                            sc.Item().BorderBottom(0.75f).BorderColor(Colors.Black).AlignCenter().Text(ValueOr(td.ApprovedByName, "Hon. City Assessor")).FontSize(9.5f).ExtraBold();
-                            sc.Item().AlignCenter().Text("Provincial / City / Municipal Assessor").FontSize(7).Bold().FontColor(Colors.Grey.Darken2);
-                        });
-                        r.ConstantItem(12);
-                        r.RelativeItem(1).Column(sc =>
-                        {
-                            sc.Item().BorderBottom(0.75f).BorderColor(Colors.Black).AlignCenter().Text((td.DateApproved ?? td.DateAssessed).ToString("MM/dd/yyyy")).FontSize(8.5f).SemiBold();
-                            sc.Item().AlignCenter().Text("Date").FontSize(7).FontColor(Colors.Grey.Darken2);
-                        });
-                    });
+                    r.AutoItem().Text("P").FontSize(8f).Bold().FontColor(Colors.Black);
+                    r.RelativeItem().AlignRight().Text($"{totalAv:N2}").FontSize(8f).Bold().FontColor(Colors.Black);
                 });
             });
 
-            // 9. Previous TD Reference & Memoranda
-            col.Item().Border(0.75f).BorderColor(Colors.Grey.Medium).Padding(5).Column(mCol =>
+            // -----------------------------------------------------------------
+            // TOTAL ASSESSED VALUE (AMOUNT IN WORDS), EFFECTIVITY & BACK TAXES
+            // -----------------------------------------------------------------
+            col.Item().PaddingTop(2).Element(c => UnderlinedField(c, "Total Assessed Value:", AmountToWords(totalAv), fs));
+
+            col.Item().Row(r =>
             {
-                mCol.Spacing(4);
-                mCol.Item().Row(r =>
-                {
-                    r.RelativeItem().Text($"This declaration cancels TD No.: {ValueOr(td.PreviousTdNo, "None / New")}").FontSize(8).SemiBold();
-                    r.RelativeItem().Text($"Previous Owner: {ValueOr(td.PreviousOwner, "N/A")}").FontSize(8).SemiBold();
-                    r.RelativeItem().AlignRight().Text($"Previous A.V.: PHP {td.PreviousAssessedValue:N2}").FontSize(8).SemiBold();
-                });
+                r.RelativeItem().BorderBottom(0.5f).BorderColor(Colors.Grey.Darken2).Height(10);
+                r.AutoItem().PaddingHorizontal(6).Text("(amount in words)").FontSize(7f).FontColor(Colors.Grey.Darken3);
+                r.RelativeItem().BorderBottom(0.5f).BorderColor(Colors.Grey.Darken2).Height(10);
+            });
 
-                mCol.Item().BorderTop(0.5f).BorderColor(Colors.Grey.Lighten1).PaddingTop(3).Column(mc =>
+            col.Item().Row(r =>
+            {
+                r.RelativeItem(1.1f).PaddingTop(9).BorderBottom(0.5f).BorderColor(Colors.Grey.Darken2).Height(4);
+                r.AutoItem().PaddingHorizontal(4).PaddingTop(2).Text("Effectivity of Assessment/Reassessment:").FontSize(fs).FontColor(Colors.Black);
+                r.RelativeItem(0.65f).Column(c =>
                 {
-                    mc.Item().Text("MEMORANDA:").FontSize(7.5f).ExtraBold().FontColor(Colors.Grey.Darken3);
-                    mc.Item().Text(ValueOr(td.Memoranda, "Standard real property assessment encoded pursuant to City Tax Ordinance.")).FontSize(8);
+                    c.Item().BorderBottom(0.5f).BorderColor(Colors.Grey.Darken2).AlignCenter()
+                        .Text(ValueOr(td.EffectivityQuarter, "1st Qtr")).FontSize(fs).Bold().FontColor(Colors.Black);
+                    c.Item().AlignCenter().Text("(Quarter)").FontSize(6.5f).FontColor(Colors.Grey.Darken3);
+                });
+                r.ConstantItem(6);
+                r.RelativeItem(0.55f).Column(c =>
+                {
+                    c.Item().BorderBottom(0.5f).BorderColor(Colors.Grey.Darken2).AlignCenter()
+                        .Text(td.EffectivityYear > 0 ? td.EffectivityYear.ToString() : DateTime.Now.Year.ToString()).FontSize(fs).Bold().FontColor(Colors.Black);
+                    c.Item().AlignCenter().Text("(Year)").FontSize(6.5f).FontColor(Colors.Grey.Darken3);
                 });
             });
+
+            col.Item().Row(r =>
+            {
+                r.RelativeItem(1.1f).PaddingTop(9).BorderBottom(0.5f).BorderColor(Colors.Grey.Darken2).Height(4);
+                r.AutoItem().PaddingLeft(4).PaddingRight(2).PaddingTop(2).Text("Period Covered by back taxes:").FontSize(fs).FontColor(Colors.Black);
+                r.ConstantItem(26).PaddingTop(9).BorderBottom(0.5f).BorderColor(Colors.Grey.Darken2).Height(4);
+                r.AutoItem().PaddingHorizontal(3).PaddingTop(2).Text("From:").FontSize(fs).FontColor(Colors.Black);
+                r.RelativeItem(0.5f).Column(c =>
+                {
+                    c.Item().BorderBottom(0.5f).BorderColor(Colors.Grey.Darken2).AlignCenter().Text(" ").FontSize(fs);
+                    c.Item().AlignCenter().Text("(Year)").FontSize(6.5f).FontColor(Colors.Grey.Darken3);
+                });
+                r.AutoItem().PaddingHorizontal(3).PaddingTop(2).Text("To:").FontSize(fs).FontColor(Colors.Black);
+                r.RelativeItem(0.5f).Column(c =>
+                {
+                    c.Item().BorderBottom(0.5f).BorderColor(Colors.Grey.Darken2).AlignCenter().Text(" ").FontSize(fs);
+                    c.Item().AlignCenter().Text("(Year)").FontSize(6.5f).FontColor(Colors.Grey.Darken3);
+                });
+            });
+
+            // -----------------------------------------------------------------
+            // TAXABILITY & MEMORANDA
+            // -----------------------------------------------------------------
+            col.Item().PaddingTop(1).Row(r =>
+            {
+                r.AutoItem().PaddingRight(14).Text("TAXABILITY:").FontSize(fs).Bold().FontColor(Colors.Black);
+                r.AutoItem().PaddingRight(18).Element(c => DrawSquareCheckbox(c, isTaxable, "Taxable", fs));
+                r.AutoItem().PaddingRight(10).Element(c => DrawSquareCheckbox(c, !isTaxable, "Exempt.", fs));
+                r.RelativeItem().Element(c => UnderlinedField(c, "Proof of or Basis for Exemption:", !isTaxable ? td.TaxabilityBasis : "", fs));
+            });
+
+            col.Item().PaddingTop(2).Text("Memoranda:").FontSize(fs).FontColor(Colors.Black);
+            var memoText = (td.Memoranda ?? "").Trim();
+            col.Item().BorderBottom(0.5f).BorderColor(Colors.Grey.Darken2).MinHeight(12).PaddingBottom(1)
+                .Text(string.IsNullOrWhiteSpace(memoText) ? " " : memoText).FontSize(7.5f).FontColor(Colors.Black);
+            col.Item().BorderBottom(0.5f).BorderColor(Colors.Grey.Darken2).Height(11);
+            col.Item().BorderBottom(0.5f).BorderColor(Colors.Grey.Darken2).Height(11);
+
+            // -----------------------------------------------------------------
+            // APPROVED BY, CANCELLATION REFERENCE, NOTES & ANNOTATIONS (PAGE 2 / BOTTOM)
+            // -----------------------------------------------------------------
+            col.Item().PaddingTop(8).Row(r =>
+            {
+                r.AutoItem().PaddingRight(10).PaddingTop(4).Text("APPROVED BY:").FontSize(fs).Bold().FontColor(Colors.Black);
+                r.RelativeItem(1.8f).Column(c =>
+                {
+                    c.Item().BorderBottom(0.75f).BorderColor(Colors.Black).PaddingBottom(1).AlignCenter()
+                        .Text(ValueOr(td.ApprovedByName, " ")).FontSize(8.5f).Bold().FontColor(Colors.Black);
+                    c.Item().AlignCenter().Text("Provincial/City/Municipal Assessor").FontSize(7f).Italic().FontColor(Colors.Black);
+                });
+                r.ConstantItem(24);
+                r.RelativeItem(0.9f).Column(c =>
+                {
+                    var appDate = (td.DateApproved ?? td.DateAssessed).ToString("MM/dd/yyyy");
+                    c.Item().BorderBottom(0.75f).BorderColor(Colors.Black).PaddingBottom(1).AlignCenter()
+                        .Text(appDate).FontSize(8f).Bold().FontColor(Colors.Black);
+                    c.Item().AlignCenter().Text("Date").FontSize(7f).Italic().FontColor(Colors.Black);
+                });
+            });
+
+            col.Item().PaddingTop(2).Row(r =>
+            {
+                r.RelativeItem(1.35f).Element(c => UnderlinedField(c, "This declaration cancels TD No.:", td.PreviousTdNo, fs));
+                r.ConstantItem(12);
+                var prevAvStr = td.PreviousAssessedValue > 0 ? $"P {td.PreviousAssessedValue:N2}" : "";
+                r.RelativeItem(1f).Element(c => UnderlinedField(c, "Previous Assessed Value:", prevAvStr, fs));
+            });
+
+            col.Item().Element(c => UnderlinedField(c, "Previous Owner:", td.PreviousOwner, fs));
+
+            col.Item().PaddingTop(4).BorderTop(0.75f).BorderColor(Colors.Black).PaddingTop(3).Row(r =>
+            {
+                r.AutoItem().PaddingRight(6).Text("Notes:").FontSize(7.5f).FontColor(Colors.Black);
+                r.RelativeItem().Text(txt =>
+                {
+                    txt.DefaultTextStyle(x => x.FontSize(7.2f).FontColor(Colors.Black));
+                    txt.Span("This declaration is made solely for real property taxation purposes pursuant to Sec. 201 of R.A. No. 7160 and should not be construed as permit in the construction of the building and other structures nor can it confer any ownership or legal title to the property and the valuation indicated herein are based on the approved schedule of market values and the duly enacted tax policy by the Sanggunian ");
+                    txt.Span("__________________").Underline();
+                    txt.Span(" under Ordinance No. ");
+                    txt.Span("__________________").Underline();
+                    txt.Span(" dated ");
+                    txt.Span("______________").Underline();
+                    txt.Span(", 20");
+                    txt.Span("____").Underline();
+                    txt.Span(". Please see annotations at the back of this Tax Declaration.");
+                });
+            });
+
+            col.Item().PaddingTop(3).Text("Annotations:").FontSize(7.5f).FontColor(Colors.Black);
         });
     }
 

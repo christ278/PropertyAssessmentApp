@@ -1,4 +1,4 @@
-﻿@model PropertyAssessmentApp.Models.PropertyAssessmentRequest
+@model PropertyAssessmentApp.Models.PropertyAssessmentRequest
 @using PropertyAssessmentApp.Models
 
 @{
@@ -638,6 +638,8 @@
             if (document.getElementById('registeredOwnerSelect')) {
                 new TomSelect('#registeredOwnerSelect', {
                     create: false,
+                    closeAfterSelect: true,
+                    selectOnTab: false,
                     valueField: 'value',
                     labelField: 'text',
                     searchField: ['value', 'text', 'name', 'tin', 'display'],
@@ -667,7 +669,13 @@
                             return `<div>${escape(item.text || item.display || '')}</div>`;
                         }
                     },
+                    onItemAdd: function () {
+                        this.close();
+                        if (this.control_input) this.control_input.blur();
+                    },
                     onChange: function (ownerId) {
+                        this.close();
+                        if (this.control_input) this.control_input.blur();
                         const ownerIdInput = document.getElementById('requestOwnerIdInput');
                         if (ownerIdInput) ownerIdInput.value = ownerId || '';
                         if (!ownerId) return;

@@ -65,18 +65,39 @@ public class UserRoleService : IUserRoleService
             }
         }
 
-        // Ensure Print Tax Declaration (ASSESSMENT_PRINT) module exists in SystemModules
-        if (!_context.SystemModules.Any(m => m.ModuleCode == "ASSESSMENT_PRINT"))
+        // Ensure Print Tax Faas (ASSESSMENT_PRINT) module exists in SystemModules
+        var printFaasMod = _context.SystemModules.FirstOrDefault(m => m.ModuleCode == "ASSESSMENT_PRINT");
+        if (printFaasMod == null)
         {
             _context.SystemModules.Add(new SystemModule
             {
                 ModuleCode = "ASSESSMENT_PRINT",
-                ModuleName = "Print Tax Declaration (Records Printout)",
+                ModuleName = "Print Tax Faas (Records Printout)",
                 Category = "FAAS & Transaction Requests",
                 ControllerName = "Assessment",
                 ActionName = "PrintPdf",
                 Icon = "printer",
                 SortOrder = 13,
+                IsActive = true
+            });
+        }
+        else if (printFaasMod.ModuleName != "Print Tax Faas (Records Printout)")
+        {
+            printFaasMod.ModuleName = "Print Tax Faas (Records Printout)";
+        }
+
+        // Ensure Print Tax Declaration (ASSESSMENT_PRINT_TD) module exists in SystemModules
+        if (!_context.SystemModules.Any(m => m.ModuleCode == "ASSESSMENT_PRINT_TD"))
+        {
+            _context.SystemModules.Add(new SystemModule
+            {
+                ModuleCode = "ASSESSMENT_PRINT_TD",
+                ModuleName = "Print Tax Declaration",
+                Category = "FAAS & Transaction Requests",
+                ControllerName = "Assessment",
+                ActionName = "PrintTaxDeclaration",
+                Icon = "file-check-2",
+                SortOrder = 14,
                 IsActive = true
             });
         }
@@ -119,6 +140,25 @@ public class UserRoleService : IUserRoleService
         }
 
         _context.SaveChanges();
+
+        var printTdMod = _context.SystemModules.FirstOrDefault(m => m.ModuleCode == "ASSESSMENT_PRINT_TD");
+        var adminRole = _context.UserRoleSettings.FirstOrDefault(r => r.RoleName == "System Administrator");
+        if (printTdMod != null && adminRole != null &&
+            !_context.RoleModulePermissions.Any(p => p.RoleId == adminRole.Id && p.ModuleId == printTdMod.ModuleId))
+        {
+            _context.RoleModulePermissions.Add(new RoleModulePermission
+            {
+                RoleId = adminRole.Id,
+                ModuleId = printTdMod.ModuleId,
+                CanView = true,
+                CanCreate = true,
+                CanEdit = true,
+                CanDelete = true,
+                CanApprove = true,
+                UpdatedDate = DateTime.Now
+            });
+            _context.SaveChanges();
+        }
     }
 
     public IEnumerable<UserRoleSetting> GetAll(string? search = null)

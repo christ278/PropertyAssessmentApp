@@ -1,4 +1,4 @@
-﻿@model PropertyAssessmentApp.Models.PropertyAssessmentRequest
+@model PropertyAssessmentApp.Models.PropertyAssessmentRequest
 @using PropertyAssessmentApp.Models
 
 @{
@@ -849,6 +849,36 @@
         let isSyncingOwnerAndProperty = false;
         const alphabetLetters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
+        function setTomSelectValueSilently(ts, value, isAdd = false) {
+            if (!ts) return;
+            const origFocus = ts.focus;
+            const origOpen = ts.open;
+            const origRefreshOptions = ts.refreshOptions;
+            const origOpenOnFocus = ts.settings.openOnFocus;
+            try {
+                ts.settings.openOnFocus = false;
+                ts.focus = function () {};
+                ts.open = function () {};
+                ts.refreshOptions = function () {};
+                if (isAdd) {
+                    ts.addItem(value, true);
+                } else {
+                    ts.setValue(value, true);
+                }
+                ts.refreshItems();
+                ts.inputState();
+            } finally {
+                ts.focus = origFocus;
+                ts.open = origOpen;
+                ts.refreshOptions = origRefreshOptions;
+                ts.settings.openOnFocus = origOpenOnFocus;
+                ts.close();
+                if (ts.control_input && document.activeElement === ts.control_input) {
+                    ts.control_input.blur();
+                }
+            }
+        }
+
         function normalizeTdnForComparison(tdn) {
             if (!tdn) return '';
             let s = String(tdn).trim().toUpperCase().replace(/[\s\-_]+/g, '-');
@@ -977,7 +1007,7 @@
                     persist: false,
                     create: false,
                     openOnFocus: true,
-                    closeAfterSelect: false,
+                    closeAfterSelect: true,
                     selectOnTab: false,
                     valueField: 'value',
                     labelField: 'text',
@@ -1072,6 +1102,8 @@
                                 return;
                             }
                         }
+                        this.close();
+                        if (this.control_input) this.control_input.blur();
                     },
                     onChange: function(values) {
                         const span = document.getElementById('refPropertyValidation');
@@ -1138,7 +1170,13 @@
                             return `<div>${escape(item.text || item.display || item.value || '')}</div>`;
                         }
                     },
+                    onItemAdd: function () {
+                        this.close();
+                        if (this.control_input) this.control_input.blur();
+                    },
                     onChange: function (ownerId) {
+                        this.close();
+                        if (this.control_input) this.control_input.blur();
                         const ownerIdInput = document.getElementById('requestOwnerIdInput');
                         if (ownerIdInput) ownerIdInput.value = ownerId || '';
                         if (!ownerId || isSyncingOwnerAndProperty) return;
@@ -1153,6 +1191,7 @@
                                     const tinInput = document.getElementById('ownerTinInput');
                                     const phoneInput = document.getElementById('contactNoInput');
                                     const addressInput = document.getElementById('ownerAddressInput');
+                                    const emailInput = document.getElementById('emailAddressInput');
 
                                     if (nameInput) {
                                         nameInput.value = data.name || '';
@@ -1164,6 +1203,9 @@
                                     if (addressInput) {
                                         addressInput.value = data.address || data.street || '';
                                         addressInput.setAttribute('data-auto-filled', 'true');
+                                    }
+                                    if (emailInput && data.email) {
+                                        emailInput.value = data.email;
                                     }
 
                                     generatedPartitions.forEach(p => {
@@ -1202,11 +1244,14 @@
                                                             text: item.display || item.text || `${item.tdn} - ${item.owner}`
                                                         });
                                                     });
-                                                    // Auto-select the first property belonging to this owner if none is currently selected
+                                                    // Auto-select the first property belonging to this owner silently (no focus/open blink)
                                                     if (!selectedPropertyIds || selectedPropertyIds.length === 0) {
-                                                        TomSelectRefProperty.addItem(String(props[0].id || props[0].value), true);
+                                                        const firstVal = String(props[0].id || props[0].value);
+                                                        setTomSelectValueSilently(TomSelectRefProperty, firstVal, true);
+                                                        handleReferencePropertiesChange(TomSelectRefProperty.getValue());
+                                                    } else {
+                                                        TomSelectRefProperty.close();
                                                     }
-                                                    TomSelectRefProperty.close();
                                                 }
                                             })
                                             .catch(() => {})
@@ -1621,7 +1666,8 @@
 
                         if (draft.selectedPropertyIds && Array.isArray(draft.selectedPropertyIds) && draft.selectedPropertyIds.length > 0) {
                             if (TomSelectRefProperty) {
-                                draft.selectedPropertyIds.forEach(id => TomSelectRefProperty.addItem(id));
+                                draft.selectedPropertyIds.forEach(id => setTomSelectValueSilently(TomSelectRefProperty, id, true));
+                                handleReferencePropertiesChange(TomSelectRefProperty.getValue());
                             }
                         }
 
@@ -1799,8 +1845,9 @@
                         for (const key in ts.options) {
                             const opt = ts.options[key];
                             if (opt && opt.text && opt.text.toLowerCase().includes(firstProp.owner.toLowerCase())) {
-                                ts.setValue(key, true);
-                                ts.close();
+                                setTomSelectValueSilently(ts, key, false);
+                                const ownerIdInput = document.getElementById('requestOwnerIdInput');
+                                if (ownerIdInput) ownerIdInput.value = key;
                                 break;
                             }
                         }

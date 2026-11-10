@@ -4,6 +4,7 @@
 @{
     ViewData["Title"] = $"Complete Assessment Record - {Model.TaxDeclarationNumber}";
     bool canPrintTd = PermissionService.CanAccess(User, "Assessment", "PrintPdf");
+    bool canPrintTaxDec = PermissionService.CanAccess(User, "Assessment", "PrintTaxDeclaration");
 
     var sketchAndImageUrls = new List<string>();
     void AddImageUrl(string? rawUrl)
@@ -44,7 +45,14 @@
                 </button>
                 <a asp-action="PrintPdf" asp-route-id="@Model.Id" target="_blank" class="px-4 py-2.5 rounded-xl bg-sky-50 hover:bg-sky-100 dark:bg-sky-500/10 dark:hover:bg-sky-500/20 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-500/30 font-bold flex items-center gap-1.5 transition-all">
                     <i data-lucide="file-text" class="w-4 h-4"></i>
-                    <span>Official Certificate</span>
+                    <span>Print FAAS</span>
+                </a>
+            }
+            @if (canPrintTaxDec)
+            {
+                <a asp-action="PrintTaxDeclaration" asp-route-id="@Model.Id" target="_blank" class="px-4 py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30 font-bold flex items-center gap-1.5 transition-all">
+                    <i data-lucide="file-check-2" class="w-4 h-4"></i>
+                    <span>Print Tax Declaration</span>
                 </a>
             }
             <a asp-action="Edit" asp-route-id="@Model.Id" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center gap-1.5 shadow-sm transition-all">
