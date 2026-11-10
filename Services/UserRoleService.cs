@@ -102,6 +102,40 @@ public class UserRoleService : IUserRoleService
             });
         }
 
+        // Ensure Executive Assessment Analytics (DASHBOARD_ANALYTICS) module exists in SystemModules
+        var analyticsMod = _context.SystemModules.FirstOrDefault(m => m.ModuleCode == "DASHBOARD_ANALYTICS");
+        if (analyticsMod == null)
+        {
+            _context.SystemModules.Add(new SystemModule
+            {
+                ModuleCode = "DASHBOARD_ANALYTICS",
+                ModuleName = "Executive Assessment Analytics",
+                Category = "Dashboards",
+                ControllerName = "Dashboard",
+                ActionName = "Analytics",
+                Icon = "bar-chart-3",
+                SortOrder = 4,
+                IsActive = true
+            });
+        }
+        else
+        {
+            analyticsMod.ModuleName = "Executive Assessment Analytics";
+            analyticsMod.Category = "Dashboards";
+            analyticsMod.ControllerName = "Dashboard";
+            analyticsMod.ActionName = "Analytics";
+            analyticsMod.Icon = "bar-chart-3";
+            analyticsMod.SortOrder = 4;
+            analyticsMod.IsActive = true;
+        }
+
+        // Deactivate obsolete/legacy ANALYTICS placeholder so only DASHBOARD_ANALYTICS is shown in Role Permissions
+        var obsoleteAnalytics = _context.SystemModules.FirstOrDefault(m => m.ModuleCode == "ANALYTICS");
+        if (obsoleteAnalytics != null && obsoleteAnalytics.IsActive)
+        {
+            obsoleteAnalytics.IsActive = false;
+        }
+
         // Ensure RPT Reports modules exist in SystemModules
         if (!_context.SystemModules.Any(m => m.ModuleCode == "REPORT_DIRECTORY"))
         {
@@ -150,6 +184,24 @@ public class UserRoleService : IUserRoleService
             {
                 RoleId = adminRole.Id,
                 ModuleId = printTdMod.ModuleId,
+                CanView = true,
+                CanCreate = true,
+                CanEdit = true,
+                CanDelete = true,
+                CanApprove = true,
+                UpdatedDate = DateTime.Now
+            });
+            _context.SaveChanges();
+        }
+
+        analyticsMod = _context.SystemModules.FirstOrDefault(m => m.ModuleCode == "DASHBOARD_ANALYTICS");
+        if (analyticsMod != null && adminRole != null &&
+            !_context.RoleModulePermissions.Any(p => p.RoleId == adminRole.Id && p.ModuleId == analyticsMod.ModuleId))
+        {
+            _context.RoleModulePermissions.Add(new RoleModulePermission
+            {
+                RoleId = adminRole.Id,
+                ModuleId = analyticsMod.ModuleId,
                 CanView = true,
                 CanCreate = true,
                 CanEdit = true,

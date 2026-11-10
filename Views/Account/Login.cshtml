@@ -1,4 +1,4 @@
-﻿@model PropertyAssessmentApp.Models.LoginViewModel
+@model PropertyAssessmentApp.Models.LoginViewModel
 
 @{
     ViewData["Title"] = "System Login";
@@ -132,28 +132,25 @@
         <div class="grid grid-cols-1 lg:grid-cols-12 rounded-3xl overflow-hidden glass-card shadow-2xl backdrop-blur-2xl">
             
             <!-- LEFT PANEL: Real Property Tax & Assessment Brand Showcase (Desktop / Tablet) -->
-            <div class="lg:col-span-6 p-8 sm:p-10 lg:p-12 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-white/10 bg-gradient-to-br from-emerald-950/40 via-slate-900/60 to-slate-950/80 relative">
+            <div class="lg:col-span-6 p-8 sm:p-10 lg:p-12 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-white/10 bg-gradient-to-br from-emerald-950/40 via-slate-900/60 to-slate-950/80 relative overflow-hidden">
                 
-                <!-- Background Accent Watermark -->
-                <div class="absolute top-0 right-0 p-8 opacity-5 pointer-events-none select-none">
-                    <svg class="w-64 h-64 text-emerald-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
-                        <path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v4M12 14v4M16 14v4" />
-                    </svg>
+                <!-- Background Accent Watermark (City of Koronadal Seal) -->
+                <div class="absolute -top-10 -right-10 p-4 opacity-[0.06] pointer-events-none select-none">
+                    <img src="~/images/koronadal_seal.png" alt="" class="w-72 h-72 object-contain" />
                 </div>
 
                 <!-- Brand Header -->
                 <div class="space-y-6 relative z-10">
-                    <div class="flex items-center gap-3">
-                        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 p-0.5 shadow-lg shadow-emerald-500/25 flex items-center justify-center ring-4 ring-emerald-500/10">
-                            <div class="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center">
-                                <i data-lucide="building-2" class="w-7 h-7 text-emerald-400"></i>
-                            </div>
+                    <div class="flex items-center gap-4">
+                        <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white/10 p-1.5 shadow-xl shadow-emerald-500/20 flex items-center justify-center ring-2 ring-emerald-400/30 backdrop-blur-md shrink-0">
+                            <img src="~/images/koronadal_seal.png" alt="City of Koronadal Official Seal" class="w-full h-full object-contain drop-shadow-md" />
                         </div>
                         <div>
                             <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                                LGU Assessor Portal
+                                City of Koronadal &bull; LGU Assessor Portal
                             </span>
-                            <h1 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mt-0.5">FAIRTRACK</h1>
+                            <h1 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mt-1">FAIRTRACK</h1>
+                            <p class="text-[11px] font-mono text-emerald-300/80 font-semibold">Office of the City Assessor</p>
                         </div>
                     </div>
 

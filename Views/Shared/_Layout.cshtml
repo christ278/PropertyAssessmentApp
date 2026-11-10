@@ -183,7 +183,8 @@
     bool canDashStaff = PermissionService.CanAccess(User, "Dashboard", "Staff");
     bool canDashHead = PermissionService.CanAccess(User, "Dashboard", "AssessorHead");
     bool canDashAdmin = PermissionService.CanAccess(User, "Dashboard", "SystemOwner");
-    bool showDashboardGroup = canDashStaff || canDashHead || canDashAdmin;
+    bool canDashAnalytics = PermissionService.CanAccess(User, "Dashboard", "Analytics");
+    bool showDashboardGroup = canDashStaff || canDashHead || canDashAdmin || canDashAnalytics;
 
     bool canPool = PermissionService.CanAccess(User, "Workflow", "Pool");
     bool canMyTransactions = PermissionService.CanAccess(User, "Workflow", "MyTransactions") || canPool;
@@ -242,6 +243,13 @@
 
                     <div id="sidebarDashboardMenu" class="sidebar-collapse">
                         <div class="sidebar-collapse-inner pl-3 border-l-2 border-emerald-500/20 dark:border-stone-800 ml-3.5 space-y-1">
+                        @if (canDashAnalytics)
+                        {
+                            <a asp-controller="Dashboard" asp-action="Analytics" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold text-xs transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Dashboard" && currentAction == "Analytics" ? "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold" : "text-slate-600 dark:text-stone-400 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                                <i data-lucide="bar-chart-3" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
+                                <span>Executive Analytics</span>
+                            </a>
+                        }
                         @if (canDashAdmin)
                         {
                             <a asp-controller="Dashboard" asp-action="SystemOwner" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold text-xs transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Dashboard" && currentAction == "SystemOwner" ? "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold" : "text-slate-600 dark:text-stone-400 hover:text-emerald-700 dark:hover:text-emerald-400")">
@@ -560,6 +568,16 @@
                             <div id="horizontalDashboardDropdownMenu" class="horizontal-nav-dropdown-menu absolute left-0 mt-2 w-64 bg-white dark:bg-till-900 border border-slate-200/90 dark:border-stone-800 rounded-2xl shadow-2xl p-2 z-50 backdrop-blur-xl space-y-1">
                                 <div class="px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-stone-500 border-b border-slate-100 dark:border-stone-800 mb-1">Select Dashboard View</div>
 
+                                @if (canDashAnalytics)
+                                {
+                                    <a asp-controller="Dashboard" asp-action="Analytics" class="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 text-xs @(currentController == "Dashboard" && currentAction == "Analytics" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300")">
+                                        <i data-lucide="bar-chart-3" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                                        <div>
+                                            <div class="font-bold">Executive Analytics</div>
+                                            <div class="text-[10px] text-slate-500 dark:text-stone-400 font-normal">RPTA assessment roll &amp; valuation</div>
+                                        </div>
+                                    </a>
+                                }
                                 @if (canDashAdmin)
                                 {
                                     <a asp-controller="Dashboard" asp-action="SystemOwner" class="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 text-xs @(currentController == "Dashboard" && currentAction == "SystemOwner" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300")">

@@ -8359,7 +8359,6 @@ namespace PropertyAssessmentApp.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("OwnerEmail")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<Guid?>("OwnerId")

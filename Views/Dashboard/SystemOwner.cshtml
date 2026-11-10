@@ -1,4 +1,4 @@
-﻿@model PropertyAssessmentApp.Models.DashboardViewModel
+@model PropertyAssessmentApp.Models.DashboardViewModel
 @{ ViewData["Title"] = "System Owner Dashboard"; }
 <partial name="_Header" model="Model" />
 <div class="rounded-2xl bg-white/90 dark:bg-stone-900/80 border border-slate-200/90 dark:border-stone-800 shadow-sm mb-6 grid grid-cols-2 lg:grid-cols-5 divide-x divide-y lg:divide-y-0 divide-slate-100 dark:divide-stone-800">
@@ -20,18 +20,165 @@
         <div><h2 class="text-sm font-bold mb-3">By Request Type</h2><partial name="_Bars" model="Model.ByRequestType" /></div>
     </div>
     <div class="border-t border-slate-100 dark:border-stone-800 p-5">
-        <h2 class="text-sm font-bold mb-3">Recent Workflow Activity</h2>
-        @if (!Model.RecentActivity.Any()) { <p class="text-sm text-slate-400">No activity yet.</p> }
-        else
-        {
-            <div class="overflow-x-auto"><table class="w-full text-xs"><thead><tr class="text-left text-[10px] uppercase font-mono text-slate-400"><th class="py-2 pr-3">When</th><th class="py-2 pr-3">Tracking No.</th><th class="py-2 pr-3">Action</th><th class="py-2 pr-3">By</th><th class="py-2">Remarks</th></tr></thead>
-            <tbody class="divide-y divide-slate-100 dark:divide-stone-800">
-            @foreach (var l in Model.RecentActivity)
-            {
-                <tr><td class="py-2 pr-3 font-mono">@l.Timestamp.ToString("MMM dd, HH:mm")</td><td class="py-2 pr-3 font-mono font-bold">@l.TrackingNumber</td><td class="py-2 pr-3">@l.ActionTaken</td><td class="py-2 pr-3">@l.ForwardedByName</td><td class="py-2">@l.Remarks</td></tr>
-            }
-            </tbody></table></div>
-        }
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="text-xs font-mono uppercase tracking-wider font-bold text-slate-500 dark:text-stone-400">
+                Recent Workflow Activity
+            </h2>
+            <span class="px-2.5 py-1 rounded-xl text-[11px] font-mono font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300">
+                Latest @Model.RecentActivity.Count Actions
+            </span>
+        </div>
+
+        <div class="border border-slate-200 dark:border-stone-800 rounded-2xl overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs font-mono">
+                    <thead class="bg-slate-100 dark:bg-stone-950 text-slate-600 dark:text-stone-400 border-b border-slate-200 dark:border-stone-800 font-bold uppercase tracking-wider">
+                        <tr>
+                            <th class="px-4 py-3.5">Tracking No.</th>
+                            <th class="px-4 py-3.5">Transaction Type</th>
+                            <th class="px-4 py-3.5">Action &amp; Stage</th>
+                            <th class="hidden md:table-cell px-4 py-3.5">Action By</th>
+                            <th class="hidden lg:table-cell px-4 py-3.5">Remarks</th>
+                            <th class="hidden sm:table-cell px-4 py-3.5">When</th>
+                            <th class="px-4 py-3.5 text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-stone-800">
+                        @if (!Model.RecentActivity.Any())
+                        {
+                            <tr>
+                                <td colspan="7" class="px-4 py-12 text-center text-slate-400 dark:text-stone-500">
+                                    <div class="flex flex-col items-center gap-2">
+                                        <i data-lucide="inbox" class="w-8 h-8 text-slate-300 dark:text-stone-600"></i>
+                                        <p class="font-bold text-slate-600 dark:text-stone-400">No recent workflow activity recorded</p>
+                                        <p class="text-[11px]">Workflow routing, claims, approvals, and releases will appear here.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var l in Model.RecentActivity)
+                            {
+                                string displayType = l.RequestType switch
+                                {
+                                    "TaxDeclarationRequest" => "Certified True Copy (TD)",
+                                    "LandHoldingRequest" => "Land Holding Certificate",
+                                    "TaxMappingRequest" => "GIS Tax Mapping",
+                                    "PropertyAssessmentRequest" => "Property Assessment (FAAS)",
+                                    "RequestForInspection" => "Request for Inspection",
+                                    _ => l.RequestType
+                                };
+
+                                string detailsUrl = l.RequestType switch
+                                {
+                                    "TaxDeclarationRequest" => Url.Action("Details", "TaxDeclarationRequest", new { id = l.RequestId }) ?? "#",
+                                    "LandHoldingRequest" => Url.Action("Details", "LandHoldingRequest", new { id = l.RequestId }) ?? "#",
+                                    "TaxMappingRequest" => Url.Action("Details", "TaxMapping", new { id = l.RequestId }) ?? "#",
+                                    "PropertyAssessmentRequest" => Url.Action("Details", "PropertyAssessmentRequest", new { id = l.RequestId }) ?? "#",
+                                    "RequestForInspection" => Url.Action("Details", "RequestForInspection", new { id = l.RequestId }) ?? "#",
+                                    _ => "#"
+                                };
+
+                                string actionLower = (l.ActionTaken ?? "").ToLowerInvariant();
+                                (string badgeClass, string dotClass) = actionLower switch
+                                {
+                                    var a when a.Contains("release") || a.Contains("complete") => ("bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60", "bg-emerald-500"),
+                                    var a when a.Contains("approv") => ("bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800/60", "bg-violet-500"),
+                                    var a when a.Contains("return") || a.Contains("defer") || a.Contains("disapprov") => ("bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800/60", "bg-rose-500"),
+                                    var a when a.Contains("claim") || a.Contains("forward") => ("bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800/60", "bg-blue-500"),
+                                    _ => ("bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/60", "bg-amber-500")
+                                };
+
+                                <tr class="hover:bg-slate-50 dark:hover:bg-stone-950/60 transition-colors">
+                                    <!-- Tracking No. -->
+                                    <td class="px-4 py-3.5 font-semibold text-emerald-700 dark:text-emerald-400">
+                                        <div class="flex items-center gap-1.5">
+                                            <i data-lucide="file-text" class="w-3.5 h-3.5 shrink-0"></i>
+                                            <span>@l.TrackingNumber</span>
+                                        </div>
+                                    </td>
+
+                                    <!-- Transaction Type & Division -->
+                                    <td class="px-4 py-3.5">
+                                        <div class="font-bold text-slate-800 dark:text-stone-200">@displayType</div>
+                                        <div class="mt-0.5">
+                                            @if ((int)l.Division == 1)
+                                            {
+                                                <span class="px-2 py-0.5 rounded-md text-[9px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-950/70 dark:text-blue-300">DIV 1 · ASSESSMENT</span>
+                                            }
+                                            else if ((int)l.Division == 2)
+                                            {
+                                                <span class="px-2 py-0.5 rounded-md text-[9px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300">DIV 2 · GIS / MAPPING</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="px-2 py-0.5 rounded-md text-[9px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-950/70 dark:text-purple-300">DIV 3 · RECORDS</span>
+                                            }
+                                        </div>
+                                    </td>
+
+                                    <!-- Action & Stage Badge -->
+                                    <td class="px-4 py-3.5">
+                                        <span class="inline-flex flex-wrap items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-semibold border @badgeClass">
+                                            <span class="w-1.5 h-1.5 rounded-full @dotClass"></span>
+                                            <span>@l.ActionTaken</span>
+                                            @if (!string.IsNullOrWhiteSpace(l.AssignedToRole))
+                                            {
+                                                <span class="opacity-40">&bull;</span>
+                                                <span>Stage: @l.AssignedToRole</span>
+                                            }
+                                        </span>
+                                    </td>
+
+                                    <!-- Action By -->
+                                    <td class="hidden md:table-cell px-4 py-3.5">
+                                        @if (string.IsNullOrWhiteSpace(l.ForwardedByName))
+                                        {
+                                            <span class="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-stone-800 text-slate-500 dark:text-stone-400 text-[10px] font-bold">
+                                                System
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <div class="inline-flex items-center gap-1.5 text-slate-700 dark:text-stone-200 font-bold">
+                                                <i data-lucide="user-check" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
+                                                <span>@l.ForwardedByName</span>
+                                            </div>
+                                            @if (!string.IsNullOrWhiteSpace(l.ForwardedByRole))
+                                            {
+                                                <div class="text-[10px] text-slate-400">@l.ForwardedByRole</div>
+                                            }
+                                        }
+                                    </td>
+
+                                    <!-- Remarks -->
+                                    <td class="hidden lg:table-cell px-4 py-3.5 text-slate-600 dark:text-stone-400 max-w-xs truncate" title="@l.Remarks">
+                                        @(string.IsNullOrWhiteSpace(l.Remarks) ? "—" : l.Remarks)
+                                    </td>
+
+                                    <!-- When -->
+                                    <td class="hidden sm:table-cell px-4 py-3.5 text-slate-600 dark:text-stone-400">
+                                        <div>@l.Timestamp.ToString("MMM dd, yyyy")</div>
+                                        <div class="text-[10px] text-slate-400">@l.Timestamp.ToString("hh:mm tt")</div>
+                                    </td>
+
+                                    <!-- Actions -->
+                                    <td class="px-4 py-3.5 text-center">
+                                        <a href="@detailsUrl"
+                                           class="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-slate-700 dark:text-stone-300 font-bold text-[10px] border border-slate-200 dark:border-stone-700 transition-colors"
+                                           title="View Transaction Details">
+                                            <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+                                            <span>View</span>
+                                        </a>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 </div>
 

@@ -82,3 +82,79 @@ public class DashboardBreakdownItem
     public string Label { get; set; } = string.Empty;
     public int Count { get; set; }
 }
+
+public class ExecutiveAnalyticsViewModel
+{
+    public List<(string Code, string Name)> Barangays { get; set; } = new();
+    public List<string> ActualUses { get; set; } = new();
+}
+
+public class DashboardAnalyticsFilterDto
+{
+    public string Preset { get; set; } = "YTD";
+    public int PropertyKind { get; set; } = 0; // 0 = All, 1 = Land, 2 = Building, 3 = Machinery
+    public string? BarangayFilter { get; set; }
+    public string? ActualUseFilter { get; set; }
+    public DateTime? StartDate { get; set; }
+    public DateTime? EndDate { get; set; }
+}
+
+public class ExecutiveAnalyticsResponseDto
+{
+    public ExecutiveKpiMetricsDto Kpis { get; set; } = new();
+    public List<MonthlyVolumeTrendDto> MonthlyTrends { get; set; } = new();
+    public List<TransactionDistributionDto> TransactionDistributions { get; set; } = new();
+    public List<ActualUseDistributionDto> ActualUseDistributions { get; set; } = new();
+    public List<BarangayAnalyticsRowDto> BarangayLeaderboard { get; set; } = new();
+    public List<BarangayAnalyticsRowDto> SummaryTableRows { get; set; } = new();
+    public string FilterSummary { get; set; } = string.Empty;
+}
+
+public class ExecutiveKpiMetricsDto
+{
+    public decimal TotalAssessmentRollValue { get; set; }
+    public decimal TotalMarketValue { get; set; }
+    public int TotalActiveDeclarations { get; set; }
+    public int ProcessedTransactionsCount { get; set; }
+    public decimal TaxableRatioPct { get; set; } = 100m;
+    public decimal ExemptRatioPct { get; set; } = 0m;
+    public decimal TotalTaxableAssessedValue { get; set; }
+    public decimal TotalExemptAssessedValue { get; set; }
+}
+
+public class MonthlyVolumeTrendDto
+{
+    public string MonthLabel { get; set; } = string.Empty;
+    public int TransactionCount { get; set; }
+    public decimal AddedAssessedValue { get; set; }
+}
+
+public class TransactionDistributionDto
+{
+    public string TransactionCode { get; set; } = string.Empty;
+    public string TransactionName { get; set; } = string.Empty;
+    public int Count { get; set; }
+    public decimal TotalAssessedValue { get; set; }
+    public decimal Percentage { get; set; }
+}
+
+public class ActualUseDistributionDto
+{
+    public string ActualUseName { get; set; } = string.Empty;
+    public decimal TotalMarketValue { get; set; }
+    public decimal TotalAssessedValue { get; set; }
+    public int ParcelCount { get; set; }
+    public decimal Percentage { get; set; }
+}
+
+public class BarangayAnalyticsRowDto
+{
+    public string BarangayCode { get; set; } = string.Empty;
+    public string BarangayName { get; set; } = string.Empty;
+    public int TotalParcelCount { get; set; }
+    public int ActiveCount { get; set; }
+    public int CancelledCount { get; set; }
+    public decimal TotalLandArea { get; set; }
+    public decimal TotalMarketValue { get; set; }
+    public decimal TotalAssessedValue { get; set; }
+}

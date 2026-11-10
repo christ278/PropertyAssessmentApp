@@ -176,6 +176,9 @@ public class PermissionService : IPermissionService
                 "staff" => "DASHBOARD_USER",
                 "assessorhead" => "DASHBOARD_HEAD",
                 "systemowner" => "DASHBOARD_ADMIN",
+                "analytics" => "DASHBOARD_ANALYTICS",
+                "getexecutiveanalytics" => "DASHBOARD_ANALYTICS",
+                "exportanalyticscsv" => "DASHBOARD_ANALYTICS",
                 _ => null
             };
 
