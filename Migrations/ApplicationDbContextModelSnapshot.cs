@@ -6651,6 +6651,10 @@ namespace PropertyAssessmentApp.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("TransactionNo")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<string>("TransactionTypeCode")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");

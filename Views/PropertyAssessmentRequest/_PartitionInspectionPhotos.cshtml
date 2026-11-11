@@ -1,0 +1,179 @@
+<!-- FIELD INSPECTION ATTACHMENTS & PHOTOS (FROM FAIRTRACK MOBILE & WEB) -->
+<div class="photo-attachment-card p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4 mt-6">
+    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-stone-800 pb-3">
+        <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+            <i data-lucide="camera" class="w-4 h-4"></i>
+            Field Inspection Photo Attachments
+        </h4>
+        <div class="flex items-center gap-3">
+            <button type="button" onclick="triggerPartitionPhotoUpload(this)" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer">
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                <span class="btnUploadPhotosText">Add Photos</span>
+            </button>
+            <span class="text-xs text-slate-400 font-mono">FairTrack Mobile Sync</span>
+        </div>
+    </div>
+    
+    <div class="inspectionPhotosContainer">
+        <!-- Populated dynamically by renderInspectionPhotosGallery() -->
+    </div>
+</div>
+
+<script>
+    (function () {
+        if (typeof window.triggerPartitionPhotoUpload === 'undefined') {
+            window.triggerPartitionPhotoUpload = function (btn) {
+                let input = document.getElementById('fileUploadInspectionPhotos');
+                if (!input) {
+                    input = document.createElement('input');
+                    input.type = 'file';
+                    input.id = 'fileUploadInspectionPhotos';
+                    input.multiple = true;
+                    input.accept = 'image/*';
+                    input.className = 'hidden';
+                    input.onchange = function (e) {
+                        if (typeof window.handleWebInspectionPhotos === 'function') {
+                            window.handleWebInspectionPhotos(e);
+                        }
+                    };
+                    document.body.appendChild(input);
+                }
+                input.click();
+            };
+        }
+
+        if (typeof window.partitionInspectionPhotos === 'undefined') {
+            window.partitionInspectionPhotos = [];
+            try {
+                const rawAtts = (document.getElementById('AttachmentsJson')?.value) || (document.getElementById('PropertyImagesJson')?.value);
+                if (rawAtts && rawAtts.trim()) {
+                    window.partitionInspectionPhotos = JSON.parse(rawAtts);
+                    if (!Array.isArray(window.partitionInspectionPhotos)) window.partitionInspectionPhotos = [];
+                }
+            } catch (e) {
+                window.partitionInspectionPhotos = [];
+            }
+        }
+
+        if (typeof window.renderInspectionPhotosGallery === 'undefined') {
+            window.renderInspectionPhotosGallery = function () {
+                const containers = document.querySelectorAll('.inspectionPhotosContainer, #inspectionPhotosContainer');
+                if (!containers || containers.length === 0) return;
+
+                let innerHtml = '';
+                const photos = window.partitionInspectionPhotos || [];
+                if (!photos || photos.length === 0) {
+                    innerHtml = `
+                        <div class="p-6 text-center text-slate-400 dark:text-stone-500 bg-white dark:bg-stone-900 rounded-xl border border-dashed border-slate-200 dark:border-stone-800">
+                            <i data-lucide="images" class="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-stone-600"></i>
+                            <p class="text-xs font-mono font-bold text-slate-600 dark:text-stone-400">No Inspection Photos Uploaded Yet</p>
+                            <p class="text-[11px] font-mono text-slate-400 dark:text-stone-500 mt-1">
+                                Click "+ Add Photos" above to upload inspection photos, or capture site photos via FairTrack Mobile app.
+                            </p>
+                        </div>`;
+                } else {
+                    innerHtml = '<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">';
+                    photos.forEach((item, index) => {
+                        const fileUrl = item.fileUrl || item.FileUrl || item.imagePath || item.ImagePath || '';
+                        const fileName = item.fileName || item.FileName || item.originalFileName || `Photo ${index + 1}`;
+                        const itemId = item.id || item.Id || ('photo_' + index);
+                        innerHtml += `
+                            <div class="group relative aspect-square rounded-xl overflow-hidden border border-slate-200 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-xs hover:border-emerald-600 transition-all">
+                                <a href="${fileUrl}" target="_blank" class="block w-full h-full">
+                                    <img src="${fileUrl}" alt="${fileName}" class="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                </a>
+                                <div class="absolute inset-x-0 bottom-0 p-1.5 bg-slate-900/80 backdrop-blur-xs text-[10px] text-white flex items-center justify-between gap-1">
+                                    <span class="truncate" title="${fileName}">${fileName}</span>
+                                    <button type="button" onclick="removePartitionPhoto('${itemId}', event)" class="text-red-400 hover:text-red-300 p-0.5 shrink-0 transition-colors" title="Delete Photo">
+                                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                                    </button>
+                                </div>
+                            </div>`;
+                    });
+                    innerHtml += '</div>';
+                }
+
+                containers.forEach(c => {
+                    c.innerHTML = innerHtml;
+                });
+
+                if (window.lucide) {
+                    lucide.createIcons();
+                }
+            };
+        }
+
+        if (typeof window.removePartitionPhoto === 'undefined') {
+            window.removePartitionPhoto = function (id, e) {
+                if (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+                if (!confirm('Are you sure you want to remove this inspection photo?')) return;
+
+                window.partitionInspectionPhotos = (window.partitionInspectionPhotos || []).filter((p, idx) => {
+                    const pid = p.id || p.Id || ('photo_' + idx);
+                    return pid !== id;
+                });
+                const attInput = document.getElementById('AttachmentsJson');
+                if (attInput) attInput.value = JSON.stringify(window.partitionInspectionPhotos);
+                const imgInput = document.getElementById('PropertyImagesJson');
+                if (imgInput) imgInput.value = JSON.stringify(window.partitionInspectionPhotos);
+
+                window.renderInspectionPhotosGallery();
+                if (window.toastr) toastr.info('Photo removed.');
+            };
+        }
+
+        if (typeof window.handleWebInspectionPhotos === 'undefined') {
+            window.handleWebInspectionPhotos = async function (event) {
+                const files = event.target.files;
+                if (!files || files.length === 0) return;
+
+                const btnTexts = document.querySelectorAll('.btnUploadPhotosText, #btnUploadPhotosText');
+                btnTexts.forEach(b => b.innerText = 'Uploading...');
+
+                const formData = new FormData();
+                for (let i = 0; i < files.length; i++) {
+                    formData.append('files', files[i]);
+                }
+                const tracking = (document.getElementById('inputTdn')?.value) || (document.getElementById('bannerDisplayTdn')?.innerText) || 'FAAS-ENC';
+                formData.append('trackingNo', tracking);
+
+                try {
+                    const response = await fetch('/PropertyAssessmentRequest/UploadPartitionInspectionPhotos', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!response.ok) throw new Error('Upload failed: ' + response.status);
+
+                    const newPhotos = await response.json();
+                    if (Array.isArray(newPhotos) && newPhotos.length > 0) {
+                        if (!Array.isArray(window.partitionInspectionPhotos)) window.partitionInspectionPhotos = [];
+                        window.partitionInspectionPhotos.push(...newPhotos);
+                        const attInput = document.getElementById('AttachmentsJson');
+                        if (attInput) attInput.value = JSON.stringify(window.partitionInspectionPhotos);
+                        const imgInput = document.getElementById('PropertyImagesJson');
+                        if (imgInput) imgInput.value = JSON.stringify(window.partitionInspectionPhotos);
+
+                        window.renderInspectionPhotosGallery();
+                        if (window.toastr) toastr.success(`Uploaded ${newPhotos.length} photo(s) successfully!`);
+                    }
+                } catch (err) {
+                    console.error('Photo upload error:', err);
+                    if (window.toastr) toastr.error('Failed to upload inspection photos.');
+                } finally {
+                    btnTexts.forEach(b => b.innerText = 'Add Photos');
+                    event.target.value = '';
+                }
+            };
+        }
+
+        setTimeout(function () {
+            if (typeof window.renderInspectionPhotosGallery === 'function') {
+                window.renderInspectionPhotosGallery();
+            }
+        }, 100);
+    })();
+</script>

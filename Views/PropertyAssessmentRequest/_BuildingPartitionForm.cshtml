@@ -197,26 +197,37 @@
         <!-- Left Column: Location of Property & Land Reference -->
         <div class="space-y-6">
             <!-- Location of Property Card (CAST Standard) -->
+            <!-- Location Card -->
             <div class="p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
                 <h3 class="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
-                    <i data-lucide="map-pin" class="w-4 h-4 text-emerald-600"></i> Location of Property
+                    <i data-lucide="map-pin" class="w-4 h-4 text-emerald-600"></i> Location of Property (City of Koronadal Standard)
                 </h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="md:col-span-2">
-                        <label asp-for="StreetLocation" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">STREET ADDRESS / NO.</label>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="md:col-span-3">
+                        <label asp-for="StreetLocation" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">STREET ADDRESS / NO.</label>
                         <input asp-for="StreetLocation" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="e.g. 123 Pioneer Avenue" />
                     </div>
                     <div>
-                        <label asp-for="DistrictOrBarangay" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">BARANGAY</label>
-                        <input asp-for="DistrictOrBarangay" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="e.g. Barangay Dadiangas South" />
+                        <label asp-for="DistrictOrBarangay" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BARANGAY <span class="text-rose-500">*</span></label>
+                        <select asp-for="DistrictOrBarangay" id="selectBldgBarangay" class="select2-barangay w-full">
+                            @foreach (var b in PropertyAssessmentApp.Controllers.DashboardController.OfficialKoronadalBarangays.OrderBy(x => x.Name))
+                            {
+                                var isSel = string.Equals(Model.DistrictOrBarangay, b.Name, StringComparison.OrdinalIgnoreCase)
+                                         || string.Equals(Model.DistrictOrBarangay, b.Code, StringComparison.OrdinalIgnoreCase)
+                                         || (string.IsNullOrWhiteSpace(Model.DistrictOrBarangay) && b.Code == "0001");
+                                <option value="@b.Name" selected="@(isSel ? "selected" : null)">@b.Name</option>
+                            }
+                        </select>
                     </div>
                     <div>
-                        <label asp-for="CityMunicipality" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">CITY / MUNICIPALITY</label>
-                        <input asp-for="CityMunicipality" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="e.g. General Santos City" />
+                        <label class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">CITY / MUNICIPALITY</label>
+                        <input id="inputBldgCity" class="w-full px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-stone-800/80 border border-slate-200 dark:border-stone-700 font-mono text-xs text-slate-600 dark:text-stone-300 font-bold cursor-not-allowed select-none opacity-80" disabled value="Koronadal City" />
+                        <input type="hidden" name="CityMunicipality" value="Koronadal City" />
                     </div>
-                    <div class="md:col-span-2">
-                        <label asp-for="Province" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">PROVINCE</label>
-                        <input asp-for="Province" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="e.g. South Cotabato" />
+                    <div>
+                        <label class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">PROVINCE</label>
+                        <input id="inputBldgProvince" class="w-full px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-stone-800/80 border border-slate-200 dark:border-stone-700 font-mono text-xs text-slate-600 dark:text-stone-300 font-bold cursor-not-allowed select-none opacity-80" disabled value="South Cotabato" />
+                        <input type="hidden" name="Province" value="South Cotabato" />
                     </div>
                 </div>
             </div>
@@ -776,6 +787,9 @@
             <textarea asp-for="Memoranda" id="textareaMemoranda" rows="4" class="w-full px-4 py-3 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-xs font-mono uppercase focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="ENTER LEGAL MEMORANDA, BOUNDARIES, DEPRECIATION BASIS, OR PARTITION RESTRICTIONS..."></textarea>
         </div>
     </div>
+
+    <!-- Field Inspection Photo Attachments (Inside last tab below Memoranda & Notes) -->
+    <partial name="~/Views/Shared/_PartitionInspectionPhotos.cshtml" />
 </div>
 
 <!-- MODAL: ADD BUILDING CORE BUCC COMPONENT / FLOOR LEVEL -->

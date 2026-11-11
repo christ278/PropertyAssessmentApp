@@ -1,4 +1,4 @@
-﻿@model PropertyAssessmentApp.Models.PropertyAssessmentRequest
+@model PropertyAssessmentApp.Models.PropertyAssessmentRequest
 @using PropertyAssessmentApp.Models
 
 @{
@@ -23,7 +23,7 @@
                     Status: @Model.Status
                 </span>
             </div>
-            <p class="text-slate-500 dark:text-stone-400 text-sm">[@Model.TransactionTypeCode] @Model.TransactionTypeName | Filed on @Model.RequestDate.ToString("MMMM dd, yyyy hh:mm tt")</p>
+            <p class="text-slate-500 dark:text-stone-400 text-sm">[@Model.TransactionTypeCode] @Model.TransactionTypeName @(!string.IsNullOrWhiteSpace(Model.TransactionNo) ? $"• TX: {Model.TransactionNo}" : "") | Filed on @Model.RequestDate.ToString("MMMM dd, yyyy hh:mm tt")</p>
         </div>
         <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
             @if (Model.Status == PropertyAssessmentStatus.Receiving || Model.Status == PropertyAssessmentStatus.Pending)
@@ -247,6 +247,10 @@
                 <div>
                     <dt class="text-[10px] text-slate-400 font-bold uppercase">Transaction Type</dt>
                     <dd class="text-xs font-black text-slate-900 dark:text-white">@Model.TransactionTypeDisplayName</dd>
+                </div>
+                <div>
+                    <dt class="text-[10px] text-slate-400 font-bold uppercase">Transaction No.</dt>
+                    <dd class="text-xs font-mono font-bold text-emerald-700 dark:text-emerald-400">@(string.IsNullOrWhiteSpace(Model.TransactionNo) ? "N/A" : Model.TransactionNo)</dd>
                 </div>
                 <div>
                     <dt class="text-[10px] text-slate-400 font-bold uppercase">Property Kind</dt>

@@ -97,6 +97,11 @@
                 initLandFormDynamicTables(window.loadedPartitionData || null);
             }
         }
+        setTimeout(function () {
+            if (typeof initPartitionBarangayDropdowns === 'function') {
+                initPartitionBarangayDropdowns();
+            }
+        }, 50);
         if (window.lucide) lucide.createIcons();
     }
 
@@ -105,6 +110,13 @@
         $('#' + tabId).removeClass('hidden');
         $('.land-tab-btn').removeClass('bg-emerald-600 text-white shadow-sm').addClass('bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-400');
         $('#btn-' + tabId).removeClass('bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-400').addClass('bg-emerald-600 text-white shadow-sm');
+        if (tabId === 'land-tab-location') {
+            setTimeout(function () {
+                if (typeof initPartitionBarangayDropdowns === 'function') {
+                    initPartitionBarangayDropdowns();
+                }
+            }, 50);
+        }
         if (window.lucide) lucide.createIcons();
     }
 
@@ -1264,6 +1276,12 @@
         $('.tab-btn').removeClass('bg-emerald-600 text-white shadow-sm').addClass('bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-400 border border-slate-200 dark:border-stone-800 hover:bg-slate-200 dark:hover:bg-stone-700');
         $('#btn-' + tabId).addClass('bg-emerald-600 text-white shadow-sm').removeClass('bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-400 border border-slate-200 dark:border-stone-800 hover:bg-slate-200 dark:hover:bg-stone-700');
 
+        setTimeout(function () {
+            if (typeof initPartitionBarangayDropdowns === 'function') {
+                initPartitionBarangayDropdowns();
+            }
+        }, 50);
+
         if (window.lucide) lucide.createIcons();
     }
 
@@ -2208,8 +2226,8 @@
             updatedPartition.localDateIssued = $('#inputMachineryLocalDateIssued').val() || null;
 
             updatedPartition.streetLocation = $('#inputMachineryStreet').val() || '';
-            updatedPartition.districtOrBarangay = $('#selectMachineryBarangay').val() || '';
-            updatedPartition.cityMunicipality = $('#inputMachineryCity').val() || 'General Santos City';
+            updatedPartition.districtOrBarangay = $('#selectMachineryBarangay').val() || 'BRGY. ZONE I';
+            updatedPartition.cityMunicipality = $('#inputMachineryCity').val() || 'Koronadal City';
             updatedPartition.province = $('#inputMachineryProvince').val() || 'South Cotabato';
             const locParts = [updatedPartition.streetLocation, updatedPartition.districtOrBarangay, updatedPartition.cityMunicipality, updatedPartition.province].filter(Boolean);
             updatedPartition.propertyLocation = locParts.join(', ');
@@ -2313,8 +2331,8 @@
 
             updatedPartition.streetLocation = $('#inputLandStreet').val() || '';
             updatedPartition.purok = $('#inputLandPurok').val() || '';
-            updatedPartition.districtOrBarangay = $('#selectLandBarangay').val() || '';
-            updatedPartition.cityMunicipality = $('#inputLandCity').val() || 'General Santos City';
+            updatedPartition.districtOrBarangay = $('#selectLandBarangay').val() || 'BRGY. ZONE I';
+            updatedPartition.cityMunicipality = $('#inputLandCity').val() || 'Koronadal City';
             updatedPartition.province = $('#inputLandProvince').val() || 'South Cotabato';
             const locParts = [updatedPartition.streetLocation, updatedPartition.purok, updatedPartition.districtOrBarangay, updatedPartition.cityMunicipality, updatedPartition.province].filter(Boolean);
             updatedPartition.propertyLocation = locParts.join(', ');
@@ -2485,9 +2503,9 @@
         updatedPartition.customOwner = true;
 
         updatedPartition.streetLocation = $('input[name="StreetLocation"]').val();
-        updatedPartition.districtOrBarangay = $('input[name="DistrictOrBarangay"]').val();
-        updatedPartition.cityMunicipality = $('input[name="CityMunicipality"]').val();
-        updatedPartition.province = $('input[name="Province"]').val();
+        updatedPartition.districtOrBarangay = $('#selectBldgBarangay').val() || $('select[name="DistrictOrBarangay"]').val() || $('input[name="DistrictOrBarangay"]').val() || 'BRGY. ZONE I';
+        updatedPartition.cityMunicipality = $('#inputBldgCity').val() || $('input[name="CityMunicipality"]').val() || 'Koronadal City';
+        updatedPartition.province = $('#inputBldgProvince').val() || $('input[name="Province"]').val() || 'South Cotabato';
         updatedPartition.propertyLocation = $('#inputPropertyLocation').val() || [updatedPartition.streetLocation, updatedPartition.districtOrBarangay, updatedPartition.cityMunicipality, updatedPartition.province].filter(Boolean).join(', ');
         $('#inputPropertyLocation').val(updatedPartition.propertyLocation);
 
@@ -2579,14 +2597,35 @@
         if (/^\d+$/.test(raw)) return raw.slice(-4).padStart(4, '0');
         const u = raw.toUpperCase();
         const map = [
-            ['DADIANGAS EAST', '0001'], ['CENTRAL', '0001'], ['POBLACION', '0001'], ['ZONE 1', '0001'],
-            ['LAGAO', '0002'], ['MORALES', '0002'], ['CALUMPANG', '0003'], ['SAN ISIDRO', '0004'],
-            ['CITY HEIGHTS', '0005'], ['DADIANGAS NORTH', '0006'], ['DADIANGAS SOUTH', '0007'],
-            ['DADIANGAS WEST', '0008'], ['LABANGAL', '0009'], ['APOPONG', '0010'], ['BALUAN', '0011'],
-            ['BATOMELONG', '0012'], ['BUAYAN', '0013'], ['BULA', '0014'], ['CONEL', '0015'],
-            ['FATIMA', '0016'], ['KATANGAWAN', '0017'], ['LIGAYA', '0018'], ['MABUHAY', '0019'],
-            ['OLYMPOG', '0020'], ['SAN JOSE', '0021'], ['SIGUEL', '0022'], ['SINAWAL', '0023'],
-            ['TAMBLER', '0024'], ['TINAGACAN', '0025'], ['UPPER LABAY', '0026'], ['SALITRAN', '0027']
+            ['ZONE I', '0001'], ['ZONE 1', '0001'],
+            ['ZONE II', '0002'], ['ZONE 2', '0002'],
+            ['ZONE III', '0003'], ['ZONE 3', '0003'],
+            ['ZONE IV', '0004'], ['ZONE 4', '0004'],
+            ['ASSUMPTION', '0005'],
+            ['AVANCEÑA', '0006'], ['AVANCENA', '0006'],
+            ['CACUB', '0007'],
+            ['CALOOCAN', '0008'],
+            ['CARPENTER HILL', '0009'],
+            ['CONCEPCION', '0010'],
+            ['ESPERANZA', '0011'],
+            ['GEN. P. SANTOS', '0012'], ['GEN. P SANTOS', '0012'], ['GEN P SANTOS', '0012'],
+            ['MABINI', '0013'],
+            ['MAGSAYSAY', '0014'],
+            ['MAMBUCAL', '0015'],
+            ['MORALES', '0016'],
+            ['NAMNAMA', '0017'],
+            ['NEW PANGASINAN', '0018'],
+            ['PARAISO', '0019'],
+            ['ROTONDA', '0020'],
+            ['SAN ISIDRO', '0021'],
+            ['SAN JOSE', '0022'],
+            ['SAN ROQUE', '0023'],
+            ['SARAVIA', '0024'],
+            ['STA. CRUZ', '0025'], ['STA CRUZ', '0025'],
+            ['STO. NIÑO', '0026'], ['STO. NINO', '0026'], ['STO NINO', '0026'],
+            ['TOPLAND', '0027'],
+            ['DADIANGAS EAST', '0001'], ['CENTRAL', '0001'], ['POBLACION', '0001'],
+            ['LAGAO', '0002'], ['CALUMPANG', '0003'], ['CITY HEIGHTS', '0005']
         ];
         for (const [k, c] of map) {
             if (u.includes(k)) return c;
@@ -2626,6 +2665,23 @@
         return `${revYearLastTwo}-${brgy4}-${seq5}`;
     }
 
+    function initPartitionBarangayDropdowns() {
+        if (typeof $.fn.select2 === 'undefined') return;
+        $('.select2-barangay').each(function () {
+            const $el = $(this);
+            if ($el.data('select2')) {
+                $el.select2('destroy');
+            }
+            $el.select2({
+                width: '100%',
+                placeholder: 'Search & select Barangay...',
+                allowClear: false
+            }).on('change', function () {
+                syncCastArpAndTdnLive();
+            });
+        });
+    }
+
     function syncCastArpAndTdnLive() {
         const k = ($('#inputKindHidden').val() || 'Land').toLowerCase();
         const isLand = k === 'land';
@@ -2634,7 +2690,7 @@
             ? ($('#selectLandBarangay').val() || '')
             : (isMachinery
                 ? ($('#selectMachineryBarangay').val() || '')
-                : ($('#container-building-appraisal input[name="DistrictOrBarangay"]').val() || ''));
+                : ($('#selectBldgBarangay').val() || $('#container-building-appraisal select[name="DistrictOrBarangay"]').val() || $('#container-building-appraisal input[name="DistrictOrBarangay"]').val() || ''));
         const secVal = isLand
             ? ($('#inputLandSectionNo').val() || '')
             : (isMachinery
@@ -2665,6 +2721,7 @@
 
     $(document).ready(function () {
         initSwitches();
+        initPartitionBarangayDropdowns();
 
         $('#inputTdn').on('input', function() {
             const v = $(this).val().trim() || 'TDN System Pending';

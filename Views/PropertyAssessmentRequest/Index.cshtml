@@ -1,4 +1,4 @@
-﻿@model IEnumerable<PropertyAssessmentApp.Models.PropertyAssessmentRequest>
+@model IEnumerable<PropertyAssessmentApp.Models.PropertyAssessmentRequest>
 @using PropertyAssessmentApp.Models
 
 @{
@@ -114,8 +114,8 @@
         </form>
 
         <!-- Requests Table -->
-        <div class="border border-slate-200 dark:border-stone-800 rounded-2xl overflow-hidden paginated-table-card">
-            <div class="overflow-x-auto">
+        <div class="border border-slate-200 dark:border-stone-800 rounded-2xl paginated-table-card">
+            <div class="overflow-x-auto min-h-[280px] pb-4">
                 <table class="w-full text-left text-xs font-mono">
                     <thead class="bg-slate-100 dark:bg-stone-950 text-slate-600 dark:text-stone-400 border-b border-slate-200 dark:border-stone-800 uppercase tracking-wider">
                         <tr>
@@ -152,6 +152,10 @@
                                             <i data-lucide="file-check-2" class="w-3.5 h-3.5"></i>
                                             @item.TrackingNumber
                                         </a>
+                                        @if (!string.IsNullOrWhiteSpace(item.TransactionNo))
+                                        {
+                                            <span class="block text-[10px] font-mono font-bold text-slate-700 dark:text-stone-300">TX: @item.TransactionNo</span>
+                                        }
                                         <span class="block text-[10px] text-slate-400 font-normal">@item.RequestDate.ToString("yyyy-MM-dd HH:mm")</span>
                                         <div class="md:hidden mt-1 text-[10px] text-slate-600 dark:text-stone-400 font-bold">
                                             @item.TransactionTypeDisplayName
@@ -220,23 +224,44 @@
                                             <span class="text-slate-400">None</span>
                                         }
                                     </td>
-                                    <td class="px-2 sm:px-4 py-3 text-center">
-                                        <div class="flex items-center justify-center gap-1.5">
-                                            @if (item.Status == PropertyAssessmentStatus.Receiving || item.Status == PropertyAssessmentStatus.Pending)
-                                            {
-                                                <button type="button" onclick="openIndexForwardModal('@item.Id', '@item.TrackingNumber', '@(item.ORNumber ?? "")')" class="p-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300 hover:scale-105 transition-all" title="Forward to GIS Mapping">
-                                                    <i data-lucide="arrow-right-circle" class="w-4 h-4"></i>
-                                                </button>
-                                            }
-                                            <a asp-action="Details" asp-route-id="@item.Id" class="p-1.5 rounded-lg bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 hover:bg-slate-200" title="Details / Partition">
-                                                <i data-lucide="eye" class="w-4 h-4"></i>
-                                            </a>
-                                            <a asp-action="Edit" asp-route-id="@item.Id" class="p-1.5 rounded-lg bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 hover:bg-slate-200" title="Edit">
-                                                <i data-lucide="edit" class="w-4 h-4"></i>
-                                            </a>
-                                            <a asp-action="PrintPdf" asp-route-id="@item.Id" target="_blank" class="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100" title="Print Tax Declaration (PDF)">
-                                                <i data-lucide="printer" class="w-4 h-4"></i>
-                                            </a>
+                                    <td class="px-2 sm:px-4 py-3 text-center relative">
+                                        <div class="relative inline-block text-left">
+                                            <button type="button" onclick="toggleKebabMenu(event, 'kebab-par-@item.Id')" class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-slate-700 dark:text-stone-300 border border-slate-200 dark:border-stone-700 transition-colors focus:outline-none" title="More Actions">
+                                                <i data-lucide="more-vertical" class="w-4 h-4"></i>
+                                            </button>
+
+                                            <div id="kebab-par-@item.Id" class="kebab-dropdown hidden absolute right-0 mt-2 w-56 rounded-2xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-xl z-50 overflow-hidden divide-y divide-slate-100 dark:divide-stone-800/80 text-xs font-mono text-left">
+                                                <div class="py-1">
+                                                    @if (item.Status == PropertyAssessmentStatus.Receiving || item.Status == PropertyAssessmentStatus.Pending)
+                                                    {
+                                                        <button type="button" onclick="openIndexForwardModal('@item.Id', '@item.TrackingNumber', '@(item.ORNumber ?? "")')" class="w-full flex items-center gap-2.5 px-3.5 py-2 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-stone-800 font-bold text-left transition-colors">
+                                                            <i data-lucide="arrow-right-circle" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
+                                                            <span>Forward to GIS</span>
+                                                        </button>
+                                                    }
+                                                    <a asp-action="Details" asp-route-id="@item.Id" class="flex items-center gap-2.5 px-3.5 py-2 text-slate-700 dark:text-stone-300 hover:bg-slate-50 dark:hover:bg-stone-800 font-bold transition-colors">
+                                                        <i data-lucide="eye" class="w-3.5 h-3.5 text-blue-600 dark:text-blue-400"></i>
+                                                        <span>Details / Partition</span>
+                                                    </a>
+                                                    <a asp-action="Edit" asp-route-id="@item.Id" class="flex items-center gap-2.5 px-3.5 py-2 text-slate-700 dark:text-stone-300 hover:bg-slate-50 dark:hover:bg-stone-800 font-bold transition-colors">
+                                                        <i data-lucide="edit-3" class="w-3.5 h-3.5 text-teal-600 dark:text-teal-400"></i>
+                                                        <span>Edit Request</span>
+                                                    </a>
+                                                    <a asp-action="PrintPdf" asp-route-id="@item.Id" target="_blank" class="flex items-center gap-2.5 px-3.5 py-2 text-slate-700 dark:text-stone-300 hover:bg-slate-50 dark:hover:bg-stone-800 font-bold transition-colors">
+                                                        <i data-lucide="printer" class="w-3.5 h-3.5 text-sky-600 dark:text-sky-400"></i>
+                                                        <span>Print Tax Declaration</span>
+                                                    </a>
+                                                </div>
+                                                @if (!string.IsNullOrEmpty(item.AttachmentFileName))
+                                                {
+                                                    <div class="py-1">
+                                                        <a asp-action="DownloadAttachment" asp-route-id="@item.Id" class="flex items-center gap-2.5 px-3.5 py-2 text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-stone-800 font-bold transition-colors">
+                                                            <i data-lucide="paperclip" class="w-3.5 h-3.5 text-blue-600"></i>
+                                                            <span>Download Attachment</span>
+                                                        </a>
+                                                    </div>
+                                                }
+                                            </div>
                                         </div>
                                     </td>
                                 </tr>

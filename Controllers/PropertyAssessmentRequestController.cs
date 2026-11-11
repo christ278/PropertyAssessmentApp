@@ -231,10 +231,12 @@ public class PropertyAssessmentRequestController : Controller
 
         var now = DateTime.Now;
         var trackingNo = $"RPA-{now:yyyyMMdd}-{new Random().Next(1000, 9999)}";
+        var transactionNo = $"TX-{now:yyyyMMdd}-{new Random().Next(100, 999)}";
 
         var model = new PropertyAssessmentRequest
         {
             TrackingNumber = trackingNo,
+            TransactionNo = transactionNo,
             TransactionTypeCode = "DC",
             TransactionTypeName = "Discovery/New Declaration",
             Kind = "Land",
@@ -261,6 +263,12 @@ public class PropertyAssessmentRequestController : Controller
         if (request.Status > PropertyAssessmentStatus.Receiving && string.IsNullOrWhiteSpace(request.ORNumber))
         {
             ModelState.AddModelError(nameof(request.ORNumber), "Official Receipt (O.R.) Number is required before forwarding this assessment request beyond Receiving.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.TransactionNo))
+        {
+            var now = DateTime.Now;
+            request.TransactionNo = $"TX-{now:yyyyMMdd}-{new Random().Next(100, 999)}";
         }
 
         ValidateAssessmentRequest(request);
@@ -372,6 +380,12 @@ public class PropertyAssessmentRequestController : Controller
             ModelState.AddModelError(nameof(request.ORNumber), "Official Receipt (O.R.) Number is required before forwarding this assessment request beyond Receiving.");
         }
 
+        if (string.IsNullOrWhiteSpace(request.TransactionNo))
+        {
+            var now = DateTime.Now;
+            request.TransactionNo = $"TX-{now:yyyyMMdd}-{new Random().Next(100, 999)}";
+        }
+
         ValidateAssessmentRequest(request);
 
         if (ModelState.IsValid)
@@ -456,7 +470,15 @@ public class PropertyAssessmentRequestController : Controller
         ViewBag.MachineryActualUses = _context.MachineryActualUses.AsNoTracking().Where(u => u.IsActive).OrderBy(u => u.Rank).ToList();
         ViewBag.MachineryAssessmentLevels = _context.MachineryAssessmentLevels.AsNoTracking().Where(l => l.IsActive).OrderByDescending(l => l.RevisionYear).ToList();
 
-        ViewBag.Barangays = _context.Barangays.AsNoTracking().OrderBy(b => b.Name).ToList();
+        ViewBag.Barangays = DashboardController.OfficialKoronadalBarangays
+            .OrderBy(b => b.Name)
+            .Select(b => new Barangay
+            {
+                Code = b.Code,
+                Name = b.Name,
+                District = "Koronadal City"
+            })
+            .ToList();
         ViewBag.RegisteredOwners = _context.TaxpayerOwners
             .AsNoTracking()
             .Where(o => o.IsActive)
@@ -466,6 +488,9 @@ public class PropertyAssessmentRequestController : Controller
             .ToList();
 
         AssessmentPartitionItem partition = new AssessmentPartitionItem();
+        partition.CityMunicipality = "Koronadal City";
+        partition.Province = "South Cotabato";
+        partition.DistrictOrBarangay = "BRGY. ZONE I";
         if (!string.IsNullOrWhiteSpace(kind))
         {
             partition.Kind = kind.Trim();
@@ -493,10 +518,40 @@ public class PropertyAssessmentRequestController : Controller
                         {
                             partition.Kind = kind.Trim();
                         }
+                        else if (string.IsNullOrWhiteSpace(partition.Kind))
+                        {
+                            if (!string.IsNullOrWhiteSpace(partition.BuildingClassification) ||
+                                !string.IsNullOrWhiteSpace(partition.StructuralType) ||
+                                (!string.IsNullOrWhiteSpace(partition.BuildingFloorBreakdownJson) && partition.BuildingFloorBreakdownJson.Length > 2))
+                            {
+                                partition.Kind = "Building";
+                            }
+                            else if (!string.IsNullOrWhiteSpace(partition.MachineryAppraisalDetailsJson) && partition.MachineryAppraisalDetailsJson.Length > 2)
+                            {
+                                partition.Kind = "Machinery";
+                            }
+                            else
+                            {
+                                partition.Kind = "Land";
+                            }
+                        }
                     }
                 }
                 catch { }
             }
+        }
+
+        if (string.IsNullOrWhiteSpace(partition.CityMunicipality))
+        {
+            partition.CityMunicipality = "Koronadal City";
+        }
+        if (string.IsNullOrWhiteSpace(partition.Province))
+        {
+            partition.Province = "South Cotabato";
+        }
+        if (string.IsNullOrWhiteSpace(partition.DistrictOrBarangay))
+        {
+            partition.DistrictOrBarangay = "BRGY. ZONE I";
         }
 
         return View(partition);
@@ -671,12 +726,32 @@ public class PropertyAssessmentRequestController : Controller
                     if (string.IsNullOrWhiteSpace(payloadItem.BaseTDN)) payloadItem.BaseTDN = item.BaseTDN;
                     if (string.IsNullOrWhiteSpace(payloadItem.AttachmentsJson)) payloadItem.AttachmentsJson = item.AttachmentsJson;
                     if (string.IsNullOrWhiteSpace(payloadItem.PropertyImagesJson)) payloadItem.PropertyImagesJson = item.PropertyImagesJson;
+                    if (string.IsNullOrWhiteSpace(payloadItem.Kind) && !string.IsNullOrWhiteSpace(item.Kind))
+                        payloadItem.Kind = item.Kind;
                     item = payloadItem;
                 }
             }
             catch (Exception ex)
             {
                 TempData["ErrorMessage"] = $"Partition payload could not be read, saved form fields only: {ex.Message}";
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(item.Kind))
+        {
+            if (!string.IsNullOrWhiteSpace(item.BuildingClassification) ||
+                !string.IsNullOrWhiteSpace(item.StructuralType) ||
+                (!string.IsNullOrWhiteSpace(item.BuildingFloorBreakdownJson) && item.BuildingFloorBreakdownJson.Length > 2))
+            {
+                item.Kind = "Building";
+            }
+            else if (!string.IsNullOrWhiteSpace(item.MachineryAppraisalDetailsJson) && item.MachineryAppraisalDetailsJson.Length > 2)
+            {
+                item.Kind = "Machinery";
+            }
+            else
+            {
+                item.Kind = "Land";
             }
         }
 
@@ -778,6 +853,10 @@ public class PropertyAssessmentRequestController : Controller
                         {
                             item.AttachmentsJson = list[index].AttachmentsJson;
                         }
+                        if (string.IsNullOrWhiteSpace(item.Kind) && !string.IsNullOrWhiteSpace(list[index].Kind))
+                        {
+                            item.Kind = list[index].Kind;
+                        }
                         list[index] = item;
                     }
                     else
@@ -805,10 +884,14 @@ public class PropertyAssessmentRequestController : Controller
                         if (index >= 0 && index < list.Count)
                         {
                             if (string.IsNullOrWhiteSpace(item.AttachmentsJson) && !string.IsNullOrWhiteSpace(list[index].AttachmentsJson))
-                        {
-                            item.AttachmentsJson = list[index].AttachmentsJson;
-                        }
-                        list[index] = item;
+                            {
+                                item.AttachmentsJson = list[index].AttachmentsJson;
+                            }
+                            if (string.IsNullOrWhiteSpace(item.Kind) && !string.IsNullOrWhiteSpace(list[index].Kind))
+                            {
+                                item.Kind = list[index].Kind;
+                            }
+                            list[index] = item;
                         }
                         else
                         {
@@ -1071,6 +1154,9 @@ public class PropertyAssessmentRequestController : Controller
                 owner = t.OwnerName,
                 location = t.CompleteAddress,
                 kind = t.Kind.ToString(),
+                hasBuilding = t.Kind == PropertyKind.Building || t.BuildingDetails != null,
+                hasLand = t.Kind == PropertyKind.Land || t.LandDetails != null || (t.BuildingDetails != null && !string.IsNullOrWhiteSpace(t.BuildingDetails.LandTdNo)),
+                landTdNo = t.BuildingDetails != null ? t.BuildingDetails.LandTdNo : null,
                 classification = t.Classification,
                 area = t.AreaSqMeters,
                 unitVal = t.UnitValue,

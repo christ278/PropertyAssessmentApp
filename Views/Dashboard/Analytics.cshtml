@@ -1209,8 +1209,11 @@
             const nav = document.getElementById("rollPaginationNav");
             let html = "";
 
+            const firstDisabled = rollCurrentPage === 1 ? "opacity-30 pointer-events-none" : "hover:bg-slate-100 dark:hover:bg-stone-800";
+            html += `<button type="button" onclick="goToRollPage(1)" class="px-2 py-1 rounded-lg border border-slate-200 dark:border-stone-800 text-slate-700 dark:text-stone-300 ${firstDisabled} cursor-pointer" title="First Page">&laquo;</button>`;
+
             const prevDisabled = rollCurrentPage === 1 ? "opacity-30 pointer-events-none" : "hover:bg-slate-100 dark:hover:bg-stone-800";
-            html += `<button type="button" onclick="goToRollPage(${rollCurrentPage - 1})" class="px-2 py-1 rounded-lg border border-slate-200 dark:border-stone-800 text-slate-700 dark:text-stone-300 ${prevDisabled} cursor-pointer">&lsaquo;</button>`;
+            html += `<button type="button" onclick="goToRollPage(${rollCurrentPage - 1})" class="px-2 py-1 rounded-lg border border-slate-200 dark:border-stone-800 text-slate-700 dark:text-stone-300 ${prevDisabled} cursor-pointer" title="Previous Page">&lsaquo;</button>`;
 
             let startP = Math.max(1, rollCurrentPage - 2);
             let endP = Math.min(totalPages, startP + 4);
@@ -1226,12 +1229,17 @@
             }
 
             if (endP < totalPages) {
-                html += `<span class="px-1 text-slate-400">...</span>`;
-                html += `<button type="button" onclick="goToRollPage(${totalPages})" class="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-stone-800 text-slate-700 dark:text-stone-300 hover:bg-slate-100 text-xs cursor-pointer">${totalPages}</button>`;
+                if (endP < totalPages - 1) {
+                    html += `<span class="px-1 text-slate-400 font-bold">...</span>`;
+                }
+                html += `<button type="button" onclick="goToRollPage(${totalPages})" class="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-stone-800 text-slate-700 dark:text-stone-300 hover:bg-slate-100 text-xs cursor-pointer">${totalPages.toLocaleString()}</button>`;
             }
 
             const nextDisabled = rollCurrentPage === totalPages ? "opacity-30 pointer-events-none" : "hover:bg-slate-100 dark:hover:bg-stone-800";
-            html += `<button type="button" onclick="goToRollPage(${rollCurrentPage + 1})" class="px-2 py-1 rounded-lg border border-slate-200 dark:border-stone-800 text-slate-700 dark:text-stone-300 ${nextDisabled} cursor-pointer">&rsaquo;</button>`;
+            html += `<button type="button" onclick="goToRollPage(${rollCurrentPage + 1})" class="px-2 py-1 rounded-lg border border-slate-200 dark:border-stone-800 text-slate-700 dark:text-stone-300 ${nextDisabled} cursor-pointer" title="Next Page">&rsaquo;</button>`;
+
+            const lastDisabled = rollCurrentPage === totalPages ? "opacity-30 pointer-events-none" : "hover:bg-slate-100 dark:hover:bg-stone-800";
+            html += `<button type="button" onclick="goToRollPage(${totalPages})" class="px-2 py-1 rounded-lg border border-slate-200 dark:border-stone-800 text-slate-700 dark:text-stone-300 ${lastDisabled} cursor-pointer" title="Last Page">&raquo;</button>`;
 
             nav.innerHTML = html;
         }

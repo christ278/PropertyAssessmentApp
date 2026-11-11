@@ -1500,6 +1500,7 @@ public class DocumentWorkflowService : IDocumentWorkflowService
         Guid targetId = requestId ?? Guid.Empty;
         string reqType = "";
         string trk = trackingNumber?.Trim() ?? "";
+        string? transactionNo = null;
         string owner = "";
         string refNum = "";
         DateTime dateSubmitted = DateTime.Now;
@@ -1560,12 +1561,17 @@ public class DocumentWorkflowService : IDocumentWorkflowService
                 else
                 {
                     // Search in RequestForInspection
-                    var rfi = targetId != Guid.Empty ? _context.RequestForInspections.FirstOrDefault(r => r.Id == targetId) : (!string.IsNullOrEmpty(trk) ? _context.RequestForInspections.FirstOrDefault(r => r.TrackingNumber == trk) : null);
+                    var rfi = targetId != Guid.Empty
+                        ? _context.RequestForInspections.FirstOrDefault(r => r.Id == targetId)
+                        : (!string.IsNullOrEmpty(trk)
+                            ? _context.RequestForInspections.FirstOrDefault(r => r.TrackingNumber == trk || (r.TransactionNo != null && r.TransactionNo == trk))
+                            : null);
                     if (rfi != null)
                     {
                         targetId = rfi.Id;
                         reqType = "RequestForInspection";
                         trk = rfi.TrackingNumber;
+                        transactionNo = rfi.TransactionNo;
                         owner = rfi.OwnerName ?? "Property Owner";
                         refNum = rfi.PropertyIndexNumber ?? rfi.TaxDeclarationNumber ?? "";
                         dateSubmitted = rfi.RequestDate;
@@ -1574,12 +1580,17 @@ public class DocumentWorkflowService : IDocumentWorkflowService
                     else
                     {
                         // Search in PropertyAssessmentRequest
-                        var rpa = targetId != Guid.Empty ? _context.PropertyAssessmentRequests.FirstOrDefault(r => r.Id == targetId) : (!string.IsNullOrEmpty(trk) ? _context.PropertyAssessmentRequests.FirstOrDefault(r => r.TrackingNumber == trk) : null);
+                        var rpa = targetId != Guid.Empty
+                            ? _context.PropertyAssessmentRequests.FirstOrDefault(r => r.Id == targetId)
+                            : (!string.IsNullOrEmpty(trk)
+                                ? _context.PropertyAssessmentRequests.FirstOrDefault(r => r.TrackingNumber == trk || (r.TransactionNo != null && r.TransactionNo == trk))
+                                : null);
                         if (rpa != null)
                         {
                             targetId = rpa.Id;
                             reqType = "PropertyAssessmentRequest";
                             trk = rpa.TrackingNumber;
+                            transactionNo = rpa.TransactionNo;
                             owner = rpa.NewOwnerName ?? rpa.PrevOwner ?? "Property Owner";
                             refNum = rpa.PrevPIN ?? rpa.PrevTDN ?? "";
                             dateSubmitted = rpa.RequestDate;
@@ -1786,6 +1797,7 @@ public class DocumentWorkflowService : IDocumentWorkflowService
         {
             RequestId = targetId,
             TrackingNumber = trk ?? "",
+            TransactionNo = transactionNo,
             RequestType = reqType ?? "",
             DisplayType = displayType,
             OwnerOrApplicant = owner,
