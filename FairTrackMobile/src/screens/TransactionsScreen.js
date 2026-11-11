@@ -61,7 +61,17 @@ export const TransactionsScreen = ({ navigation }) => {
 
   useEffect(() => {
     fetchTransactions();
-  }, []);
+    const unsubscribe = navigation?.addListener?.('focus', () => {
+      fetchTransactions();
+    });
+    return unsubscribe;
+  }, [navigation]);
+
+  useEffect(() => {
+    if (isOffline || downloadedCount === 0) {
+      fetchTransactions();
+    }
+  }, [downloadedCount]);
 
   const loadOfflineData = async () => {
     if (typeof getOfflineTransactions === 'function') {
@@ -85,6 +95,16 @@ export const TransactionsScreen = ({ navigation }) => {
           .map(normalizeTransactionItem)
           .filter(isAllowedMobileTransaction);
         setTransactions(list);
+
+        // Auto-refresh partition details and inspection photos for already-downloaded items without pending edits
+        for (const item of list) {
+          if (item.HasPartition && isTransactionDownloaded(item.TrackingNo, item.FormworkflowId)) {
+            const hasPending = typeof hasPendingEdits === 'function' && hasPendingEdits(item.TrackingNo, item.FormworkflowId);
+            if (!hasPending) {
+              downloadSingleTransaction(item).catch(() => {});
+            }
+          }
+        }
       }
     } catch (err) {
       console.warn('Network unavailable, falling back to downloaded offline transactions:', err);
@@ -96,12 +116,40 @@ export const TransactionsScreen = ({ navigation }) => {
     }
   };
 
-  // Instant offline-compatible filtering and search
+  // Instant offline-compatible filtering and search with deduplication
+  const uniqueTransactions = React.useMemo(() => {
+    const seen = new Set();
+    const result = [];
+    for (const t of transactions) {
+      const key = (t.TrackingNo || t.FormworkflowId || '').toString().trim().toLowerCase();
+      if (!key) {
+        result.push(t);
+        continue;
+      }
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push(t);
+      }
+    }
+    return result;
+  }, [transactions]);
+
+  const downloadedOnlyCount = React.useMemo(() => {
+    return uniqueTransactions.filter(t => isTransactionDownloaded(t.TrackingNo, t.FormworkflowId)).length;
+  }, [uniqueTransactions, downloadedForms]);
+
+  const notDownloadedCount = React.useMemo(() => {
+    return uniqueTransactions.filter(t => !isTransactionDownloaded(t.TrackingNo, t.FormworkflowId)).length;
+  }, [uniqueTransactions, downloadedForms]);
+
   const displayTransactions = React.useMemo(() => {
-    let list = transactions;
+    let list = uniqueTransactions;
     if (selectedType === 4) {
       // Downloaded only
       list = list.filter(t => isTransactionDownloaded(t.TrackingNo, t.FormworkflowId));
+    } else if (selectedType === 5) {
+      // Not Downloaded only
+      list = list.filter(t => !isTransactionDownloaded(t.TrackingNo, t.FormworkflowId));
     } else if (selectedType > 0) {
       list = list.filter(t => t.TransactionTypeId === selectedType);
     }
@@ -116,7 +164,7 @@ export const TransactionsScreen = ({ navigation }) => {
       );
     }
     return list;
-  }, [transactions, selectedType, searchQuery, downloadedForms]);
+  }, [uniqueTransactions, selectedType, searchQuery, downloadedForms]);
 
   const executeDownloadSingle = async (item) => {
     setDownloadingId(item.FormworkflowId);
@@ -498,7 +546,16 @@ export const TransactionsScreen = ({ navigation }) => {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bgLight }]}>
-      <HeaderBar title="MY TRANSACTIONS" subtitle="Property Assessment & Field Inspection" navigation={navigation} />
+      <HeaderBar
+        title="MY TRANSACTIONS"
+        subtitle="Property Assessment & Field Inspection"
+        navigation={navigation}
+        onRefresh={() => {
+          setRefreshing(true);
+          fetchTransactions();
+        }}
+        isRefreshing={refreshing || loading}
+      />
 
       {/* Offline Status Alert */}
       {isOffline ? (
@@ -573,101 +630,126 @@ export const TransactionsScreen = ({ navigation }) => {
       </View>
 
       {/* Filter Tabs */}
-      <View style={styles.filterTabs}>
-        <TouchableOpacity
-          style={[
-            styles.tabPill,
-            { backgroundColor: colors.cardBg, borderColor: colors.border },
-            selectedType === 0 && { backgroundColor: colors.primary, borderColor: colors.primary }
-          ]}
-          onPress={() => setSelectedType(0)}
+      <View style={{ maxHeight: 52 }}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterTabs}
         >
-          <Text
+          <TouchableOpacity
             style={[
-              styles.tabText,
-              { color: colors.textMuted },
-              selectedType === 0 && styles.tabTextActive
+              styles.tabPill,
+              { backgroundColor: colors.cardBg, borderColor: colors.border },
+              selectedType === 0 && { backgroundColor: colors.primary, borderColor: colors.primary }
             ]}
+            onPress={() => setSelectedType(0)}
           >
-            All ({transactions.length})
-          </Text>
-        </TouchableOpacity>
+            <Text
+              style={[
+                styles.tabText,
+                { color: colors.textMuted },
+                selectedType === 0 && styles.tabTextActive
+              ]}
+            >
+              All ({uniqueTransactions.length})
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[
-            styles.tabPill,
-            { backgroundColor: colors.cardBg, borderColor: colors.border },
-            selectedType === 4 && { backgroundColor: colors.primary, borderColor: colors.primary }
-          ]}
-          onPress={() => setSelectedType(4)}
-        >
-          <Text
+          <TouchableOpacity
             style={[
-              styles.tabText,
-              { color: colors.textMuted },
-              selectedType === 4 && styles.tabTextActive
+              styles.tabPill,
+              { backgroundColor: colors.cardBg, borderColor: colors.border },
+              selectedType === 4 && { backgroundColor: colors.primary, borderColor: colors.primary }
             ]}
+            onPress={() => setSelectedType(4)}
           >
-            Downloaded ({downloadedCount || 0})
-          </Text>
-        </TouchableOpacity>
+            <Text
+              style={[
+                styles.tabText,
+                { color: colors.textMuted },
+                selectedType === 4 && styles.tabTextActive
+              ]}
+            >
+              Downloaded ({downloadedOnlyCount})
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[
-            styles.tabPill,
-            { backgroundColor: colors.cardBg, borderColor: colors.border },
-            selectedType === 2 && { backgroundColor: colors.primary, borderColor: colors.primary }
-          ]}
-          onPress={() => setSelectedType(2)}
-        >
-          <Text
+          <TouchableOpacity
             style={[
-              styles.tabText,
-              { color: colors.textMuted },
-              selectedType === 2 && styles.tabTextActive
+              styles.tabPill,
+              { backgroundColor: colors.cardBg, borderColor: colors.border },
+              selectedType === 5 && { backgroundColor: colors.primary, borderColor: colors.primary }
             ]}
+            onPress={() => setSelectedType(5)}
           >
-            Building
-          </Text>
-        </TouchableOpacity>
+            <Text
+              style={[
+                styles.tabText,
+                { color: colors.textMuted },
+                selectedType === 5 && styles.tabTextActive
+              ]}
+            >
+              Not Downloaded ({notDownloadedCount})
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[
-            styles.tabPill,
-            { backgroundColor: colors.cardBg, borderColor: colors.border },
-            selectedType === 1 && { backgroundColor: colors.primary, borderColor: colors.primary }
-          ]}
-          onPress={() => setSelectedType(1)}
-        >
-          <Text
+          <TouchableOpacity
             style={[
-              styles.tabText,
-              { color: colors.textMuted },
-              selectedType === 1 && styles.tabTextActive
+              styles.tabPill,
+              { backgroundColor: colors.cardBg, borderColor: colors.border },
+              selectedType === 2 && { backgroundColor: colors.primary, borderColor: colors.primary }
             ]}
+            onPress={() => setSelectedType(2)}
           >
-            Land
-          </Text>
-        </TouchableOpacity>
+            <Text
+              style={[
+                styles.tabText,
+                { color: colors.textMuted },
+                selectedType === 2 && styles.tabTextActive
+              ]}
+            >
+              Building
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[
-            styles.tabPill,
-            { backgroundColor: colors.cardBg, borderColor: colors.border },
-            selectedType === 3 && { backgroundColor: colors.primary, borderColor: colors.primary }
-          ]}
-          onPress={() => setSelectedType(3)}
-        >
-          <Text
+          <TouchableOpacity
             style={[
-              styles.tabText,
-              { color: colors.textMuted },
-              selectedType === 3 && styles.tabTextActive
+              styles.tabPill,
+              { backgroundColor: colors.cardBg, borderColor: colors.border },
+              selectedType === 1 && { backgroundColor: colors.primary, borderColor: colors.primary }
             ]}
+            onPress={() => setSelectedType(1)}
           >
-            Machinery
-          </Text>
-        </TouchableOpacity>
+            <Text
+              style={[
+                styles.tabText,
+                { color: colors.textMuted },
+                selectedType === 1 && styles.tabTextActive
+              ]}
+            >
+              Land
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.tabPill,
+              { backgroundColor: colors.cardBg, borderColor: colors.border },
+              selectedType === 3 && { backgroundColor: colors.primary, borderColor: colors.primary }
+            ]}
+            onPress={() => setSelectedType(3)}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                { color: colors.textMuted },
+                selectedType === 3 && styles.tabTextActive
+              ]}
+            >
+              Machinery
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
       </View>
 
       {/* Transaction List */}

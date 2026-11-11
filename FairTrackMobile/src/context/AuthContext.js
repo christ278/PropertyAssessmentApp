@@ -24,8 +24,10 @@ export const AuthProvider = ({ children }) => {
       const savedUrl = await AsyncStorage.getItem('@fairtrack_server_url');
       if (savedUrl) {
         const isInvalidMobileUrl =
-          Platform.OS !== 'web' &&
-          (savedUrl.includes('localhost') || savedUrl.includes('10.0.2.2') || savedUrl.includes(':56018'));
+          savedUrl.includes('188.180.241.183') ||
+          (Platform.OS !== 'web' &&
+            (savedUrl.includes('localhost') || savedUrl.includes('10.0.2.2') || savedUrl.includes(':56018'))) ||
+          (Platform.OS === 'web' && !savedUrl.includes('localhost') && !savedUrl.includes('127.0.0.1'));
         if (isInvalidMobileUrl) {
           setServerUrl(DEFAULT_BASE_URL);
           await AsyncStorage.setItem('@fairtrack_server_url', DEFAULT_BASE_URL);

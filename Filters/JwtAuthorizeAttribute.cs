@@ -10,6 +10,12 @@ public class JwtAuthorizeAttribute : Attribute, IAuthorizationFilter
 {
     public void OnAuthorization(AuthorizationFilterContext context)
     {
+        // Allow HTTP OPTIONS requests immediately (CORS preflight)
+        if (HttpMethods.IsOptions(context.HttpContext.Request.Method))
+        {
+            return;
+        }
+
         // Skip authorization if action is decorated with [AllowAnonymous]
         if (context.ActionDescriptor.EndpointMetadata.OfType<Microsoft.AspNetCore.Authorization.AllowAnonymousAttribute>().Any())
         {

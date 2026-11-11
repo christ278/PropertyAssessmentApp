@@ -14,7 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { MobileApi } from '../api/mobileApi';
-import { resolveServerUrl } from '../api/apiClient';
+import { resolveServerUrl, DEFAULT_BASE_URL } from '../api/apiClient';
 import { useTheme } from '../context/ThemeContext';
 import { ActionModal } from './ActionModal';
 
@@ -41,8 +41,15 @@ export const AttachmentsSection = ({
     const resolveAll = async () => {
       const uris = {};
       for (const att of (attachments || [])) {
-        if (att && att.fileUrl) {
-          uris[att.id || att.fileUrl] = await resolveServerUrl(att.fileUrl);
+        if (!att) continue;
+        const rawUrl = att.fileUrl || att.FileUrl || att.uri;
+        if (rawUrl) {
+          const resolved = await resolveServerUrl(rawUrl);
+          const id = att.id || att.Id;
+          if (id) uris[id] = resolved;
+          uris[rawUrl] = resolved;
+          if (att.fileUrl) uris[att.fileUrl] = resolved;
+          if (att.FileUrl) uris[att.FileUrl] = resolved;
         }
       }
       if (isMounted) setResolvedAttachmentUris(uris);
@@ -62,6 +69,20 @@ export const AttachmentsSection = ({
     }
     return () => { isMounted = false; };
   }, [sketchUrl]);
+
+  const getFullPhotoUrl = (rawUrl, itemId) => {
+    if (!rawUrl) return '';
+    if (resolvedAttachmentUris[itemId]) return resolvedAttachmentUris[itemId];
+    if (resolvedAttachmentUris[rawUrl]) return resolvedAttachmentUris[rawUrl];
+    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://') || rawUrl.startsWith('data:') || rawUrl.startsWith('file://')) {
+      return rawUrl;
+    }
+    const base = DEFAULT_BASE_URL.replace(/\/+$/, '');
+    const cleanPath = rawUrl.startsWith('/') ? rawUrl : '/' + rawUrl;
+    return `${base}${cleanPath}`;
+  };
+
+  const displaySketchUri = resolvedSketchUri || (sketchUrl && (sketchUrl.startsWith('http') ? sketchUrl : `${DEFAULT_BASE_URL.replace(/\/+$/, '')}/${sketchUrl.replace(/^\/+/, '')}`));
 
   // Request permissions for camera
   const requestCameraPermission = async () => {
@@ -193,7 +214,6 @@ export const AttachmentsSection = ({
       }
     } catch (netErr) {
       // Offline fallback: keep local URI and base64Data for office batch sync
-      console.log('Saved inspection photo offline for office sync');
     } finally {
       setUploading(false);
     }
@@ -210,7 +230,8 @@ export const AttachmentsSection = ({
   // Update caption
   const handleUpdateCaption = (id, text) => {
     const updated = (attachments || []).map(a => {
-      if (a.id === id) return { ...a, caption: text };
+      const aid = a?.id || a?.Id || a?.fileUrl || a?.FileUrl;
+      if (aid === id) return { ...a, caption: text, Caption: text };
       return a;
     });
     if (onAttachmentsChange) onAttachmentsChange(updated);
@@ -235,15 +256,15 @@ export const AttachmentsSection = ({
           </View>
         </View>
 
-        {resolvedSketchUri ? (
+        {displaySketchUri ? (
           <View style={styles.sketchContainer}>
             <TouchableOpacity
               activeOpacity={0.85}
               style={styles.sketchImageWrap}
-              onPress={() => setFullscreenImage(resolvedSketchUri)}
+              onPress={() => setFullscreenImage(displaySketchUri)}
             >
               <Image
-                source={{ uri: resolvedSketchUri }}
+                source={{ uri: displaySketchUri }}
                 style={styles.sketchImage}
                 resizeMode="contain"
               />
@@ -339,36 +360,54 @@ export const AttachmentsSection = ({
         ) : (
           <View style={styles.attachmentsList}>
             {attachments.map((item, idx) => {
-              const itemUri = resolvedAttachmentUris[item.id || item.fileUrl] || item.fileUrl;
+              const rawUrl = item?.fileUrl || item?.FileUrl || item?.uri || '';
+              const itemId = item?.id || item?.Id || rawUrl || ('photo_' + idx);
+              const fileName = item?.fileName || item?.FileName || `Photo ${idx + 1}`;
+              const fileSize = item?.fileSize || item?.FileSize || 'Image';
+              const fileType = (item?.fileType || item?.FileType || 'image').toLowerCase();
+              const caption = item?.caption || item?.Caption || '';
+              const uploadedAt = item?.uploadedAt || item?.UploadedAt;
+              const itemUri = getFullPhotoUrl(rawUrl, itemId);
+              const isPdf = fileType === 'document' || fileName.toLowerCase().endsWith('.pdf') || rawUrl.toLowerCase().endsWith('.pdf');
+
               return (
-                <View key={item.id || idx} style={styles.attachmentCard}>
+                <View key={itemId} style={styles.attachmentCard}>
                   <View style={styles.attTopRow}>
                     {/* Photo Thumbnail */}
                     <TouchableOpacity
                       activeOpacity={0.8}
-                      onPress={() => setFullscreenImage(itemUri)}
+                      onPress={() => !isPdf && setFullscreenImage(itemUri)}
                       style={styles.attThumbnailWrap}
                     >
-                      <Image
-                        source={{ uri: itemUri }}
-                        style={styles.attThumbnail}
-                        resizeMode="cover"
-                      />
-                      <View style={styles.thumbZoomPill}>
-                        <Ionicons name="search" size={10} color="#ffffff" />
-                      </View>
+                      {isPdf ? (
+                        <View style={[styles.attThumbnail, { backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' }]}>
+                          <Ionicons name="document-text" size={26} color="#059669" />
+                        </View>
+                      ) : (
+                        <Image
+                          key={itemUri}
+                          source={{ uri: itemUri }}
+                          style={styles.attThumbnail}
+                          resizeMode="cover"
+                        />
+                      )}
+                      {!isPdf && (
+                        <View style={styles.thumbZoomPill}>
+                          <Ionicons name="search" size={10} color="#ffffff" />
+                        </View>
+                      )}
                     </TouchableOpacity>
 
                     {/* Photo Meta */}
                     <View style={styles.attMetaWrap}>
                       <Text style={styles.attFileName} numberOfLines={1}>
-                        {item.fileName || `Photo ${idx + 1}`}
+                        {fileName}
                       </Text>
                       <View style={styles.attSubMeta}>
-                        <Text style={styles.attSizeText}>{item.fileSize || 'Image'}</Text>
+                        <Text style={styles.attSizeText}>{fileSize}</Text>
                         <Text style={styles.attDot}>•</Text>
                         <Text style={styles.attTimeText}>
-                          {item.uploadedAt ? new Date(item.uploadedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Local'}
+                          {uploadedAt ? new Date(uploadedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Local'}
                         </Text>
                       </View>
                     </View>
@@ -376,7 +415,7 @@ export const AttachmentsSection = ({
                     {/* Delete Photo Button */}
                     <TouchableOpacity
                       style={styles.deleteAttBtn}
-                      onPress={() => handleDeletePhoto(item.id)}
+                      onPress={() => handleDeletePhoto(itemId)}
                     >
                       <Ionicons name="trash-outline" size={18} color={colors.accentRed} />
                     </TouchableOpacity>
@@ -387,8 +426,8 @@ export const AttachmentsSection = ({
                     <Ionicons name="pencil-outline" size={14} color={colors.textMuted} style={{ marginRight: 6 }} />
                     <TextInput
                       style={styles.captionInput}
-                      value={item.caption || ''}
-                      onChangeText={(txt) => handleUpdateCaption(item.id, txt)}
+                      value={caption}
+                      onChangeText={(txt) => handleUpdateCaption(itemId, txt)}
                       placeholder="Add photo notes / caption (e.g. Front View, Defects)..."
                       placeholderTextColor={colors.placeholder}
                     />
@@ -443,7 +482,10 @@ export const AttachmentsSection = ({
             style: 'danger',
             icon: 'trash-outline',
             onPress: () => {
-              const updated = (attachments || []).filter(a => a.id !== photoToDelete);
+              const updated = (attachments || []).filter(a => {
+                const aid = a?.id || a?.Id || a?.fileUrl || a?.FileUrl;
+                return aid !== photoToDelete;
+              });
               if (onAttachmentsChange) onAttachmentsChange(updated);
               setPhotoToDelete(null);
             }
@@ -687,11 +729,13 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
     alignItems: 'center'
   },
   attThumbnailWrap: {
-    width: 52,
-    height: 52,
-    borderRadius: 6,
+    width: 60,
+    height: 60,
+    borderRadius: 8,
     overflow: 'hidden',
-    backgroundColor: '#000000',
+    backgroundColor: isDarkMode ? '#1e293b' : '#e2e8f0',
+    borderWidth: 1,
+    borderColor: colors.border,
     position: 'relative'
   },
   attThumbnail: {

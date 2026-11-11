@@ -2396,6 +2396,7 @@
                 updatedPartition.backTaxesYearFrom = parseInt($('#inputMachineryBackTaxesFrom').val()) || null;
                 updatedPartition.backTaxesYearTo = parseInt($('#inputMachineryBackTaxesTo').val()) || null;
                 updatedPartition.memoranda = $('#textareaMachineryMemoranda').val() || '';
+                updatedPartition.attachmentsJson = $('#AttachmentsJson').val() || '';
 
                 try {
                     let savedDraft = sessionStorage.getItem('propertyAssessmentRequest_draft');
@@ -2861,6 +2862,10 @@
                         }
                     }
                 } catch (e) { }
+            } else if (isEditFromDb) {
+                try {
+                    sessionStorage.removeItem('propertyAssessmentRequest_draft');
+                } catch (e) { }
             }
 
             switchAppraisalKind(currentKind);
@@ -2879,18 +2884,48 @@
                     if (p.registrationStatus) $('#selectLandRegStatus').val(p.registrationStatus);
                     if (p.titleType) $('#selectLandTitleType').val(p.titleType);
                     if (p.titleNo) $('#inputLandTitleNo').val(p.titleNo);
-                    if (p.dateRegistered) $('#inputLandDateRegistered').val(formatIsoDate(p.dateRegistered));
-                    if (p.cadastralSurveyNo) $('#inputLandCadSurveyNo').val(p.cadastralSurveyNo);
-                    if (p.sectionNo) $('#inputLandSectionNo').val(p.sectionNo);
-                    if (p.lotNumber) $('#inputLandLotNo').val(p.lotNumber);
-                    if (p.blockNumber) $('#inputLandBlockNo').val(p.blockNumber);
-                    if (p.parcelNo) $('#inputLandParcelNo').val(p.parcelNo);
-                    if (p.surveyNumber) $('#inputLandSurveyNo').val(p.surveyNumber);
+                    const landDateReg = p.dateRegistered || p.DateRegistered || p.tctDate || p.TctDate;
+                    if (landDateReg) $('#inputLandDateRegistered').val(formatIsoDate(landDateReg));
+
+                    const landCadSurvey = p.cadastralSurveyNo || p.CadastralSurveyNo;
+                    if (landCadSurvey) $('#inputLandCadSurveyNo').val(landCadSurvey);
+
+                    const landSec = p.sectionNo || p.SectionNo;
+                    if (landSec) $('#inputLandSectionNo').val(landSec);
+
+                    const landLot = p.lotNumber || p.LotNumber || p.lotNo || p.LotNo;
+                    if (landLot) {
+                        $('#inputLandLotNo').val(landLot);
+                        $('input[name="LotNumber"]').val(landLot);
+                    }
+
+                    const landBlock = p.blockNumber || p.BlockNumber || p.blockNo || p.BlockNo;
+                    if (landBlock) {
+                        $('#inputLandBlockNo').val(landBlock);
+                        $('input[name="BlockNumber"]').val(landBlock);
+                    }
+
+                    const landParcel = p.parcelNo || p.ParcelNo;
+                    if (landParcel) $('#inputLandParcelNo').val(landParcel);
+
+                    const landSurvey = p.surveyNumber || p.SurveyNumber || p.surveyNo || p.SurveyNo || landCadSurvey;
+                    if (landSurvey) {
+                        $('#inputLandSurveyNo').val(landSurvey);
+                        $('input[name="SurveyNumber"]').val(landSurvey);
+                    }
 
                     // Location
-                    if (p.streetLocation) $('#inputLandStreet').val(p.streetLocation);
-                    if (p.purok) $('#inputLandPurok').val(p.purok);
-                    if (p.districtOrBarangay) $('#selectLandBarangay').val(p.districtOrBarangay);
+                    const landStreet = p.streetLocation || p.StreetLocation || p.streetNo || p.StreetNo || p.buildingNo || p.BuildingNo || p.location || p.Location;
+                    if (landStreet) {
+                        $('#inputLandStreet').val(landStreet);
+                        $('input[name="StreetLocation"]').val(landStreet);
+                    }
+
+                    const landPurok = p.purok || p.Purok;
+                    if (landPurok) $('#inputLandPurok').val(landPurok);
+
+                    const landBrgy = p.districtOrBarangay || p.DistrictOrBarangay || p.barangay || p.Barangay;
+                    if (landBrgy) $('#selectLandBarangay').val(landBrgy);
 
                     // Boundaries & Remarks
                     if (p.boundaryNorth) $('#inputLandBNorth').val(p.boundaryNorth);
@@ -3069,13 +3104,14 @@
                 }
             });
 
-            // Load any existing client-side draft if server partition has empty TDN/area
+            // Load any existing client-side draft ONLY for new unsaved requests (never override database ground truth)
             try {
-                const savedDraft = sessionStorage.getItem('propertyAssessmentRequest_draft');
-                if (savedDraft) {
-                    const draftObj = JSON.parse(savedDraft);
-                    if (draftObj && draftObj.partitions && draftObj.partitions[partitionIndex]) {
-                        const p = draftObj.partitions[partitionIndex];
+                if (!isEditFromDb && !hasServerData) {
+                    const savedDraft = sessionStorage.getItem('propertyAssessmentRequest_draft');
+                    if (savedDraft) {
+                        const draftObj = JSON.parse(savedDraft);
+                        if (draftObj && draftObj.partitions && draftObj.partitions[partitionIndex]) {
+                            const p = draftObj.partitions[partitionIndex];
                         if (p.systemGeneratedTDN && !$('#inputTdn').val()) {
                             $('#inputTdn').val(p.systemGeneratedTDN);
                             $('#displayHeaderTdn').text(p.systemGeneratedTDN);
@@ -3254,6 +3290,7 @@
                         if (memoVal) $('textarea[name="Memoranda"]').val(memoVal);
                     }
                 }
+            }
 
                 const existingFloors = $('#buildingFloorBreakdownJson').val();
                 if (existingFloors) {

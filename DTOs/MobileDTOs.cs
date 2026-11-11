@@ -156,6 +156,15 @@ public class TDNLandDataDTO
     public string? Eremarks { get; set; }
     public string? WestBoundary { get; set; }
     public string? Wremarks { get; set; }
+    public string? LandAppraisalDetailsJson { get; set; }
+    public string? LandImprovementsJson { get; set; }
+    public string? LandAdjustmentsJson { get; set; }
+    public string? LandPropertyAssessmentsJson { get; set; }
+    public string? Classification { get; set; }
+    public string? SubClassification { get; set; }
+    public string? ActualUse { get; set; }
+    public decimal? UnitValue { get; set; }
+    public decimal? AssessmentLevelPercent { get; set; }
 }
 
 public class TDNLandDTO

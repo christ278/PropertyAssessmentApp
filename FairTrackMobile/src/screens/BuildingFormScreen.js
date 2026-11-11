@@ -19,6 +19,8 @@ import { MobileApi } from '../api/mobileApi';
 import { HeaderBar } from '../components/HeaderBar';
 import { DiscardChangesModal } from '../components/DiscardChangesModal';
 import { AttachmentsSection } from '../components/AttachmentsSection';
+import { DatePickerModal } from '../components/DatePickerModal';
+import { BARANGAY_OPTIONS, normalizeBarangay } from '../constants/locationData';
 
 const BUILDING_PROPERTY_TYPES = [
   'Residential Condominium',
@@ -131,7 +133,16 @@ export const BuildingFormScreen = ({ route, navigation }) => {
   const formWorkflowIdParam = route?.params?.formWorkflowId || null;
   const partitionIndexParam = route?.params?.partitionIndex ?? 0;
   const partitionLetterParam = route?.params?.partitionLetter || String.fromCharCode(65 + (parseInt(partitionIndexParam, 10) || 0));
-  const { queueOfflineUpdate, getDownloadedFormData, isTransactionDownloaded } = useContext(SyncContext);
+  const {
+    queueOfflineUpdate,
+    markTransactionSynced,
+    getDownloadedFormData,
+    isTransactionDownloaded,
+    hasPendingEdits,
+    downloadSingleTransaction,
+    isOnline,
+    checkConnectivity
+  } = useContext(SyncContext);
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -224,6 +235,7 @@ export const BuildingFormScreen = ({ route, navigation }) => {
   const [dateConstructed, setDateConstructed] = useState('');
   const [dateCompleted, setDateCompleted] = useState('');
   const [dateOccupied, setDateOccupied] = useState('');
+  const [activeDatePicker, setActiveDatePicker] = useState(null); // 'constructed' | 'completed' | 'occupied' | null
   const [storeyNo, setStoreyNo] = useState('1');
   const [areaPerFloor, setAreaPerFloor] = useState('');
   const [totalFloorArea, setTotalFloorArea] = useState('');
@@ -253,6 +265,38 @@ export const BuildingFormScreen = ({ route, navigation }) => {
   const [autoForward, setAutoForward] = useState(true);
   const [nextStatusId, setNextStatusId] = useState(4); // 4 = Checked / Recommend Approval
 
+  const hydrateEffectivityAndNotes = (p) => {
+    if (!p) return;
+    if (p.effectivityQuarter || p.EffectivityQuarter || p.quarterEffectivity || p.QuarterEffectivity) {
+      const rawQ = (p.effectivityQuarter || p.EffectivityQuarter || p.quarterEffectivity || p.QuarterEffectivity).toString();
+      const match = rawQ.match(/\d+/);
+      setQuarterEffectivity(match ? match[0] : '1');
+    }
+    if (p.effectivityYear != null || p.EffectivityYear != null || p.yearEffectivity != null || p.YearEffectivity != null) {
+      setYearEffectivity((p.effectivityYear ?? p.EffectivityYear ?? p.yearEffectivity ?? p.YearEffectivity).toString());
+    }
+    if (p.taxability !== undefined && p.taxability !== null) {
+      setTaxability(typeof p.taxability === 'boolean' ? p.taxability : String(p.taxability).toLowerCase().includes('taxable'));
+    } else if (p.Taxability !== undefined && p.Taxability !== null) {
+      setTaxability(typeof p.Taxability === 'boolean' ? p.Taxability : String(p.Taxability).toLowerCase().includes('taxable'));
+    }
+    if (p.assessmentBasis || p.AssessmentBasis) {
+      setAssessmentBasis(p.assessmentBasis || p.AssessmentBasis);
+    }
+    if (p.backTaxesYearFrom != null || p.BackTaxesYearFrom != null || p.backTaxesFrom != null) {
+      setBackTaxesYearFrom((p.backTaxesYearFrom ?? p.BackTaxesYearFrom ?? p.backTaxesFrom).toString());
+    }
+    if (p.backTaxesYearTo != null || p.BackTaxesYearTo != null || p.backTaxesTo != null) {
+      setBackTaxesYearTo((p.backTaxesYearTo ?? p.BackTaxesYearTo ?? p.backTaxesTo).toString());
+    }
+    if (p.memoranda || p.Memoranda) {
+      setMemoranda(p.memoranda || p.Memoranda);
+    }
+    if (p.remarks || p.Remarks) {
+      setRemarks(p.remarks || p.Remarks);
+    }
+  };
+
   useEffect(() => {
     loadBuildingData();
   }, []);
@@ -260,7 +304,7 @@ export const BuildingFormScreen = ({ route, navigation }) => {
   const loadBuildingData = async () => {
     setNotDownloadedError(false);
 
-    // 1. Check if downloaded offline copy exists
+    // 1. Check if downloaded offline copy exists and populate immediately
     const downloaded = getDownloadedFormData(trackingNoParam, formWorkflowIdParam, partitionIndexParam);
     if (downloaded) {
       if (downloaded.owner) setOwnerName(downloaded.owner);
@@ -271,11 +315,19 @@ export const BuildingFormScreen = ({ route, navigation }) => {
 
       if (downloaded.currentPartition) {
         const cp = downloaded.currentPartition;
+        if (cp.streetLocation || cp.streetNo || cp.buildingNo) {
+          setStreetLocation(cp.streetLocation || cp.streetNo || cp.buildingNo);
+        }
+        if (cp.districtOrBarangay) {
+          setDistrictOrBarangay(normalizeBarangay(cp.districtOrBarangay));
+        }
+        if (cp.cityMunicipality) setCityMunicipality(cp.cityMunicipality);
+        if (cp.province) setProvince(cp.province);
         if (cp.propertyTypeAccordUse) setPropertyTypeAccordUse(cp.propertyTypeAccordUse);
         if (cp.otherPropertyTypeAccordUse) setOtherPropertyTypeAccordUse(cp.otherPropertyTypeAccordUse);
         if (cp.pin) setPin(cp.pin);
-        if (cp.surveyNo) setSurveyNo(cp.surveyNo);
-        if (cp.lotNo) setLotNo(cp.lotNo);
+        if (cp.surveyNo || cp.surveyNumber) setSurveyNo(cp.surveyNo || cp.surveyNumber);
+        if (cp.lotNo || cp.lotNumber) setLotNo(cp.lotNo || cp.lotNumber);
         if (cp.titleNo) setTctNo(cp.titleNo);
         if (cp.sectionNo) setSectionNo(cp.sectionNo);
         if (cp.arpNo) setArpNo(cp.arpNo);
@@ -284,29 +336,55 @@ export const BuildingFormScreen = ({ route, navigation }) => {
           setAreaSqMeters(cp.areaSqMeters.toString());
           setTotalFloorArea(cp.areaSqMeters.toString());
         }
+        hydrateEffectivityAndNotes(cp);
       }
 
       if (downloaded.formData) {
         populateFieldsFromDTO(downloaded.formData);
+        if (downloaded.formData.TDN) {
+          hydrateEffectivityAndNotes(downloaded.formData.TDN);
+        }
         if (downloaded.currentPartition?.systemGeneratedTDN) setDeclarationNo(downloaded.currentPartition.systemGeneratedTDN);
       }
-      return;
     }
 
-    // 2. If not pre-downloaded, try fetching live if online
-    try {
-      setLoading(true);
-      const res = await MobileApi.getBuildingForm(tdnId || 1, castTdnBuildingId || 1);
-      if (res && res.success && res.data) {
-        populateFieldsFromDTO(res.data);
-      } else {
-        setNotDownloadedError(true);
+    // 2. If online and no unsynced offline edits, fetch latest live partition data (including newly uploaded web photos & sketches)
+    const hasUnsynced = typeof hasPendingEdits === 'function' && hasPendingEdits(trackingNoParam, formWorkflowIdParam);
+    if (!hasUnsynced && (trackingNoParam || formWorkflowIdParam)) {
+      try {
+        if (!downloaded) setLoading(true);
+        const liveRes = await MobileApi.downloadTransactionDetails(formWorkflowIdParam, trackingNoParam);
+        if (liveRes && liveRes.success) {
+          const targetIdx = parseInt(partitionIndexParam, 10) || 0;
+          const livePart = (liveRes.partitions && liveRes.partitions[targetIdx]) || null;
+          const liveAtts = livePart?.attachments || liveRes.attachments || [];
+          const liveSketch = livePart?.sketchUrl || liveRes.sketchUrl;
+
+          if (liveSketch) setSketchUrl(liveSketch);
+          if (Array.isArray(liveAtts)) setAttachments(liveAtts);
+          if (livePart) {
+            hydrateEffectivityAndNotes(livePart);
+          }
+
+          // Update downloadedForms cache seamlessly
+          if (typeof downloadSingleTransaction === 'function') {
+            await downloadSingleTransaction({
+              TrackingNo: trackingNoParam || liveRes.trackingNo,
+              FormworkflowId: formWorkflowIdParam || liveRes.formWorkflowId,
+              HasPartition: true
+            });
+          }
+        } else if (!downloaded) {
+          setNotDownloadedError(true);
+        }
+      } catch (e) {
+        // Offline or network error: gracefully keep using the offline copy
+        if (!downloaded) setNotDownloadedError(true);
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.warn('Cannot fetch live form and not downloaded:', err);
+    } else if (!downloaded) {
       setNotDownloadedError(true);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -328,8 +406,9 @@ export const BuildingFormScreen = ({ route, navigation }) => {
       if (t.PropAdminName) setAdminName(t.PropAdminName);
       if (t.PropAdminAddress) setAdminAddress(t.PropAdminAddress);
       if (t.PropAdminContactNo) setAdminContact(t.PropAdminContactNo);
-      if (t.PropLocationStreet || t.Location) setStreetLocation(t.PropLocationStreet || t.Location);
-      if (t.DistrictOrBarangay || t.Barangay) setDistrictOrBarangay(t.DistrictOrBarangay || t.Barangay);
+      if (t.PropLocationStreet) setStreetLocation(t.PropLocationStreet);
+      else if (t.Location && !t.Location.includes(',')) setStreetLocation(t.Location);
+      if (t.DistrictOrBarangay || t.Barangay) setDistrictOrBarangay(normalizeBarangay(t.DistrictOrBarangay || t.Barangay));
       if (t.CityMunicipality || t.Municipality) setCityMunicipality(t.CityMunicipality || t.Municipality);
       if (t.Province) setProvince(t.Province);
       if (t.AssessmentBasis) setAssessmentBasis(t.AssessmentBasis);
@@ -347,7 +426,8 @@ export const BuildingFormScreen = ({ route, navigation }) => {
       if (t.Memoranda) setMemoranda(t.Memoranda);
       if (t.Taxability != null) setTaxability(!!t.Taxability);
       if (t.FloorPlanSketchPath) setSketchUrl(t.FloorPlanSketchPath);
-      if (t.Attachments && Array.isArray(t.Attachments)) setAttachments(t.Attachments);
+      const rawAtts = t.Attachments || t.attachments;
+      if (rawAtts && Array.isArray(rawAtts) && rawAtts.length > 0) setAttachments(rawAtts);
     }
 
     if (d.refOwner) {
@@ -404,6 +484,16 @@ export const BuildingFormScreen = ({ route, navigation }) => {
       if (b.DepreciationMarketval != null) setDepreciationMarketval(b.DepreciationMarketval.toString());
       if (b.TotalMarketVal != null) setMarketValue(b.TotalMarketVal.toString());
       if (b.TotalAssessedVal != null) setAssessedValue(b.TotalAssessedVal.toString());
+      if (b.STREET && !streetLocation) setStreetLocation(b.STREET);
+    }
+
+    if (d.currentPartition) {
+      const cp = d.currentPartition;
+      if (cp.streetLocation || cp.streetNo || cp.buildingNo) setStreetLocation(cp.streetLocation || cp.streetNo || cp.buildingNo);
+      if (cp.districtOrBarangay) setDistrictOrBarangay(normalizeBarangay(cp.districtOrBarangay));
+      if (cp.cityMunicipality) setCityMunicipality(cp.cityMunicipality);
+      if (cp.province) setProvince(cp.province);
+      hydrateEffectivityAndNotes(cp);
     }
   };
 
@@ -431,7 +521,7 @@ export const BuildingFormScreen = ({ route, navigation }) => {
     setDiscardModalVisible(true);
   };
 
-  const handleSave = async (forceOffline = false) => {
+  const handleSave = async (forceOffline = false, transferStage = false) => {
     const payload = {
       TDN: {
         TDNId: parseInt(tdnId) || 0,
@@ -531,25 +621,28 @@ export const BuildingFormScreen = ({ route, navigation }) => {
       }
     };
 
-    const workflowForwardPayload = autoForward && formWorkflowIdParam ? {
+    const workflowForwardPayload = transferStage && formWorkflowIdParam ? {
       formWorkflowId: formWorkflowIdParam,
       nextStatusId: nextStatusId,
-      remarks: remarks || 'Field building inspection completed.'
+      remarks: remarks || 'Field building inspection completed and transferred.'
     } : null;
 
     if (forceOffline) {
+      setSaving(true);
       await queueOfflineUpdate(
         'UPDATE_BUILDING',
         payload,
         `Building FAAS [Part ${partitionLetterParam}]: ${trackingNo || arpNo} (${ownerName || 'Owner'})`,
         workflowForwardPayload
       );
-      showCompleteAlertAndGoBack('Queued for Office Sync', 'Your field building inspection changes have been saved locally on this phone. It will automatically upload and transfer to the next step when you return to the office.');
+      setSaving(false);
+      navigateBack();
       return;
     }
 
+    setSaving(true);
+
     try {
-      setSaving(true);
       const res = await MobileApi.updateBuildingForm(payload);
       if (res && res.success) {
         if (workflowForwardPayload) {
@@ -560,25 +653,29 @@ export const BuildingFormScreen = ({ route, navigation }) => {
               workflowForwardPayload.remarks
             );
           } catch (fwdErr) {
-            console.warn('Forward workflow warning:', fwdErr);
+            // Workflow forward handled
           }
         }
-        showCompleteAlertAndGoBack('Saved to Server', 'Building assessment updated and transferred successfully.');
-      } else {
-        throw new Error(res?.message || 'Server error');
+        if (typeof markTransactionSynced === 'function') {
+          await markTransactionSynced(trackingNo || trackingNoParam, formWorkflowIdParam, transferStage, payload);
+        }
+        setSaving(false);
+        navigateBack();
+        return;
       }
     } catch (err) {
-      // Offline fallback: Queue automatically
-      await queueOfflineUpdate(
-        'UPDATE_BUILDING',
-        payload,
-        `Building FAAS [Part ${partitionLetterParam}]: ${trackingNo || arpNo} (${ownerName || 'Owner'})`,
-        workflowForwardPayload
-      );
-      showCompleteAlertAndGoBack('Saved Offline', 'Network disconnected. Your changes and next-step transfer are safely queued on this phone. Tap Sync All when you return to the office.');
-    } finally {
-      setSaving(false);
+      // Fallback to offline queue
     }
+
+    // Offline fallback: Queue automatically without alert
+    await queueOfflineUpdate(
+      'UPDATE_BUILDING',
+      payload,
+      `Building FAAS [Part ${partitionLetterParam}]: ${trackingNo || arpNo} (${ownerName || 'Owner'})`,
+      workflowForwardPayload
+    );
+    setSaving(false);
+    navigateBack();
   };
 
   const renderSelectField = (label, value, options, onSelect) => (
@@ -624,7 +721,9 @@ export const BuildingFormScreen = ({ route, navigation }) => {
           style={[styles.sectionTabBtn, activeTab === 0 && styles.sectionTabBtnActive]}
           onPress={() => setActiveTab(0)}
         >
-          <Text style={[styles.sectionTabText, activeTab === 0 && styles.sectionTabTextActive]}>1. Property Info & Taxpayer (CCT)</Text>
+          <Text style={[styles.sectionTabText, activeTab === 0 && styles.sectionTabTextActive]}>
+            1. Property Info & Photos {attachments && attachments.length > 0 ? `(${attachments.length})` : ''}
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.sectionTabBtn, activeTab === 1 && styles.sectionTabBtnActive]}
@@ -891,12 +990,12 @@ export const BuildingFormScreen = ({ route, navigation }) => {
                   <Text style={styles.cardHeaderTitle}>Location of Property</Text>
 
                   <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>STREET ADDRESS / NO.</Text>
+                    <Text style={styles.inputLabel}>BUILDING NO. / STREET / ROAD</Text>
                     <TextInput
                       style={styles.input}
                       value={streetLocation}
                       onChangeText={setStreetLocation}
-                      placeholder="e.g. 123 Pioneer Avenue"
+                      placeholder="e.g. Building 4, Pioneer Avenue, Corner Salazar St."
                       placeholderTextColor={colors.placeholder}
                     />
                   </View>
@@ -904,13 +1003,16 @@ export const BuildingFormScreen = ({ route, navigation }) => {
                   <View style={styles.rowInputs}>
                     <View style={[styles.inputGroup, { flex: 1 }]}>
                       <Text style={styles.inputLabel}>BARANGAY</Text>
-                      <TextInput
-                        style={styles.input}
-                        value={districtOrBarangay}
-                        onChangeText={setDistrictOrBarangay}
-                        placeholder="e.g. Barangay Dadiangas South"
-                        placeholderTextColor={colors.placeholder}
-                      />
+                      <TouchableOpacity
+                        style={styles.selectBtn}
+                        onPress={() => openPicker('BARANGAY', BARANGAY_OPTIONS, districtOrBarangay, setDistrictOrBarangay)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.selectBtnText, !districtOrBarangay && { color: colors.placeholder }]} numberOfLines={1}>
+                          {districtOrBarangay || 'Select Barangay...'}
+                        </Text>
+                        <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
+                      </TouchableOpacity>
                     </View>
                     <View style={[styles.inputGroup, { flex: 1 }]}>
                       <Text style={styles.inputLabel}>CITY / MUNICIPALITY</Text>
@@ -1042,35 +1144,80 @@ export const BuildingFormScreen = ({ route, navigation }) => {
                   <View style={styles.rowInputs}>
                     <View style={[styles.inputGroup, { flex: 1 }]}>
                       <Text style={styles.inputLabel}>DATE CONSTRUCTED / STARTED</Text>
-                      <TextInput
-                        style={styles.input}
-                        value={dateConstructed}
-                        onChangeText={setDateConstructed}
-                        placeholder="YYYY-MM-DD"
-                        placeholderTextColor={colors.placeholder}
-                      />
+                      <View style={{ flexDirection: 'row', alignItems: 'stretch', width: '100%' }}>
+                        <TextInput
+                          style={[styles.input, { flex: 1, borderTopRightRadius: 0, borderBottomRightRadius: 0, borderRightWidth: 0 }]}
+                          value={dateConstructed}
+                          onChangeText={setDateConstructed}
+                          placeholder="YYYY-MM-DD"
+                          placeholderTextColor={colors.placeholder}
+                        />
+                        <TouchableOpacity
+                          style={{
+                            backgroundColor: colors.primary,
+                            width: 38,
+                            borderTopRightRadius: 8,
+                            borderBottomRightRadius: 8,
+                            justifyContent: 'center',
+                            alignItems: 'center'
+                          }}
+                          onPress={() => setActiveDatePicker('constructed')}
+                        >
+                          <Ionicons name="calendar-outline" size={17} color="#ffffff" />
+                        </TouchableOpacity>
+                      </View>
                     </View>
                     <View style={[styles.inputGroup, { flex: 1 }]}>
                       <Text style={styles.inputLabel}>DATE COMPLETED</Text>
-                      <TextInput
-                        style={styles.input}
-                        value={dateCompleted}
-                        onChangeText={setDateCompleted}
-                        placeholder="YYYY-MM-DD"
-                        placeholderTextColor={colors.placeholder}
-                      />
+                      <View style={{ flexDirection: 'row', alignItems: 'stretch', width: '100%' }}>
+                        <TextInput
+                          style={[styles.input, { flex: 1, borderTopRightRadius: 0, borderBottomRightRadius: 0, borderRightWidth: 0 }]}
+                          value={dateCompleted}
+                          onChangeText={setDateCompleted}
+                          placeholder="YYYY-MM-DD"
+                          placeholderTextColor={colors.placeholder}
+                        />
+                        <TouchableOpacity
+                          style={{
+                            backgroundColor: colors.primary,
+                            width: 38,
+                            borderTopRightRadius: 8,
+                            borderBottomRightRadius: 8,
+                            justifyContent: 'center',
+                            alignItems: 'center'
+                          }}
+                          onPress={() => setActiveDatePicker('completed')}
+                        >
+                          <Ionicons name="calendar-outline" size={17} color="#ffffff" />
+                        </TouchableOpacity>
+                      </View>
                     </View>
                   </View>
 
                   <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>DATE OCCUPIED</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={dateOccupied}
-                      onChangeText={setDateOccupied}
-                      placeholder="YYYY-MM-DD"
-                      placeholderTextColor={colors.placeholder}
-                    />
+                    <View style={{ flexDirection: 'row', alignItems: 'stretch', width: '100%' }}>
+                      <TextInput
+                        style={[styles.input, { flex: 1, borderTopRightRadius: 0, borderBottomRightRadius: 0, borderRightWidth: 0 }]}
+                        value={dateOccupied}
+                        onChangeText={setDateOccupied}
+                        placeholder="YYYY-MM-DD"
+                        placeholderTextColor={colors.placeholder}
+                      />
+                      <TouchableOpacity
+                        style={{
+                          backgroundColor: colors.primary,
+                          width: 38,
+                          borderTopRightRadius: 8,
+                          borderBottomRightRadius: 8,
+                          justifyContent: 'center',
+                          alignItems: 'center'
+                        }}
+                        onPress={() => setActiveDatePicker('occupied')}
+                      >
+                        <Ionicons name="calendar-outline" size={17} color="#ffffff" />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </View>
 
@@ -1344,20 +1491,55 @@ export const BuildingFormScreen = ({ route, navigation }) => {
             )}
 
             {/* Action Buttons */}
+            {!isOnline && (
+              <View style={styles.offlineNoticeRow}>
+                <Ionicons name="cloud-offline-outline" size={15} color="#b45309" />
+                <Text style={styles.offlineNoticeText}>
+                  Offline Mode: Changes will be saved locally to this device.
+                </Text>
+              </View>
+            )}
             <View style={styles.buttonContainer}>
+              {/* Button 1: Save & Sync to Web (Draft - No Transfer) */}
               <TouchableOpacity
-                style={[styles.saveBtn, styles.saveBtnPrimary]}
-                onPress={() => handleSave(false)}
+                style={[
+                  styles.saveBtn,
+                  styles.saveBtnPrimary,
+                  !isOnline && styles.saveBtnOffline
+                ]}
+                onPress={() => handleSave(false, false)}
                 disabled={saving}
               >
                 {saving ? (
                   <ActivityIndicator color="#ffffff" />
                 ) : (
                   <>
-                    <Ionicons name="cloud-upload" size={18} color="#ffffff" />
-                    <Text style={styles.saveBtnText}>Save Assessment & Stage Transfer</Text>
+                    <Ionicons
+                      name={isOnline ? "cloud-upload" : "file-tray-full-outline"}
+                      size={18}
+                      color="#ffffff"
+                    />
+                    <Text style={styles.saveBtnText}>
+                      {isOnline
+                        ? "Save & Sync to Web (Draft)"
+                        : "Save to Offline Queue (No Transfer)"}
+                    </Text>
                   </>
                 )}
+              </TouchableOpacity>
+
+              {/* Button 2: Save & Transfer to Supervisor (Advances Workflow) */}
+              <TouchableOpacity
+                style={[styles.saveBtn, styles.saveBtnTransfer]}
+                onPress={() => handleSave(false, true)}
+                disabled={saving}
+              >
+                <Ionicons name="send" size={16} color="#ffffff" />
+                <Text style={styles.saveBtnText}>
+                  {isOnline
+                    ? "Save & Transfer to Supervisor"
+                    : "Queue & Transfer to Supervisor"}
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -1424,7 +1606,28 @@ export const BuildingFormScreen = ({ route, navigation }) => {
           </View>
         </TouchableOpacity>
       </Modal>
-          <DiscardChangesModal
+          {/* Date Picker Modal for Building Dates */}
+      <DatePickerModal
+        visible={!!activeDatePicker}
+        onClose={() => setActiveDatePicker(null)}
+        value={
+          activeDatePicker === 'constructed' ? dateConstructed :
+          activeDatePicker === 'completed' ? dateCompleted :
+          activeDatePicker === 'occupied' ? dateOccupied : ''
+        }
+        onSelectDate={(newDate) => {
+          if (activeDatePicker === 'constructed') setDateConstructed(newDate);
+          else if (activeDatePicker === 'completed') setDateCompleted(newDate);
+          else if (activeDatePicker === 'occupied') setDateOccupied(newDate);
+        }}
+        title={
+          activeDatePicker === 'constructed' ? 'Date Constructed / Started' :
+          activeDatePicker === 'completed' ? 'Date Completed' :
+          activeDatePicker === 'occupied' ? 'Date Occupied' : 'Select Date'
+        }
+      />
+
+      <DiscardChangesModal
         visible={discardModalVisible}
         onClose={() => setDiscardModalVisible(false)}
         onConfirmDiscard={navigateBack}
@@ -1605,6 +1808,31 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 14,
     gap: 8
+  },
+  offlineNoticeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef3c7',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    gap: 6
+  },
+  offlineNoticeText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#92400e'
+  },
+  saveBtnTransfer: {
+    backgroundColor: '#059669'
+  },
+  saveBtnOffline: {
+    backgroundColor: '#0284c7'
   },
   saveBtnPrimary: {
     backgroundColor: colors.primary

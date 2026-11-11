@@ -17,8 +17,8 @@ export const MobileApi = {
     }
   },
 
-  ping: async () => {
-    const response = await apiClient.get('/api/auth/ping');
+  ping: async (timeoutMs = 3500) => {
+    const response = await apiClient.get('/api/auth/ping', { timeout: timeoutMs });
     return response.data;
   },
 

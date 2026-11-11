@@ -18,6 +18,7 @@ import { MobileApi } from '../api/mobileApi';
 import { HeaderBar } from '../components/HeaderBar';
 import { DiscardChangesModal } from '../components/DiscardChangesModal';
 import { AttachmentsSection } from '../components/AttachmentsSection';
+import { DatePickerModal } from '../components/DatePickerModal';
 import { COLORS, SHADOWS } from '../constants/theme';
 
 export const MachineryFormScreen = ({ route, navigation }) => {
@@ -27,7 +28,16 @@ export const MachineryFormScreen = ({ route, navigation }) => {
   const formWorkflowIdParam = route?.params?.formWorkflowId || null;
   const partitionIndexParam = route?.params?.partitionIndex ?? 0;
   const partitionLetterParam = route?.params?.partitionLetter || String.fromCharCode(65 + (parseInt(partitionIndexParam, 10) || 0));
-  const { queueOfflineUpdate, getDownloadedFormData, isTransactionDownloaded } = useContext(SyncContext);
+  const {
+    queueOfflineUpdate,
+    markTransactionSynced,
+    getDownloadedFormData,
+    isTransactionDownloaded,
+    hasPendingEdits,
+    downloadSingleTransaction,
+    isOnline,
+    checkConnectivity
+  } = useContext(SyncContext);
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -66,6 +76,7 @@ export const MachineryFormScreen = ({ route, navigation }) => {
   const [dateAcquired, setDateAcquired] = useState('');
   const [dateInstalled, setDateInstalled] = useState('');
   const [dateOperational, setDateOperational] = useState('');
+  const [activeDatePicker, setActiveDatePicker] = useState(null); // 'acquired' | 'installed' | 'operational' | null
   const [conditionWhenAcquired, setConditionWhenAcquired] = useState('New');
   const [economicLifeEstimated, setEconomicLifeEstimated] = useState('10');
 
@@ -98,7 +109,7 @@ export const MachineryFormScreen = ({ route, navigation }) => {
   const loadMachineryData = async () => {
     setNotDownloadedError(false);
 
-    // 1. Check if downloaded offline copy exists
+    // 1. Check if downloaded offline copy exists and populate immediately
     const downloaded = getDownloadedFormData(trackingNoParam, formWorkflowIdParam, partitionIndexParam);
     if (downloaded) {
       if (downloaded.owner) setOwnerName(downloaded.owner);
@@ -107,27 +118,66 @@ export const MachineryFormScreen = ({ route, navigation }) => {
       if (downloaded.sketchUrl) setSketchUrl(downloaded.sketchUrl);
       if (downloaded.attachments && Array.isArray(downloaded.attachments)) setAttachments(downloaded.attachments);
 
+      if (downloaded.currentPartition) {
+        const cp = downloaded.currentPartition;
+        if (cp.systemGeneratedTDN) setDeclarationNo(cp.systemGeneratedTDN);
+        if (cp.arpNo) setArpNo(cp.arpNo);
+        if (cp.pin) setPin(cp.pin);
+        if (cp.streetLocation || cp.streetNo || cp.propertyLocation) {
+          setPlantLocation(cp.streetLocation || cp.streetNo || cp.propertyLocation);
+        }
+        if (cp.lotNo || cp.lotNumber) setLotNo(cp.lotNo || cp.lotNumber);
+        if (cp.surveyNo || cp.surveyNumber || cp.cadastralSurveyNo) setCadastralSurveyNo(cp.surveyNo || cp.surveyNumber || cp.cadastralSurveyNo);
+      }
+
       if (downloaded.formData) {
         populateFieldsFromDTO(downloaded.formData);
-        if (downloaded.currentPartition?.systemGeneratedTDN) setDeclarationNo(downloaded.currentPartition.systemGeneratedTDN);
       }
-      return;
     }
 
-    // 2. Fetch live if online
-    try {
-      setLoading(true);
-      const res = await MobileApi.getMachineryForm(tdnId || 1, tdnMachineId || 1);
-      if (res && res.success && res.data) {
-        populateFieldsFromDTO(res.data);
-      } else {
-        setNotDownloadedError(true);
+    // 2. If online and no unsynced offline edits, fetch latest live partition data (including newly uploaded web photos & sketches)
+    const hasUnsynced = typeof hasPendingEdits === 'function' && hasPendingEdits(trackingNoParam, formWorkflowIdParam);
+    if (!hasUnsynced && (trackingNoParam || formWorkflowIdParam)) {
+      try {
+        if (!downloaded) setLoading(true);
+        const liveRes = await MobileApi.downloadTransactionDetails(formWorkflowIdParam, trackingNoParam);
+        if (liveRes && liveRes.success) {
+          const targetIdx = parseInt(partitionIndexParam, 10) || 0;
+          const livePart = (liveRes.partitions && liveRes.partitions[targetIdx]) || null;
+          const liveAtts = livePart?.attachments || liveRes.attachments || [];
+          const liveSketch = livePart?.sketchUrl || liveRes.sketchUrl;
+
+          if (liveSketch) setSketchUrl(liveSketch);
+          if (Array.isArray(liveAtts)) setAttachments(liveAtts);
+
+          if (livePart) {
+            if (livePart.systemGeneratedTDN) setDeclarationNo(livePart.systemGeneratedTDN);
+            if (livePart.arpNo) setArpNo(livePart.arpNo);
+            if (livePart.pin) setPin(livePart.pin);
+            if (livePart.streetLocation || livePart.streetNo || livePart.propertyLocation) {
+              setPlantLocation(livePart.streetLocation || livePart.streetNo || livePart.propertyLocation);
+            }
+          }
+
+          // Update downloadedForms cache seamlessly
+          if (typeof downloadSingleTransaction === 'function') {
+            await downloadSingleTransaction({
+              TrackingNo: trackingNoParam || liveRes.trackingNo,
+              FormworkflowId: formWorkflowIdParam || liveRes.formWorkflowId,
+              HasPartition: true
+            });
+          }
+        } else if (!downloaded) {
+          setNotDownloadedError(true);
+        }
+      } catch (e) {
+        // Offline or network error: gracefully keep using the offline copy
+        if (!downloaded) setNotDownloadedError(true);
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.warn('Cannot fetch live machinery form and not downloaded:', err);
+    } else if (!downloaded) {
       setNotDownloadedError(true);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -151,7 +201,8 @@ export const MachineryFormScreen = ({ route, navigation }) => {
       if (t.Memoranda) setMemoranda(t.Memoranda);
       if (t.Taxability != null) setTaxability(!!t.Taxability);
       if (t.FloorPlanSketchPath) setSketchUrl(t.FloorPlanSketchPath);
-      if (t.Attachments && Array.isArray(t.Attachments)) setAttachments(t.Attachments);
+      const rawAtts = t.Attachments || t.attachments;
+      if (rawAtts && Array.isArray(rawAtts) && rawAtts.length > 0) setAttachments(rawAtts);
     }
 
     if (d.refOwner) {
@@ -232,7 +283,7 @@ export const MachineryFormScreen = ({ route, navigation }) => {
     setDiscardModalVisible(true);
   };
 
-  const handleSave = async (forceOffline = false) => {
+  const handleSave = async (forceOffline = false, transferStage = false) => {
     const payload = {
       TDN: {
         TDNId: parseInt(tdnId) || 0,
@@ -289,25 +340,28 @@ export const MachineryFormScreen = ({ route, navigation }) => {
       ]
     };
 
-    const workflowForwardPayload = autoForward && formWorkflowIdParam ? {
+    const workflowForwardPayload = transferStage && formWorkflowIdParam ? {
       formWorkflowId: formWorkflowIdParam,
       nextStatusId: nextStatusId,
-      remarks: remarks || 'Field machinery appraisal completed.'
+      remarks: remarks || 'Field machinery appraisal completed and transferred.'
     } : null;
 
     if (forceOffline) {
+      setSaving(true);
       await queueOfflineUpdate(
         'UPDATE_MACHINERY',
         payload,
         `Machinery FAAS [Part ${partitionLetterParam}]: ${trackingNo || arpNo} (${ownerName || 'Company'})`,
         workflowForwardPayload
       );
-      showCompleteAlertAndGoBack('Queued for Office Sync', 'Your machinery inspection changes are saved locally on this phone. It will automatically upload and transfer to the next step when you return to the office.');
+      setSaving(false);
+      navigateBack();
       return;
     }
 
+    setSaving(true);
+
     try {
-      setSaving(true);
       const res = await MobileApi.updateMachineryForm(payload);
       if (res && res.success) {
         if (workflowForwardPayload) {
@@ -318,24 +372,29 @@ export const MachineryFormScreen = ({ route, navigation }) => {
               workflowForwardPayload.remarks
             );
           } catch (fwdErr) {
-            console.warn('Forward workflow warning:', fwdErr);
+            // Workflow forward handled
           }
         }
-        showCompleteAlertAndGoBack('Saved to Server', 'Machinery assessment updated and transferred successfully.');
-      } else {
-        throw new Error(res?.message || 'Server error');
+        if (typeof markTransactionSynced === 'function') {
+          await markTransactionSynced(trackingNo || trackingNoParam, formWorkflowIdParam, transferStage, payload);
+        }
+        setSaving(false);
+        navigateBack();
+        return;
       }
     } catch (err) {
-      await queueOfflineUpdate(
-        'UPDATE_MACHINERY',
-        payload,
-        `Machinery FAAS [Part ${partitionLetterParam}]: ${trackingNo || arpNo} (${ownerName || 'Company'})`,
-        workflowForwardPayload
-      );
-      showCompleteAlertAndGoBack('Saved Offline', 'Network disconnected. Your changes and next-step transfer are safely queued on this phone. Tap Sync All when you return to the office.');
-    } finally {
-      setSaving(false);
+      // Fallback to offline queue
     }
+
+    // Fallback: Queue offline safely without alert
+    await queueOfflineUpdate(
+      'UPDATE_MACHINERY',
+      payload,
+      `Machinery FAAS [Part ${partitionLetterParam}]: ${trackingNo || arpNo} (${ownerName || 'Company'})`,
+      workflowForwardPayload
+    );
+    setSaving(false);
+    navigateBack();
   };
 
   return (
@@ -378,7 +437,9 @@ export const MachineryFormScreen = ({ route, navigation }) => {
           style={[styles.sectionTabBtn, activeTab === 3 && styles.sectionTabBtnActive]}
           onPress={() => setActiveTab(3)}
         >
-          <Text style={[styles.sectionTabText, activeTab === 3 && styles.sectionTabTextActive]}>4. Photos & Sketch</Text>
+          <Text style={[styles.sectionTabText, activeTab === 3 && styles.sectionTabTextActive]}>
+            4. Photos & Sketch {attachments && attachments.length > 0 ? `(${attachments.length})` : ''}
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.sectionTabBtn, activeTab === 4 && styles.sectionTabBtnActive]}
@@ -658,35 +719,80 @@ export const MachineryFormScreen = ({ route, navigation }) => {
 
                   <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>Date Acquired (YYYY-MM-DD)</Text>
-                    <TextInput
+                    <View style={{ flexDirection: 'row', alignItems: 'stretch', width: '100%' }}>
+                      <TextInput
                         placeholderTextColor={colors.placeholder}
-                      style={styles.input}
-                      value={dateAcquired}
-                      onChangeText={setDateAcquired}
-                      placeholder="YYYY-MM-DD"
-                    />
+                        style={[styles.input, { flex: 1, borderTopRightRadius: 0, borderBottomRightRadius: 0, borderRightWidth: 0 }]}
+                        value={dateAcquired}
+                        onChangeText={setDateAcquired}
+                        placeholder="YYYY-MM-DD"
+                      />
+                      <TouchableOpacity
+                        style={{
+                          backgroundColor: colors.primary,
+                          width: 38,
+                          borderTopRightRadius: 8,
+                          borderBottomRightRadius: 8,
+                          justifyContent: 'center',
+                          alignItems: 'center'
+                        }}
+                        onPress={() => setActiveDatePicker('acquired')}
+                      >
+                        <Ionicons name="calendar-outline" size={17} color="#ffffff" />
+                      </TouchableOpacity>
+                    </View>
                   </View>
 
                   <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>Date of Installation (YYYY-MM-DD)</Text>
-                    <TextInput
+                    <View style={{ flexDirection: 'row', alignItems: 'stretch', width: '100%' }}>
+                      <TextInput
                         placeholderTextColor={colors.placeholder}
-                      style={styles.input}
-                      value={dateInstalled}
-                      onChangeText={setDateInstalled}
-                      placeholder="YYYY-MM-DD"
-                    />
+                        style={[styles.input, { flex: 1, borderTopRightRadius: 0, borderBottomRightRadius: 0, borderRightWidth: 0 }]}
+                        value={dateInstalled}
+                        onChangeText={setDateInstalled}
+                        placeholder="YYYY-MM-DD"
+                      />
+                      <TouchableOpacity
+                        style={{
+                          backgroundColor: colors.primary,
+                          width: 38,
+                          borderTopRightRadius: 8,
+                          borderBottomRightRadius: 8,
+                          justifyContent: 'center',
+                          alignItems: 'center'
+                        }}
+                        onPress={() => setActiveDatePicker('installed')}
+                      >
+                        <Ionicons name="calendar-outline" size={17} color="#ffffff" />
+                      </TouchableOpacity>
+                    </View>
                   </View>
 
                   <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>Date of Operation (YYYY-MM-DD)</Text>
-                    <TextInput
+                    <View style={{ flexDirection: 'row', alignItems: 'stretch', width: '100%' }}>
+                      <TextInput
                         placeholderTextColor={colors.placeholder}
-                      style={styles.input}
-                      value={dateOperational}
-                      onChangeText={setDateOperational}
-                      placeholder="YYYY-MM-DD"
-                    />
+                        style={[styles.input, { flex: 1, borderTopRightRadius: 0, borderBottomRightRadius: 0, borderRightWidth: 0 }]}
+                        value={dateOperational}
+                        onChangeText={setDateOperational}
+                        placeholder="YYYY-MM-DD"
+                      />
+                      <TouchableOpacity
+                        style={{
+                          backgroundColor: colors.primary,
+                          width: 38,
+                          borderTopRightRadius: 8,
+                          borderBottomRightRadius: 8,
+                          justifyContent: 'center',
+                          alignItems: 'center'
+                        }}
+                        onPress={() => setActiveDatePicker('operational')}
+                      >
+                        <Ionicons name="calendar-outline" size={17} color="#ffffff" />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </View>
               </View>
@@ -894,20 +1000,55 @@ export const MachineryFormScreen = ({ route, navigation }) => {
             )}
 
             {/* Action Buttons */}
+            {!isOnline && (
+              <View style={styles.offlineNoticeRow}>
+                <Ionicons name="cloud-offline-outline" size={15} color="#b45309" />
+                <Text style={styles.offlineNoticeText}>
+                  Offline Mode: Changes will be saved locally to this device.
+                </Text>
+              </View>
+            )}
             <View style={styles.buttonContainer}>
+              {/* Button 1: Save & Sync to Web (Draft - No Transfer) */}
               <TouchableOpacity
-                style={[styles.saveBtn, styles.saveBtnPrimary]}
-                onPress={() => handleSave(false)}
+                style={[
+                  styles.saveBtn,
+                  styles.saveBtnPrimary,
+                  !isOnline && styles.saveBtnOffline
+                ]}
+                onPress={() => handleSave(false, false)}
                 disabled={saving}
               >
                 {saving ? (
                   <ActivityIndicator color="#ffffff" />
                 ) : (
                   <>
-                    <Ionicons name="cloud-upload" size={18} color="#ffffff" />
-                    <Text style={styles.saveBtnText}>Save Machinery & Stage Transfer</Text>
+                    <Ionicons
+                      name={isOnline ? "cloud-upload" : "file-tray-full-outline"}
+                      size={18}
+                      color="#ffffff"
+                    />
+                    <Text style={styles.saveBtnText}>
+                      {isOnline
+                        ? "Save & Sync to Web (Draft)"
+                        : "Save to Offline Queue (No Transfer)"}
+                    </Text>
                   </>
                 )}
+              </TouchableOpacity>
+
+              {/* Button 2: Save & Transfer to Supervisor (Advances Workflow) */}
+              <TouchableOpacity
+                style={[styles.saveBtn, styles.saveBtnTransfer]}
+                onPress={() => handleSave(false, true)}
+                disabled={saving}
+              >
+                <Ionicons name="send" size={16} color="#ffffff" />
+                <Text style={styles.saveBtnText}>
+                  {isOnline
+                    ? "Save & Transfer to Supervisor"
+                    : "Queue & Transfer to Supervisor"}
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -929,7 +1070,28 @@ export const MachineryFormScreen = ({ route, navigation }) => {
           </>
         )}
       </ScrollView>
-          <DiscardChangesModal
+          {/* Date Picker Modal for Machinery Dates */}
+      <DatePickerModal
+        visible={!!activeDatePicker}
+        onClose={() => setActiveDatePicker(null)}
+        value={
+          activeDatePicker === 'acquired' ? dateAcquired :
+          activeDatePicker === 'installed' ? dateInstalled :
+          activeDatePicker === 'operational' ? dateOperational : ''
+        }
+        onSelectDate={(newDate) => {
+          if (activeDatePicker === 'acquired') setDateAcquired(newDate);
+          else if (activeDatePicker === 'installed') setDateInstalled(newDate);
+          else if (activeDatePicker === 'operational') setDateOperational(newDate);
+        }}
+        title={
+          activeDatePicker === 'acquired' ? 'Date Acquired' :
+          activeDatePicker === 'installed' ? 'Date of Installation' :
+          activeDatePicker === 'operational' ? 'Date of Operation' : 'Select Date'
+        }
+      />
+
+      <DiscardChangesModal
         visible={discardModalVisible}
         onClose={() => setDiscardModalVisible(false)}
         onConfirmDiscard={navigateBack}
@@ -1103,6 +1265,31 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 14,
     gap: 8
+  },
+  offlineNoticeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef3c7',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    gap: 6
+  },
+  offlineNoticeText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#92400e'
+  },
+  saveBtnTransfer: {
+    backgroundColor: '#059669'
+  },
+  saveBtnOffline: {
+    backgroundColor: '#0284c7'
   },
   saveBtnPrimary: {
     backgroundColor: colors.primary

@@ -1,6 +1,8 @@
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect, useCallback } from 'react';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MobileApi } from '../api/mobileApi';
+import storageResetEpoch from '../constants/storageResetEpoch.json';
 
 export const SyncContext = createContext();
 
@@ -131,13 +133,96 @@ export const SyncProvider = ({ children }) => {
   const [isDownloading, setIsDownloading] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState(null);
   const [syncLogs, setSyncLogs] = useState([]);
+  const [isOnline, setIsOnline] = useState(
+    Platform.OS === 'web' && typeof navigator !== 'undefined'
+      ? navigator.onLine !== false
+      : true
+  );
+
+  const checkConnectivity = useCallback(async (timeoutMs = 3000) => {
+    if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.onLine === false) {
+      setIsOnline(false);
+      return false;
+    }
+    try {
+      const res = await MobileApi.ping(timeoutMs);
+      const ok = Boolean(res && (res.status === 'OK' || res.success));
+      setIsOnline(ok);
+      return ok;
+    } catch (e) {
+      setIsOnline(false);
+      return false;
+    }
+  }, []);
+
+  useEffect(() => {
+    checkConnectivity();
+
+    let onlineHandler = null;
+    let offlineHandler = null;
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.addEventListener) {
+      onlineHandler = () => {
+        checkConnectivity();
+      };
+      offlineHandler = () => {
+        setIsOnline(false);
+      };
+      window.addEventListener('online', onlineHandler);
+      window.addEventListener('offline', offlineHandler);
+    }
+
+    const interval = setInterval(() => {
+      checkConnectivity(3000);
+    }, 20000);
+
+    return () => {
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && window.removeEventListener) {
+        if (onlineHandler) window.removeEventListener('online', onlineHandler);
+        if (offlineHandler) window.removeEventListener('offline', offlineHandler);
+      }
+      clearInterval(interval);
+    };
+  }, [checkConnectivity]);
+
+  // Clear all offline transactional data (downloaded forms, cached edits, sync queue) while preserving user auth
+  const clearAllOfflineData = async () => {
+    try {
+      setSyncQueue([]);
+      setCachedForms({});
+      setDownloadedForms({});
+      setCachedTransactions([]);
+      setLastSyncTime(null);
+      setSyncLogs([]);
+
+      await AsyncStorage.multiRemove([
+        '@fairtrack_sync_queue',
+        '@fairtrack_cached_forms',
+        '@fairtrack_downloaded_forms',
+        '@fairtrack_last_sync'
+      ]);
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err?.message || 'Error clearing offline data' };
+    }
+  };
 
   useEffect(() => {
     loadLocalQueue();
-  }, []);
+  }, [storageResetEpoch?.resetEpoch]);
 
   const loadLocalQueue = async () => {
     try {
+      const targetEpoch = storageResetEpoch?.resetEpoch;
+      if (targetEpoch) {
+        const appliedEpoch = await AsyncStorage.getItem('@fairtrack_applied_reset_epoch');
+        if (appliedEpoch !== targetEpoch) {
+          await clearAllOfflineData();
+          await AsyncStorage.setItem('@fairtrack_applied_reset_epoch', targetEpoch);
+          return;
+        }
+      }
+
       const storedQueue = await AsyncStorage.getItem('@fairtrack_sync_queue');
       if (storedQueue) setSyncQueue(JSON.parse(storedQueue));
 
@@ -176,6 +261,16 @@ export const SyncProvider = ({ children }) => {
 
   const getOfflineTransactions = async () => {
     try {
+      const targetEpoch = storageResetEpoch?.resetEpoch;
+      if (targetEpoch) {
+        const appliedEpoch = await AsyncStorage.getItem('@fairtrack_applied_reset_epoch');
+        if (appliedEpoch !== targetEpoch) {
+          await clearAllOfflineData();
+          await AsyncStorage.setItem('@fairtrack_applied_reset_epoch', targetEpoch);
+          return [];
+        }
+      }
+
       const storedDownloads = await AsyncStorage.getItem('@fairtrack_downloaded_forms');
       if (storedDownloads) {
         const downloadsMap = JSON.parse(storedDownloads);
@@ -261,15 +356,120 @@ export const SyncProvider = ({ children }) => {
   };
 
   // Remove a downloaded transaction from offline storage
-  const removeDownloadedTransaction = async (key) => {
+  const removeDownloadedTransaction = async (trackingNo, formWorkflowId) => {
     try {
+      const cleanTrack = (trackingNo || '').toString().trim().toLowerCase();
+      const cleanWf = formWorkflowId != null ? formWorkflowId.toString().trim() : '';
+
       const current = { ...downloadedForms };
-      delete current[key.toString()];
+      for (const [k, v] of Object.entries(current)) {
+        const kStr = k.trim().toLowerCase();
+        const vTrack = (v?.transItem?.TrackingNo || v?.transItem?.trackingNo || '').toString().trim().toLowerCase();
+        const vWf = (v?.transItem?.FormworkflowId || v?.transItem?.formworkflowId || '').toString().trim();
+
+        if (
+          (cleanTrack && (kStr === cleanTrack || vTrack === cleanTrack)) ||
+          (cleanWf && (kStr === cleanWf || vWf === cleanWf))
+        ) {
+          delete current[k];
+        }
+      }
       await saveDownloadedForms(current);
       return true;
     } catch (e) {
       console.warn('Failed to remove downloaded transaction:', e);
       return false;
+    }
+  };
+
+  const updateDownloadedFormWithPayload = async (trackingNo, formWorkflowId, payload) => {
+    if (!payload || !downloadedForms || Object.keys(downloadedForms).length === 0) return;
+    try {
+      const tracking = (trackingNo || '').toString().trim().toLowerCase();
+      const wfId = formWorkflowId != null ? formWorkflowId.toString().trim() : '';
+
+      let dKey = null;
+      if (tracking && downloadedForms[tracking]) dKey = tracking;
+      else if (wfId && downloadedForms[wfId]) dKey = wfId;
+      else {
+        dKey = Object.keys(downloadedForms).find(k =>
+          (tracking && k.toLowerCase() === tracking) ||
+          (wfId && k.toString() === wfId)
+        );
+      }
+
+      if (!dKey || !downloadedForms[dKey]) return;
+
+      const itemRecord = { ...downloadedForms[dKey] };
+      const tdn = payload.TDN || payload.tdn;
+      const partIdx = tdn?.PartitionItemIndex != null ? parseInt(tdn.PartitionItemIndex, 10) : 0;
+
+      const cp = itemRecord.currentPartition ? { ...itemRecord.currentPartition } : {};
+      if (tdn?.LotNo) { cp.lotNo = tdn.LotNo; cp.lotNumber = tdn.LotNo; }
+      if (tdn?.BlockNo) { cp.blockNo = tdn.BlockNo; cp.blockNumber = tdn.BlockNo; }
+      if (tdn?.SurveyNo) { cp.surveyNo = tdn.SurveyNo; cp.surveyNumber = tdn.SurveyNo; }
+      if (tdn?.CadastralSurveyNo) cp.cadastralSurveyNo = tdn.CadastralSurveyNo;
+      if (tdn?.SectionNo) cp.sectionNo = tdn.SectionNo;
+      if (tdn?.ParcelNo) cp.parcelNo = tdn.ParcelNo;
+      if (tdn?.PropLocationStreet) { cp.streetLocation = tdn.PropLocationStreet; cp.streetNo = tdn.PropLocationStreet; }
+      if (tdn?.Location) cp.location = tdn.Location;
+      if (tdn?.Purok) cp.purok = tdn.Purok;
+      if (tdn?.DistrictOrBarangay) cp.districtOrBarangay = tdn.DistrictOrBarangay;
+      if (tdn?.CityMunicipality) cp.cityMunicipality = tdn.CityMunicipality;
+      if (tdn?.Province) cp.province = tdn.Province;
+      if (tdn?.DisplayName) cp.owner = tdn.DisplayName;
+      if (tdn?.OwnerAddress) cp.ownerAddress = tdn.OwnerAddress;
+      if (tdn?.OwnerTIN) cp.ownerTin = tdn.OwnerTIN;
+      if (tdn?.TotalArea) cp.area = tdn.TotalArea;
+      if (tdn?.TotalMarketValue) cp.marketValue = tdn.TotalMarketValue;
+      if (tdn?.TotalAssessedValue) cp.assessedValue = tdn.TotalAssessedValue;
+      itemRecord.currentPartition = cp;
+
+      if (Array.isArray(itemRecord.partitions) && itemRecord.partitions.length > partIdx) {
+        const updatedPartitions = [...itemRecord.partitions];
+        updatedPartitions[partIdx] = {
+          ...updatedPartitions[partIdx],
+          ...cp
+        };
+        itemRecord.partitions = updatedPartitions;
+      }
+
+      if (tdn?.DisplayName) itemRecord.owner = tdn.DisplayName;
+
+      const newDownloads = { ...downloadedForms, [dKey]: itemRecord };
+      await saveDownloadedForms(newDownloads);
+    } catch (e) {
+      // Handled silently
+    }
+  };
+
+  // Mark transaction synced: clears pending syncQueue items, and if transferred, removes from downloadedForms
+  const markTransactionSynced = async (trackingNo, formWorkflowId, isTransferred = false, payload = null) => {
+    try {
+      const cleanTrack = (trackingNo || '').toString().trim().toLowerCase();
+      const cleanWf = formWorkflowId != null ? formWorkflowId.toString().trim() : '';
+
+      // 1. Remove from syncQueue
+      const filteredQueue = syncQueue.filter(item => {
+        const p = item.payload;
+        const tdn = p?.TDN || p?.tdn;
+        const itemTracking = (tdn?.TrackingNo || tdn?.trackingNo || p?.TrackingNo || p?.trackingNo || '').toString().trim().toLowerCase();
+        const itemWfId = (tdn?.FormWorkflowId || tdn?.formWorkflowId || p?.FormWorkflowId || p?.formWorkflowId || item.workflowForwardPayload?.FormWorkflowId || item.workflowForwardPayload?.formWorkflowId || '').toString().trim();
+
+        const matchTrack = cleanTrack && itemTracking && cleanTrack === itemTracking;
+        const matchWf = cleanWf && itemWfId && cleanWf === itemWfId;
+        return !(matchTrack || matchWf);
+      });
+      await saveQueue(filteredQueue);
+
+      // 2. If transferred, remove completely from downloadedForms
+      if (isTransferred) {
+        await removeDownloadedTransaction(trackingNo, formWorkflowId);
+      } else if (payload) {
+        await updateDownloadedFormWithPayload(trackingNo, formWorkflowId, payload);
+      }
+    } catch (e) {
+      // Handled silently
     }
   };
 
@@ -283,7 +483,7 @@ export const SyncProvider = ({ children }) => {
       const p = item.payload;
       const tdn = p?.TDN || p?.tdn;
       const itemTracking = (tdn?.TrackingNo || tdn?.trackingNo || p?.TrackingNo || p?.trackingNo || '').toString().trim().toLowerCase();
-      const itemWfId = (tdn?.FormWorkflowId || tdn?.formWorkflowId || p?.FormWorkflowId || p?.formWorkflowId || item.workflowForwardPayload?.FormWorkflowId || '').toString().trim();
+      const itemWfId = (tdn?.FormWorkflowId || tdn?.formWorkflowId || p?.FormWorkflowId || p?.formWorkflowId || item.workflowForwardPayload?.FormWorkflowId || item.workflowForwardPayload?.formWorkflowId || '').toString().trim();
 
       if (tNo && itemTracking && tNo === itemTracking) return true;
       if (wfId && itemWfId && wfId === itemWfId) return true;
@@ -375,37 +575,156 @@ export const SyncProvider = ({ children }) => {
     };
   };
 
-  // Check if a transaction is already downloaded
+  // Check if a transaction is already downloaded in local storage (case-insensitive & multi-key safe)
   const isTransactionDownloaded = (trackingNo, formWorkflowId) => {
-    if (trackingNo && downloadedForms[trackingNo]) return true;
-    if (formWorkflowId && downloadedForms[formWorkflowId.toString()]) return true;
+    if (!downloadedForms || Object.keys(downloadedForms).length === 0) return false;
+    const tNo = (trackingNo || '').toString().trim().toLowerCase();
+    const wfId = (formWorkflowId || '').toString().trim();
+
+    for (const [k, item] of Object.entries(downloadedForms)) {
+      const keyLower = k.toLowerCase();
+      if (tNo && (keyLower === tNo || (item?.transItem?.TrackingNo && item.transItem.TrackingNo.toLowerCase() === tNo) || (item?.trackingNo && item.trackingNo.toLowerCase() === tNo))) {
+        return true;
+      }
+      if (wfId && (k === wfId || (item?.transItem?.FormworkflowId && item.transItem.FormworkflowId.toString() === wfId) || (item?.formWorkflowId && item.formWorkflowId.toString() === wfId))) {
+        return true;
+      }
+    }
     return false;
   };
 
-  // Retrieve downloaded form data
+  // Retrieve downloaded form data (with automatic overlay of unsynced drafts from syncQueue)
   const getDownloadedFormData = (trackingNo, formWorkflowId, partitionIndex = 0) => {
-    let found = null;
-    if (trackingNo && downloadedForms[trackingNo]) {
-      found = downloadedForms[trackingNo];
-    } else if (formWorkflowId && downloadedForms[formWorkflowId.toString()]) {
-      found = downloadedForms[formWorkflowId.toString()];
-    }
-    if (!found) return null;
-
     const targetIdx = parseInt(partitionIndex, 10) || 0;
-    if (Array.isArray(found.partitions) && found.partitions.length > targetIdx && found.partitions[targetIdx]) {
-      const partObj = found.partitions[targetIdx];
-      const partFormData = partObj.formData ? withPascalCaseKeys(partObj.formData) : (found.formData ? withPascalCaseKeys(found.formData) : null);
+    const tNo = (trackingNo || '').toString().trim().toLowerCase();
+    const wfId = (formWorkflowId || '').toString().trim();
+
+    let found = null;
+    let foundKey = null;
+
+    if (downloadedForms && Object.keys(downloadedForms).length > 0) {
+      if (trackingNo && downloadedForms[trackingNo]) {
+        found = downloadedForms[trackingNo];
+        foundKey = trackingNo;
+      } else if (formWorkflowId && downloadedForms[formWorkflowId.toString()]) {
+        found = downloadedForms[formWorkflowId.toString()];
+        foundKey = formWorkflowId.toString();
+      } else {
+        for (const [k, item] of Object.entries(downloadedForms)) {
+          const keyLower = k.toLowerCase();
+          const itemTNo = (item?.transItem?.TrackingNo || item?.trackingNo || '').toString().trim().toLowerCase();
+          const itemWfId = (item?.transItem?.FormworkflowId || item?.formWorkflowId || '').toString().trim();
+          if ((tNo && (keyLower === tNo || itemTNo === tNo)) || (wfId && (k === wfId || itemWfId === wfId))) {
+            found = item;
+            foundKey = k;
+            break;
+          }
+        }
+      }
+    }
+
+    // Check if there is an unsynced draft in syncQueue for this specific partition
+    let pendingDraft = null;
+    if (syncQueue && syncQueue.length > 0) {
+      const match = syncQueue.find(item => {
+        const p = item.payload;
+        const tdn = p?.TDN || p?.tdn;
+        const itemTracking = (tdn?.TrackingNo || tdn?.trackingNo || p?.TrackingNo || p?.trackingNo || '').toString().trim().toLowerCase();
+        const itemWfId = (tdn?.FormWorkflowId || tdn?.formWorkflowId || p?.FormWorkflowId || p?.formWorkflowId || item.workflowForwardPayload?.FormWorkflowId || item.workflowForwardPayload?.formWorkflowId || '').toString().trim();
+        const itemPartIdx = parseInt(tdn?.PartitionItemIndex ?? p?.partitionIndex ?? 0, 10) || 0;
+
+        const trackingMatches = tNo && itemTracking && tNo === itemTracking;
+        const wfMatches = wfId && itemWfId && wfId === itemWfId;
+        return (trackingMatches || wfMatches) && itemPartIdx === targetIdx;
+      });
+      if (match) {
+        pendingDraft = match.payload;
+      }
+    }
+
+    if (!found && !pendingDraft) return null;
+
+    if (found && Array.isArray(found.partitions) && found.partitions.length > targetIdx && found.partitions[targetIdx]) {
+      const partObj = { ...found.partitions[targetIdx] };
+      let partFormData = partObj.formData ? withPascalCaseKeys(partObj.formData) : (found.formData ? withPascalCaseKeys(found.formData) : null);
+
+      // If an unsynced draft exists in syncQueue, overlay it into partFormData and partObj!
+      if (pendingDraft) {
+        const draftPascal = withPascalCaseKeys(pendingDraft);
+        partFormData = draftPascal;
+        const tdn = draftPascal?.TDN || draftPascal?.tdn || {};
+        const tdnLand = draftPascal?.TDNLand || draftPascal?.tdnLand || {};
+        const tdnBldg = draftPascal?.TDNBuilding || draftPascal?.tdnBuilding || {};
+
+        if (tdn.PropLocationStreet || tdn.Location) {
+          partObj.streetLocation = tdn.PropLocationStreet || tdn.Location;
+          partObj.streetNo = tdn.PropLocationStreet || tdn.Location;
+          partObj.buildingNo = tdn.PropLocationStreet || tdn.Location;
+        }
+        if (tdn.Purok) partObj.purok = tdn.Purok;
+        if (tdn.DistrictOrBarangay) partObj.districtOrBarangay = tdn.DistrictOrBarangay;
+        if (tdn.CityMunicipality) partObj.cityMunicipality = tdn.CityMunicipality;
+        if (tdn.Province) partObj.province = tdn.Province;
+        if (tdn.DisplayName) {
+          partObj.ownerName = tdn.DisplayName;
+          partObj.newOwnerName = tdn.DisplayName;
+        }
+        if (tdn.OwnerAddress) partObj.ownerAddress = tdn.OwnerAddress;
+        if (tdn.OwnerTIN) partObj.ownerTin = tdn.OwnerTIN;
+        if (tdn.OwnerContactNo) partObj.ownerContactNo = tdn.OwnerContactNo;
+        if (tdn.OwnerEmail) partObj.ownerEmail = tdn.OwnerEmail;
+        if (tdn.FloorPlanSketchPath) partObj.sketchUrl = tdn.FloorPlanSketchPath;
+        if (tdn.Attachments && Array.isArray(tdn.Attachments)) partObj.attachments = tdn.Attachments;
+
+        // Land partition overrides
+        if (tdnLand.NorthBoundary !== undefined) partObj.boundaryNorth = tdnLand.NorthBoundary;
+        if (tdnLand.Nremarks !== undefined) partObj.nremarks = tdnLand.Nremarks;
+        if (tdnLand.SouthBoundary !== undefined) partObj.boundarySouth = tdnLand.SouthBoundary;
+        if (tdnLand.Sremarks !== undefined) partObj.sremarks = tdnLand.Sremarks;
+        if (tdnLand.EastBoundary !== undefined) partObj.boundaryEast = tdnLand.EastBoundary;
+        if (tdnLand.Eremarks !== undefined) partObj.eremarks = tdnLand.Eremarks;
+        if (tdnLand.WestBoundary !== undefined) partObj.boundaryWest = tdnLand.WestBoundary;
+        if (tdnLand.Wremarks !== undefined) partObj.wremarks = tdnLand.Wremarks;
+        if (tdn.LandAppraisalDetailsJson || tdnLand.LandAppraisalDetailsJson) {
+          partObj.landAppraisalDetailsJson = tdn.LandAppraisalDetailsJson || tdnLand.LandAppraisalDetailsJson;
+        }
+        if (tdn.LandImprovementsJson || tdnLand.LandImprovementsJson) {
+          partObj.landImprovementsJson = tdn.LandImprovementsJson || tdnLand.LandImprovementsJson;
+        }
+        if (tdn.LandAdjustmentsJson || tdnLand.LandAdjustmentsJson) {
+          partObj.landAdjustmentsJson = tdn.LandAdjustmentsJson || tdnLand.LandAdjustmentsJson;
+        }
+        if (tdn.LandPropertyAssessmentsJson || tdnLand.LandPropertyAssessmentsJson) {
+          partObj.landPropertyAssessmentsJson = tdn.LandPropertyAssessmentsJson || tdnLand.LandPropertyAssessmentsJson;
+        }
+
+        // Building partition overrides
+        if (tdnBldg.BuildingType) partObj.buildingType = tdnBldg.BuildingType;
+        if (tdnBldg.StructuralType) partObj.structuralType = tdnBldg.StructuralType;
+        if (tdnBldg.TotalFloorArea) partObj.areaSqMeters = tdnBldg.TotalFloorArea;
+
+        // Effectivity & Notes overrides
+        if (tdn.QuarterEffectivity) {
+          partObj.quarterEffectivity = typeof tdn.QuarterEffectivity === 'number'
+            ? `${tdn.QuarterEffectivity}${tdn.QuarterEffectivity === 1 ? 'st' : tdn.QuarterEffectivity === 2 ? 'nd' : tdn.QuarterEffectivity === 3 ? 'rd' : 'th'} Quarter`
+            : tdn.QuarterEffectivity;
+        }
+        if (tdn.YearEffectivity) partObj.yearEffectivity = tdn.YearEffectivity.toString();
+        if (tdn.Taxability !== undefined) partObj.taxability = tdn.Taxability ? 'Taxable' : 'Exempt';
+        if (tdn.AssessmentBasis) partObj.assessmentBasis = tdn.AssessmentBasis;
+        if (tdn.Memoranda) partObj.memoranda = tdn.Memoranda;
+      }
+
       return {
-        ...found,
+        ...(found || {}),
         selectedPartitionIndex: targetIdx,
-        formType: partObj.formType || found.formType,
-        transactionTypeId: partObj.transactionTypeId || found.transactionTypeId,
-        owner: partObj.ownerName || found.owner,
-        arpNo: partObj.systemGeneratedTDN || found.arpNo,
-        sketchUrl: partObj.sketchUrl || found.sketchUrl,
-        sketchFileName: partObj.sketchFileName || found.sketchFileName,
-        attachments: partObj.attachments || found.attachments || [],
+        formType: partObj.formType || found?.formType,
+        transactionTypeId: partObj.transactionTypeId || found?.transactionTypeId,
+        owner: partObj.ownerName || found?.owner,
+        arpNo: partObj.systemGeneratedTDN || found?.arpNo,
+        sketchUrl: partObj.sketchUrl || found?.sketchUrl,
+        sketchFileName: partObj.sketchFileName || found?.sketchFileName,
+        attachments: partObj.attachments || found?.attachments || [],
         formData: partFormData,
         currentPartition: partObj
       };
@@ -417,6 +736,19 @@ export const SyncProvider = ({ children }) => {
         formData: withPascalCaseKeys(found.formData)
       };
     }
+
+    if (pendingDraft) {
+      const draftPascal = withPascalCaseKeys(pendingDraft);
+      return {
+        formData: draftPascal,
+        owner: draftPascal?.TDN?.DisplayName || '',
+        arpNo: draftPascal?.TDN?.DeclarationNo || '',
+        sketchUrl: draftPascal?.TDN?.FloorPlanSketchPath || null,
+        attachments: draftPascal?.TDN?.Attachments || [],
+        currentPartition: null
+      };
+    }
+
     return found;
   };
 
@@ -432,40 +764,103 @@ export const SyncProvider = ({ children }) => {
       status: 'PENDING'
     };
 
-    const updated = [queueItem, ...syncQueue];
+    const tdn = payload?.TDN || payload?.tdn;
+    const tracking = (tdn?.TrackingNo || payload?.trackingNo || payload?.TrackingNo || '').toString().trim();
+    const wfId = (tdn?.FormWorkflowId || payload?.formWorkflowId || payload?.FormWorkflowId || (workflowForwardPayload?.formWorkflowId || workflowForwardPayload?.FormWorkflowId) || '').toString().trim();
+    const partIdx = parseInt(tdn?.PartitionItemIndex ?? payload?.partitionIndex ?? 0, 10) || 0;
+
+    // Filter out previous drafts in syncQueue for the exact same partition so queue items don't accumulate duplicates
+    const filteredQueue = syncQueue.filter(item => {
+      const p = item.payload;
+      const itemTdn = p?.TDN || p?.tdn;
+      const itemTracking = (itemTdn?.TrackingNo || itemTdn?.trackingNo || p?.TrackingNo || p?.trackingNo || '').toString().trim();
+      const itemWfId = (itemTdn?.FormWorkflowId || itemTdn?.formWorkflowId || p?.FormWorkflowId || p?.formWorkflowId || item.workflowForwardPayload?.FormWorkflowId || item.workflowForwardPayload?.formWorkflowId || '').toString().trim();
+      const itemPartIdx = parseInt(itemTdn?.PartitionItemIndex ?? p?.partitionIndex ?? 0, 10) || 0;
+
+      const trackingMatches = tracking && itemTracking && tracking.toLowerCase() === itemTracking.toLowerCase();
+      const wfMatches = wfId && itemWfId && wfId === itemWfId;
+      return !((trackingMatches || wfMatches) && itemPartIdx === partIdx && item.type === type);
+    });
+
+    const updated = [queueItem, ...filteredQueue];
     await saveQueue(updated);
 
-    // Update local cached form representation
-    if (payload && payload.TDN && payload.TDN.TDNId) {
-      const partIdx = parseInt(payload.TDN.PartitionItemIndex, 10) || 0;
-      const formKey = `${type}_${payload.TDN.TDNId}_part_${partIdx}`;
-      const newCachedForms = { ...cachedForms, [formKey]: payload };
-      setCachedForms(newCachedForms);
-      await AsyncStorage.setItem('@fairtrack_cached_forms', JSON.stringify(newCachedForms));
+    // Update cachedForms
+    const cacheId = tdn?.TDNId || tracking || wfId || 'temp';
+    const formKey = `${type}_${cacheId}_part_${partIdx}`;
+    const newCachedForms = { ...cachedForms, [formKey]: payload };
+    setCachedForms(newCachedForms);
+    await AsyncStorage.setItem('@fairtrack_cached_forms', JSON.stringify(newCachedForms));
 
-      // Also update downloadedForms cache so switching partitions offline reflects latest edits
-      const tracking = payload.TDN.TrackingNo;
-      const wfId = payload.TDN.FormWorkflowId;
-      const dKey = (tracking || wfId || '').toString();
-      if (dKey && downloadedForms[dKey]) {
-        const itemRecord = { ...downloadedForms[dKey] };
-        if (Array.isArray(itemRecord.partitions) && itemRecord.partitions.length > partIdx) {
-          const updatedPartitions = [...itemRecord.partitions];
-          updatedPartitions[partIdx] = {
-            ...updatedPartitions[partIdx],
-            formData: payload,
-            sketchUrl: payload.TDN.FloorPlanSketchPath || updatedPartitions[partIdx].sketchUrl,
-            attachments: payload.TDN.Attachments || updatedPartitions[partIdx].attachments
-          };
-          itemRecord.partitions = updatedPartitions;
-        }
-        if (partIdx === 0) {
-          itemRecord.formData = payload;
-        }
-        const newDownloads = { ...downloadedForms, [dKey]: itemRecord };
-        setDownloadedForms(newDownloads);
-        await AsyncStorage.setItem('@fairtrack_downloaded_forms', JSON.stringify(newDownloads));
+    // Update downloadedForms cache so switching partitions offline reflects latest edits immediately
+    let dKey = null;
+    if (downloadedForms && Object.keys(downloadedForms).length > 0) {
+      if (tracking && downloadedForms[tracking]) dKey = tracking;
+      else if (wfId && downloadedForms[wfId]) dKey = wfId;
+      else {
+        const matchKey = Object.keys(downloadedForms).find(k =>
+          (tracking && k.toLowerCase() === tracking.toLowerCase()) ||
+          (wfId && k.toString() === wfId.toString())
+        );
+        if (matchKey) dKey = matchKey;
       }
+    }
+
+    if (dKey && downloadedForms[dKey]) {
+      const itemRecord = { ...downloadedForms[dKey] };
+      if (Array.isArray(itemRecord.partitions) && itemRecord.partitions.length > partIdx) {
+        const updatedPartitions = [...itemRecord.partitions];
+        const existingPart = updatedPartitions[partIdx] || {};
+        const tdnLand = payload?.TDNLand || payload?.tdnLand || {};
+        const tdnBldg = payload?.TDNBuilding || payload?.tdnBuilding || {};
+
+        updatedPartitions[partIdx] = {
+          ...existingPart,
+          formData: payload,
+          sketchUrl: tdn?.FloorPlanSketchPath || existingPart.sketchUrl,
+          attachments: tdn?.Attachments || existingPart.attachments,
+          streetLocation: tdn?.PropLocationStreet || tdn?.Location || existingPart.streetLocation,
+          streetNo: tdn?.PropLocationStreet || tdn?.Location || existingPart.streetNo,
+          buildingNo: tdn?.PropLocationStreet || tdn?.Location || existingPart.buildingNo,
+          purok: tdn?.Purok || existingPart.purok,
+          districtOrBarangay: tdn?.DistrictOrBarangay || existingPart.districtOrBarangay,
+          cityMunicipality: tdn?.CityMunicipality || existingPart.cityMunicipality,
+          province: tdn?.Province || existingPart.province,
+          ownerName: tdn?.DisplayName || existingPart.ownerName,
+          newOwnerName: tdn?.DisplayName || existingPart.newOwnerName,
+          ownerAddress: tdn?.OwnerAddress || existingPart.ownerAddress,
+          ownerTin: tdn?.OwnerTIN || existingPart.ownerTin,
+          ownerContactNo: tdn?.OwnerContactNo || existingPart.ownerContactNo,
+          ownerEmail: tdn?.OwnerEmail || existingPart.ownerEmail,
+          boundaryNorth: tdnLand.NorthBoundary !== undefined ? tdnLand.NorthBoundary : existingPart.boundaryNorth,
+          nremarks: tdnLand.Nremarks !== undefined ? tdnLand.Nremarks : existingPart.nremarks,
+          boundarySouth: tdnLand.SouthBoundary !== undefined ? tdnLand.SouthBoundary : existingPart.boundarySouth,
+          sremarks: tdnLand.Sremarks !== undefined ? tdnLand.Sremarks : existingPart.sremarks,
+          boundaryEast: tdnLand.EastBoundary !== undefined ? tdnLand.EastBoundary : existingPart.boundaryEast,
+          eremarks: tdnLand.Eremarks !== undefined ? tdnLand.Eremarks : existingPart.eremarks,
+          boundaryWest: tdnLand.WestBoundary !== undefined ? tdnLand.WestBoundary : existingPart.boundaryWest,
+          wremarks: tdnLand.Wremarks !== undefined ? tdnLand.Wremarks : existingPart.wremarks,
+          landAppraisalDetailsJson: tdn?.LandAppraisalDetailsJson || tdnLand.LandAppraisalDetailsJson || existingPart.landAppraisalDetailsJson,
+          landImprovementsJson: tdn?.LandImprovementsJson || tdnLand.LandImprovementsJson || existingPart.landImprovementsJson,
+          landAdjustmentsJson: tdn?.LandAdjustmentsJson || tdnLand.LandAdjustmentsJson || existingPart.landAdjustmentsJson,
+          landPropertyAssessmentsJson: tdn?.LandPropertyAssessmentsJson || tdnLand.LandPropertyAssessmentsJson || existingPart.landPropertyAssessmentsJson,
+          buildingType: tdnBldg.BuildingType || existingPart.buildingType,
+          structuralType: tdnBldg.StructuralType || existingPart.structuralType,
+          areaSqMeters: tdnBldg.TotalFloorArea || existingPart.areaSqMeters,
+          quarterEffectivity: tdn?.QuarterEffectivity ? (typeof tdn.QuarterEffectivity === 'number' ? `${tdn.QuarterEffectivity}${tdn.QuarterEffectivity === 1 ? 'st' : tdn.QuarterEffectivity === 2 ? 'nd' : tdn.QuarterEffectivity === 3 ? 'rd' : 'th'} Quarter` : tdn.QuarterEffectivity) : existingPart.quarterEffectivity,
+          yearEffectivity: tdn?.YearEffectivity ? tdn.YearEffectivity.toString() : existingPart.yearEffectivity,
+          taxability: tdn?.Taxability !== undefined ? (tdn.Taxability ? 'Taxable' : 'Exempt') : existingPart.taxability,
+          assessmentBasis: tdn?.AssessmentBasis || existingPart.assessmentBasis,
+          memoranda: tdn?.Memoranda || existingPart.memoranda
+        };
+        itemRecord.partitions = updatedPartitions;
+      }
+      if (partIdx === 0) {
+        itemRecord.formData = payload;
+        if (tdn?.DisplayName) itemRecord.owner = tdn.DisplayName;
+      }
+      const newDownloads = { ...downloadedForms, [dKey]: itemRecord };
+      await saveDownloadedForms(newDownloads);
     }
 
     return queueItem;
@@ -477,13 +872,26 @@ export const SyncProvider = ({ children }) => {
       return { success: true, count: 0, message: 'Sync queue is empty. No offline edits pending.' };
     }
 
+    const online = await checkConnectivity(3000);
+    if (!online) {
+      return {
+        success: false,
+        isOffline: true,
+        successCount: 0,
+        failureCount: syncQueue.length,
+        remainingCount: syncQueue.length,
+        message: 'Office server is unreachable. Please connect to the office network before syncing.'
+      };
+    }
+
     setIsSyncing(true);
     let successCount = 0;
     let failureCount = 0;
     const remainingQueue = [];
     const newLogs = [];
 
-    for (const item of syncQueue) {
+    for (let i = 0; i < syncQueue.length; i++) {
+      const item = syncQueue[i];
       try {
         let res = null;
         if (item.type === 'UPDATE_BUILDING') {
@@ -502,6 +910,7 @@ export const SyncProvider = ({ children }) => {
 
         if (res && res.success) {
           // If this update included a workflow transfer to the next step, forward it too
+          let wasTransferred = false;
           if (item.workflowForwardPayload && item.workflowForwardPayload.formWorkflowId && item.workflowForwardPayload.nextStatusId) {
             try {
               await MobileApi.forwardWorkflow(
@@ -509,9 +918,24 @@ export const SyncProvider = ({ children }) => {
                 item.workflowForwardPayload.nextStatusId,
                 item.workflowForwardPayload.remarks || 'Completed field assessment and synced.'
               );
+              wasTransferred = true;
             } catch (fwdErr) {
-              console.warn('Auto workflow forward warning:', fwdErr);
+              // Workflow forward completed or handled offline
             }
+          }
+
+          if (wasTransferred) {
+            const p = item.payload;
+            const tdn = p?.TDN || p?.tdn;
+            const itemTrack = tdn?.TrackingNo || tdn?.trackingNo;
+            const itemWf = tdn?.FormWorkflowId || tdn?.formWorkflowId;
+            await removeDownloadedTransaction(itemTrack, itemWf);
+          } else {
+            const p = item.payload;
+            const tdn = p?.TDN || p?.tdn;
+            const itemTrack = tdn?.TrackingNo || tdn?.trackingNo;
+            const itemWf = tdn?.FormWorkflowId || tdn?.formWorkflowId;
+            await updateDownloadedFormWithPayload(itemTrack, itemWf, p);
           }
 
           successCount++;
@@ -536,13 +960,22 @@ export const SyncProvider = ({ children }) => {
       } catch (err) {
         failureCount++;
         remainingQueue.push(item);
+        const isNetworkErr = !err.response || err.code === 'ECONNABORTED' || (err.message && err.message.toLowerCase().includes('network'));
         newLogs.unshift({
           id: item.id,
           title: item.title,
           status: 'ERROR',
           time: new Date().toLocaleTimeString(),
-          message: err.response?.data?.message || err.message || 'Network / Server error'
+          message: isNetworkErr ? 'Network disconnected during sync' : (err.response?.data?.message || err.message || 'Server error')
         });
+
+        if (isNetworkErr) {
+          setIsOnline(false);
+          for (let j = i + 1; j < syncQueue.length; j++) {
+            remainingQueue.push(syncQueue[j]);
+          }
+          break;
+        }
       }
     }
 
@@ -557,6 +990,7 @@ export const SyncProvider = ({ children }) => {
 
     return {
       success: failureCount === 0,
+      isOffline: !isOnline,
       successCount,
       failureCount,
       remainingCount: remainingQueue.length
@@ -585,17 +1019,21 @@ export const SyncProvider = ({ children }) => {
         isDownloading,
         lastSyncTime,
         syncLogs,
+        isOnline,
+        checkConnectivity,
         getOfflineTransactions,
         downloadSingleTransaction,
         downloadAllTransactions,
         removeDownloadedTransaction,
+        markTransactionSynced,
         isTransactionDownloaded,
         hasPendingEdits,
         getDownloadedFormData,
         queueOfflineUpdate,
         syncAllToServer,
         removeQueueItem,
-        clearQueue
+        clearQueue,
+        clearAllOfflineData
       }}
     >
       {children}

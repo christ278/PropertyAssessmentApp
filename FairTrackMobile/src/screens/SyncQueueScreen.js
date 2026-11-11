@@ -26,6 +26,8 @@ export const SyncQueueScreen = ({ navigation }) => {
     isSyncing,
     lastSyncTime,
     syncLogs,
+    isOnline,
+    checkConnectivity,
     syncAllToServer,
     removeQueueItem,
     clearQueue
@@ -35,6 +37,17 @@ export const SyncQueueScreen = ({ navigation }) => {
   const handleSyncAll = async () => {
     if (pendingCount === 0) {
       showModal({ title: 'Queue Empty', message: 'There are no pending offline changes to sync.', icon: 'checkmark-circle-outline', iconType: 'primary' });
+      return;
+    }
+
+    const online = await checkConnectivity(2500);
+    if (!online) {
+      showModal({
+        title: 'Office Server Unreachable',
+        message: 'Your device is offline or cannot connect to the office server. Please verify your connection to the office Wi-Fi or LAN before syncing.',
+        icon: 'cloud-offline-outline',
+        iconType: 'warning'
+      });
       return;
     }
 
@@ -112,6 +125,15 @@ export const SyncQueueScreen = ({ navigation }) => {
       <HeaderBar title="OFFICE SYNC CENTER" subtitle="Offline-to-Online Batch Manager" navigation={navigation} />
 
       <View style={styles.content}>
+        {!isOnline && (
+          <View style={styles.offlineNoticeBanner}>
+            <Ionicons name="cloud-offline-outline" size={18} color="#b45309" />
+            <Text style={styles.offlineNoticeText}>
+              Device is offline. Office sync will be available when connected to the local office network.
+            </Text>
+          </View>
+        )}
+
         {/* Sync Summary Hero Card */}
         <View
           style={[
@@ -143,8 +165,10 @@ export const SyncQueueScreen = ({ navigation }) => {
               <ActivityIndicator color="#ffffff" size="small" />
             ) : (
               <>
-                <Ionicons name="cloud-upload" size={20} color="#ffffff" />
-                <Text style={styles.syncActionText}>Sync All to Server</Text>
+                <Ionicons name={!isOnline ? "cloud-offline-outline" : "cloud-upload"} size={20} color="#ffffff" />
+                <Text style={styles.syncActionText}>
+                  {!isOnline ? "Sync All to Server (Offline)" : "Sync All to Server"}
+                </Text>
               </>
             )}
           </TouchableOpacity>
@@ -332,6 +356,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: COLORS.accentRed
+  },
+  offlineNoticeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef3c7',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 14,
+    gap: 8
+  },
+  offlineNoticeText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#92400e'
   },
   emptyState: {
     alignItems: 'center',
