@@ -20,7 +20,7 @@ public class RPTCertificatePdfService : IRPTCertificatePdfService
     public byte[] GenerateCertificatePdf(OfficialCertificateViewModel model)
     {
         QuestPDF.Settings.License = LicenseType.Community;
-        QuestPDF.Settings.CheckIfAllTextGlyphsAreAvailable = false;
+        QuestPDF.Settings.ThrowOnMissingTextGlyphs = false;
 
         byte[]? sealImageBytes = LoadSealImage();
 

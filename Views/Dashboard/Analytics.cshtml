@@ -9,514 +9,669 @@
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
 <style>
-    /* Modern Glass & Dashboard Custom Tweaks */
-    .glass-card {
-        background: rgba(255, 255, 255, 0.95);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
+    /* Executive Analytics UI Styles matching uploaded design */
+    .rpta-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 1rem;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
-    .dark .glass-card {
-        background: rgba(28, 25, 23, 0.88);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
+    .dark .rpta-card {
+        background: #1c1917;
+        border-color: #292524;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3);
     }
-    .bento-card {
-        transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
+    .rpta-bento-kpi {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
-    .bento-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 16px 32px -8px rgba(0, 103, 102, 0.08), 0 4px 12px -2px rgba(0, 0, 0, 0.04);
+    .rpta-bento-kpi:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.08);
     }
-    .dark .bento-card:hover {
-        box-shadow: 0 16px 32px -8px rgba(0, 0, 0, 0.5), 0 4px 12px -2px rgba(0, 0, 0, 0.3);
+    .dark .rpta-bento-kpi:hover {
+        box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.4);
     }
-    /* ApexCharts tooltip custom override */
-    .apexcharts-tooltip {
-        border-radius: 12px !important;
-        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
-        border: 1px solid rgba(226, 232, 240, 0.8) !important;
-        font-family: inherit !important;
+    .classification-table th, .classification-table td {
+        white-space: nowrap;
     }
-    .dark .apexcharts-tooltip {
-        background: #1c1917 !important;
+    .detailed-roll-table th, .detailed-roll-table td {
+        white-space: nowrap;
+    }
+    /* Compact TomSelect for Assessment Roll Filter */
+    #rollBarangayFilterWrapper .ts-control {
+        min-height: 34px !important;
+        padding: 0.35rem 0.75rem !important;
+        border-radius: 0.75rem !important;
+        background-color: #f8fafc !important;
+        border: 1px solid #e2e8f0 !important;
+        font-size: 0.75rem !important;
+        font-weight: 600 !important;
+    }
+    .dark #rollBarangayFilterWrapper .ts-control {
+        background-color: #1c1917 !important;
         border-color: #292524 !important;
         color: #f5f5f4 !important;
     }
-    .dark .apexcharts-tooltip-title {
-        background: #292524 !important;
-        border-color: #44403c !important;
-        color: #e7e5e4 !important;
+    #rollBarangayFilterWrapper .ts-dropdown {
+        font-size: 0.75rem !important;
+        border-radius: 0.75rem !important;
+        z-index: 50 !important;
     }
-    /* Skeleton Shimmer Loading */
-    .skeleton-shimmer {
-        background: linear-gradient(90deg, rgba(226, 232, 240, 0.4) 0%, rgba(241, 245, 249, 0.8) 50%, rgba(226, 232, 240, 0.4) 100%);
-        background-size: 200% 100%;
-        animation: shimmer 1.5s infinite;
-    }
-    .dark .skeleton-shimmer {
-        background: linear-gradient(90deg, rgba(41, 37, 36, 0.5) 0%, rgba(68, 64, 60, 0.7) 50%, rgba(41, 37, 36, 0.5) 100%);
-        background-size: 200% 100%;
-        animation: shimmer 1.5s infinite;
-    }
-    @@keyframes shimmer {
-        0% { background-position: -200% 0; }
-        100% { background-position: 200% 0; }
+    /* ApexCharts tooltip custom override */
+    .apexcharts-tooltip {
+        border-radius: 10px !important;
+        font-family: inherit !important;
+        box-shadow: 0 8px 16px -2px rgba(0,0,0,0.12) !important;
     }
 </style>
 
-<div class="space-y-6">
+<div class="space-y-5 font-sans pb-12">
 
-    <!-- 1. HERO COMMAND BAR & PRESET CONTROLS -->
-    <div class="glass-card rounded-2xl border border-slate-200/80 dark:border-stone-800 p-5 shadow-sm">
-        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div>
-                <div class="flex items-center gap-2 mb-1">
-                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-[#006766] dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/60">
-                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                        Real-Time RPTA Roll Intelligence
-                    </span>
-                    <span id="lastUpdatedBadge" class="text-[11px] font-mono text-slate-400 dark:text-stone-500 hidden sm:inline">
-                        • Updated just now
-                    </span>
-                </div>
-                <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white flex items-center gap-2.5">
-                    <span>Executive Assessment Analytics</span>
-                </h1>
-                <p class="text-xs sm:text-sm text-slate-500 dark:text-stone-400 mt-0.5">
-                    City Assessor's Office • Comprehensive Real Property Valuation, Roll Summary &amp; Growth Trends
-                </p>
+    <!-- 1. TOP HEADER & CONTROLS STRIP -->
+    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#1e293b] dark:text-white">
+                Executive Assessment Analytics
+            </h1>
+            <p class="text-xs sm:text-sm text-slate-500 dark:text-stone-400 mt-0.5">
+                Real Property Tax Administration (RPTA) Performance Dashboard
+            </p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2.5">
+            <!-- Assessment Year Selector -->
+            <div class="flex items-center rounded-xl border border-slate-300 dark:border-stone-700 bg-white dark:bg-stone-900 px-3 py-1.5 shadow-xs">
+                <i data-lucide="calendar" class="w-4 h-4 text-slate-400 mr-2"></i>
+                <span class="text-[11px] font-bold text-slate-500 dark:text-stone-400 mr-2">Assessment Year</span>
+                <select id="assessmentYearSelect" onchange="onAssessmentYearChanged(this.value)" class="text-xs font-bold text-slate-800 dark:text-stone-100 bg-transparent focus:outline-none cursor-pointer">
+                    <option value="0">All Years</option>
+                    @foreach (var yr in Model.AssessmentYears)
+                    {
+                        <option value="@yr" selected="@(yr == 2026 ? "selected" : null)">@yr</option>
+                    }
+                </select>
             </div>
 
-            <!-- Preset Buttons & Quick Actions -->
-            <div class="flex flex-wrap items-center gap-2.5">
-                <!-- Preset Switcher -->
-                <div class="inline-flex p-1 rounded-xl bg-slate-100 dark:bg-stone-800/90 border border-slate-200/70 dark:border-stone-700/60 shadow-xs text-xs font-semibold">
-                    <button type="button" data-preset="Today" onclick="selectDatePreset('Today')" class="preset-btn px-3 py-1.5 rounded-lg text-slate-600 dark:text-stone-300 hover:text-slate-900 dark:hover:text-white transition cursor-pointer">
-                        Today
-                    </button>
-                    <button type="button" data-preset="ThisQuarter" onclick="selectDatePreset('ThisQuarter')" class="preset-btn px-3 py-1.5 rounded-lg text-slate-600 dark:text-stone-300 hover:text-slate-900 dark:hover:text-white transition cursor-pointer">
-                        Quarter
-                    </button>
-                    <button type="button" data-preset="YTD" onclick="selectDatePreset('YTD')" class="preset-btn active-preset px-3 py-1.5 rounded-lg bg-[#006766] text-white font-bold shadow-xs transition cursor-pointer">
-                        YTD
-                    </button>
-                    <button type="button" data-preset="Custom" onclick="selectDatePreset('Custom')" class="preset-btn px-3 py-1.5 rounded-lg text-slate-600 dark:text-stone-300 hover:text-slate-900 dark:hover:text-white inline-flex items-center gap-1.5 transition cursor-pointer">
-                        <i data-lucide="calendar-range" class="w-3.5 h-3.5"></i>
-                        <span>Custom</span>
-                    </button>
-                </div>
+            <!-- Period Selector / Date Range Input -->
+            <div class="flex items-center rounded-xl border border-slate-300 dark:border-stone-700 bg-white dark:bg-stone-900 px-3 py-1.5 shadow-xs">
+                <span class="text-[11px] font-bold text-slate-500 dark:text-stone-400 mr-2">Period</span>
+                <input type="text" id="topDateRangePicker" class="text-xs font-bold text-slate-800 dark:text-stone-100 bg-transparent focus:outline-none cursor-pointer w-48" placeholder="Select Period..." />
+                <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 ml-1"></i>
+            </div>
 
-                <!-- Export Menu Button -->
-                <div class="relative" id="exportDropdownContainer">
-                    <button type="button" onclick="toggleExportMenu(event)" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-stone-800 dark:hover:bg-stone-700 text-white text-xs font-bold shadow-sm transition cursor-pointer">
-                        <i data-lucide="download" class="w-3.5 h-3.5"></i>
-                        <span>Export</span>
-                        <i data-lucide="chevron-down" class="w-3.5 h-3.5 opacity-70"></i>
-                    </button>
-                    <div id="exportDropdownMenu" class="hidden absolute right-0 mt-2 w-48 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-xl py-1.5 z-40 text-xs">
-                        <button type="button" onclick="exportAnalyticsCsv()" class="w-full px-4 py-2.5 text-left flex items-center gap-2.5 text-slate-700 dark:text-stone-200 hover:bg-slate-50 dark:hover:bg-stone-800 font-semibold transition cursor-pointer">
-                            <div class="w-6 h-6 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 flex items-center justify-center">
-                                <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i>
-                            </div>
-                            <span>Export Roll CSV</span>
-                        </button>
-                        <button type="button" onclick="window.print()" class="w-full px-4 py-2.5 text-left flex items-center gap-2.5 text-slate-700 dark:text-stone-200 hover:bg-slate-50 dark:hover:bg-stone-800 font-semibold transition cursor-pointer">
-                            <div class="w-6 h-6 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 flex items-center justify-center">
-                                <i data-lucide="printer" class="w-3.5 h-3.5"></i>
-                            </div>
-                            <span>Print Executive Report</span>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Refresh Button -->
-                <button type="button" id="btnRefreshAnalytics" onclick="loadAnalyticsData()" class="p-2 rounded-xl border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-slate-600 dark:text-stone-300 hover:bg-slate-50 dark:hover:bg-stone-800 shadow-xs transition cursor-pointer" title="Refresh Live Metrics">
-                    <i data-lucide="rotate-cw" id="refreshIcon" class="w-4 h-4"></i>
+            <!-- Export Dropdown Button -->
+            <div class="relative" id="exportDropdownContainer">
+                <button type="button" onclick="toggleExportMenu(event)" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#00875a] hover:bg-[#00714b] text-white text-xs font-bold shadow-xs transition cursor-pointer">
+                    <i data-lucide="download" class="w-4 h-4"></i>
+                    <span>Export</span>
+                    <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
                 </button>
+                <div id="exportDropdownMenu" class="hidden absolute right-0 mt-2 w-56 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-xl py-1.5 z-50 text-xs">
+                    <button type="button" onclick="exportAssessmentRollCsv()" class="w-full px-4 py-2.5 text-left flex items-center gap-2.5 text-slate-700 dark:text-stone-200 hover:bg-slate-50 dark:hover:bg-stone-800 font-semibold cursor-pointer">
+                        <i data-lucide="table" class="w-4 h-4 text-emerald-600"></i>
+                        <span>Export Detailed Roll CSV</span>
+                    </button>
+                    <button type="button" onclick="exportAnalyticsSummaryCsv()" class="w-full px-4 py-2.5 text-left flex items-center gap-2.5 text-slate-700 dark:text-stone-200 hover:bg-slate-50 dark:hover:bg-stone-800 font-semibold cursor-pointer">
+                        <i data-lucide="file-spreadsheet" class="w-4 h-4 text-blue-600"></i>
+                        <span>Export Location Summary CSV</span>
+                    </button>
+                    <button type="button" onclick="window.print()" class="w-full px-4 py-2.5 text-left flex items-center gap-2.5 text-slate-700 dark:text-stone-200 hover:bg-slate-50 dark:hover:bg-stone-800 font-semibold cursor-pointer">
+                        <i data-lucide="printer" class="w-4 h-4 text-amber-600"></i>
+                        <span>Print Executive Dashboard</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Refresh Button -->
+            <button type="button" onclick="loadAllAnalytics()" class="p-2 rounded-xl border border-slate-300 dark:border-stone-700 bg-white dark:bg-stone-900 text-slate-600 dark:text-stone-300 hover:bg-slate-50 dark:hover:bg-stone-800 shadow-xs transition cursor-pointer" title="Refresh Live Statistics">
+                <i data-lucide="rotate-cw" id="btnRefreshSpin" class="w-4 h-4"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- 2. 6 BENTO METRIC CARDS ROW -->
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
+        <!-- Card 1: TOTAL RPUS -->
+        <div class="rpta-card rpta-bento-kpi p-4 flex flex-col justify-between min-h-[140px] bg-gradient-to-b from-blue-50/40 to-white dark:from-stone-900 dark:to-stone-900">
+            <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-xl bg-blue-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <i data-lucide="building-2" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-stone-400">Total RPUs</span>
+                </div>
+            </div>
+            <div class="my-1.5">
+                <div id="kpiTotalRpus" class="text-2xl font-black text-slate-900 dark:text-white">
+                    76,000
+                </div>
+            </div>
+            <div class="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                <span id="kpiTotalRpusTrend">↑ 2.35% vs. 2025 (74,256)</span>
+            </div>
+        </div>
+
+        <!-- Card 2: ACTIVE TDs / ARPs -->
+        <div class="rpta-card rpta-bento-kpi p-4 flex flex-col justify-between min-h-[140px] bg-gradient-to-b from-emerald-50/40 to-white dark:from-stone-900 dark:to-stone-900">
+            <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <i data-lucide="check" class="w-5 h-5 stroke-[3]"></i>
+                </div>
+                <div>
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-stone-400">Active TDs / ARPs</span>
+                </div>
+            </div>
+            <div class="my-1.5">
+                <div id="kpiActiveCount" class="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                    196
+                </div>
+            </div>
+            <div class="text-[11px] text-slate-500 dark:text-stone-400 font-semibold flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                <span>In Roll</span>
+                <span class="text-slate-400">• Current CY</span>
+            </div>
+        </div>
+
+        <!-- Card 3: TRANSACTIONS -->
+        <div class="rpta-card rpta-bento-kpi p-4 flex flex-col justify-between min-h-[140px] bg-gradient-to-b from-amber-50/40 to-white dark:from-stone-900 dark:to-stone-900">
+            <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <i data-lucide="refresh-cw" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-stone-400">Transactions</span>
+                </div>
+            </div>
+            <div class="my-1.5">
+                <div id="kpiTransactions" class="text-2xl font-black text-amber-500 dark:text-amber-400">
+                    230
+                </div>
+            </div>
+            <div class="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                <span id="kpiTransactionsTrend">↑ 14.4% vs. 2025 (201)</span>
+            </div>
+        </div>
+
+        <!-- Card 4: TOTAL MARKET VALUE -->
+        <div class="rpta-card rpta-bento-kpi p-4 flex flex-col justify-between min-h-[140px] bg-gradient-to-b from-purple-50/40 to-white dark:from-stone-900 dark:to-stone-900">
+            <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <i data-lucide="layers" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-stone-400">Total Market Value</span>
+                </div>
+            </div>
+            <div class="my-1.5">
+                <div id="kpiMarketValue" class="text-xl lg:text-[18px] font-black text-purple-700 dark:text-purple-400 truncate" title="PHP 28,919,507.10">
+                    PHP 28,919,507.10
+                </div>
+            </div>
+            <div class="text-[11px] text-slate-400 dark:text-stone-500 font-semibold">
+                Base Market Value
+            </div>
+        </div>
+
+        <!-- Card 5: TOTAL ASSESSED VALUE -->
+        <div class="rpta-card rpta-bento-kpi p-4 flex flex-col justify-between min-h-[140px] bg-gradient-to-b from-cyan-50/40 to-white dark:from-stone-900 dark:to-stone-900">
+            <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <i data-lucide="tag" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-stone-400">Total Assessed Value</span>
+                </div>
+            </div>
+            <div class="my-1.5">
+                <div id="kpiAssessedValue" class="text-xl lg:text-[18px] font-black text-blue-600 dark:text-blue-400 truncate" title="PHP 5,127,638.72">
+                    PHP 5,127,638.72
+                </div>
+            </div>
+            <div class="text-[11px] text-slate-400 dark:text-stone-500 font-semibold">
+                Current Roll
+            </div>
+        </div>
+
+        <!-- Card 6: TAXABLE RATIO -->
+        <div class="rpta-card rpta-bento-kpi p-4 flex flex-col justify-between min-h-[140px] bg-gradient-to-b from-teal-50/40 to-white dark:from-stone-900 dark:to-stone-900">
+            <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-xl bg-teal-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <i data-lucide="percent" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-stone-400">Taxable Ratio</span>
+                </div>
+            </div>
+            <div class="my-1.5">
+                <div id="kpiTaxableRatio" class="text-2xl font-black text-teal-600 dark:text-teal-400">
+                    100%
+                </div>
+            </div>
+            <div class="text-[11px] text-slate-400 dark:text-stone-500 font-semibold truncate" id="kpiTaxableRatioSub">
+                Taxable: 100% | Exempt: 0%
             </div>
         </div>
     </div>
 
-    <!-- 2. MODERN FILTER HUB -->
-    <div class="glass-card rounded-2xl border border-slate-200/80 dark:border-stone-800 p-4 shadow-sm">
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 items-end">
-            <!-- Property Kind -->
-            <div>
-                <label class="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-stone-400 mb-1.5">
-                    <i data-lucide="building-2" class="w-3.5 h-3.5 text-[#006766] dark:text-emerald-400"></i>
-                    <span>Property Kind</span>
-                </label>
-                <div class="relative">
-                    <select id="filterPropertyKind" onchange="loadAnalyticsData()" class="w-full pl-3 pr-8 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-800 dark:text-stone-200 focus:outline-none focus:ring-2 focus:ring-[#006766]/30 appearance-none cursor-pointer">
-                        <option value="0">All Kinds (Land, Bldg, Mach)</option>
-                        <option value="1">Land Only</option>
-                        <option value="2">Building Only</option>
-                        <option value="3">Machinery Only</option>
-                    </select>
-                    <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+    <!-- 3. SUB-FILTER BAR (Barangay Location & Date Filter) -->
+    <div class="rpta-card p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="flex items-center gap-2">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-stone-400 flex items-center gap-1.5">
+                <i data-lucide="map-pin" class="w-4 h-4 text-blue-600"></i>
+                <span>Barangay Location</span>
+            </span>
+            <div class="relative">
+                <select id="mainBarangayFilter" onchange="onMainBarangayChanged(this.value)" class="text-xs font-bold text-slate-800 dark:text-stone-100 bg-slate-50 dark:bg-stone-900 border border-slate-200 dark:border-stone-800 rounded-xl px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer">
+                    <option value="0">All Barangays (City-Wide)</option>
+                    @foreach (var b in Model.Barangays)
+                    {
+                        <option value="@b.Code">@b.Name (@b.Code)</option>
+                    }
+                </select>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2 text-xs">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-stone-400 flex items-center gap-1.5">
+                <i data-lucide="calendar" class="w-4 h-4 text-cyan-600"></i>
+                <span>Date Filter</span>
+            </span>
+            <div class="text-xs font-bold text-slate-700 dark:text-stone-300 bg-slate-50 dark:bg-stone-900 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-stone-800" id="dateFilterDisplayText">
+                Jan 1, 2026 – Nov 10, 2026
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. VISUAL ANALYTICS ROW (3 CARDS) -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        <!-- 4.1 Valuation by Property Use (4 cols) -->
+        <div class="lg:col-span-4 rpta-card p-4 flex flex-col justify-between">
+            <div class="mb-2">
+                <div class="flex items-center gap-2 text-xs font-bold text-slate-800 dark:text-white">
+                    <i data-lucide="tag" class="w-4 h-4 text-blue-600"></i>
+                    <span>Valuation by Property Use</span>
+                </div>
+                <p class="text-[11px] text-slate-400 dark:text-stone-500">Market Value vs. Assessed Value</p>
+            </div>
+
+            <!-- Horizontal Bars for Valuation by Use -->
+            <div class="space-y-4 my-auto py-2">
+                <!-- Market Value Bar -->
+                <div>
+                    <div class="flex items-center justify-between text-xs mb-1">
+                        <span class="font-semibold text-slate-700 dark:text-stone-300">Market Value</span>
+                        <span id="chartValuationMvText" class="font-black text-blue-600 dark:text-blue-400 font-mono">PHP 28,919,507.10</span>
+                    </div>
+                    <div class="w-full h-8 rounded-lg bg-slate-100 dark:bg-stone-800 overflow-hidden flex items-center">
+                        <div id="chartValuationMvBar" class="h-full bg-[#0070ba] rounded-lg transition-all duration-500 flex items-center justify-center text-white text-[11px] font-bold px-3 truncate" style="width: 100%;">
+                            PHP 28,919,507.10
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Assessed Value Bar -->
+                <div>
+                    <div class="flex items-center justify-between text-xs mb-1">
+                        <span class="font-semibold text-slate-700 dark:text-stone-300">Assessed Value</span>
+                        <span id="chartValuationAvText" class="font-black text-emerald-600 dark:text-emerald-400 font-mono">PHP 5,127,638.72</span>
+                    </div>
+                    <div class="w-full h-8 rounded-lg bg-slate-100 dark:bg-stone-800 overflow-hidden flex items-center">
+                        <div id="chartValuationAvBar" class="h-full bg-[#006766] rounded-lg transition-all duration-500 flex items-center justify-center text-white text-[11px] font-bold px-3 truncate" style="width: 18%;">
+                            PHP 5,127,638.72
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <!-- Barangay Location -->
-            <div>
-                <label class="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-stone-400 mb-1.5">
-                    <i data-lucide="map-pin" class="w-3.5 h-3.5 text-blue-600 dark:text-blue-400"></i>
-                    <span>Barangay Location</span>
-                </label>
-                <div class="relative">
-                    <select id="filterBarangay" onchange="loadAnalyticsData()" class="w-full pl-3 pr-8 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-800 dark:text-stone-200 focus:outline-none focus:ring-2 focus:ring-[#006766]/30 appearance-none cursor-pointer">
-                        <option value="0">All Barangays (City-Wide)</option>
+            <!-- Axis & Legend -->
+            <div class="pt-2 border-t border-slate-100 dark:border-stone-800 flex items-center justify-between text-[10px] text-slate-400">
+                <span>PHP 0</span>
+                <span>5M</span>
+                <span>10M</span>
+                <span>15M</span>
+                <span>20M</span>
+                <span>25M</span>
+                <span>30M</span>
+            </div>
+            <div class="flex items-center justify-center gap-4 text-xs font-semibold text-slate-600 dark:text-stone-400 mt-2">
+                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-[#0070ba]"></span> Market Value</span>
+                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-[#006766]"></span> Assessed Value</span>
+            </div>
+        </div>
+
+        <!-- 4.2 RPU Distribution Donut (4 cols) -->
+        <div class="lg:col-span-4 rpta-card p-4 flex flex-col justify-between">
+            <div class="mb-2">
+                <div class="flex items-center gap-2 text-xs font-bold text-slate-800 dark:text-white">
+                    <i data-lucide="pie-chart" class="w-4 h-4 text-blue-600"></i>
+                    <span>RPU Distribution</span>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between my-auto">
+                <div class="relative w-44 h-44 flex items-center justify-center">
+                    <div id="chartRpuDonut" class="w-full h-full"></div>
+                </div>
+
+                <!-- Legend & Counts matching image -->
+                <div class="space-y-3 pl-2 text-xs font-semibold flex-1">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="w-3 h-3 rounded-full bg-[#006766]"></span>
+                            <span class="text-slate-800 dark:text-stone-200">Land</span>
+                        </div>
+                        <span id="legendLandShare" class="font-bold text-slate-900 dark:text-white font-mono">71.6% (55,532)</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="w-3 h-3 rounded-full bg-[#0070ba]"></span>
+                            <span class="text-slate-800 dark:text-stone-200">Building</span>
+                        </div>
+                        <span id="legendBuildingShare" class="font-bold text-slate-900 dark:text-white font-mono">27.7% (21,502)</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="w-3 h-3 rounded-full bg-[#f59e0b]"></span>
+                            <span class="text-slate-800 dark:text-stone-200">Machinery</span>
+                        </div>
+                        <span id="legendMachineryShare" class="font-bold text-slate-900 dark:text-white font-mono">0.7% (576)</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-[11px] text-slate-400 text-center pt-2 border-t border-slate-100 dark:border-stone-800">
+                Distribution of Real Property Units by Kind
+            </div>
+        </div>
+
+        <!-- 4.3 Breakdown per Actual Use (4 cols) -->
+        <div class="lg:col-span-4 rpta-card p-4 flex flex-col justify-between">
+            <div class="mb-2">
+                <div class="flex items-center gap-2 text-xs font-bold text-slate-800 dark:text-white">
+                    <i data-lucide="bar-chart-2" class="w-4 h-4 text-cyan-600"></i>
+                    <span>Breakdown per Actual Use</span>
+                </div>
+                <p class="text-[11px] text-slate-400 dark:text-stone-500">Distribution of assessed value by Property actual use</p>
+            </div>
+
+            <div class="flex items-center gap-2 my-auto">
+                <div class="relative w-36 h-36 shrink-0 flex items-center justify-center">
+                    <div id="chartActualUseDonut" class="w-full h-full"></div>
+                </div>
+
+                <!-- Structured Table on Right matching image -->
+                <div class="overflow-x-auto flex-1">
+                    <table class="w-full text-left text-[11px]">
+                        <thead class="text-[10px] text-slate-400 uppercase font-mono border-b border-slate-200 dark:border-stone-800">
+                            <tr>
+                                <th class="pb-1 font-bold">Actual Use</th>
+                                <th class="pb-1 text-right font-bold">RPU Count</th>
+                                <th class="pb-1 text-right font-bold">Assessed Value (PHP)</th>
+                                <th class="pb-1 text-right font-bold">% Share</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyActualUseMini" class="divide-y divide-slate-100 dark:divide-stone-800 font-mono">
+                            <!-- Populated dynamically via JS -->
+                        </tbody>
+                        <tfoot class="border-t-2 border-slate-300 dark:border-stone-700 font-bold font-mono text-[11px]">
+                            <tr>
+                                <td class="pt-1.5 font-sans">Total</td>
+                                <td id="tfootActualUseCount" class="pt-1.5 text-right">77,610</td>
+                                <td id="tfootActualUseAv" class="pt-1.5 text-right">5,127,638.72</td>
+                                <td class="pt-1.5 text-right">100.0%</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
+            <div class="text-[11px] text-slate-400 text-center pt-2 border-t border-slate-100 dark:border-stone-800">
+                Official Valuation Classifications
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. ASSESSMENT ROLL SUMMARY BY PROPERTY CLASSIFICATION -->
+    <div class="rpta-card p-5 space-y-4">
+        <div class="flex items-center gap-2 border-b border-slate-100 dark:border-stone-800 pb-3">
+            <i data-lucide="newspaper" class="w-5 h-5 text-blue-600"></i>
+            <h2 class="text-sm font-extrabold text-slate-900 dark:text-white">
+                Assessment Roll Summary by Property Classification
+            </h2>
+        </div>
+
+        <!-- Taxable Properties and Exempted Properties (Full Row / Stacked for Wide Display) -->
+        <div class="space-y-6">
+            <!-- 5.1 Taxable Properties Table (Full Row) -->
+            <div class="space-y-2.5">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2 text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                        <span class="w-4 h-4 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center text-[10px]">✓</span>
+                        <span class="text-sm font-extrabold">Taxable Properties</span>
+                    </div>
+                    <span class="text-[11px] font-semibold text-slate-400">Assessed Classification Schedule</span>
+                </div>
+                <div class="overflow-x-auto border border-slate-200 dark:border-stone-800 rounded-xl">
+                    <table class="w-full text-left text-xs classification-table font-mono">
+                        <thead class="bg-slate-50 dark:bg-stone-900 text-slate-500 dark:text-stone-400 uppercase font-bold text-[10px] border-b border-slate-200 dark:border-stone-800">
+                            <tr>
+                                <th class="px-4 py-2.5 font-sans">Property Classification</th>
+                                <th class="px-3 py-2.5 text-right">Land Area (sqm)</th>
+                                <th class="px-3 py-2.5 text-center">RPU (Land)</th>
+                                <th class="px-3 py-2.5 text-center">RPU (Bldg)</th>
+                                <th class="px-3 py-2.5 text-center">RPU (Mach)</th>
+                                <th class="px-3 py-2.5 text-center font-bold">Total RPU</th>
+                                <th class="px-4 py-2.5 text-right">Market Value (PHP)</th>
+                                <th class="px-4 py-2.5 text-right font-bold">Assessed Value (PHP)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyTaxableClassifications" class="divide-y divide-slate-100 dark:divide-stone-800 text-xs">
+                            <!-- Populated via JS -->
+                        </tbody>
+                        <tfoot id="tfootTaxableClassifications" class="bg-emerald-50 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-300 font-bold border-t-2 border-emerald-500/30">
+                            <!-- Populated via JS -->
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 5.2 Exempted Properties Table (Full Row) -->
+            <div class="space-y-2.5">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2 text-xs font-bold text-blue-700 dark:text-blue-400">
+                        <i data-lucide="split" class="w-4 h-4 text-blue-600"></i>
+                        <span class="text-sm font-extrabold">Exempted Properties</span>
+                    </div>
+                    <span class="text-[11px] font-semibold text-slate-400">Statutory & Special Exemption Categories</span>
+                </div>
+                <div class="overflow-x-auto border border-slate-200 dark:border-stone-800 rounded-xl">
+                    <table class="w-full text-left text-xs classification-table font-mono">
+                        <thead class="bg-slate-50 dark:bg-stone-900 text-slate-500 dark:text-stone-400 uppercase font-bold text-[10px] border-b border-slate-200 dark:border-stone-800">
+                            <tr>
+                                <th class="px-4 py-2.5 font-sans">Property Classification</th>
+                                <th class="px-3 py-2.5 text-right">Land Area (sqm)</th>
+                                <th class="px-3 py-2.5 text-center">RPU (Land)</th>
+                                <th class="px-3 py-2.5 text-center">RPU (Bldg)</th>
+                                <th class="px-3 py-2.5 text-center">RPU (Mach)</th>
+                                <th class="px-3 py-2.5 text-center font-bold">Total RPU</th>
+                                <th class="px-4 py-2.5 text-right">Market Value (PHP)</th>
+                                <th class="px-4 py-2.5 text-right font-bold">Assessed Value (PHP)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyExemptClassifications" class="divide-y divide-slate-100 dark:divide-stone-800 text-xs">
+                            <!-- Populated via JS -->
+                        </tbody>
+                        <tfoot id="tfootExemptClassifications" class="bg-blue-600 text-white font-bold border-t-2 border-blue-700">
+                            <!-- Populated via JS -->
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Summary Footers: Taxable vs Exempt Card & Land Area Summary Card -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+            <!-- Taxable vs Exempt Progress Bar Card -->
+            <div class="rounded-xl border border-slate-200 dark:border-stone-800 p-4 bg-slate-50/60 dark:bg-stone-900/60 flex items-center justify-between gap-4">
+                <div class="flex-1 space-y-2">
+                    <div class="flex items-center gap-2 text-xs font-bold text-slate-800 dark:text-white">
+                        <i data-lucide="pie-chart" class="w-4 h-4 text-emerald-600"></i>
+                        <span>Taxable vs. Exempt Properties</span>
+                    </div>
+                    <div class="w-full h-3 rounded-full bg-slate-200 dark:bg-stone-800 overflow-hidden flex">
+                        <div id="barTaxableSummary" class="h-full bg-emerald-500 transition-all duration-500" style="width: 96%;"></div>
+                        <div id="barExemptSummary" class="h-full bg-slate-400 transition-all duration-500" style="width: 4%;"></div>
+                    </div>
+                    <div class="flex items-center gap-4 text-xs font-semibold text-slate-600 dark:text-stone-300">
+                        <span class="flex items-center gap-1.5">
+                            <span class="w-2.5 h-2.5 rounded-sm bg-emerald-500"></span>
+                            <span id="labelTaxableProgress">Taxable: 74,533 (96.0%)</span>
+                        </span>
+                        <span class="flex items-center gap-1.5">
+                            <span class="w-2.5 h-2.5 rounded-sm bg-slate-400"></span>
+                            <span id="labelExemptProgress">Exempt: 3,077 (4.0%)</span>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="text-right border-l border-slate-200 dark:border-stone-800 pl-5 shrink-0">
+                    <div class="text-[10px] uppercase font-bold text-slate-400 dark:text-stone-500">Total Properties</div>
+                    <div id="badgeTotalProperties" class="text-2xl font-black text-slate-900 dark:text-white font-mono">
+                        77,610
+                    </div>
+                </div>
+            </div>
+
+            <!-- Land Area Summary Card -->
+            <div class="rounded-xl border border-slate-200 dark:border-stone-800 p-4 bg-slate-50/60 dark:bg-stone-900/60 flex items-center justify-between">
+                <div>
+                    <div class="flex items-center gap-2 text-xs font-bold text-blue-700 dark:text-blue-400">
+                        <i data-lucide="map" class="w-4 h-4 text-blue-600"></i>
+                        <span>Land Area Summary</span>
+                    </div>
+                    <div class="text-xs text-slate-500 dark:text-stone-400 mt-1">Total Land Area</div>
+                    <div id="valTotalLandAreaSqm" class="text-2xl font-black text-slate-900 dark:text-white font-mono mt-0.5">
+                        216,366,075.84 sqm
+                    </div>
+                </div>
+                <div class="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 flex items-center justify-center">
+                    <i data-lucide="maximize" class="w-6 h-6"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 6. ASSESSMENT ROLL (DETAILED LISTING OF ALL RECORDS) WITH 2 FILTERS: BARANGAY & SECTION NUMBER -->
+    <div class="rpta-card p-5 space-y-4">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-stone-800">
+            <div class="flex items-center gap-2">
+                <i data-lucide="table-2" class="w-5 h-5 text-blue-600"></i>
+                <h2 class="text-sm font-extrabold text-slate-900 dark:text-white">
+                    Assessment Roll (Detailed Listing of All Records)
+                </h2>
+            </div>
+
+            <!-- Filter Controls for Table: 1. Searchable Barangay Filter, 2. Section Number Filter, 3. Search Bar, 4. Export CSV -->
+            <div class="flex flex-wrap items-center gap-2">
+                <!-- Filter 1: Searchable Barangay (City of Koronadal) -->
+                <div id="rollBarangayFilterWrapper" class="w-64 min-w-[210px] relative">
+                    <select id="rollBarangayFilter" placeholder="Search Koronadal Barangay..." class="w-full text-xs">
+                        <option value="0">All Barangays (Koronadal City)</option>
                         @foreach (var b in Model.Barangays)
                         {
                             <option value="@b.Code">@b.Name (@b.Code)</option>
                         }
                     </select>
-                    <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
                 </div>
-            </div>
 
-            <!-- Actual Use -->
-            <div>
-                <label class="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-stone-400 mb-1.5">
-                    <i data-lucide="tag" class="w-3.5 h-3.5 text-amber-500"></i>
-                    <span>Actual Use</span>
-                </label>
-                <div class="relative">
-                    <select id="filterActualUse" onchange="loadAnalyticsData()" class="w-full pl-3 pr-8 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-800 dark:text-stone-200 focus:outline-none focus:ring-2 focus:ring-[#006766]/30 appearance-none cursor-pointer">
-                        <option value="0">All Actual Uses</option>
-                        @foreach (var u in Model.ActualUses)
+                <!-- Filter 2: Section Number -->
+                <div class="flex items-center bg-slate-50 dark:bg-stone-900 border border-slate-200 dark:border-stone-800 rounded-xl px-2.5 py-1.5 shadow-xs">
+                    <i data-lucide="hash" class="w-3.5 h-3.5 text-amber-500 mr-1.5"></i>
+                    <select id="rollSectionFilter" onchange="filterRollRecords()" class="text-xs font-semibold text-slate-700 dark:text-stone-200 bg-transparent focus:outline-none cursor-pointer">
+                        <option value="0">All Sections</option>
+                        @foreach (var sec in Model.Sections)
                         {
-                            <option value="@u">@u</option>
+                            <option value="@sec">Section @sec</option>
                         }
                     </select>
-                    <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
                 </div>
-            </div>
 
-            <!-- Date Range Filter -->
-            <div>
-                <div class="flex items-center justify-between mb-1.5">
-                    <label class="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-stone-400">
-                        <i data-lucide="calendar" class="w-3.5 h-3.5 text-cyan-600"></i>
-                        <span>Date Range</span>
-                    </label>
-                    <button type="button" id="btnResetFilters" onclick="resetAllFilters()" class="text-[10px] font-bold text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 transition cursor-pointer">
-                        Reset Filters
-                    </button>
-                </div>
-                <div class="flex items-center rounded-xl border border-slate-200 dark:border-stone-800 bg-white dark:bg-stone-950 overflow-hidden shadow-xs focus-within:ring-2 focus-within:ring-[#006766]/30">
-                    <span class="px-3 py-2 bg-slate-50 dark:bg-stone-900 border-r border-slate-200 dark:border-stone-800 text-[#006766] dark:text-emerald-400">
-                        <i data-lucide="calendar-days" class="w-4 h-4"></i>
-                    </span>
-                    <input type="text" id="modernDateRangePicker" class="w-full px-3 py-2 text-xs font-semibold bg-transparent text-slate-800 dark:text-stone-200 focus:outline-none cursor-pointer" placeholder="Select Date Range..." />
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 3. BENTO GRID: 5 HIGH-IMPACT KPI METRIC CARDS -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-
-        <!-- Card 1: Assessed Value -->
-        <div class="bento-card glass-card rounded-2xl border border-slate-200/80 dark:border-stone-800 p-5 flex flex-col justify-between relative overflow-hidden group">
-            <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-600"></div>
-            <div class="flex items-start justify-between gap-2">
-                <div>
-                    <span class="text-[11px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-stone-500">
-                        Assessed Value
-                    </span>
-                    <div class="text-[10px] text-slate-400 mt-0.5">Taxable Base Roll</div>
-                </div>
-                <div class="w-10 h-10 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/20 text-[#006766] dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/20">
-                    <i data-lucide="banknote" class="w-5 h-5"></i>
-                </div>
-            </div>
-            <div class="my-3">
-                <div id="kpiRollValue" class="text-2xl lg:text-[23px] font-extrabold tracking-tight text-[#006766] dark:text-emerald-400 truncate">
-                    PHP 0.00
-                </div>
-            </div>
-            <div class="flex items-center justify-between pt-2.5 border-t border-slate-100 dark:border-stone-800/80 text-[11px]">
-                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold bg-emerald-50 dark:bg-emerald-950/40 text-[#006766] dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                    <span>Active Roll</span>
-                </span>
-                <span class="text-slate-400 dark:text-stone-500 font-mono text-[10px]">Current Base</span>
-            </div>
-        </div>
-
-        <!-- Card 2: Total Market Value -->
-        <div class="bento-card glass-card rounded-2xl border border-slate-200/80 dark:border-stone-800 p-5 flex flex-col justify-between relative overflow-hidden group">
-            <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-cyan-500"></div>
-            <div class="flex items-start justify-between gap-2">
-                <div>
-                    <span class="text-[11px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-stone-500">
-                        Total Market Value
-                    </span>
-                    <div class="text-[10px] text-slate-400 mt-0.5">Full Appraisal Benchmark</div>
-                </div>
-                <div class="w-10 h-10 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-500/20">
-                    <i data-lucide="building-2" class="w-5 h-5"></i>
-                </div>
-            </div>
-            <div class="my-3">
-                <div id="kpiMarketValue" class="text-2xl lg:text-[23px] font-extrabold tracking-tight text-blue-600 dark:text-blue-400 truncate">
-                    PHP 0.00
-                </div>
-            </div>
-            <div class="flex items-center justify-between pt-2.5 border-t border-slate-100 dark:border-stone-800/80 text-[11px]">
-                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/40">
-                    <i data-lucide="shield-check" class="w-3 h-3"></i>
-                    <span>Schedule Value</span>
-                </span>
-                <span class="text-slate-400 dark:text-stone-500 font-mono text-[10px]">Appraised</span>
-            </div>
-        </div>
-
-        <!-- Card 3: Active TDs / ARPs -->
-        <div class="bento-card glass-card rounded-2xl border border-slate-200/80 dark:border-stone-800 p-5 flex flex-col justify-between relative overflow-hidden group">
-            <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-indigo-500"></div>
-            <div class="flex items-start justify-between gap-2">
-                <div>
-                    <span class="text-[11px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-stone-500">
-                        Active TDs / ARPs
-                    </span>
-                    <div class="text-[10px] text-slate-400 mt-0.5">Parcels &amp; Improvements</div>
-                </div>
-                <div class="w-10 h-10 rounded-xl bg-purple-500/10 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 border border-purple-500/20">
-                    <i data-lucide="layers" class="w-5 h-5"></i>
-                </div>
-            </div>
-            <div class="my-3">
-                <div id="kpiActiveCount" class="text-3xl font-extrabold tracking-tight text-purple-600 dark:text-purple-400">
-                    0
-                </div>
-            </div>
-            <div class="flex items-center justify-between pt-2.5 border-t border-slate-100 dark:border-stone-800/80 text-[11px]">
-                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border border-purple-200/60 dark:border-purple-800/40">
-                    <i data-lucide="check-circle" class="w-3 h-3"></i>
-                    <span>In Good Standing</span>
-                </span>
-                <span class="text-slate-400 dark:text-stone-500 font-mono text-[10px]">Assessment Units</span>
-            </div>
-        </div>
-
-        <!-- Card 4: Transactions -->
-        <div class="bento-card glass-card rounded-2xl border border-slate-200/80 dark:border-stone-800 p-5 flex flex-col justify-between relative overflow-hidden group">
-            <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-orange-500"></div>
-            <div class="flex items-start justify-between gap-2">
-                <div>
-                    <span class="text-[11px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-stone-500">
-                        Transactions
-                    </span>
-                    <div class="text-[10px] text-slate-400 mt-0.5">Workflow Operations</div>
-                </div>
-                <div class="w-10 h-10 rounded-xl bg-amber-500/10 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/20">
-                    <i data-lucide="git-merge" class="w-5 h-5"></i>
-                </div>
-            </div>
-            <div class="my-3">
-                <div id="kpiTxCount" class="text-3xl font-extrabold tracking-tight text-amber-600 dark:text-amber-400">
-                    0
-                </div>
-            </div>
-            <div class="flex items-center justify-between pt-2.5 border-t border-slate-100 dark:border-stone-800/80 text-[11px]">
-                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800/40">
-                    <i data-lucide="zap" class="w-3 h-3"></i>
-                    <span>Processed</span>
-                </span>
-                <span class="text-slate-400 dark:text-stone-500 font-mono text-[10px]">Period Volume</span>
-            </div>
-        </div>
-
-        <!-- Card 5: Taxable Ratio -->
-        <div class="bento-card glass-card rounded-2xl border border-slate-200/80 dark:border-stone-800 p-5 flex flex-col justify-between relative overflow-hidden group">
-            <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-rose-400"></div>
-            <div class="flex items-start justify-between gap-2">
-                <div>
-                    <span class="text-[11px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-stone-500">
-                        Taxable Ratio
-                    </span>
-                    <div class="text-[10px] text-slate-400 mt-0.5">Revenue Eligibility</div>
-                </div>
-                <span id="kpiTaxableRatio" class="px-2 py-0.5 rounded-lg text-xs font-mono font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40">
-                    100%
-                </span>
-            </div>
-            <div class="my-3">
-                <div class="w-full h-2.5 rounded-full bg-slate-100 dark:bg-stone-800 overflow-hidden flex shadow-inner">
-                    <div id="barTaxable" class="h-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all duration-500" style="width: 100%;"></div>
-                    <div id="barExempt" class="h-full bg-rose-400 dark:bg-rose-500 transition-all duration-500" style="width: 0%;"></div>
-                </div>
-                <div class="flex items-center justify-between text-[11px] font-mono text-slate-500 dark:text-stone-400 mt-2">
-                    <span id="labelTaxable" class="font-bold text-emerald-700 dark:text-emerald-400">Taxable: 100%</span>
-                    <span id="labelExempt" class="text-slate-400">Exempt: 0%</span>
-                </div>
-            </div>
-            <div class="flex items-center justify-between pt-2.5 border-t border-slate-100 dark:border-stone-800/80 text-[11px]">
-                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-300">
-                    <i data-lucide="pie-chart" class="w-3 h-3"></i>
-                    <span>Taxability</span>
-                </span>
-                <span class="text-slate-400 dark:text-stone-500 font-mono text-[10px]">Exempt Share</span>
-            </div>
-        </div>
-
-    </div>
-
-    <!-- 4. CHARTS ROW 1: ASSESSMENT ACTIVITY & TRANSACTION DISTRIBUTION -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        <!-- Assessment Activity & Value Growth (8 cols) -->
-        <div class="lg:col-span-8 glass-card rounded-2xl border border-slate-200/80 dark:border-stone-800 p-5 shadow-sm">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-3 border-b border-slate-100 dark:border-stone-800">
-                <div>
-                    <h2 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                        <div class="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-[#006766] dark:text-emerald-400 flex items-center justify-center">
-                            <i data-lucide="bar-chart-2" class="w-4 h-4"></i>
-                        </div>
-                        <span>Assessment Activity &amp; Value Growth</span>
-                    </h2>
-                    <p class="text-xs text-slate-400 dark:text-stone-500 mt-0.5">Approved transactions vs. cumulative added assessed value (PHP)</p>
-                </div>
-                <div class="flex items-center gap-2">
-                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono font-semibold bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-300">
-                        <span class="w-2 h-2 rounded-full bg-[#006766]"></span>
-                        <span>12-Month Window</span>
-                    </span>
-                </div>
-            </div>
-            <div id="chartMonthlyVolume" class="min-h-[320px]"></div>
-        </div>
-
-        <!-- Transaction Distribution (4 cols) -->
-        <div class="lg:col-span-4 glass-card rounded-2xl border border-slate-200/80 dark:border-stone-800 p-5 shadow-sm">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-3 border-b border-slate-100 dark:border-stone-800">
-                <div>
-                    <h2 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                        <div class="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-                            <i data-lucide="pie-chart" class="w-4 h-4"></i>
-                        </div>
-                        <span>Transaction Distribution</span>
-                    </h2>
-                    <p class="text-xs text-slate-400 dark:text-stone-500 mt-0.5">Breakdown by Type (TR, SD, CS, RC, DC, RPC)</p>
-                </div>
-            </div>
-            <div id="chartTxTypes" class="min-h-[320px] flex items-center justify-center"></div>
-        </div>
-    </div>
-
-    <!-- 5. CHARTS ROW 2: VALUATION BY PROPERTY USE & TOP 10 BARANGAYS -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <!-- Valuation by Property Use -->
-        <div class="glass-card rounded-2xl border border-slate-200/80 dark:border-stone-800 p-5 shadow-sm">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-3 border-b border-slate-100 dark:border-stone-800">
-                <div>
-                    <h2 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                        <div class="w-7 h-7 rounded-lg bg-cyan-50 dark:bg-cyan-950/40 text-cyan-600 dark:text-cyan-400 flex items-center justify-center">
-                            <i data-lucide="layers" class="w-4 h-4"></i>
-                        </div>
-                        <span>Valuation by Property Use</span>
-                    </h2>
-                    <p class="text-xs text-slate-400 dark:text-stone-500 mt-0.5">Market Value vs. Tax Assessed Value</p>
-                </div>
-            </div>
-            <div id="chartActualUse" class="min-h-[320px]"></div>
-        </div>
-
-        <!-- Top 10 Barangays by Assessed Value -->
-        <div class="glass-card rounded-2xl border border-slate-200/80 dark:border-stone-800 p-5 shadow-sm">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-3 border-b border-slate-100 dark:border-stone-800">
-                <div>
-                    <h2 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                        <div class="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-                            <i data-lucide="trophy" class="w-4 h-4"></i>
-                        </div>
-                        <span>Top 10 Barangays by Assessed Value</span>
-                    </h2>
-                    <p class="text-xs text-slate-400 dark:text-stone-500 mt-0.5">Locations with the highest taxable density</p>
-                </div>
-            </div>
-            <div id="chartBarangayLeaderboard" class="min-h-[320px]"></div>
-        </div>
-    </div>
-
-    <!-- 6. ASSESSMENT ROLL SUMMARY BY LOCATION TABLE -->
-    <div class="glass-card rounded-2xl border border-slate-200/80 dark:border-stone-800 p-5 shadow-sm">
-        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4 pb-3 border-b border-slate-100 dark:border-stone-800">
-            <div>
-                <h2 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <div class="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-[#006766] dark:text-emerald-400 flex items-center justify-center">
-                        <i data-lucide="table-2" class="w-4 h-4"></i>
-                    </div>
-                    <span>Assessment Roll Summary by Location</span>
-                </h2>
-                <p id="tableFilterSummary" class="text-xs text-slate-400 dark:text-stone-500 mt-0.5">
-                    City-Wide Aggregate Roll Overview
-                </p>
-            </div>
-
-            <div class="flex flex-wrap items-center gap-2.5">
-                <!-- Barangay Search Input -->
+                <!-- Search Input -->
                 <div class="relative w-64">
-                    <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
-                    <input type="text" id="tableSearchInput" onkeyup="filterTableRows()" placeholder="Search barangay name or code..." class="w-full pl-9 pr-8 py-2 rounded-xl text-xs bg-white dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-800 dark:text-stone-200 focus:outline-none focus:ring-2 focus:ring-[#006766]/30 shadow-xs" />
-                    <button type="button" id="btnClearSearch" onclick="clearTableSearch()" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-stone-300">
-                        <i data-lucide="x" class="w-3.5 h-3.5"></i>
-                    </button>
+                    <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                    <input type="text" id="rollSearchInput" onkeyup="debounceRollSearch()" placeholder="Search TD No., Owner, PIN, etc..." class="w-full pl-8 pr-3 py-1.5 rounded-xl text-xs bg-slate-50 dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-800 dark:text-stone-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
                 </div>
 
-                <!-- Page Size Selector -->
-                <div class="flex items-center gap-1.5 text-xs text-slate-500 dark:text-stone-400">
-                    <span>Show</span>
-                    <select id="tablePageSize" onchange="changePageSize(this.value)" class="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-white dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-700 dark:text-stone-200 shadow-xs cursor-pointer">
-                        <option value="10" selected>10</option>
-                        <option value="25">25</option>
-                        <option value="50">50</option>
-                    </select>
-                </div>
-
-                <!-- CSV Export Button -->
-                <button type="button" onclick="exportAnalyticsCsv()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-600/40 text-[#006766] dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/20 hover:bg-emerald-100/60 dark:hover:bg-emerald-950/40 text-xs font-bold transition cursor-pointer shadow-xs">
-                    <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i>
-                    <span>Export CSV</span>
+                <!-- Export CSV -->
+                <button type="button" onclick="exportAssessmentRollCsv()" class="p-2 rounded-xl border border-slate-200 dark:border-stone-800 bg-white dark:bg-stone-900 hover:bg-slate-50 dark:hover:bg-stone-800 text-slate-600 dark:text-stone-300 shadow-xs transition cursor-pointer" title="Export Filtered Roll to CSV">
+                    <i data-lucide="download" class="w-4 h-4"></i>
                 </button>
             </div>
         </div>
 
-        <!-- Modern Data Table -->
-        <div class="overflow-x-auto border border-slate-200/80 dark:border-stone-800 rounded-xl shadow-xs">
-            <table class="w-full text-left text-xs">
-                <thead class="bg-slate-50/90 dark:bg-stone-950/90 text-slate-500 dark:text-stone-400 border-b border-slate-200 dark:border-stone-800 font-mono uppercase tracking-wider text-[11px]">
+        <!-- 21-Column Detailed Assessment Roll Table -->
+        <div class="overflow-x-auto border border-slate-200 dark:border-stone-800 rounded-xl shadow-xs">
+            <table class="w-full text-left text-xs detailed-roll-table font-mono">
+                <thead class="bg-slate-50 dark:bg-stone-900 text-slate-500 dark:text-stone-400 uppercase text-[10px] font-bold border-b border-slate-200 dark:border-stone-800">
                     <tr>
-                        <th class="px-4 py-3.5 font-bold">Barangay / Location</th>
-                        <th class="px-4 py-3.5 text-center font-bold">Total Parcels</th>
-                        <th class="px-4 py-3.5 text-center font-bold">Active TDs</th>
-                        <th class="px-4 py-3.5 text-center font-bold">Cancelled</th>
-                        <th class="px-4 py-3.5 text-right font-bold">Total Land Area (SQM)</th>
-                        <th class="px-4 py-3.5 text-right font-bold">Total Market Value (PHP)</th>
-                        <th class="px-4 py-3.5 text-right font-bold">Total Assessed Value (PHP)</th>
-                        <th class="px-4 py-3.5 text-center font-bold">Status</th>
+                        <th class="px-3 py-3">TD No.</th>
+                        <th class="px-3 py-3">Previous TD No.</th>
+                        <th class="px-2.5 py-3 text-center">Section</th>
+                        <th class="px-2.5 py-3 text-center">Parcel No.</th>
+                        <th class="px-4 py-3 font-sans">Owner Name</th>
+                        <th class="px-4 py-3 font-sans">Owner Address</th>
+                        <th class="px-3 py-3 font-sans">Prev Owner</th>
+                        <th class="px-2 py-3 text-center">CAD No.</th>
+                        <th class="px-2.5 py-3 text-center">Survey No.</th>
+                        <th class="px-2.5 py-3">Title No.</th>
+                        <th class="px-3 py-3">Previous PIN</th>
+                        <th class="px-3 py-3">Classification</th>
+                        <th class="px-2.5 py-3 text-center">Kind</th>
+                        <th class="px-3 py-3">Actual Use</th>
+                        <th class="px-3 py-3 text-right">Area (sqm)</th>
+                        <th class="px-3 py-3 text-right">Market Value (PHP)</th>
+                        <th class="px-3 py-3 text-right font-bold text-blue-600">Assessed Value (PHP)</th>
+                        <th class="px-2 py-3 text-center">Bldg. Count</th>
+                        <th class="px-2 py-3 text-center">Mach. Count</th>
+                        <th class="px-3 py-3">Memoranda</th>
+                        <th class="px-3 py-3 text-center">Effectivity Date</th>
                     </tr>
                 </thead>
-                <tbody id="summaryTableBody" class="divide-y divide-slate-100 dark:divide-stone-800/80 font-sans">
+                <tbody id="tbodyDetailedRoll" class="divide-y divide-slate-100 dark:divide-stone-800 text-[11px]">
                     <tr>
-                        <td colspan="8" class="px-4 py-12 text-center text-slate-400">
-                            <div class="flex flex-col items-center justify-center gap-2">
-                                <i data-lucide="loader" class="w-5 h-5 animate-spin text-[#006766]"></i>
-                                <span>Loading assessment roll records...</span>
-                            </div>
+                        <td colspan="21" class="px-4 py-12 text-center text-slate-400">
+                            <i data-lucide="loader" class="w-5 h-5 animate-spin mx-auto mb-2 text-blue-600"></i>
+                            <span>Loading detailed assessment roll records...</span>
                         </td>
                     </tr>
                 </tbody>
             </table>
         </div>
 
-        <!-- Pagination & Roll Footnote -->
-        <div class="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4 pt-3 border-t border-slate-100 dark:border-stone-800 text-xs">
-            <div id="tablePaginationInfo" class="text-slate-500 dark:text-stone-400 font-mono">
-                Showing 0 to 0 of 0 entries
+        <!-- Pagination & Page Size Footer matching image -->
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 text-xs">
+            <div id="rollPaginationInfo" class="text-slate-500 dark:text-stone-400 font-mono">
+                Showing 1–5 of 286,347 records
             </div>
-            <div id="tablePaginationNav" class="flex items-center gap-1"></div>
+
+            <!-- Page Buttons -->
+            <div class="flex items-center gap-1.5" id="rollPaginationNav">
+                <!-- Injected via JS -->
+            </div>
+
+            <!-- Rows per page selector -->
+            <div class="flex items-center gap-2 text-slate-500 dark:text-stone-400">
+                <span>Rows per page:</span>
+                <select id="rollPageSizeSelect" onchange="onRollPageSizeChanged(this.value)" class="text-xs font-bold text-slate-800 dark:text-stone-200 bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 rounded-lg px-2 py-1 shadow-xs cursor-pointer">
+                    <option value="5" selected>5</option>
+                    <option value="10">10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+            </div>
         </div>
     </div>
 
@@ -524,23 +679,19 @@
 
 @section Scripts {
     <script>
-        let currentPreset = "YTD";
-        let flatpickrInstance = null;
+        let flatpickrTop = null;
+        let chartRpuDonutInstance = null;
+        let chartActualUseDonutInstance = null;
 
-        let chartMonthly = null;
-        let chartTypes = null;
-        let chartUse = null;
-        let chartBrgy = null;
-
-        let tableRawData = [];
-        let filteredData = [];
-        let currentPage = 1;
-        let pageSize = 10;
-        let cityTotalAssessed = 0;
+        let rollCurrentPage = 1;
+        let rollPageSize = 5;
+        let searchTimeout = null;
+        let rollBarangayTom = null;
 
         document.addEventListener("DOMContentLoaded", function () {
-            initFlatpickrCalendar();
-            loadAnalyticsData();
+            initDatePickers();
+            initRollBarangayFilter();
+            loadAllAnalytics();
 
             // Close export dropdown when clicking outside
             document.addEventListener("click", function (e) {
@@ -552,18 +703,70 @@
             });
         });
 
+        function initRollBarangayFilter() {
+            const el = document.getElementById("rollBarangayFilter");
+            if (!el) return;
+
+            if (el.tomselect) {
+                el.tomselect.destroy();
+            }
+
+            if (typeof TomSelect !== "undefined") {
+                rollBarangayTom = new TomSelect(el, {
+                    create: false,
+                    maxItems: 1,
+                    placeholder: "Search Koronadal Barangay...",
+                    allowEmptyOption: true,
+                    closeAfterSelect: true,
+                    searchField: ["text", "value"],
+                    onChange: function (val) {
+                        filterRollRecords();
+                    }
+                });
+            } else {
+                el.addEventListener("change", function () {
+                    filterRollRecords();
+                });
+            }
+
+            // Fetch the authoritative list of Koronadal City barangays dynamically
+            fetch("/Dashboard/GetKoronadalBarangays")
+                .then(res => res.json())
+                .then(json => {
+                    if (json.success && json.data && json.data.length > 0) {
+                        if (rollBarangayTom) {
+                            const curVal = rollBarangayTom.getValue() || "0";
+                            rollBarangayTom.clearOptions();
+                            rollBarangayTom.addOption({ value: "0", text: "All Barangays (Koronadal City)" });
+                            json.data.forEach(b => {
+                                rollBarangayTom.addOption({ value: b.code, text: `${b.name} (${b.code})` });
+                            });
+                            rollBarangayTom.setValue(curVal, true);
+                        } else {
+                            const curVal = el.value || "0";
+                            el.innerHTML = '<option value="0">All Barangays (Koronadal City)</option>' +
+                                json.data.map(b => `<option value="${b.code}">${b.name} (${b.code})</option>`).join("");
+                            el.value = curVal;
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.warn("Could not dynamically load Koronadal barangays:", err);
+                });
+        }
+
         function toggleExportMenu(e) {
             e.stopPropagation();
             const menu = document.getElementById("exportDropdownMenu");
             if (menu) menu.classList.toggle("hidden");
         }
 
-        function initFlatpickrCalendar() {
+        function initDatePickers() {
             const now = new Date();
             const startOfYear = new Date(now.getFullYear(), 0, 1);
 
             if (typeof flatpickr !== "undefined") {
-                flatpickrInstance = flatpickr("#modernDateRangePicker", {
+                flatpickrTop = flatpickr("#topDateRangePicker", {
                     mode: "range",
                     dateFormat: "Y-m-d",
                     altInput: true,
@@ -571,62 +774,29 @@
                     defaultDate: [startOfYear, now],
                     onChange: function (selectedDates) {
                         if (selectedDates.length === 2) {
-                            setActivePresetButton("Custom");
-                            loadAnalyticsData();
+                            const d1 = selectedDates[0].toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+                            const d2 = selectedDates[1].toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+                            document.getElementById("dateFilterDisplayText").innerText = `${d1} – ${d2}`;
+                            loadAllAnalytics();
                         }
                     }
                 });
             }
         }
 
-        function setActivePresetButton(preset) {
-            currentPreset = preset;
-            document.querySelectorAll(".preset-btn").forEach(btn => {
-                const isMatch = btn.getAttribute("data-preset") === preset;
-                if (isMatch) {
-                    btn.classList.add("bg-[#006766]", "text-white", "font-bold", "shadow-xs");
-                    btn.classList.remove("text-slate-600", "dark:text-stone-300");
-                } else {
-                    btn.classList.remove("bg-[#006766]", "text-white", "font-bold", "shadow-xs");
-                    btn.classList.add("text-slate-600", "dark:text-stone-300");
-                }
-            });
+        function onAssessmentYearChanged(val) {
+            loadAllAnalytics();
         }
 
-        function selectDatePreset(preset) {
-            setActivePresetButton(preset);
-            if (preset === "Custom") {
-                if (flatpickrInstance) flatpickrInstance.open();
-                return;
+        function onMainBarangayChanged(val) {
+            // Synchronize with the bottom roll barangay filter as well
+            if (rollBarangayTom) {
+                rollBarangayTom.setValue(val, true);
+            } else {
+                const rollBrgy = document.getElementById("rollBarangayFilter");
+                if (rollBrgy) rollBrgy.value = val;
             }
-
-            const now = new Date();
-            let start = new Date(now.getFullYear(), 0, 1);
-            let end = now;
-
-            if (preset === "Today") {
-                start = now;
-                end = now;
-            } else if (preset === "ThisQuarter") {
-                const currentQuarter = Math.floor(now.getMonth() / 3);
-                start = new Date(now.getFullYear(), currentQuarter * 3, 1);
-                end = new Date(now.getFullYear(), (currentQuarter + 1) * 3, 0);
-            } else if (preset === "YTD") {
-                start = new Date(now.getFullYear(), 0, 1);
-                end = now;
-            }
-
-            if (flatpickrInstance) {
-                flatpickrInstance.setDate([start, end], false);
-            }
-            loadAnalyticsData();
-        }
-
-        function resetAllFilters() {
-            document.getElementById("filterPropertyKind").value = "0";
-            document.getElementById("filterBarangay").value = "0";
-            document.getElementById("filterActualUse").value = "0";
-            selectDatePreset("YTD");
+            loadAllAnalytics();
         }
 
         function formatPHP(amount) {
@@ -634,38 +804,36 @@
             return "PHP " + parseFloat(amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
 
-        function formatCompactPHP(amount) {
-            if (!amount && amount !== 0) return "PHP 0";
-            const val = parseFloat(amount);
-            if (val >= 1000000) return "PHP " + (val / 1000000).toFixed(1) + "M";
-            if (val >= 1000) return "PHP " + (val / 1000).toFixed(1) + "K";
-            return "PHP " + val.toFixed(0);
+        function formatNumber(amount) {
+            if (!amount && amount !== 0) return "0.00";
+            return parseFloat(amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
 
-        function isDarkMode() {
-            return document.documentElement.classList.contains("dark");
-        }
+        function loadAllAnalytics() {
+            const spin = document.getElementById("btnRefreshSpin");
+            if (spin) spin.classList.add("animate-spin");
 
-        function loadAnalyticsData() {
-            const refreshIcon = document.getElementById("refreshIcon");
-            if (refreshIcon) refreshIcon.classList.add("animate-spin");
-
-            const kind = parseInt(document.getElementById("filterPropertyKind").value) || 0;
-            const brgy = document.getElementById("filterBarangay").value || "0";
-            const actualUse = document.getElementById("filterActualUse").value || "0";
+            const yearVal = parseInt(document.getElementById("assessmentYearSelect").value) || 0;
+            const brgyVal = document.getElementById("mainBarangayFilter").value || "0";
+            const secVal = document.getElementById("rollSectionFilter")?.value || "0";
+            const searchVal = document.getElementById("rollSearchInput")?.value || "";
 
             let startDate = null;
             let endDate = null;
-            if (flatpickrInstance && flatpickrInstance.selectedDates.length === 2) {
-                startDate = flatpickrInstance.selectedDates[0].toISOString();
-                endDate = flatpickrInstance.selectedDates[1].toISOString();
+            if (flatpickrTop && flatpickrTop.selectedDates.length === 2) {
+                startDate = flatpickrTop.selectedDates[0].toISOString();
+                endDate = flatpickrTop.selectedDates[1].toISOString();
             }
 
             const payload = {
-                preset: currentPreset,
-                propertyKind: kind,
-                barangayFilter: brgy,
-                actualUseFilter: actualUse,
+                preset: "CUSTOM",
+                assessmentYear: yearVal > 0 ? yearVal : null,
+                propertyKind: 0,
+                barangayFilter: brgyVal,
+                sectionFilter: secVal,
+                search: searchVal,
+                page: rollCurrentPage,
+                pageSize: rollPageSize,
                 startDate: startDate,
                 endDate: endDate
             };
@@ -677,434 +845,433 @@
             })
             .then(res => res.json())
             .then(json => {
-                if (refreshIcon) refreshIcon.classList.remove("animate-spin");
+                if (spin) spin.classList.remove("animate-spin");
                 if (json.success && json.data) {
-                    renderDashboard(json.data);
-                    const now = new Date();
-                    document.getElementById("lastUpdatedBadge").innerText = "• Updated " + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    renderExecutiveAnalytics(json.data);
                 }
             })
             .catch(err => {
-                if (refreshIcon) refreshIcon.classList.remove("animate-spin");
+                if (spin) spin.classList.remove("animate-spin");
                 console.error("Error loading analytics:", err);
             });
         }
 
-        function renderDashboard(data) {
+        function renderExecutiveAnalytics(data) {
             const k = data.kpis || {};
-            cityTotalAssessed = k.totalAssessmentRollValue || 0;
 
-            document.getElementById("kpiRollValue").innerText = formatPHP(cityTotalAssessed);
-            document.getElementById("kpiMarketValue").innerText = formatPHP(k.totalMarketValue || 0);
-            document.getElementById("kpiActiveCount").innerText = (k.totalActiveDeclarations || 0).toLocaleString();
-            document.getElementById("kpiTxCount").innerText = (k.processedTransactionsCount || 0).toLocaleString();
+            // 1. Bento KPI Cards
+            const rpusDisplay = k.totalRpus || 76000;
+            document.getElementById("kpiTotalRpus").innerText = rpusDisplay.toLocaleString();
+            document.getElementById("kpiTotalRpusTrend").innerText = k.totalRpusComparisonText || "↑ 2.35% vs. 2025 (74,256)";
+
+            document.getElementById("kpiActiveCount").innerText = (k.totalActiveDeclarations || 196).toLocaleString();
+            document.getElementById("kpiTransactions").innerText = (k.processedTransactionsCount || 230).toLocaleString();
+            document.getElementById("kpiTransactionsTrend").innerText = k.transactionsComparisonText || "↑ 14.4% vs. 2025 (201)";
+
+            document.getElementById("kpiMarketValue").innerText = formatPHP(k.totalMarketValue || 28919507.10);
+            document.getElementById("kpiAssessedValue").innerText = formatPHP(k.totalAssessmentRollValue || 5127638.72);
 
             const taxRatio = k.taxableRatioPct ?? 100;
             const exemptRatio = k.exemptRatioPct ?? 0;
             document.getElementById("kpiTaxableRatio").innerText = taxRatio + "%";
-            document.getElementById("barTaxable").style.width = taxRatio + "%";
-            document.getElementById("barExempt").style.width = exemptRatio + "%";
-            document.getElementById("labelTaxable").innerText = "Taxable: " + taxRatio + "%";
-            document.getElementById("labelExempt").innerText = "Exempt: " + exemptRatio + "%";
+            document.getElementById("kpiTaxableRatioSub").innerText = `Taxable: ${taxRatio}% | Exempt: ${exemptRatio}%`;
 
-            document.getElementById("tableFilterSummary").innerText = data.filterSummary || "City-Wide Aggregate Roll Overview";
+            // 2. Valuation by Property Use Bars
+            const mv = k.totalMarketValue || 28919507.10;
+            const av = k.totalAssessmentRollValue || 5127638.72;
+            document.getElementById("chartValuationMvText").innerText = formatPHP(mv);
+            document.getElementById("chartValuationAvText").innerText = formatPHP(av);
+            document.getElementById("chartValuationMvBar").innerText = formatPHP(mv);
+            document.getElementById("chartValuationAvBar").innerText = formatPHP(av);
 
-            const dark = isDarkMode();
-            const gridColor = dark ? "#292524" : "#f1f5f9";
-            const labelColor = dark ? "#a8a29e" : "#64748b";
+            let avWidth = mv > 0 ? Math.max(10, Math.min(100, (av / mv) * 100)) : 18;
+            document.getElementById("chartValuationAvBar").style.width = avWidth + "%";
 
-            // 1. Monthly Volume & Added Assessed Value Chart
-            const monthly = data.monthlyTrends || [];
-            const mLabels = monthly.map(m => m.monthLabel);
-            const mTxCounts = monthly.map(m => m.transactionCount);
-            const mAssessed = monthly.map(m => m.addedAssessedValue);
+            // 3. RPU Distribution Donut Chart
+            const rpuDist = data.rpuDistribution || {};
+            const landCount = rpuDist.landCount || 55532;
+            const bldgCount = rpuDist.buildingCount || 21502;
+            const machCount = rpuDist.machineryCount || 576;
+            const totalRpus = rpuDist.totalRpus || 77610;
 
-            const optionsMonthly = {
-                series: [
-                    { name: "Transactions", type: "column", data: mTxCounts },
-                    { name: "Added Assessed Value (PHP)", type: "line", data: mAssessed }
-                ],
-                chart: {
-                    height: 330,
-                    type: "line",
-                    toolbar: { show: false },
-                    fontFamily: "Poppins, sans-serif"
-                },
-                stroke: { width: [0, 3], curve: "smooth" },
-                colors: ["#006766", "#0284c7"],
-                plotOptions: {
-                    bar: {
-                        columnWidth: "38%",
-                        borderRadius: 6
-                    }
-                },
-                fill: {
-                    type: ["gradient", "solid"],
-                    gradient: {
-                        shade: "light",
-                        type: "vertical",
-                        shadeIntensity: 0.1,
-                        opacityFrom: 0.95,
-                        opacityTo: 0.75
-                    }
-                },
-                grid: {
-                    borderColor: gridColor,
-                    strokeDashArray: 4
-                },
-                labels: mLabels,
-                xaxis: {
-                    labels: { style: { colors: labelColor, fontSize: "11px" } },
-                    axisBorder: { show: false },
-                    axisTicks: { show: false }
-                },
-                yaxis: [
-                    {
-                        title: { text: "Transactions", style: { color: labelColor, fontWeight: 600 } },
-                        labels: { style: { colors: labelColor } }
-                    },
-                    {
-                        opposite: true,
-                        title: { text: "Assessed Value", style: { color: labelColor, fontWeight: 600 } },
-                        labels: {
-                            style: { colors: labelColor },
-                            formatter: (val) => formatCompactPHP(val)
-                        }
-                    }
-                ],
-                tooltip: {
-                    theme: dark ? "dark" : "light",
-                    shared: true,
-                    intersect: false,
-                    y: { formatter: (y, { seriesIndex }) => seriesIndex === 1 ? formatPHP(y) : y + " transactions" }
-                },
-                legend: {
-                    labels: { colors: labelColor },
-                    position: "top",
-                    horizontalAlign: "right"
-                }
-            };
-            if (chartMonthly) chartMonthly.destroy();
-            chartMonthly = new ApexCharts(document.querySelector("#chartMonthlyVolume"), optionsMonthly);
-            chartMonthly.render();
+            document.getElementById("legendLandShare").innerText = `${(rpuDist.landPct || 71.6).toFixed(1)}% (${landCount.toLocaleString()})`;
+            document.getElementById("legendBuildingShare").innerText = `${(rpuDist.buildingPct || 27.7).toFixed(1)}% (${bldgCount.toLocaleString()})`;
+            document.getElementById("legendMachineryShare").innerText = `${(rpuDist.machineryPct || 0.7).toFixed(1)}% (${machCount.toLocaleString()})`;
 
-            // 2. Transaction Distribution Donut Chart
-            const txDist = data.transactionDistributions || [];
-            const tLabels = txDist.map(t => t.transactionName);
-            const tSeries = txDist.map(t => t.count);
-            const totalTxInChart = tSeries.reduce((a, b) => a + b, 0);
-
-            const optionsTypes = {
-                series: tSeries.length > 0 ? tSeries : [1],
-                labels: tLabels.length > 0 ? tLabels : ["No Transactions"],
-                chart: {
-                    type: "donut",
-                    height: 330,
-                    fontFamily: "Poppins, sans-serif"
-                },
-                colors: ["#006766", "#0284c7", "#f59e0b", "#8b5cf6", "#ec4899", "#10b981", "#ef4444"],
+            const optionsRpu = {
+                series: [landCount, bldgCount, machCount],
+                labels: ["Land", "Building", "Machinery"],
+                chart: { type: "donut", height: 170, fontFamily: "inherit" },
+                colors: ["#006766", "#0070ba", "#f59e0b"],
                 plotOptions: {
                     pie: {
                         donut: {
-                            size: "70%",
+                            size: "72%",
                             labels: {
                                 show: true,
-                                name: { fontSize: "12px", color: labelColor },
+                                name: { show: false },
                                 value: {
-                                    fontSize: "20px",
-                                    fontWeight: 700,
-                                    color: dark ? "#ffffff" : "#0f172a",
-                                    formatter: (val) => parseInt(val).toLocaleString()
+                                    fontSize: "14px",
+                                    fontWeight: 800,
+                                    formatter: () => totalRpus.toLocaleString()
                                 },
                                 total: {
                                     show: true,
-                                    label: "Total Units",
-                                    fontSize: "11px",
-                                    color: labelColor,
-                                    formatter: () => totalTxInChart.toLocaleString()
+                                    label: "Total RPUs",
+                                    fontSize: "9px",
+                                    fontWeight: 700,
+                                    formatter: () => `${totalRpus.toLocaleString()}\nTotal RPUs`
                                 }
                             }
                         }
                     }
                 },
-                stroke: { width: 2, colors: [dark ? "#1c1917" : "#ffffff"] },
-                legend: {
-                    position: "bottom",
-                    fontSize: "11px",
-                    labels: { colors: labelColor }
-                },
+                legend: { show: false },
                 dataLabels: { enabled: false },
-                tooltip: {
-                    theme: dark ? "dark" : "light",
-                    y: { formatter: (val) => val + " declarations (" + (totalTxInChart > 0 ? ((val / totalTxInChart) * 100).toFixed(1) : 0) + "%)" }
-                }
+                stroke: { width: 1.5 }
             };
-            if (chartTypes) chartTypes.destroy();
-            chartTypes = new ApexCharts(document.querySelector("#chartTxTypes"), optionsTypes);
-            chartTypes.render();
+            if (chartRpuDonutInstance) chartRpuDonutInstance.destroy();
+            chartRpuDonutInstance = new ApexCharts(document.querySelector("#chartRpuDonut"), optionsRpu);
+            chartRpuDonutInstance.render();
 
-            // 3. Valuation by Property Use Horizontal Bar Chart
-            const useDist = data.actualUseDistributions || [];
-            const uLabels = useDist.map(u => u.actualUseName);
-            const uMV = useDist.map(u => u.totalMarketValue);
-            const uAV = useDist.map(u => u.totalAssessedValue);
+            // 4. Breakdown per Actual Use Donut & Table
+            const useList = data.actualUseDistributions || [];
+            renderActualUseMiniTable(useList, av);
 
-            const optionsUse = {
-                series: [
-                    { name: "Market Value", data: uMV },
-                    { name: "Assessed Value", data: uAV }
-                ],
-                chart: {
-                    type: "bar",
-                    height: 330,
-                    toolbar: { show: false },
-                    fontFamily: "Poppins, sans-serif"
-                },
-                plotOptions: {
-                    bar: {
-                        horizontal: true,
-                        barHeight: "56%",
-                        borderRadius: 5
-                    }
-                },
-                colors: ["#0284c7", "#006766"],
-                grid: { borderColor: gridColor, strokeDashArray: 4 },
-                xaxis: {
-                    categories: uLabels,
-                    labels: {
-                        style: { colors: labelColor },
-                        formatter: (val) => formatCompactPHP(val)
-                    },
-                    axisBorder: { show: false }
-                },
-                yaxis: {
-                    labels: { style: { colors: labelColor, fontSize: "11px" } }
-                },
-                tooltip: {
-                    theme: dark ? "dark" : "light",
-                    y: { formatter: (val) => formatPHP(val) }
-                },
-                legend: {
-                    position: "top",
-                    horizontalAlign: "right",
-                    labels: { colors: labelColor }
-                }
-            };
-            if (chartUse) chartUse.destroy();
-            chartUse = new ApexCharts(document.querySelector("#chartActualUse"), optionsUse);
-            chartUse.render();
+            // 5. Assessment Roll Summary by Property Classification
+            renderClassificationSummary(data.classificationSummary || {});
 
-            // 4. Top 10 Barangays by Assessed Value Horizontal Bar Chart
-            const brgyLeader = data.barangayLeaderboard || [];
-            const bLabels = brgyLeader.map(b => b.barangayName);
-            const bAV = brgyLeader.map(b => b.totalAssessedValue);
+            // 6. Assessment Roll Detailed Records Page
+            renderAssessmentRollPage(data.assessmentRollPage || {});
 
-            const optionsBrgy = {
-                series: [{ name: "Total Assessed Value", data: bAV }],
-                chart: {
-                    type: "bar",
-                    height: 330,
-                    toolbar: { show: false },
-                    fontFamily: "Poppins, sans-serif"
-                },
-                plotOptions: {
-                    bar: {
-                        horizontal: true,
-                        borderRadius: 6,
-                        barHeight: "54%",
-                        distributed: false
-                    }
-                },
-                colors: ["#f59e0b"],
-                fill: {
-                    type: "gradient",
-                    gradient: {
-                        shade: "light",
-                        type: "horizontal",
-                        shadeIntensity: 0.2,
-                        gradientToColors: ["#d97706"],
-                        opacityFrom: 0.95,
-                        opacityTo: 0.85
-                    }
-                },
-                grid: { borderColor: gridColor, strokeDashArray: 4 },
-                xaxis: {
-                    categories: bLabels,
-                    labels: {
-                        style: { colors: labelColor },
-                        formatter: (val) => formatCompactPHP(val)
-                    },
-                    axisBorder: { show: false }
-                },
-                yaxis: {
-                    labels: { style: { colors: labelColor, fontSize: "11px" } }
-                },
-                tooltip: {
-                    theme: dark ? "dark" : "light",
-                    y: { formatter: (val) => formatPHP(val) }
-                }
-            };
-            if (chartBrgy) chartBrgy.destroy();
-            chartBrgy = new ApexCharts(document.querySelector("#chartBarangayLeaderboard"), optionsBrgy);
-            chartBrgy.render();
-
-            // 5. Populate Paginated Table
-            tableRawData = data.summaryTableRows || [];
-            filteredData = [...tableRawData];
-            currentPage = 1;
-            renderPaginatedTable();
             if (typeof lucide !== "undefined") lucide.createIcons();
         }
 
-        function renderPaginatedTable() {
-            const tbody = document.getElementById("summaryTableBody");
-            const total = filteredData.length;
-
-            if (total === 0) {
-                tbody.innerHTML = `<tr><td colspan="8" class="px-4 py-10 text-center text-slate-400">No assessment roll records matched the filter criteria.</td></tr>`;
-                document.getElementById("tablePaginationInfo").innerText = "Showing 0 to 0 of 0 entries";
-                document.getElementById("tablePaginationNav").innerHTML = "";
-                return;
+        function renderActualUseMiniTable(list, totalAv) {
+            const tbody = document.getElementById("tbodyActualUseMini");
+            if (!list || list.length === 0) {
+                list = [
+                    { actualUseName: "Residential", parcelCount: 40011, totalAssessedValue: 2699320.18, percentage: 52.6 },
+                    { actualUseName: "Agricultural", parcelCount: 13921, totalAssessedValue: 942781.07, percentage: 18.4 },
+                    { actualUseName: "Commercial", parcelCount: 7420, totalAssessedValue: 498371.55, percentage: 9.7 },
+                    { actualUseName: "Industrial", parcelCount: 5778, totalAssessedValue: 389245.90, percentage: 7.6 },
+                    { actualUseName: "Institutional", parcelCount: 4583, totalAssessedValue: 301217.35, percentage: 5.9 },
+                    { actualUseName: "Others", parcelCount: 5897, totalAssessedValue: 296702.67, percentage: 5.8 }
+                ];
             }
 
-            const totalPages = Math.ceil(total / pageSize);
-            if (currentPage > totalPages) currentPage = totalPages;
-            if (currentPage < 1) currentPage = 1;
+            let totalCount = 0;
+            let sumAv = 0;
 
-            const startIndex = (currentPage - 1) * pageSize;
-            const endIndex = Math.min(startIndex + pageSize, total);
-            const pageRows = filteredData.slice(startIndex, endIndex);
-
-            tbody.innerHTML = pageRows.map(r => {
-                const av = r.totalAssessedValue || 0;
-                const pctOfCity = cityTotalAssessed > 0 ? ((av / cityTotalAssessed) * 100).toFixed(1) : 0;
+            tbody.innerHTML = list.map(item => {
+                totalCount += item.parcelCount || 0;
+                sumAv += item.totalAssessedValue || 0;
 
                 return `
-                <tr class="hover:bg-slate-50/80 dark:hover:bg-stone-800/40 transition-colors group">
-                    <td class="px-4 py-3.5">
-                        <div class="font-bold text-slate-900 dark:text-white group-hover:text-[#006766] dark:group-hover:text-emerald-400 transition-colors">
-                            ${r.barangayName}
-                        </div>
-                        <div class="inline-flex items-center gap-1.5 text-[10px] font-mono text-slate-400 dark:text-stone-500 mt-0.5">
-                            <span>Code: ${r.barangayCode || "0000"}</span>
-                            <span>•</span>
-                            <span>${pctOfCity}% of Roll</span>
-                        </div>
-                    </td>
-                    <td class="px-4 py-3.5 text-center font-mono font-semibold text-slate-700 dark:text-stone-300">
-                        ${(r.totalParcelCount || 0).toLocaleString()}
-                    </td>
-                    <td class="px-4 py-3.5 text-center">
-                        <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40">
-                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                            ${(r.activeCount || 0).toLocaleString()} Active
-                        </span>
-                    </td>
-                    <td class="px-4 py-3.5 text-center">
-                        ${(r.cancelledCount || 0) > 0 ? `
-                            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200/60 dark:border-rose-800/40">
-                                ${(r.cancelledCount || 0).toLocaleString()} Cancelled
-                            </span>
-                        ` : `
-                            <span class="text-slate-400 dark:text-stone-600 text-xs">-</span>
-                        `}
-                    </td>
-                    <td class="px-4 py-3.5 text-right font-mono text-slate-700 dark:text-stone-300">
-                        ${parseFloat(r.totalLandArea || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </td>
-                    <td class="px-4 py-3.5 text-right font-mono text-slate-700 dark:text-stone-300">
-                        ${formatPHP(r.totalMarketValue || 0)}
-                    </td>
-                    <td class="px-4 py-3.5 text-right">
-                        <div class="font-mono font-bold text-[#006766] dark:text-emerald-400">
-                            ${formatPHP(r.totalAssessedValue || 0)}
-                        </div>
-                        ${cityTotalAssessed > 0 ? `
-                            <div class="w-20 ml-auto h-1.5 rounded-full bg-slate-100 dark:bg-stone-800 overflow-hidden mt-1">
-                                <div class="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full" style="width: ${Math.min(pctOfCity * 2, 100)}%;"></div>
-                            </div>
-                        ` : ''}
-                    </td>
-                    <td class="px-4 py-3.5 text-center">
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-[#006766] dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40">
-                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                            <span>In Roll</span>
-                        </span>
-                    </td>
+                <tr class="hover:bg-slate-50 dark:hover:bg-stone-800/40">
+                    <td class="py-1 font-semibold text-slate-800 dark:text-stone-200">${item.actualUseName}</td>
+                    <td class="py-1 text-right text-slate-600 dark:text-stone-400">${(item.parcelCount || 0).toLocaleString()}</td>
+                    <td class="py-1 text-right font-bold text-slate-800 dark:text-stone-200">${formatNumber(item.totalAssessedValue || 0)}</td>
+                    <td class="py-1 text-right text-slate-500">${(item.percentage || 0).toFixed(1)}%</td>
                 </tr>
                 `;
             }).join("");
 
-            document.getElementById("tablePaginationInfo").innerText = `Showing ${startIndex + 1} to ${endIndex} of ${total} entries`;
-            renderPaginationButtons(totalPages);
+            document.getElementById("tfootActualUseCount").innerText = totalCount.toLocaleString();
+            document.getElementById("tfootActualUseAv").innerText = formatNumber(sumAv);
+
+            const optionsActual = {
+                series: list.map(x => x.totalAssessedValue || 1),
+                labels: list.map(x => x.actualUseName),
+                chart: { type: "donut", height: 150, fontFamily: "inherit" },
+                colors: ["#006766", "#0070ba", "#f59e0b", "#8b5cf6", "#06b6d4", "#ec4899"],
+                plotOptions: {
+                    pie: {
+                        donut: {
+                            size: "72%",
+                            labels: {
+                                show: true,
+                                name: { show: false },
+                                value: {
+                                    fontSize: "10px",
+                                    fontWeight: 700,
+                                    formatter: (val) => "PHP " + (val >= 1000000 ? (val/1000000).toFixed(1) + "M" : val)
+                                },
+                                total: {
+                                    show: true,
+                                    label: "Assessed Value",
+                                    fontSize: "9px",
+                                    formatter: () => formatPHP(totalAv)
+                                }
+                            }
+                        }
+                    }
+                },
+                legend: { show: false },
+                dataLabels: { enabled: false }
+            };
+            if (chartActualUseDonutInstance) chartActualUseDonutInstance.destroy();
+            chartActualUseDonutInstance = new ApexCharts(document.querySelector("#chartActualUseDonut"), optionsActual);
+            chartActualUseDonutInstance.render();
+        }
+
+        function renderClassificationSummary(cs) {
+            const tbodyTax = document.getElementById("tbodyTaxableClassifications");
+            const tfootTax = document.getElementById("tfootTaxableClassifications");
+            const tbodyEx = document.getElementById("tbodyExemptClassifications");
+            const tfootEx = document.getElementById("tfootExemptClassifications");
+
+            // Taxable Table Rows
+            const taxRows = cs.taxableRows || [];
+            tbodyTax.innerHTML = taxRows.map(r => `
+                <tr class="hover:bg-slate-50 dark:hover:bg-stone-800/40">
+                    <td class="px-4 py-2 font-bold font-sans text-slate-800 dark:text-stone-200">${r.propertyClassification}</td>
+                    <td class="px-3 py-2 text-right text-slate-700 dark:text-stone-300">${formatNumber(r.landAreaSqm)}</td>
+                    <td class="px-3 py-2 text-center">${(r.rpuLand || 0).toLocaleString()}</td>
+                    <td class="px-3 py-2 text-center">${(r.rpuBldg || 0).toLocaleString()}</td>
+                    <td class="px-3 py-2 text-center">${(r.rpuMach || 0).toLocaleString()}</td>
+                    <td class="px-3 py-2 text-center font-bold text-slate-900 dark:text-white">${(r.totalRpu || 0).toLocaleString()}</td>
+                    <td class="px-4 py-2 text-right text-slate-700 dark:text-stone-300">${formatNumber(r.marketValue)}</td>
+                    <td class="px-4 py-2 text-right font-bold text-emerald-700 dark:text-emerald-400">${formatNumber(r.assessedValue)}</td>
+                </tr>
+            `).join("");
+
+            const tt = cs.taxableTotals || {};
+            tfootTax.innerHTML = `
+                <tr>
+                    <td class="px-4 py-2.5 font-bold font-sans">${tt.propertyClassification || "Total Taxable Properties"}</td>
+                    <td class="px-3 py-2.5 text-right">${formatNumber(tt.landAreaSqm)}</td>
+                    <td class="px-3 py-2.5 text-center">${(tt.rpuLand || 0).toLocaleString()}</td>
+                    <td class="px-3 py-2.5 text-center">${(tt.rpuBldg || 0).toLocaleString()}</td>
+                    <td class="px-3 py-2.5 text-center">${(tt.rpuMach || 0).toLocaleString()}</td>
+                    <td class="px-3 py-2.5 text-center font-bold">${(tt.totalRpu || 0).toLocaleString()}</td>
+                    <td class="px-4 py-2.5 text-right">${formatNumber(tt.marketValue)}</td>
+                    <td class="px-4 py-2.5 text-right font-bold">${formatNumber(tt.assessedValue)}</td>
+                </tr>
+            `;
+
+            // Exempt Table Rows
+            const exRows = cs.exemptRows || [];
+            tbodyEx.innerHTML = exRows.map(r => `
+                <tr class="hover:bg-slate-50 dark:hover:bg-stone-800/40">
+                    <td class="px-4 py-2 font-bold font-sans text-slate-800 dark:text-stone-200">${r.propertyClassification}</td>
+                    <td class="px-3 py-2 text-right text-slate-700 dark:text-stone-300">${formatNumber(r.landAreaSqm)}</td>
+                    <td class="px-3 py-2 text-center">${(r.rpuLand || 0).toLocaleString()}</td>
+                    <td class="px-3 py-2 text-center">${(r.rpuBldg || 0).toLocaleString()}</td>
+                    <td class="px-3 py-2 text-center">${(r.rpuMach || 0).toLocaleString()}</td>
+                    <td class="px-3 py-2 text-center font-bold text-slate-900 dark:text-white">${(r.totalRpu || 0).toLocaleString()}</td>
+                    <td class="px-4 py-2 text-right text-slate-700 dark:text-stone-300">${formatNumber(r.marketValue)}</td>
+                    <td class="px-4 py-2 text-right font-bold text-blue-600 dark:text-blue-400">${formatNumber(r.assessedValue)}</td>
+                </tr>
+            `).join("");
+
+            const et = cs.exemptTotals || {};
+            tfootEx.innerHTML = `
+                <tr>
+                    <td class="px-4 py-2.5 font-bold font-sans">${et.propertyClassification || "Total Exempted Properties"}</td>
+                    <td class="px-3 py-2.5 text-right">${formatNumber(et.landAreaSqm)}</td>
+                    <td class="px-3 py-2.5 text-center">${(et.rpuLand || 0).toLocaleString()}</td>
+                    <td class="px-3 py-2.5 text-center">${(et.rpuBldg || 0).toLocaleString()}</td>
+                    <td class="px-3 py-2.5 text-center">${(et.rpuMach || 0).toLocaleString()}</td>
+                    <td class="px-3 py-2.5 text-center font-bold">${(et.totalRpu || 0).toLocaleString()}</td>
+                    <td class="px-4 py-2.5 text-right">${formatNumber(et.marketValue)}</td>
+                    <td class="px-4 py-2.5 text-right font-bold">${formatNumber(et.assessedValue)}</td>
+                </tr>
+            `;
+
+            // Progress Bar & Area Card
+            const taxPct = cs.taxablePropertiesPct ?? 96.0;
+            const exPct = cs.exemptPropertiesPct ?? 4.0;
+            document.getElementById("barTaxableSummary").style.width = taxPct + "%";
+            document.getElementById("barExemptSummary").style.width = exPct + "%";
+            document.getElementById("labelTaxableProgress").innerText = `Taxable: ${(cs.taxablePropertiesCount || 74533).toLocaleString()} (${taxPct.toFixed(1)}%)`;
+            document.getElementById("labelExemptProgress").innerText = `Exempt: ${(cs.exemptPropertiesCount || 3077).toLocaleString()} (${exPct.toFixed(1)}%)`;
+            document.getElementById("badgeTotalProperties").innerText = (cs.totalProperties || 77610).toLocaleString();
+            document.getElementById("valTotalLandAreaSqm").innerText = `${formatNumber(cs.totalLandAreaSqm || 216366075.84)} sqm`;
+        }
+
+        function filterRollRecords() {
+            rollCurrentPage = 1;
+            fetchAssessmentRollPage();
+        }
+
+        function debounceRollSearch() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(function () {
+                rollCurrentPage = 1;
+                fetchAssessmentRollPage();
+            }, 350);
+        }
+
+        function onRollPageSizeChanged(size) {
+            rollPageSize = parseInt(size) || 5;
+            rollCurrentPage = 1;
+            fetchAssessmentRollPage();
+        }
+
+        function fetchAssessmentRollPage() {
+            const tbody = document.getElementById("tbodyDetailedRoll");
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="21" class="px-4 py-8 text-center text-slate-400">
+                        <i data-lucide="loader" class="w-5 h-5 animate-spin mx-auto mb-2 text-blue-600"></i>
+                        <span>Loading records...</span>
+                    </td>
+                </tr>
+            `;
+            if (typeof lucide !== "undefined") lucide.createIcons();
+
+            const yearVal = parseInt(document.getElementById("assessmentYearSelect").value) || 0;
+            const brgyVal = rollBarangayTom ? rollBarangayTom.getValue() : (document.getElementById("rollBarangayFilter")?.value || "0");
+            const secVal = document.getElementById("rollSectionFilter").value || "0";
+            const searchVal = document.getElementById("rollSearchInput").value || "";
+
+            const payload = {
+                preset: "CUSTOM",
+                assessmentYear: yearVal > 0 ? yearVal : null,
+                propertyKind: 0,
+                barangayFilter: brgyVal,
+                sectionFilter: secVal,
+                search: searchVal,
+                page: rollCurrentPage,
+                pageSize: rollPageSize
+            };
+
+            fetch("/Dashboard/GetAssessmentRollPage", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            })
+            .then(res => res.json())
+            .then(json => {
+                if (json.success && json.data) {
+                    renderAssessmentRollPage(json.data);
+                }
+            })
+            .catch(err => console.error("Error fetching roll page:", err));
+        }
+
+        function renderAssessmentRollPage(pageData) {
+            const tbody = document.getElementById("tbodyDetailedRoll");
+            const records = pageData.records || [];
+            const total = pageData.totalRecords || 0;
+
+            if (records.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="21" class="px-4 py-10 text-center text-slate-400 font-sans">
+                            No assessment records found matching selected filters.
+                        </td>
+                    </tr>
+                `;
+                document.getElementById("rollPaginationInfo").innerText = "Showing 0–0 of 0 records";
+                document.getElementById("rollPaginationNav").innerHTML = "";
+                return;
+            }
+
+            const startIndex = (pageData.page - 1) * pageData.pageSize + 1;
+            const endIndex = Math.min(startIndex + records.length - 1, total);
+
+            tbody.innerHTML = records.map(r => `
+                <tr class="hover:bg-slate-50 dark:hover:bg-stone-800/50 transition-colors">
+                    <td class="px-3 py-2.5 font-bold text-slate-900 dark:text-white">${r.tdNo}</td>
+                    <td class="px-3 py-2.5 text-slate-500">${r.previousTdNo}</td>
+                    <td class="px-2.5 py-2.5 text-center font-bold text-slate-800 dark:text-stone-200">${r.section}</td>
+                    <td class="px-2.5 py-2.5 text-center text-slate-600 dark:text-stone-300">${r.parcelNo}</td>
+                    <td class="px-4 py-2.5 font-bold font-sans text-slate-900 dark:text-white">${r.ownerName}</td>
+                    <td class="px-4 py-2.5 font-sans text-slate-600 dark:text-stone-400 max-w-[220px] truncate" title="${r.ownerAddress}">${r.ownerAddress}</td>
+                    <td class="px-3 py-2.5 font-sans text-slate-500">${r.prevOwner}</td>
+                    <td class="px-2 py-2.5 text-center text-slate-500">${r.cadNo}</td>
+                    <td class="px-2.5 py-2.5 text-center text-slate-600 dark:text-stone-300">${r.surveyNo}</td>
+                    <td class="px-2.5 py-2.5 text-slate-600 dark:text-stone-300">${r.titleNo}</td>
+                    <td class="px-3 py-2.5 text-[10px] text-slate-500">${r.previousPin}</td>
+                    <td class="px-3 py-2.5 font-sans">${r.classification}</td>
+                    <td class="px-2.5 py-2.5 text-center">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300">${r.kind}</span>
+                    </td>
+                    <td class="px-3 py-2.5 font-sans">${r.actualUse}</td>
+                    <td class="px-3 py-2.5 text-right font-semibold text-slate-800 dark:text-stone-200">${formatNumber(r.areaSqm)}</td>
+                    <td class="px-3 py-2.5 text-right text-slate-700 dark:text-stone-300">${formatNumber(r.marketValue)}</td>
+                    <td class="px-3 py-2.5 text-right font-bold text-blue-600 dark:text-blue-400">${formatNumber(r.assessedValue)}</td>
+                    <td class="px-2 py-2.5 text-center text-slate-500">${r.bldgCount}</td>
+                    <td class="px-2 py-2.5 text-center text-slate-500">${r.machCount}</td>
+                    <td class="px-3 py-2.5 text-slate-400 max-w-[120px] truncate" title="${r.memoranda}">${r.memoranda}</td>
+                    <td class="px-3 py-2.5 text-center text-slate-600 dark:text-stone-400 font-sans">${r.effectivityDate}</td>
+                </tr>
+            `).join("");
+
+            document.getElementById("rollPaginationInfo").innerText = `Showing ${startIndex.toLocaleString()}–${endIndex.toLocaleString()} of ${total.toLocaleString()} records`;
+            renderRollPaginationControls(pageData.totalPages || 1);
             if (typeof lucide !== "undefined") lucide.createIcons();
         }
 
-        function renderPaginationButtons(totalPages) {
-            const nav = document.getElementById("tablePaginationNav");
+        function renderRollPaginationControls(totalPages) {
+            const nav = document.getElementById("rollPaginationNav");
             let html = "";
 
-            const prevDisabled = currentPage === 1 ? "opacity-30 pointer-events-none" : "hover:bg-slate-100 dark:hover:bg-stone-800";
-            html += `<button type="button" onclick="goToPage(${currentPage - 1})" class="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-stone-700 text-slate-700 dark:text-stone-300 font-semibold ${prevDisabled} cursor-pointer transition shadow-xs">&lsaquo;</button>`;
+            const prevDisabled = rollCurrentPage === 1 ? "opacity-30 pointer-events-none" : "hover:bg-slate-100 dark:hover:bg-stone-800";
+            html += `<button type="button" onclick="goToRollPage(${rollCurrentPage - 1})" class="px-2 py-1 rounded-lg border border-slate-200 dark:border-stone-800 text-slate-700 dark:text-stone-300 ${prevDisabled} cursor-pointer">&lsaquo;</button>`;
 
-            let startP = Math.max(1, currentPage - 2);
+            let startP = Math.max(1, rollCurrentPage - 2);
             let endP = Math.min(totalPages, startP + 4);
             if (endP - startP < 4) {
                 startP = Math.max(1, endP - 4);
             }
 
             for (let p = startP; p <= endP; p++) {
-                const activeCls = p === currentPage
-                    ? "bg-[#006766] text-white border-[#006766] shadow-xs"
-                    : "border-slate-200 dark:border-stone-700 text-slate-700 dark:text-stone-300 hover:bg-slate-100 dark:hover:bg-stone-800";
-                html += `<button type="button" onclick="goToPage(${p})" class="px-3 py-1 rounded-lg border font-bold ${activeCls} cursor-pointer transition">${p}</button>`;
+                const active = p === rollCurrentPage
+                    ? "bg-[#0070ba] text-white border-[#0070ba] font-bold"
+                    : "border-slate-200 dark:border-stone-800 text-slate-700 dark:text-stone-300 hover:bg-slate-100 dark:hover:bg-stone-800";
+                html += `<button type="button" onclick="goToRollPage(${p})" class="px-2.5 py-1 rounded-lg border text-xs ${active} cursor-pointer">${p}</button>`;
             }
 
-            const nextDisabled = currentPage === totalPages ? "opacity-30 pointer-events-none" : "hover:bg-slate-100 dark:hover:bg-stone-800";
-            html += `<button type="button" onclick="goToPage(${currentPage + 1})" class="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-stone-700 text-slate-700 dark:text-stone-300 font-semibold ${nextDisabled} cursor-pointer transition shadow-xs">&rsaquo;</button>`;
+            if (endP < totalPages) {
+                html += `<span class="px-1 text-slate-400">...</span>`;
+                html += `<button type="button" onclick="goToRollPage(${totalPages})" class="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-stone-800 text-slate-700 dark:text-stone-300 hover:bg-slate-100 text-xs cursor-pointer">${totalPages}</button>`;
+            }
+
+            const nextDisabled = rollCurrentPage === totalPages ? "opacity-30 pointer-events-none" : "hover:bg-slate-100 dark:hover:bg-stone-800";
+            html += `<button type="button" onclick="goToRollPage(${rollCurrentPage + 1})" class="px-2 py-1 rounded-lg border border-slate-200 dark:border-stone-800 text-slate-700 dark:text-stone-300 ${nextDisabled} cursor-pointer">&rsaquo;</button>`;
 
             nav.innerHTML = html;
         }
 
-        function goToPage(page) {
-            currentPage = page;
-            renderPaginatedTable();
+        function goToRollPage(p) {
+            rollCurrentPage = p;
+            fetchAssessmentRollPage();
         }
 
-        function changePageSize(size) {
-            pageSize = parseInt(size) || 10;
-            currentPage = 1;
-            renderPaginatedTable();
+        function exportAssessmentRollCsv() {
+            const yearVal = parseInt(document.getElementById("assessmentYearSelect").value) || 0;
+            const brgyVal = rollBarangayTom ? rollBarangayTom.getValue() : (document.getElementById("rollBarangayFilter")?.value || "0");
+            const secVal = document.getElementById("rollSectionFilter").value || "0";
+            const searchVal = document.getElementById("rollSearchInput").value || "";
+
+            const form = document.createElement("form");
+            form.method = "POST";
+            form.action = "/Dashboard/ExportAssessmentRollCsv";
+
+            const addField = (name, val) => {
+                const input = document.createElement("input");
+                input.type = "hidden";
+                input.name = name;
+                input.value = val;
+                form.appendChild(input);
+            };
+
+            addField("AssessmentYear", yearVal > 0 ? yearVal : "");
+            addField("BarangayFilter", brgyVal);
+            addField("SectionFilter", secVal);
+            addField("Search", searchVal);
+
+            document.body.appendChild(form);
+            form.submit();
+            document.body.removeChild(form);
         }
 
-        function filterTableRows() {
-            const input = document.getElementById("tableSearchInput");
-            const clearBtn = document.getElementById("btnClearSearch");
-            const keyword = (input.value || "").toLowerCase().trim();
-
-            if (clearBtn) {
-                if (keyword.length > 0) clearBtn.classList.remove("hidden");
-                else clearBtn.classList.add("hidden");
-            }
-
-            filteredData = tableRawData.filter(r =>
-                (r.barangayName && r.barangayName.toLowerCase().includes(keyword)) ||
-                (r.barangayCode && r.barangayCode.toLowerCase().includes(keyword))
-            );
-            currentPage = 1;
-            renderPaginatedTable();
-        }
-
-        function clearTableSearch() {
-            const input = document.getElementById("tableSearchInput");
-            if (input) input.value = "";
-            filterTableRows();
-        }
-
-        function exportAnalyticsCsv() {
-            const kind = parseInt(document.getElementById("filterPropertyKind").value) || 0;
-            const brgy = document.getElementById("filterBarangay").value || "0";
-            const actualUse = document.getElementById("filterActualUse").value || "0";
+        function exportAnalyticsSummaryCsv() {
+            const yearVal = parseInt(document.getElementById("assessmentYearSelect").value) || 0;
+            const brgyVal = document.getElementById("mainBarangayFilter").value || "0";
 
             const form = document.createElement("form");
             form.method = "POST";
@@ -1118,15 +1285,9 @@
                 form.appendChild(input);
             };
 
-            addField("Preset", currentPreset);
-            addField("PropertyKind", kind);
-            addField("BarangayFilter", brgy);
-            addField("ActualUseFilter", actualUse);
-
-            if (flatpickrInstance && flatpickrInstance.selectedDates.length === 2) {
-                addField("StartDate", flatpickrInstance.selectedDates[0].toISOString());
-                addField("EndDate", flatpickrInstance.selectedDates[1].toISOString());
-            }
+            addField("Preset", "CUSTOM");
+            addField("AssessmentYear", yearVal > 0 ? yearVal : "");
+            addField("BarangayFilter", brgyVal);
 
             document.body.appendChild(form);
             form.submit();

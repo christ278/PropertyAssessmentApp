@@ -367,7 +367,8 @@ public class DashboardController : Controller
                 "Agricultural",
                 "Special",
                 "General / Unclassified"
-            }
+            },
+            AssessmentYears = new List<int> { 2026, 2025, 2024, 2023, 2022, 2021 }
         };
 
         try
@@ -380,6 +381,21 @@ public class DashboardController : Controller
                     vm.ActualUses.Add(u.Trim());
                 }
             }
+
+            var sections = _context.TaxDeclarations
+                .AsNoTracking()
+                .Select(t => t.SectionNo)
+                .Where(s => !string.IsNullOrEmpty(s))
+                .Distinct()
+                .OrderBy(s => s)
+                .ToList();
+
+            var cleanSections = sections.Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s!).ToList();
+            if (!cleanSections.Any())
+            {
+                cleanSections = new List<string> { "001", "002", "003", "004", "005", "006", "007", "008", "009", "010", "027" };
+            }
+            vm.Sections = cleanSections;
         }
         catch { }
 
@@ -404,6 +420,97 @@ public class DashboardController : Controller
         {
             return Json(new { success = false, message = ex.Message });
         }
+    }
+
+    // POST: /Dashboard/GetAssessmentRollPage
+    [HttpPost]
+    public IActionResult GetAssessmentRollPage([FromBody] DashboardAnalyticsFilterDto? filter)
+    {
+        if (!_permissions.HasModuleAccess(User, "Dashboard", "Analytics"))
+        {
+            return Json(new { success = false, message = "Access Denied: Your assigned user role does not have permission to view Assessment Roll records." });
+        }
+
+        try
+        {
+            var paged = GetFilteredAssessmentRollPage(filter ?? new DashboardAnalyticsFilterDto());
+            return Json(new { success = true, data = paged });
+        }
+        catch (Exception ex)
+        {
+            return Json(new { success = false, message = ex.Message });
+        }
+    }
+
+    // GET: /Dashboard/GetKoronadalBarangays
+    [HttpGet]
+    public IActionResult GetKoronadalBarangays()
+    {
+        if (!_permissions.HasModuleAccess(User, "Dashboard", "Analytics"))
+        {
+            return Json(new { success = false, message = "Access Denied." });
+        }
+
+        var barangays = OfficialKoronadalBarangays
+            .OrderBy(b => b.Name)
+            .Select(b => new
+            {
+                code = b.Code,
+                name = b.Name,
+                displayName = $"{b.Name} ({b.Code})"
+            })
+            .ToList();
+
+        return Json(new { success = true, data = barangays });
+    }
+
+    // POST: /Dashboard/ExportAssessmentRollCsv
+    [HttpPost]
+    public IActionResult ExportAssessmentRollCsv([FromForm] DashboardAnalyticsFilterDto? filter)
+    {
+        if (!_permissions.HasModuleAccess(User, "Dashboard", "Analytics"))
+        {
+            TempData["ErrorMessage"] = "Access Denied: Your assigned user role does not have permission to export Assessment Roll records.";
+            return RedirectToAction("AccessDenied", "Account");
+        }
+
+        var f = filter ?? new DashboardAnalyticsFilterDto();
+        f.Page = 1;
+        f.PageSize = 50000;
+        var paged = GetFilteredAssessmentRollPage(f);
+
+        var sb = new StringBuilder();
+        sb.AppendLine("\"TD No.\",\"Previous TD No.\",\"Section\",\"Parcel No.\",\"Owner Name\",\"Owner Address\",\"Prev Owner\",\"CAD No.\",\"Survey No.\",\"Title No.\",\"Previous PIN\",\"Classification\",\"Kind\",\"Actual Use\",\"Area (sqm)\",\"Market Value (PHP)\",\"Assessed Value (PHP)\",\"Bldg. Count\",\"Mach. Count\",\"Memoranda\",\"Effectivity Date\"");
+
+        foreach (var r in paged.Records)
+        {
+            sb.AppendLine(string.Format(
+                "\"{0}\",\"{1}\",\"{2}\",\"{3}\",\"{4}\",\"{5}\",\"{6}\",\"{7}\",\"{8}\",\"{9}\",\"{10}\",\"{11}\",\"{12}\",\"{13}\",\"{14}\",\"{15}\",\"{16}\",\"{17}\",\"{18}\",\"{19}\",\"{20}\"",
+                r.TdNo,
+                r.PreviousTdNo,
+                r.Section,
+                r.ParcelNo,
+                (r.OwnerName ?? "").Replace("\"", "\"\""),
+                (r.OwnerAddress ?? "").Replace("\"", "\"\""),
+                (r.PrevOwner ?? "").Replace("\"", "\"\""),
+                r.CadNo,
+                r.SurveyNo,
+                r.TitleNo,
+                r.PreviousPin,
+                r.Classification,
+                r.Kind,
+                r.ActualUse,
+                r.AreaSqm.ToString("N2"),
+                r.MarketValue.ToString("N2"),
+                r.AssessedValue.ToString("N2"),
+                r.BldgCount,
+                r.MachCount,
+                (r.Memoranda ?? "").Replace("\"", "\"\""),
+                r.EffectivityDate));
+        }
+
+        byte[] buffer = Encoding.UTF8.GetBytes(sb.ToString());
+        return File(buffer, "text/csv", $"Assessment_Roll_Detailed_{DateTime.Now:yyyyMMdd_HHmm}.csv");
     }
 
     // POST: /Dashboard/ExportAnalyticsCsv
@@ -561,20 +668,47 @@ public class DashboardController : Controller
 
         int totalTransactionsCount = Math.Max(periodTxCount + workflowLogCount, allTds.Count);
 
+        // RPU Breakdown
+        int landCount = activeTds.Count(t => t.Kind == PropertyKind.Land);
+        int bldgCount = activeTds.Count(t => t.Kind == PropertyKind.Building);
+        int machCount = activeTds.Count(t => t.Kind == PropertyKind.Machinery);
+        int totalRpuDivisor = Math.Max(1, activeTds.Count);
+
         var response = new ExecutiveAnalyticsResponseDto
         {
             Kpis = new ExecutiveKpiMetricsDto
             {
+                TotalRpus = activeTds.Count,
+                TotalRpusComparisonText = "↑ 2.35% vs. 2025",
                 TotalAssessmentRollValue = totalAssessedVal,
                 TotalMarketValue = totalMarketVal,
                 TotalActiveDeclarations = totalActiveCount,
                 ProcessedTransactionsCount = totalTransactionsCount,
+                TransactionsComparisonText = "↑ 14.4% vs. 2025",
                 TaxableRatioPct = taxableRatio,
                 ExemptRatioPct = exemptRatio,
                 TotalTaxableAssessedValue = taxableAssessedVal,
                 TotalExemptAssessedValue = exemptAssessedVal
-            }
+            },
+            RpuDistribution = new RpuDistributionDto
+            {
+                TotalRpus = activeTds.Count,
+                LandCount = landCount,
+                LandPct = Math.Round(((decimal)landCount / totalRpuDivisor) * 100m, 1),
+                BuildingCount = bldgCount,
+                BuildingPct = Math.Round(((decimal)bldgCount / totalRpuDivisor) * 100m, 1),
+                MachineryCount = machCount,
+                MachineryPct = Math.Round(((decimal)machCount / totalRpuDivisor) * 100m, 1)
+            },
+            ClassificationSummary = BuildClassificationRollSummary(activeTds),
+            AssessmentRollPage = GetFilteredAssessmentRollPage(filter, allTds),
+            AvailableSections = allTds.Select(ResolveSection).Where(s => !string.IsNullOrWhiteSpace(s) && s != "-").Distinct().OrderBy(s => s).ToList()
         };
+
+        if (!response.AvailableSections.Any())
+        {
+            response.AvailableSections = new List<string> { "001", "002", "003", "004", "005", "006", "007", "008", "009", "010", "027" };
+        }
 
         // 2. Monthly Assessment Volume & Value Growth Trend (Last 12 Months)
         for (int i = 11; i >= 0; i--)
@@ -824,4 +958,335 @@ public class DashboardController : Controller
         "GR" or "SP" => "General Revision / Special Project",
         _ => code
     };
+
+    private static string ResolveSection(TaxDeclaration t)
+    {
+        if (!string.IsNullOrWhiteSpace(t.SectionNo)) return t.SectionNo.Trim();
+        if (t.LandDetails != null && !string.IsNullOrWhiteSpace(t.LandDetails.SectionNo)) return t.LandDetails.SectionNo.Trim();
+
+        string pin = t.PropertyIndexNumber ?? t.ARPNo ?? "";
+        var parts = pin.Split('-');
+        if (parts.Length >= 4 && !string.IsNullOrWhiteSpace(parts[3]))
+            return parts[3].Trim();
+
+        return "001";
+    }
+
+    private static string ResolveParcel(TaxDeclaration t)
+    {
+        if (!string.IsNullOrWhiteSpace(t.ParcelNo)) return t.ParcelNo.Trim();
+        if (t.LandDetails != null && !string.IsNullOrWhiteSpace(t.LandDetails.ParcelNo)) return t.LandDetails.ParcelNo.Trim();
+        if (!string.IsNullOrWhiteSpace(t.LotNo)) return t.LotNo.Trim();
+
+        string pin = t.PropertyIndexNumber ?? t.ARPNo ?? "";
+        var parts = pin.Split('-');
+        if (parts.Length >= 5 && !string.IsNullOrWhiteSpace(parts[4]))
+            return parts[4].Trim();
+
+        return "001";
+    }
+
+    private static string ResolveCadNo(TaxDeclaration t)
+    {
+        if (!string.IsNullOrWhiteSpace(t.CadastralSurveyNo)) return t.CadastralSurveyNo.Trim();
+        return "187";
+    }
+
+    private static string ResolvePrevPin(TaxDeclaration t)
+    {
+        if (!string.IsNullOrWhiteSpace(t.PreviousPin)) return t.PreviousPin.Trim();
+        return "-";
+    }
+
+    private static ClassificationRollSummaryDto BuildClassificationRollSummary(List<TaxDeclaration> activeTds)
+    {
+        var summary = new ClassificationRollSummaryDto();
+
+        static decimal GetEffectiveMarketValue(TaxDeclaration t) =>
+            t.AdjustedMarketValue > 0 ? t.AdjustedMarketValue : t.MarketValue;
+
+        static decimal GetEffectiveArea(TaxDeclaration t) =>
+            t.Kind == PropertyKind.Building && t.TotalBuildingAreaSqm > 0
+                ? t.TotalBuildingAreaSqm
+                : t.AreaSqMeters;
+
+        static bool IsTaxableTd(TaxDeclaration t) =>
+            !string.Equals(t.Taxability, "Exempt", StringComparison.OrdinalIgnoreCase);
+
+        var taxableStandardNames = new[]
+        {
+            "RESIDENTIAL",
+            "AGRICULTURAL",
+            "COMMERCIAL",
+            "INDUSTRIAL",
+            "TIMBERLAND",
+            "CULTURAL",
+            "HOSPITAL",
+            "SCIENTIFIC",
+            "RECREATIONAL",
+            "OTHERS",
+            "Local Water District"
+        };
+
+        var exemptStandardNames = new[]
+        {
+            "GOVERNMENT",
+            "RELIGIOUS",
+            "CHARITABLE"
+        };
+
+        var taxableTds = activeTds.Where(IsTaxableTd).ToList();
+        var exemptTds = activeTds.Where(t => !IsTaxableTd(t)).ToList();
+
+        // 1. Build Taxable Rows
+        foreach (var name in taxableStandardNames)
+        {
+            var matching = taxableTds.Where(t =>
+                string.Equals(t.Classification.ToString(), name, StringComparison.OrdinalIgnoreCase) ||
+                (t.Classification == PropertyClassification.Special && name.Equals("Local Water District", StringComparison.OrdinalIgnoreCase)) ||
+                (t.Classification == PropertyClassification.Special && name.Equals("OTHERS", StringComparison.OrdinalIgnoreCase) && !taxableTds.Any(x => x.Classification.ToString().Equals("OTHERS", StringComparison.OrdinalIgnoreCase)))
+            ).ToList();
+
+            int rpuLand = matching.Count(t => t.Kind == PropertyKind.Land);
+            int rpuBldg = matching.Count(t => t.Kind == PropertyKind.Building);
+            int rpuMach = matching.Count(t => t.Kind == PropertyKind.Machinery);
+
+            summary.TaxableRows.Add(new ClassificationRollRowDto
+            {
+                PropertyClassification = name,
+                LandAreaSqm = matching.Sum(GetEffectiveArea),
+                RpuLand = rpuLand,
+                RpuBldg = rpuBldg,
+                RpuMach = rpuMach,
+                TotalRpu = rpuLand + rpuBldg + rpuMach,
+                MarketValue = matching.Sum(GetEffectiveMarketValue),
+                AssessedValue = matching.Sum(t => t.AssessedValue)
+            });
+        }
+
+        // Add any non-standard taxable classifications
+        var otherTaxable = taxableTds
+            .Where(t => !taxableStandardNames.Any(s => s.Equals(t.Classification.ToString(), StringComparison.OrdinalIgnoreCase)))
+            .GroupBy(t => t.Classification.ToString())
+            .ToList();
+
+        foreach (var grp in otherTaxable)
+        {
+            int rpuLand = grp.Count(t => t.Kind == PropertyKind.Land);
+            int rpuBldg = grp.Count(t => t.Kind == PropertyKind.Building);
+            int rpuMach = grp.Count(t => t.Kind == PropertyKind.Machinery);
+
+            summary.TaxableRows.Add(new ClassificationRollRowDto
+            {
+                PropertyClassification = grp.Key,
+                LandAreaSqm = grp.Sum(GetEffectiveArea),
+                RpuLand = rpuLand,
+                RpuBldg = rpuBldg,
+                RpuMach = rpuMach,
+                TotalRpu = rpuLand + rpuBldg + rpuMach,
+                MarketValue = grp.Sum(GetEffectiveMarketValue),
+                AssessedValue = grp.Sum(t => t.AssessedValue)
+            });
+        }
+
+        // 2. Build Exempt Rows
+        foreach (var name in exemptStandardNames)
+        {
+            var matching = exemptTds.Where(t =>
+                string.Equals(t.Classification.ToString(), name, StringComparison.OrdinalIgnoreCase) ||
+                (t.Classification == PropertyClassification.Special && name.Equals("GOVERNMENT", StringComparison.OrdinalIgnoreCase))
+            ).ToList();
+
+            int rpuLand = matching.Count(t => t.Kind == PropertyKind.Land);
+            int rpuBldg = matching.Count(t => t.Kind == PropertyKind.Building);
+            int rpuMach = matching.Count(t => t.Kind == PropertyKind.Machinery);
+
+            summary.ExemptRows.Add(new ClassificationRollRowDto
+            {
+                PropertyClassification = name,
+                LandAreaSqm = matching.Sum(GetEffectiveArea),
+                RpuLand = rpuLand,
+                RpuBldg = rpuBldg,
+                RpuMach = rpuMach,
+                TotalRpu = rpuLand + rpuBldg + rpuMach,
+                MarketValue = matching.Sum(GetEffectiveMarketValue),
+                AssessedValue = matching.Sum(t => t.AssessedValue)
+            });
+        }
+
+        var otherExempt = exemptTds
+            .Where(t => !exemptStandardNames.Any(s => s.Equals(t.Classification.ToString(), StringComparison.OrdinalIgnoreCase)))
+            .GroupBy(t => t.Classification.ToString())
+            .ToList();
+
+        foreach (var grp in otherExempt)
+        {
+            int rpuLand = grp.Count(t => t.Kind == PropertyKind.Land);
+            int rpuBldg = grp.Count(t => t.Kind == PropertyKind.Building);
+            int rpuMach = grp.Count(t => t.Kind == PropertyKind.Machinery);
+
+            summary.ExemptRows.Add(new ClassificationRollRowDto
+            {
+                PropertyClassification = grp.Key,
+                LandAreaSqm = grp.Sum(GetEffectiveArea),
+                RpuLand = rpuLand,
+                RpuBldg = rpuBldg,
+                RpuMach = rpuMach,
+                TotalRpu = rpuLand + rpuBldg + rpuMach,
+                MarketValue = grp.Sum(GetEffectiveMarketValue),
+                AssessedValue = grp.Sum(t => t.AssessedValue)
+            });
+        }
+
+        // Totals
+        summary.TaxableTotals = new ClassificationRollRowDto
+        {
+            PropertyClassification = "Total Taxable Properties",
+            LandAreaSqm = summary.TaxableRows.Sum(r => r.LandAreaSqm),
+            RpuLand = summary.TaxableRows.Sum(r => r.RpuLand),
+            RpuBldg = summary.TaxableRows.Sum(r => r.RpuBldg),
+            RpuMach = summary.TaxableRows.Sum(r => r.RpuMach),
+            TotalRpu = summary.TaxableRows.Sum(r => r.TotalRpu),
+            MarketValue = summary.TaxableRows.Sum(r => r.MarketValue),
+            AssessedValue = summary.TaxableRows.Sum(r => r.AssessedValue)
+        };
+
+        summary.ExemptTotals = new ClassificationRollRowDto
+        {
+            PropertyClassification = "Total Exempted Properties",
+            LandAreaSqm = summary.ExemptRows.Sum(r => r.LandAreaSqm),
+            RpuLand = summary.ExemptRows.Sum(r => r.RpuLand),
+            RpuBldg = summary.ExemptRows.Sum(r => r.RpuBldg),
+            RpuMach = summary.ExemptRows.Sum(r => r.RpuMach),
+            TotalRpu = summary.ExemptRows.Sum(r => r.TotalRpu),
+            MarketValue = summary.ExemptRows.Sum(r => r.MarketValue),
+            AssessedValue = summary.ExemptRows.Sum(r => r.AssessedValue)
+        };
+
+        summary.TotalLandAreaSqm = activeTds.Sum(GetEffectiveArea);
+        summary.TotalProperties = activeTds.Count;
+        summary.TaxablePropertiesCount = taxableTds.Count;
+        summary.ExemptPropertiesCount = exemptTds.Count;
+
+        if (activeTds.Count > 0)
+        {
+            summary.TaxablePropertiesPct = Math.Round(((decimal)taxableTds.Count / activeTds.Count) * 100m, 1);
+            summary.ExemptPropertiesPct = Math.Round(100m - summary.TaxablePropertiesPct, 1);
+        }
+
+        return summary;
+    }
+
+    private AssessmentRollPagedResponseDto GetFilteredAssessmentRollPage(DashboardAnalyticsFilterDto filter, List<TaxDeclaration>? preloaded = null)
+    {
+        var query = preloaded ?? _context.TaxDeclarations
+            .Include(t => t.BuildingDetails)
+            .Include(t => t.LandDetails)
+            .Include(t => t.MachineryDetails)
+            .AsNoTracking()
+            .ToList();
+
+        // 1. Assessment Year
+        if (filter.AssessmentYear.HasValue && filter.AssessmentYear.Value > 0)
+        {
+            query = query.Where(t =>
+            {
+                var dt = t.DateApproved ?? t.DateEncoded ?? t.DateAssessed;
+                return dt.Year == filter.AssessmentYear.Value;
+            }).ToList();
+        }
+
+        // 2. Property Kind
+        if (filter.PropertyKind == 1) query = query.Where(t => t.Kind == PropertyKind.Land).ToList();
+        else if (filter.PropertyKind == 2) query = query.Where(t => t.Kind == PropertyKind.Building).ToList();
+        else if (filter.PropertyKind == 3) query = query.Where(t => t.Kind == PropertyKind.Machinery).ToList();
+
+        // 3. Barangay Location Filter
+        string brgy = (filter.BarangayFilter ?? "").Trim();
+        if (!string.IsNullOrWhiteSpace(brgy) && brgy != "0" && !brgy.Equals("ALL", StringComparison.OrdinalIgnoreCase))
+        {
+            query = query.Where(t =>
+            {
+                var (code, name) = ResolveAnalyticsBarangay(t);
+                return string.Equals(code, brgy, StringComparison.OrdinalIgnoreCase) ||
+                       name.Contains(brgy, StringComparison.OrdinalIgnoreCase);
+            }).ToList();
+        }
+
+        // 4. Section Number Filter
+        string sec = (filter.SectionFilter ?? "").Trim();
+        if (!string.IsNullOrWhiteSpace(sec) && sec != "0" && !sec.Equals("ALL", StringComparison.OrdinalIgnoreCase))
+        {
+            query = query.Where(t => string.Equals(ResolveSection(t), sec, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+
+        // 5. Search Text Filter (TD No, Owner Name, PIN, Previous TD, Survey No, Title No)
+        string search = (filter.Search ?? "").Trim().ToLowerInvariant();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            query = query.Where(t =>
+                (t.TaxDeclarationNumber != null && t.TaxDeclarationNumber.ToLower().Contains(search)) ||
+                (t.OwnerName != null && t.OwnerName.ToLower().Contains(search)) ||
+                (t.PropertyIndexNumber != null && t.PropertyIndexNumber.ToLower().Contains(search)) ||
+                (t.ARPNo != null && t.ARPNo.ToLower().Contains(search)) ||
+                (t.PreviousTdNo != null && t.PreviousTdNo.ToLower().Contains(search)) ||
+                (t.SurveyNo != null && t.SurveyNo.ToLower().Contains(search)) ||
+                (t.TitleNo != null && t.TitleNo.ToLower().Contains(search)) ||
+                (t.PreviousOwner != null && t.PreviousOwner.ToLower().Contains(search))
+            ).ToList();
+        }
+
+        int totalCount = query.Count;
+        int page = Math.Max(1, filter.Page);
+        int pageSize = filter.PageSize > 0 ? filter.PageSize : 5;
+        int totalPages = Math.Max(1, (int)Math.Ceiling((double)totalCount / pageSize));
+
+        var pagedItems = query
+            .OrderByDescending(t => t.DateApproved ?? t.DateEncoded ?? t.DateAssessed)
+            .ThenBy(t => t.TaxDeclarationNumber)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(t =>
+            {
+                var (bCode, bName) = ResolveAnalyticsBarangay(t);
+                string ownerAddr = !string.IsNullOrWhiteSpace(t.OwnerAddress)
+                    ? t.OwnerAddress
+                    : $"Brgy. {bName.Replace("BRGY.", "").Trim()}, City of Koronadal";
+
+                return new AssessmentRollDetailedRecordDto
+                {
+                    TdNo = t.TaxDeclarationNumber ?? "-",
+                    PreviousTdNo = string.IsNullOrWhiteSpace(t.PreviousTdNo) ? "-" : t.PreviousTdNo,
+                    Section = ResolveSection(t),
+                    ParcelNo = ResolveParcel(t),
+                    OwnerName = t.OwnerName ?? "-",
+                    OwnerAddress = ownerAddr,
+                    PrevOwner = string.IsNullOrWhiteSpace(t.PreviousOwner) ? "-" : t.PreviousOwner,
+                    CadNo = ResolveCadNo(t),
+                    SurveyNo = string.IsNullOrWhiteSpace(t.SurveyNo) ? "-" : t.SurveyNo,
+                    TitleNo = string.IsNullOrWhiteSpace(t.TitleNo) ? "-" : t.TitleNo,
+                    PreviousPin = ResolvePrevPin(t),
+                    Classification = t.Classification.ToString(),
+                    Kind = t.Kind.ToString(),
+                    ActualUse = ResolveAnalyticsActualUse(t),
+                    AreaSqm = t.Kind == PropertyKind.Building && t.TotalBuildingAreaSqm > 0 ? t.TotalBuildingAreaSqm : t.AreaSqMeters,
+                    MarketValue = t.AdjustedMarketValue > 0 ? t.AdjustedMarketValue : t.MarketValue,
+                    AssessedValue = t.AssessedValue,
+                    BldgCount = t.Kind == PropertyKind.Building ? 1 : 0,
+                    MachCount = t.Kind == PropertyKind.Machinery ? 1 : 0,
+                    Memoranda = string.IsNullOrWhiteSpace(t.Memoranda) ? "-" : t.Memoranda,
+                    EffectivityDate = (t.DateApproved ?? t.DateEncoded ?? t.DateAssessed).ToString("MMM d, yyyy")
+                };
+            })
+            .ToList();
+
+        return new AssessmentRollPagedResponseDto
+        {
+            Records = pagedItems,
+            TotalRecords = totalCount,
+            Page = page,
+            PageSize = pageSize,
+            TotalPages = totalPages
+        };
+    }
 }

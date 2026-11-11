@@ -179,6 +179,9 @@ public class PermissionService : IPermissionService
                 "analytics" => "DASHBOARD_ANALYTICS",
                 "getexecutiveanalytics" => "DASHBOARD_ANALYTICS",
                 "exportanalyticscsv" => "DASHBOARD_ANALYTICS",
+                "getassessmentrollpage" => "DASHBOARD_ANALYTICS",
+                "exportassessmentrollcsv" => "DASHBOARD_ANALYTICS",
+                "getkoronadalbarangays" => "DASHBOARD_ANALYTICS",
                 _ => null
             };
 

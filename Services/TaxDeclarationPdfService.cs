@@ -39,7 +39,7 @@ public class TaxDeclarationPdfService : ITaxDeclarationPdfService
     public byte[] GenerateRequestTdCertificatePdf(IReadOnlyList<TaxDeclaration> declarations, string? trackingNo = null, string? transactionLabel = null)
     {
         QuestPDF.Settings.License = LicenseType.Community;
-        QuestPDF.Settings.CheckIfAllTextGlyphsAreAvailable = false;
+        QuestPDF.Settings.ThrowOnMissingTextGlyphs = false;
 
         var items = declarations != null && declarations.Count > 0
             ? declarations
@@ -70,7 +70,7 @@ public class TaxDeclarationPdfService : ITaxDeclarationPdfService
     public byte[] GenerateCompleteRecordPdf(TaxDeclaration td)
     {
         QuestPDF.Settings.License = LicenseType.Community;
-        QuestPDF.Settings.CheckIfAllTextGlyphsAreAvailable = false;
+        QuestPDF.Settings.ThrowOnMissingTextGlyphs = false;
 
         var document = Document.Create(container =>
         {
