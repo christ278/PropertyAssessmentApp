@@ -6,7 +6,8 @@ import {
   TouchableOpacity,
   Image,
   Modal,
-  Platform
+  Platform,
+  ActivityIndicator
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,7 +17,16 @@ import { AuthContext } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { LogoutModal } from './LogoutModal';
 
-export const HeaderBar = ({ title, subtitle, onSyncPress, navigation, showBack = false, onBackPress }) => {
+export const HeaderBar = ({
+  title,
+  subtitle,
+  onSyncPress,
+  navigation,
+  showBack = false,
+  onBackPress,
+  onRefresh,
+  isRefreshing = false
+}) => {
   const insets = useSafeAreaInsets();
   const { pendingCount, isSyncing, syncAllToServer } = useContext(SyncContext);
   const { user, logout } = useContext(AuthContext);
@@ -90,7 +100,30 @@ export const HeaderBar = ({ title, subtitle, onSyncPress, navigation, showBack =
       </View>
 
       <View style={styles.actionsContainer}>
-        {/* Sync Queue Button with Badge */}
+        {/* Refresh / Update List from Web Server Button */}
+        {onRefresh ? (
+          <TouchableOpacity
+            style={[
+              styles.syncButton,
+              { backgroundColor: isDarkMode ? '#1e293b' : colors.primaryLight }
+            ]}
+            onPress={onRefresh}
+            disabled={isRefreshing}
+            accessibilityLabel="Refresh transactions from web"
+          >
+            {isRefreshing ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Ionicons
+                name="refresh-outline"
+                size={20}
+                color={colors.primary}
+              />
+            )}
+          </TouchableOpacity>
+        ) : null}
+
+        {/* Sync Queue Button with Badge (Mobile -> Web) */}
         <TouchableOpacity
           style={[
             styles.syncButton,

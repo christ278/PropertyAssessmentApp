@@ -88,6 +88,7 @@ public class TransactionTimelineDto
 {
     public Guid RequestId { get; set; }
     public string TrackingNumber { get; set; } = string.Empty;
+    public string? TransactionNo { get; set; }
     public string RequestType { get; set; } = string.Empty;
     public string DisplayType { get; set; } = string.Empty;
     public string OwnerOrApplicant { get; set; } = string.Empty;

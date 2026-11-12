@@ -105,6 +105,11 @@ export const DashboardScreen = ({ navigation }) => {
         title="FAIRTRACK MOBILE"
         subtitle={`Division ${user?.divisionId || 1} • ${user?.name || 'Staff'}`}
         navigation={navigation}
+        onRefresh={() => {
+          setRefreshing(true);
+          fetchDashboard();
+        }}
+        isRefreshing={refreshing || loading}
       />
 
       <ScrollView

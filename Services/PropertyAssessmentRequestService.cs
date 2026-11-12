@@ -39,6 +39,7 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
         {
             var term = search.Trim().ToLower();
             query = query.Where(r => r.TrackingNumber.ToLower().Contains(term)
+                                  || (r.TransactionNo != null && r.TransactionNo.ToLower().Contains(term))
                                   || r.NewOwnerName.ToLower().Contains(term)
                                   || (r.PrevOwner != null && r.PrevOwner.ToLower().Contains(term))
                                   || (r.PrevTDN != null && r.PrevTDN.ToLower().Contains(term))
@@ -172,7 +173,7 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                             StreetNo = !string.IsNullOrWhiteSpace(p.StreetLocation) ? p.StreetLocation : (request.PropertyLocation ?? string.Empty),
                             Municipality = !string.IsNullOrWhiteSpace(p.CityMunicipality) ? p.CityMunicipality : (refTd?.Municipality ?? "General Santos City"),
                             ProvinceCity = !string.IsNullOrWhiteSpace(p.Province) ? p.Province : (refTd?.ProvinceCity ?? "South Cotabato"),
-                            Kind = Enum.TryParse<PropertyKind>(p.Kind, true, out var parsedKind) ? parsedKind : (refTd?.Kind ?? PropertyKind.Land),
+                            Kind = Enum.TryParse<PropertyKind>(p.Kind, true, out var parsedKind) ? parsedKind : (p.Kind?.Contains("Building", StringComparison.OrdinalIgnoreCase) == true ? PropertyKind.Building : (refTd?.Kind ?? PropertyKind.Land)),
                             Classification = Enum.TryParse<PropertyClassification>(p.Classification, true, out var parsedClass) ? parsedClass : (refTd?.Classification ?? PropertyClassification.Residential),
                             ActualUse = refTd?.ActualUse ?? p.Classification,
                             AreaSqMeters = p.AreaSqMeters > 0 ? p.AreaSqMeters : (refTd?.AreaSqMeters ?? 100m),
@@ -352,6 +353,14 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
             existing.Status = request.Status;
             existing.TransactionTypeCode = request.TransactionTypeCode;
             existing.TransactionTypeName = request.TransactionTypeName;
+            if (!string.IsNullOrWhiteSpace(request.TransactionNo))
+            {
+                existing.TransactionNo = request.TransactionNo;
+            }
+            else if (string.IsNullOrWhiteSpace(existing.TransactionNo))
+            {
+                existing.TransactionNo = $"TX-{existing.RequestDate:yyyyMMdd}-{new Random().Next(100, 999)}";
+            }
             existing.Kind = request.Kind;
             existing.Partitions = request.Partitions;
 
@@ -932,7 +941,7 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                 StreetNo = !string.IsNullOrWhiteSpace(conf?.StreetLocation) ? conf.StreetLocation : (request.PropertyLocation ?? string.Empty),
                 Municipality = !string.IsNullOrWhiteSpace(conf?.CityMunicipality) ? conf.CityMunicipality : (refTd?.Municipality ?? "General Santos City"),
                 ProvinceCity = !string.IsNullOrWhiteSpace(conf?.Province) ? conf.Province : (refTd?.ProvinceCity ?? "South Cotabato"),
-                Kind = conf != null && Enum.TryParse<PropertyKind>(conf.Kind, true, out var parsedConfKind) ? parsedConfKind : (Enum.TryParse<PropertyKind>(request.Kind, true, out var parsedKind) ? parsedKind : PropertyKind.Land),
+                Kind = conf != null && Enum.TryParse<PropertyKind>(conf.Kind, true, out var parsedConfKind) ? parsedConfKind : (Enum.TryParse<PropertyKind>(request.Kind, true, out var parsedKind) ? parsedKind : (request.Kind?.Contains("Building", StringComparison.OrdinalIgnoreCase) == true ? PropertyKind.Building : PropertyKind.Land)),
                 Classification = conf != null && Enum.TryParse<PropertyClassification>(conf.Classification, true, out var parsedConfClass) ? parsedConfClass : (refTd?.Classification ?? PropertyClassification.Residential),
                 ActualUse = conf?.ActualUse ?? refTd?.ActualUse ?? "Residential",
                 AreaSqMeters = dividedArea,

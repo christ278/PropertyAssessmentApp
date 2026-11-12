@@ -50,6 +50,10 @@ public class PropertyAssessmentRequest
     [Display(Name = "Tracking No.")]
     public string TrackingNumber { get; set; } = string.Empty;
 
+    [Display(Name = "Transaction No.")]
+    [StringLength(100)]
+    public string? TransactionNo { get; set; }
+
     public static readonly Dictionary<string, string> StandardTransactionCodes = new()
     {
         { "SD", "Subdivision" },
@@ -275,10 +279,10 @@ public class AssessmentPartitionItem
     public string? OwnerGender { get; set; } = "Male";
     public string? OwnerCivilStatus { get; set; } = "Single";
     public string? OwnerEmail { get; set; }
-    public string? DistrictOrBarangay { get; set; }
+    public string? DistrictOrBarangay { get; set; } = "BRGY. ZONE I";
     public string? StreetLocation { get; set; }
-    public string? CityMunicipality { get; set; }
-    public string? Province { get; set; }
+    public string? CityMunicipality { get; set; } = "Koronadal City";
+    public string? Province { get; set; } = "South Cotabato";
     public string? PropertyLocation { get; set; }
 
     public string DisplayPropertyLocation

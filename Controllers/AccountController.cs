@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PropertyAssessmentApp.Models;
 using PropertyAssessmentApp.Services;
@@ -11,11 +12,16 @@ public class AccountController : Controller
 {
     private readonly IUserAccountService _userService;
     private readonly IPermissionService _permissionService;
+    private readonly IDocumentWorkflowService _workflowService;
 
-    public AccountController(IUserAccountService userService, IPermissionService permissionService)
+    public AccountController(
+        IUserAccountService userService, 
+        IPermissionService permissionService,
+        IDocumentWorkflowService workflowService)
     {
         _userService = userService;
         _permissionService = permissionService;
+        _workflowService = workflowService;
     }
 
     // GET: /Account/Login
@@ -110,6 +116,29 @@ public class AccountController : Controller
     public IActionResult AccessDenied()
     {
         return View();
+    }
+
+    // GET: /Account/TrackTransaction
+    [HttpGet]
+    [AllowAnonymous]
+    public IActionResult TrackTransaction(string? referenceNumber)
+    {
+        if (string.IsNullOrWhiteSpace(referenceNumber))
+        {
+            return Json(new { success = false, message = "Please provide a valid Transaction Number or Tracking Number." });
+        }
+
+        var cleanRef = referenceNumber.Trim();
+        var timeline = _workflowService.GetTransactionTimeline(null, cleanRef);
+        if (timeline == null)
+        {
+            return Json(new { 
+                success = false, 
+                message = $"No transaction found for \"{cleanRef}\". Please check the Transaction or Tracking Number and try again." 
+            });
+        }
+
+        return Json(new { success = true, data = timeline });
     }
 
     private IActionResult RedirectToLocal(string? returnUrl)

@@ -10,6 +10,8 @@
     var jsonOptions = new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase };
 }
 
+<partial name="_Select2Style" />
+
 <div class="space-y-8 font-mono text-xs">
 
     <!-- Top Header (Matches File Property Assessment Request standard) -->
@@ -104,31 +106,8 @@
                 <partial name="_MachineryPartitionForm" model="Model" />
             </div> <!-- /#container-machinery-appraisal -->
 
-            <!-- FIELD INSPECTION ATTACHMENTS & PHOTOS (FROM FAIRTRACK MOBILE & WEB) -->
-            <div class="p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
-                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-stone-800 pb-3">
-                    <!-- <h3 class="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2">
-                        <i data-lucide="camera" class="w-4 h-4 text-emerald-600"></i> Field Inspection Photo Attachments
-                    </h3> -->
-
-                    <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
-                        <i data-lucide="clipboard-list" class="w-4 h-4"></i>
-                        Field Inspection Photo Attachments
-                    </h4>
-                    <div class="flex items-center gap-3">
-                        <input type="file" id="fileUploadInspectionPhotos" multiple accept="image/*" class="hidden" onchange="handleWebInspectionPhotos(event)" />
-                        <button type="button" onclick="document.getElementById('fileUploadInspectionPhotos').click()" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer">
-                            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-                            <span id="btnUploadPhotosText">Add Photos</span>
-                        </button>
-                        <span class="text-xs text-slate-400 font-mono">FairTrack Mobile Sync</span>
-                    </div>
-                </div>
-                
-                <div id="inspectionPhotosContainer">
-                    <!-- Populated dynamically by renderInspectionPhotosGallery() -->
-                </div>
-            </div>
+            <!-- Hidden file input for FairTrack Inspection Photo uploads -->
+            <input type="file" id="fileUploadInspectionPhotos" multiple accept="image/*" class="hidden" onchange="handleWebInspectionPhotos(event)" />
 
             <!-- Submit Button Footer (Matches File Property Assessment Request standard) -->
             <div class="flex flex-col-reverse sm:flex-row sm:items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-stone-800">
@@ -145,6 +124,7 @@
 </div>
 
 @section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script>
         const returnUrl = "@Html.Raw(returnUrl)";
         const partitionIndex = parseInt("@partitionIndex") || 0;
@@ -204,6 +184,7 @@
                 $('#container-machinery-appraisal :input').prop('disabled', true);
                 $('#container-land-appraisal :input').prop('disabled', false);
             }
+            initPartitionBarangayDropdowns();
             if (window.lucide) lucide.createIcons();
         }
 
@@ -212,6 +193,11 @@
             $('#' + tabId).removeClass('hidden');
             $('.land-tab-btn').removeClass('bg-emerald-600 text-white shadow-sm').addClass('bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-400');
             $('#btn-' + tabId).removeClass('bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-400').addClass('bg-emerald-600 text-white shadow-sm');
+            if (tabId === 'land-tab-location') {
+                setTimeout(function() {
+                    initPartitionBarangayDropdowns();
+                }, 50);
+            }
             if (window.lucide) lucide.createIcons();
         }
 
@@ -1376,6 +1362,10 @@
             $('.tab-btn').removeClass('bg-emerald-600 text-white shadow-sm').addClass('bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-400 border border-slate-200 dark:border-stone-800 hover:bg-slate-200 dark:hover:bg-stone-700');
             $('#btn-' + tabId).addClass('bg-emerald-600 text-white shadow-sm').removeClass('bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-400 border border-slate-200 dark:border-stone-800 hover:bg-slate-200 dark:hover:bg-stone-700');
             
+            setTimeout(function() {
+                initPartitionBarangayDropdowns();
+            }, 50);
+
             if (window.lucide) lucide.createIcons();
         }
 
@@ -2193,12 +2183,20 @@
             partitionInspectionPhotos = [];
         }
 
-        function renderInspectionPhotosGallery() {
-            const container = document.getElementById('inspectionPhotosContainer');
-            if (!container) return;
+        function triggerPartitionPhotoUpload(btn) {
+            const input = document.getElementById('fileUploadInspectionPhotos');
+            if (input) {
+                input.click();
+            }
+        }
 
+        function renderInspectionPhotosGallery() {
+            const containers = document.querySelectorAll('.inspectionPhotosContainer, #inspectionPhotosContainer');
+            if (!containers || containers.length === 0) return;
+
+            let innerHtml = '';
             if (!partitionInspectionPhotos || partitionInspectionPhotos.length === 0) {
-                container.innerHTML = `
+                innerHtml = `
                     <div class="p-6 text-center text-slate-400 dark:text-stone-500 bg-white dark:bg-stone-900 rounded-xl border border-dashed border-slate-200 dark:border-stone-800">
                         <i data-lucide="images" class="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-stone-600"></i>
                         <p class="text-xs font-mono font-bold text-slate-600 dark:text-stone-400">No Inspection Photos Uploaded Yet</p>
@@ -2207,12 +2205,12 @@
                         </p>
                     </div>`;
             } else {
-                let html = '<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">';
+                innerHtml = '<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">';
                 partitionInspectionPhotos.forEach((item, index) => {
                     const fileUrl = item.fileUrl || item.FileUrl || '';
                     const fileName = item.fileName || item.FileName || `Photo ${index + 1}`;
                     const itemId = item.id || item.Id || ('photo_' + index);
-                    html += `
+                    innerHtml += `
                         <div class="group relative aspect-square rounded-xl overflow-hidden border border-slate-200 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-xs hover:border-emerald-600 transition-all">
                             <a href="${fileUrl}" target="_blank" class="block w-full h-full">
                                 <img src="${fileUrl}" alt="${fileName}" class="w-full h-full object-cover group-hover:scale-105 transition-transform" />
@@ -2225,9 +2223,12 @@
                             </div>
                         </div>`;
                 });
-                html += '</div>';
-                container.innerHTML = html;
+                innerHtml += '</div>';
             }
+
+            containers.forEach(c => {
+                c.innerHTML = innerHtml;
+            });
 
             if (window.lucide) {
                 lucide.createIcons();
@@ -2254,9 +2255,8 @@
             const files = event.target.files;
             if (!files || files.length === 0) return;
 
-            const btnText = document.getElementById('btnUploadPhotosText');
-            const originalText = btnText ? btnText.innerText : 'Add Photos';
-            if (btnText) btnText.innerText = 'Uploading...';
+            const btnTexts = document.querySelectorAll('.btnUploadPhotosText, #btnUploadPhotosText');
+            btnTexts.forEach(b => b.innerText = 'Uploading...');
 
             const formData = new FormData();
             for (let i = 0; i < files.length; i++) {
@@ -2286,7 +2286,7 @@
                 if (window.toastr) toastr.error('Failed to upload inspection photos. Please try again.');
                 else alert('Failed to upload inspection photos.');
             } finally {
-                if (btnText) btnText.innerText = originalText;
+                btnTexts.forEach(b => b.innerText = 'Add Photos');
                 event.target.value = '';
             }
         }
@@ -2339,8 +2339,8 @@
                 updatedPartition.localDateIssued = $('#inputMachineryLocalDateIssued').val() || null;
 
                 updatedPartition.streetLocation = $('#inputMachineryStreet').val() || '';
-                updatedPartition.districtOrBarangay = $('#selectMachineryBarangay').val() || '';
-                updatedPartition.cityMunicipality = $('#inputMachineryCity').val() || 'General Santos City';
+                updatedPartition.districtOrBarangay = $('#selectMachineryBarangay').val() || 'BRGY. ZONE I';
+                updatedPartition.cityMunicipality = $('#inputMachineryCity').val() || 'Koronadal City';
                 updatedPartition.province = $('#inputMachineryProvince').val() || 'South Cotabato';
                 const locParts = [updatedPartition.streetLocation, updatedPartition.districtOrBarangay, updatedPartition.cityMunicipality, updatedPartition.province].filter(Boolean);
                 updatedPartition.propertyLocation = locParts.join(', ');
@@ -2396,6 +2396,7 @@
                 updatedPartition.backTaxesYearFrom = parseInt($('#inputMachineryBackTaxesFrom').val()) || null;
                 updatedPartition.backTaxesYearTo = parseInt($('#inputMachineryBackTaxesTo').val()) || null;
                 updatedPartition.memoranda = $('#textareaMachineryMemoranda').val() || '';
+                updatedPartition.attachmentsJson = $('#AttachmentsJson').val() || '';
 
                 try {
                     let savedDraft = sessionStorage.getItem('propertyAssessmentRequest_draft');
@@ -2445,8 +2446,8 @@
                 // Location
                 updatedPartition.streetLocation = $('#inputLandStreet').val() || '';
                 updatedPartition.purok = $('#inputLandPurok').val() || '';
-                updatedPartition.districtOrBarangay = $('#selectLandBarangay').val() || '';
-                updatedPartition.cityMunicipality = $('#inputLandCity').val() || 'General Santos City';
+                updatedPartition.districtOrBarangay = $('#selectLandBarangay').val() || 'BRGY. ZONE I';
+                updatedPartition.cityMunicipality = $('#inputLandCity').val() || 'Koronadal City';
                 updatedPartition.province = $('#inputLandProvince').val() || 'South Cotabato';
                 const locParts = [updatedPartition.streetLocation, updatedPartition.purok, updatedPartition.districtOrBarangay, updatedPartition.cityMunicipality, updatedPartition.province].filter(Boolean);
                 updatedPartition.propertyLocation = locParts.join(', ');
@@ -2597,7 +2598,7 @@
             updatedPartition.propertyTypeAccordUse = $('#selectPropertyTypeAccordUse').val();
             updatedPartition.otherPropertyTypeAccordUse = $('#inputOtherPropertyType').val();
             updatedPartition.titleNo = $('#inputTitleNo').val();
-            updatedPartition.kind = $('#selectKind').val();
+            updatedPartition.kind = 'Building';
             updatedPartition.classification = $('select[name="Classification"]').val();
             updatedPartition.actualUse = $('input[name="ActualUse"]').val();
             updatedPartition.areaSqMeters = totalAreaVal;
@@ -2626,11 +2627,11 @@
             updatedPartition.ownerEmail = $('#inputBldgOwnerEmail').val();
             updatedPartition.customOwner = true;
 
-            // Location of Property
+            // Location of Property (City of Koronadal Standard)
             updatedPartition.streetLocation = $('input[name="StreetLocation"]').val();
-            updatedPartition.districtOrBarangay = $('input[name="DistrictOrBarangay"]').val();
-            updatedPartition.cityMunicipality = $('input[name="CityMunicipality"]').val();
-            updatedPartition.province = $('input[name="Province"]').val();
+            updatedPartition.districtOrBarangay = $('#selectBldgBarangay').val() || $('select[name="DistrictOrBarangay"]').val() || $('input[name="DistrictOrBarangay"]').val() || 'BRGY. ZONE I';
+            updatedPartition.cityMunicipality = $('#inputBldgCity').val() || $('input[name="CityMunicipality"]').val() || 'Koronadal City';
+            updatedPartition.province = $('#inputBldgProvince').val() || $('input[name="Province"]').val() || 'South Cotabato';
             updatedPartition.propertyLocation = $('#inputPropertyLocation').val() || [updatedPartition.streetLocation, updatedPartition.districtOrBarangay, updatedPartition.cityMunicipality, updatedPartition.province].filter(Boolean).join(', ');
 
             // Land Reference
@@ -2731,14 +2732,35 @@
             if (/^\d+$/.test(raw)) return raw.slice(-4).padStart(4, '0');
             const u = raw.toUpperCase();
             const map = [
-                ['DADIANGAS EAST', '0001'], ['CENTRAL', '0001'], ['POBLACION', '0001'], ['ZONE 1', '0001'],
-                ['LAGAO', '0002'], ['MORALES', '0002'], ['CALUMPANG', '0003'], ['SAN ISIDRO', '0004'],
-                ['CITY HEIGHTS', '0005'], ['DADIANGAS NORTH', '0006'], ['DADIANGAS SOUTH', '0007'],
-                ['DADIANGAS WEST', '0008'], ['LABANGAL', '0009'], ['APOPONG', '0010'], ['BALUAN', '0011'],
-                ['BATOMELONG', '0012'], ['BUAYAN', '0013'], ['BULA', '0014'], ['CONEL', '0015'],
-                ['FATIMA', '0016'], ['KATANGAWAN', '0017'], ['LIGAYA', '0018'], ['MABUHAY', '0019'],
-                ['OLYMPOG', '0020'], ['SAN JOSE', '0021'], ['SIGUEL', '0022'], ['SINAWAL', '0023'],
-                ['TAMBLER', '0024'], ['TINAGACAN', '0025'], ['UPPER LABAY', '0026'], ['SALITRAN', '0027']
+                ['ZONE I', '0001'], ['ZONE 1', '0001'],
+                ['ZONE II', '0002'], ['ZONE 2', '0002'],
+                ['ZONE III', '0003'], ['ZONE 3', '0003'],
+                ['ZONE IV', '0004'], ['ZONE 4', '0004'],
+                ['ASSUMPTION', '0005'],
+                ['AVANCEÑA', '0006'], ['AVANCENA', '0006'],
+                ['CACUB', '0007'],
+                ['CALOOCAN', '0008'],
+                ['CARPENTER HILL', '0009'],
+                ['CONCEPCION', '0010'],
+                ['ESPERANZA', '0011'],
+                ['GEN. P. SANTOS', '0012'], ['GEN. P SANTOS', '0012'], ['GEN P SANTOS', '0012'],
+                ['MABINI', '0013'],
+                ['MAGSAYSAY', '0014'],
+                ['MAMBUCAL', '0015'],
+                ['MORALES', '0016'],
+                ['NAMNAMA', '0017'],
+                ['NEW PANGASINAN', '0018'],
+                ['PARAISO', '0019'],
+                ['ROTONDA', '0020'],
+                ['SAN ISIDRO', '0021'],
+                ['SAN JOSE', '0022'],
+                ['SAN ROQUE', '0023'],
+                ['SARAVIA', '0024'],
+                ['STA. CRUZ', '0025'], ['STA CRUZ', '0025'],
+                ['STO. NIÑO', '0026'], ['STO. NINO', '0026'], ['STO NINO', '0026'],
+                ['TOPLAND', '0027'],
+                ['DADIANGAS EAST', '0001'], ['CENTRAL', '0001'], ['POBLACION', '0001'],
+                ['LAGAO', '0002'], ['CALUMPANG', '0003'], ['CITY HEIGHTS', '0005']
             ];
             for (const [k, c] of map) {
                 if (u.includes(k)) return c;
@@ -2780,6 +2802,23 @@
             return `${revYearLastTwo}-${brgy4}-${seq5}`;
         }
 
+        function initPartitionBarangayDropdowns() {
+            if (typeof $.fn.select2 === 'undefined') return;
+            $('.select2-barangay').each(function () {
+                const $el = $(this);
+                if ($el.data('select2')) {
+                    $el.select2('destroy');
+                }
+                $el.select2({
+                    width: '100%',
+                    placeholder: 'Search & select Barangay...',
+                    allowClear: false
+                }).on('change', function () {
+                    syncCastArpAndTdnLive();
+                });
+            });
+        }
+
         function syncCastArpAndTdnLive() {
             const k = ($('#inputKindHidden').val() || 'Land').toLowerCase();
             const isLand = k === 'land';
@@ -2788,7 +2827,7 @@
                 ? ($('#selectLandBarangay').val() || '')
                 : (isMachinery
                     ? ($('#selectMachineryBarangay').val() || '')
-                    : ($('#container-building-appraisal input[name="DistrictOrBarangay"]').val() || ''));
+                    : ($('#selectBldgBarangay').val() || $('#container-building-appraisal select[name="DistrictOrBarangay"]').val() || $('#container-building-appraisal input[name="DistrictOrBarangay"]').val() || ''));
             const secVal = isLand
                 ? ($('#inputLandSectionNo').val() || '')
                 : (isMachinery
@@ -2819,6 +2858,7 @@
 
         $(document).ready(function () {
             initSwitches();
+            initPartitionBarangayDropdowns();
 
             // Real-time TDN & ARP input reflection into headers
             $('#inputTdn').on('input', function() {
@@ -2830,7 +2870,7 @@
                 const v = $(this).val().trim() || '187-00-0000-000-000';
                 $('#bannerDisplayArpNo').text(v);
             });
-            $('#selectLandBarangay, #inputLandSectionNo, #inputLandLotNo, #inputLandParcelNo, #inputLandEffYear, #selectMachineryBarangay, #inputMachinerySectionNo, #inputMachineryLotNo, #inputMachineryEffYear, #container-building-appraisal input[name="DistrictOrBarangay"], #inputBldgSectionNo, #inputLotNumber, #container-building-appraisal input[name="EffectivityYear"]').on('input change', function() {
+            $('#selectLandBarangay, #inputLandSectionNo, #inputLandLotNo, #inputLandParcelNo, #inputLandEffYear, #selectMachineryBarangay, #inputMachinerySectionNo, #inputMachineryLotNo, #inputMachineryEffYear, #selectBldgBarangay, #container-building-appraisal select[name="DistrictOrBarangay"], #container-building-appraisal input[name="DistrictOrBarangay"], #inputBldgSectionNo, #inputLotNumber, #container-building-appraisal input[name="EffectivityYear"]').on('input change', function() {
                 syncCastArpAndTdnLive();
             });
 
@@ -2846,20 +2886,29 @@
                 (serverModel.buildingFloorBreakdownJson && serverModel.buildingFloorBreakdownJson.length > 2)
             );
 
-            let currentKind = (serverModel && serverModel.kind) ? serverModel.kind : '@(Model?.Kind ?? "Land")';
+            const urlKind = new URLSearchParams(window.location.search).get('kind');
+            let currentKind = urlKind || (serverModel && serverModel.kind) || '@(Model?.Kind ?? "")';
+            if (!currentKind) currentKind = 'Land';
             let loadedPartition = serverModel;
 
             const isEditFromDb = '@(requestId.HasValue ? "true" : "false")' === 'true';
-            if (!isEditFromDb && !hasServerData) {
+            if (!isEditFromDb) {
                 try {
                     const savedDraft = sessionStorage.getItem('propertyAssessmentRequest_draft');
                     if (savedDraft) {
                         const draftObj = JSON.parse(savedDraft);
                         if (draftObj && draftObj.partitions && draftObj.partitions[partitionIndex]) {
-                            loadedPartition = draftObj.partitions[partitionIndex];
-                            if (loadedPartition.kind) currentKind = loadedPartition.kind;
+                            const dp = draftObj.partitions[partitionIndex];
+                            if (dp.kind && !urlKind) currentKind = dp.kind;
+                            if (!hasServerData) {
+                                loadedPartition = dp;
+                            }
                         }
                     }
+                } catch (e) { }
+            } else if (isEditFromDb) {
+                try {
+                    sessionStorage.removeItem('propertyAssessmentRequest_draft');
                 } catch (e) { }
             }
 
@@ -2879,18 +2928,48 @@
                     if (p.registrationStatus) $('#selectLandRegStatus').val(p.registrationStatus);
                     if (p.titleType) $('#selectLandTitleType').val(p.titleType);
                     if (p.titleNo) $('#inputLandTitleNo').val(p.titleNo);
-                    if (p.dateRegistered) $('#inputLandDateRegistered').val(formatIsoDate(p.dateRegistered));
-                    if (p.cadastralSurveyNo) $('#inputLandCadSurveyNo').val(p.cadastralSurveyNo);
-                    if (p.sectionNo) $('#inputLandSectionNo').val(p.sectionNo);
-                    if (p.lotNumber) $('#inputLandLotNo').val(p.lotNumber);
-                    if (p.blockNumber) $('#inputLandBlockNo').val(p.blockNumber);
-                    if (p.parcelNo) $('#inputLandParcelNo').val(p.parcelNo);
-                    if (p.surveyNumber) $('#inputLandSurveyNo').val(p.surveyNumber);
+                    const landDateReg = p.dateRegistered || p.DateRegistered || p.tctDate || p.TctDate;
+                    if (landDateReg) $('#inputLandDateRegistered').val(formatIsoDate(landDateReg));
+
+                    const landCadSurvey = p.cadastralSurveyNo || p.CadastralSurveyNo;
+                    if (landCadSurvey) $('#inputLandCadSurveyNo').val(landCadSurvey);
+
+                    const landSec = p.sectionNo || p.SectionNo;
+                    if (landSec) $('#inputLandSectionNo').val(landSec);
+
+                    const landLot = p.lotNumber || p.LotNumber || p.lotNo || p.LotNo;
+                    if (landLot) {
+                        $('#inputLandLotNo').val(landLot);
+                        $('input[name="LotNumber"]').val(landLot);
+                    }
+
+                    const landBlock = p.blockNumber || p.BlockNumber || p.blockNo || p.BlockNo;
+                    if (landBlock) {
+                        $('#inputLandBlockNo').val(landBlock);
+                        $('input[name="BlockNumber"]').val(landBlock);
+                    }
+
+                    const landParcel = p.parcelNo || p.ParcelNo;
+                    if (landParcel) $('#inputLandParcelNo').val(landParcel);
+
+                    const landSurvey = p.surveyNumber || p.SurveyNumber || p.surveyNo || p.SurveyNo || landCadSurvey;
+                    if (landSurvey) {
+                        $('#inputLandSurveyNo').val(landSurvey);
+                        $('input[name="SurveyNumber"]').val(landSurvey);
+                    }
 
                     // Location
-                    if (p.streetLocation) $('#inputLandStreet').val(p.streetLocation);
-                    if (p.purok) $('#inputLandPurok').val(p.purok);
-                    if (p.districtOrBarangay) $('#selectLandBarangay').val(p.districtOrBarangay);
+                    const landStreet = p.streetLocation || p.StreetLocation || p.streetNo || p.StreetNo || p.buildingNo || p.BuildingNo || p.location || p.Location;
+                    if (landStreet) {
+                        $('#inputLandStreet').val(landStreet);
+                        $('input[name="StreetLocation"]').val(landStreet);
+                    }
+
+                    const landPurok = p.purok || p.Purok;
+                    if (landPurok) $('#inputLandPurok').val(landPurok);
+
+                    const landBrgy = p.districtOrBarangay || p.DistrictOrBarangay || p.barangay || p.Barangay;
+                    if (landBrgy) $('#selectLandBarangay').val(landBrgy);
 
                     // Boundaries & Remarks
                     if (p.boundaryNorth) $('#inputLandBNorth').val(p.boundaryNorth);
@@ -2993,7 +3072,9 @@
                     if (p.landPin) $('#inputMachineryLandPin').val(p.landPin);
                     if (p.landTdNo) $('#inputMachineryLandTdNo').val(p.landTdNo);
                     if (p.streetLocation) $('#inputMachineryStreet').val(p.streetLocation);
-                    if (p.districtOrBarangay) $('#selectMachineryBarangay').val(p.districtOrBarangay);
+                    if (p.districtOrBarangay) {
+                        $('#selectMachineryBarangay').val(p.districtOrBarangay).trigger('change');
+                    }
 
                     // Property Registration Details (Outside the Philippines / Local Manufacturer)
                     const isLocal = !!(p.isLocallyManufactured || p.IsLocallyManufactured);
@@ -3069,13 +3150,14 @@
                 }
             });
 
-            // Load any existing client-side draft if server partition has empty TDN/area
+            // Load any existing client-side draft ONLY for new unsaved requests (never override database ground truth)
             try {
-                const savedDraft = sessionStorage.getItem('propertyAssessmentRequest_draft');
-                if (savedDraft) {
-                    const draftObj = JSON.parse(savedDraft);
-                    if (draftObj && draftObj.partitions && draftObj.partitions[partitionIndex]) {
-                        const p = draftObj.partitions[partitionIndex];
+                if (!isEditFromDb && !hasServerData) {
+                    const savedDraft = sessionStorage.getItem('propertyAssessmentRequest_draft');
+                    if (savedDraft) {
+                        const draftObj = JSON.parse(savedDraft);
+                        if (draftObj && draftObj.partitions && draftObj.partitions[partitionIndex]) {
+                            const p = draftObj.partitions[partitionIndex];
                         if (p.systemGeneratedTDN && !$('#inputTdn').val()) {
                             $('#inputTdn').val(p.systemGeneratedTDN);
                             $('#displayHeaderTdn').text(p.systemGeneratedTDN);
@@ -3096,7 +3178,9 @@
                             if (!$('#inputBldgSectionNo').val()) $('#inputBldgSectionNo').val(p.sectionNo);
                             if (!$('#inputLandSectionNo').val()) $('#inputLandSectionNo').val(p.sectionNo);
                         }
-                        if (p.kind && !$('#selectKind').val()) $('#selectKind').val(p.kind);
+                        if (p.kind) {
+                            $('#inputKindHidden').val(p.kind);
+                        }
                         if (p.classification) $('select[name="Classification"]').val(p.classification);
                         if (p.actualUse) $('input[name="ActualUse"]').val(p.actualUse);
                         if (p.lotNumber) $('input[name="LotNumber"]').val(p.lotNumber);
@@ -3128,7 +3212,10 @@
                         if (p.propertyLocation) $('#inputPropertyLocation').val(p.propertyLocation);
                         if (p.streetLocation) $('input[name="StreetLocation"]').val(p.streetLocation);
                         else if (p.propertyLocation) $('input[name="StreetLocation"]').val(p.propertyLocation);
-                        if (p.districtOrBarangay) $('input[name="DistrictOrBarangay"]').val(p.districtOrBarangay);
+                        if (p.districtOrBarangay) {
+                            $('#selectBldgBarangay').val(p.districtOrBarangay).trigger('change');
+                            $('input[name="DistrictOrBarangay"]').val(p.districtOrBarangay);
+                        }
                         if (p.cityMunicipality) $('input[name="CityMunicipality"]').val(p.cityMunicipality);
                         if (p.province) $('input[name="Province"]').val(p.province);
 
@@ -3254,6 +3341,7 @@
                         if (memoVal) $('textarea[name="Memoranda"]').val(memoVal);
                     }
                 }
+            }
 
                 const existingFloors = $('#buildingFloorBreakdownJson').val();
                 if (existingFloors) {

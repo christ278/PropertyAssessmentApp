@@ -82,6 +82,9 @@ public class TDNDTO
     public DateTime? TCTDate { get; set; }
     public string? OCTNo { get; set; }
     public string? BlockNo { get; set; }
+    public string? RegistrationStatus { get; set; }
+    public string? TitleType { get; set; }
+    public DateTime? DateRegistered { get; set; }
     public string? Phase { get; set; }
     public string? Location { get; set; }
     public string? SurveyorName { get; set; }
@@ -97,12 +100,34 @@ public class TDNDTO
 
     // Extended CAST Fields (Location, Basis & Back Taxes)
     public string? DistrictOrBarangay { get; set; }
+    public string? Purok { get; set; }
     public string? CityMunicipality { get; set; }
     public string? Province { get; set; }
+    public string? OwnerTIN { get; set; }
+    public string? OwnerContactNo { get; set; }
+    public string? OwnerEmail { get; set; }
+    public string? OwnerGender { get; set; }
+    public bool IsAdministrator { get; set; }
+    public bool IsBeneficialUser { get; set; }
+    public bool IsPossessor { get; set; }
+    public string? AdministratorName { get; set; }
+    public string? AdministratorAddress { get; set; }
+    public string? AdministratorContactNo { get; set; }
+    public string? AdministratorTin { get; set; }
+    public string? AdministratorEmail { get; set; }
+    public string? AdministratorGender { get; set; }
     public string? AssessmentBasis { get; set; }
     public int? BackTaxesYearFrom { get; set; }
     public int? BackTaxesYearTo { get; set; }
     public decimal? UnitValue { get; set; }
+    public string? LandAppraisalDetailsJson { get; set; }
+    public string? LandImprovementsJson { get; set; }
+    public string? LandAdjustmentsJson { get; set; }
+    public string? LandPropertyAssessmentsJson { get; set; }
+    public string? Classification { get; set; }
+    public string? SubClassification { get; set; }
+    public string? ActualUse { get; set; }
+    public decimal? AssessmentLevelPercent { get; set; }
 
     // Floor Plan / Site Sketch File & Attachments
     public string? FloorPlanSketchPath { get; set; }

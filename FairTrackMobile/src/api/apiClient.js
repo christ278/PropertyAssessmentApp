@@ -92,11 +92,44 @@ export const setOnUnauthorizedCallback = (callback) => {
   onUnauthorizedCallback = callback;
 };
 
-// Response interceptor for session expiration (401)
+// Response interceptor for session expiration (401) with automatic offline-to-online token upgrade
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response && error.response.status === 401) {
+    const originalRequest = error.config;
+    if (error.response && error.response.status === 401 && originalRequest && !originalRequest._retried) {
+      originalRequest._retried = true;
+      try {
+        const currentToken = await AsyncStorage.getItem('@fairtrack_jwt_token');
+        if (currentToken && currentToken.startsWith('offline-token-')) {
+          const rawUser = await AsyncStorage.getItem('@fairtrack_user');
+          const rawAccounts = await AsyncStorage.getItem('@fairtrack_offline_accounts');
+          const userObj = rawUser ? JSON.parse(rawUser) : null;
+          const accounts = rawAccounts ? JSON.parse(rawAccounts) : {};
+          const userKey = (userObj?.username || '').toLowerCase();
+          const cachedAccount = userKey ? accounts[userKey] : null;
+
+          if (cachedAccount && cachedAccount.password) {
+            const loginRes = await axios.post(
+              `${originalRequest.baseURL || DEFAULT_BASE_URL + '/'}api/auth/login`,
+              { username: userObj.username, password: cachedAccount.password }
+            );
+            if (loginRes.data && loginRes.data.success && loginRes.data.accessToken) {
+              const newToken = loginRes.data.accessToken;
+              await AsyncStorage.setItem('@fairtrack_jwt_token', newToken);
+              if (loginRes.data.user) {
+                await AsyncStorage.setItem('@fairtrack_user', JSON.stringify(loginRes.data.user));
+                await AsyncStorage.setItem('@fairtrack_last_user', JSON.stringify(loginRes.data.user));
+              }
+              originalRequest.headers.Authorization = `Bearer ${newToken}`;
+              return apiClient(originalRequest);
+            }
+          }
+        }
+      } catch (reAuthErr) {
+        // Ignore silent upgrade error and fall through
+      }
+
       if (typeof onUnauthorizedCallback === 'function') {
         onUnauthorizedCallback();
       }
