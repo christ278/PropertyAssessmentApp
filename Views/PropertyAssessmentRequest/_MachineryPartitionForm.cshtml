@@ -421,7 +421,7 @@
             </div>
             <div>
                 <label asp-for="DistrictOrBarangay" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BARANGAY <span class="text-rose-500">*</span></label>
-                <select asp-for="DistrictOrBarangay" id="selectMachineryBarangay" class="select2-barangay w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold cursor-pointer">
+                <select asp-for="DistrictOrBarangay" id="selectMachineryBarangay" class="select2-barangay w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-medium cursor-pointer">
                     @foreach (var b in PropertyAssessmentApp.Controllers.DashboardController.OfficialKoronadalBarangays.OrderBy(x => x.Name))
                     {
                         var isSel = string.Equals(Model.DistrictOrBarangay, b.Name, StringComparison.OrdinalIgnoreCase)

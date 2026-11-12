@@ -256,7 +256,7 @@
                     </div>
                     <div>
                         <label asp-for="DistrictOrBarangay" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BARANGAY <span class="text-rose-500">*</span></label>
-                        <select asp-for="DistrictOrBarangay" id="selectBldgBarangay" class="select2-barangay w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold cursor-pointer">
+                        <select asp-for="DistrictOrBarangay" id="selectBldgBarangay" class="select2-barangay w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-medium cursor-pointer">
                             @foreach (var b in PropertyAssessmentApp.Controllers.DashboardController.OfficialKoronadalBarangays.OrderBy(x => x.Name))
                             {
                                 var isSel = string.Equals(Model.DistrictOrBarangay, b.Name, StringComparison.OrdinalIgnoreCase)
@@ -331,7 +331,7 @@
         </div>
 
         <!-- Right Column: Building Floor Plan Sketch Attachment (CAST Standard) -->
-        <div class="p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4 flex flex-col justify-between">
+        <div class="p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4 flex flex-col justify-between overflow-hidden">
             <div>
                 <div class="border-b border-slate-200 dark:border-stone-800 pb-2 flex items-center justify-between">
                     <h3 class="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2">
@@ -366,10 +366,14 @@
             </div>
 
             <!-- Sketch Footer & Actions -->
-            <div class="pt-3 border-t border-slate-200 dark:border-stone-800 flex items-center justify-between">
-                <span class="text-[11px] font-mono text-slate-400" id="sketchFilenameDisplay">@(string.IsNullOrEmpty(Model.BuildingFloorPlanSketchPath) ? "No file chosen" : Model.BuildingFloorPlanSketchPath)</span>
-                <button type="button" id="btnClearSketch" onclick="clearSketchImage()" class="px-3 py-1.5 rounded-lg text-xs font-mono font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors flex items-center gap-1.5 @(string.IsNullOrEmpty(Model.BuildingFloorPlanSketchBase64) && string.IsNullOrEmpty(Model.BuildingFloorPlanSketchPath) ? "hidden" : "")">
-                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Clear Sketch
+            <div class="pt-3 border-t border-slate-200 dark:border-stone-800 flex items-center justify-between gap-3 min-w-0">
+                <div class="min-w-0 flex-1 overflow-hidden">
+                    <span class="text-[11px] font-mono text-slate-500 dark:text-stone-400 block break-all line-clamp-2" id="sketchFilenameDisplay" title="@(string.IsNullOrEmpty(Model.BuildingFloorPlanSketchPath) ? "No file chosen" : Model.BuildingFloorPlanSketchPath)">
+                        @(string.IsNullOrEmpty(Model.BuildingFloorPlanSketchPath) ? "No file chosen" : Model.BuildingFloorPlanSketchPath)
+                    </span>
+                </div>
+                <button type="button" id="btnClearSketch" onclick="clearSketchImage()" class="shrink-0 px-3 py-1.5 rounded-lg text-xs font-mono font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors inline-flex items-center gap-1.5 whitespace-nowrap @(string.IsNullOrEmpty(Model.BuildingFloorPlanSketchBase64) && string.IsNullOrEmpty(Model.BuildingFloorPlanSketchPath) ? "hidden" : "")">
+                    <i data-lucide="trash-2" class="w-3.5 h-3.5 shrink-0"></i> <span>Clear Sketch</span>
                 </button>
             </div>
 
