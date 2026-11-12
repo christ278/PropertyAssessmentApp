@@ -62,6 +62,13 @@ public class TaxDeclarationRequestController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(TaxDeclarationRequest request, IFormFile? fileUpload)
     {
+        if (string.IsNullOrWhiteSpace(request.TrackingNumber))
+        {
+            var now = DateTime.Now;
+            request.TrackingNumber = $"TD-{now:yyyyMMddHHmmss}-{now.Second:D2}";
+        }
+        ModelState.Remove(nameof(request.TrackingNumber));
+
         if (ModelState.IsValid)
         {
             try
@@ -117,6 +124,8 @@ public class TaxDeclarationRequestController : Controller
         {
             return BadRequest();
         }
+
+        ModelState.Remove(nameof(request.TrackingNumber));
 
         if (ModelState.IsValid)
         {

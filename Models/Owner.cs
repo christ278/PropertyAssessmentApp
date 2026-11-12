@@ -125,4 +125,7 @@ public class Owner
     [ValidateNever]
     [Display(Name = "Complete Address")]
     public string FullAddress => $"{Address}, {BarangayName}, {CityMunicipalityName}, {ProvinceName}".Trim(',', ' ');
+
+    [ValidateNever]
+    public virtual ICollection<TaxDeclaration> TaxDeclarations { get; set; } = new List<TaxDeclaration>();
 }

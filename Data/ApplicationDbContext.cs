@@ -204,7 +204,7 @@ public class ApplicationDbContext : DbContext
         {
             entity.HasKey(t => t.Id);
             entity.HasOne(t => t.Owner)
-                  .WithMany()
+                  .WithMany(o => o.TaxDeclarations)
                   .HasForeignKey(t => t.OwnerId)
                   .OnDelete(DeleteBehavior.SetNull);
             entity.HasOne(t => t.BuildingDetails)

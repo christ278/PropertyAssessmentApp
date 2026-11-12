@@ -343,14 +343,14 @@
             <div class="p-5 sm:p-6 bg-slate-950/40 border-b border-slate-800/80">
                 <form id="trackSearchForm" onsubmit="handleTrackSearch(event)" class="space-y-3">
                     <label for="inputTrackRef" class="block text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
-                        Enter Transaction No. or Tracking No. <span class="text-rose-400">*</span>
+                        Enter Transaction Number <span class="text-rose-400">*</span>
                     </label>
                     <div class="flex flex-col sm:flex-row items-center gap-2.5">
                         <div class="relative w-full group">
                             <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-emerald-400 transition-colors">
                                 <i data-lucide="search" class="w-4 h-4"></i>
                             </div>
-                            <input type="text" id="inputTrackRef" class="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono text-xs sm:text-sm placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all uppercase" placeholder="e.g. TX-20261111-001 or RPA-20261110-7908" required autocomplete="off" />
+                            <input type="text" id="inputTrackRef" class="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono text-xs sm:text-sm placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all uppercase" placeholder="e.g. TX-20261111-001" required autocomplete="off" />
                         </div>
                         <button type="submit" id="btnTrackSubmit" class="w-full sm:w-auto px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-extrabold text-xs font-mono uppercase tracking-wider shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 shrink-0 transition-all active:scale-[0.98]">
                             <svg id="trackSpinner" class="hidden animate-spin h-4 w-4 text-slate-950" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -362,11 +362,8 @@
                         </button>
                     </div>
                     <div class="flex flex-wrap items-center gap-2 text-[11px] font-mono text-slate-400">
-                        <span class="text-slate-500">Supported:</span>
-                        <span class="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300">Transaction No. (TX-...)</span>
-                        <span class="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300">Assessment (RPA-...)</span>
-                        <span class="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300">Inspection (RFI-...)</span>
-                        <span class="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300">GIS Mapping</span>
+                        <span class="text-slate-500">Format:</span>
+                        <span class="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300">Transaction No. (e.g. TX-20261111-001)</span>
                     </div>
                 </form>
             </div>
@@ -381,7 +378,7 @@
                     </div>
                     <h3 class="text-sm font-bold text-slate-200">Real-Time Assessor Document Tracking</h3>
                     <p class="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
-                        Input your reference number above to view the exact handling division, assigned officer, processing stage, and full chronological audit timeline of your request.
+                        Input your transaction number above to view the exact handling division, assigned officer, processing stage, and full chronological audit timeline of your request.
                     </p>
                 </div>
 
@@ -401,7 +398,7 @@
                     </div>
                     <p id="trackErrorMessage" class="text-slate-300 leading-relaxed"></p>
                     <p class="text-[11px] text-slate-400 pt-1">
-                        Please double-check the tracking or transaction number issued on your acknowledgment receipt or Order of Payment.
+                        Please double-check the transaction number issued on your acknowledgment receipt or Order of Payment.
                     </p>
                 </div>
 
@@ -421,14 +418,10 @@
                         </div>
 
                         <!-- Reference Numbers Grid -->
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-mono">
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-mono">
                             <div class="p-3 rounded-xl bg-slate-900 border border-slate-800/80">
                                 <span class="text-[10px] text-slate-400 block uppercase font-bold">Transaction No.</span>
                                 <span id="resTransactionNo" class="font-extrabold text-emerald-400 text-sm mt-0.5 block">--</span>
-                            </div>
-                            <div class="p-3 rounded-xl bg-slate-900 border border-slate-800/80">
-                                <span class="text-[10px] text-slate-400 block uppercase font-bold">Tracking No.</span>
-                                <span id="resTrackingNumber" class="font-extrabold text-white text-sm mt-0.5 block">--</span>
                             </div>
                             <div class="p-3 rounded-xl bg-slate-900 border border-slate-800/80">
                                 <span class="text-[10px] text-slate-400 block uppercase font-bold">Applicant / Owner</span>

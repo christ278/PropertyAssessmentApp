@@ -81,7 +81,7 @@
         <!-- Filter Form -->
         <form method="get" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-                <input type="text" name="search" value="@currentSearch" placeholder="Search Tracking No, New Owner, Prev Owner, TDN..." class="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs focus:outline-none focus:border-emerald-600" />
+                <input type="text" name="search" value="@currentSearch" placeholder="Search Transaction No, New Owner, Prev Owner, TDN..." class="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs focus:outline-none focus:border-emerald-600" />
             </div>
             <div>
                 <select name="status" class="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs focus:outline-none focus:border-emerald-600">
@@ -119,7 +119,7 @@
                 <table class="w-full text-left text-xs font-mono">
                     <thead class="bg-slate-100 dark:bg-stone-950 text-slate-600 dark:text-stone-400 border-b border-slate-200 dark:border-stone-800 uppercase tracking-wider">
                         <tr>
-                            <th class="px-3 sm:px-4 py-3">Tracking No.</th>
+                            <th class="px-3 sm:px-4 py-3">Transaction No.</th>
                             <th class="hidden md:table-cell px-4 py-3">Transaction</th>
                             <th class="px-3 sm:px-4 py-3">New Owner / Declarant</th>
                             <th class="hidden lg:table-cell px-4 py-3">Previous Property</th>
@@ -150,12 +150,8 @@
                                     <td class="px-3 sm:px-4 py-3 font-bold text-emerald-700 dark:text-emerald-400">
                                         <a asp-action="Details" asp-route-id="@item.Id" class="hover:underline flex items-center gap-1.5">
                                             <i data-lucide="file-check-2" class="w-3.5 h-3.5"></i>
-                                            @item.TrackingNumber
+                                            @(item.TransactionNo ?? item.TrackingNumber)
                                         </a>
-                                        @if (!string.IsNullOrWhiteSpace(item.TransactionNo))
-                                        {
-                                            <span class="block text-[10px] font-mono font-bold text-slate-700 dark:text-stone-300">TX: @item.TransactionNo</span>
-                                        }
                                         <span class="block text-[10px] text-slate-400 font-normal">@item.RequestDate.ToString("yyyy-MM-dd HH:mm")</span>
                                         <div class="md:hidden mt-1 text-[10px] text-slate-600 dark:text-stone-400 font-bold">
                                             @item.TransactionTypeDisplayName
@@ -234,7 +230,7 @@
                                                 <div class="py-1">
                                                     @if (item.Status == PropertyAssessmentStatus.Receiving || item.Status == PropertyAssessmentStatus.Pending)
                                                     {
-                                                        <button type="button" onclick="openIndexForwardModal('@item.Id', '@item.TrackingNumber', '@(item.ORNumber ?? "")')" class="w-full flex items-center gap-2.5 px-3.5 py-2 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-stone-800 font-bold text-left transition-colors">
+                                                        <button type="button" onclick="openIndexForwardModal('@item.Id', '@(item.TransactionNo ?? item.TrackingNumber)', '@(item.ORNumber ?? "")')" class="w-full flex items-center gap-2.5 px-3.5 py-2 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-stone-800 font-bold text-left transition-colors">
                                                             <i data-lucide="arrow-right-circle" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
                                                             <span>Forward to GIS</span>
                                                         </button>
@@ -295,7 +291,7 @@
                 </div>
                 <div>
                     <h3 class="text-base font-black text-slate-900 dark:text-white">Forward to GIS Mapping</h3>
-                    <p class="text-xs text-slate-500 dark:text-stone-400">Tracking No: <span id="modalIdxTrackingNo" class="font-bold text-slate-800 dark:text-stone-200 font-mono"></span></p>
+                    <p class="text-xs text-slate-500 dark:text-stone-400">Transaction No: <span id="modalIdxTrackingNo" class="font-bold text-slate-800 dark:text-stone-200 font-mono"></span></p>
                 </div>
             </div>
             <button type="button" onclick="closeIndexForwardModal()" class="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-stone-200 rounded-xl hover:bg-slate-100 dark:hover:bg-stone-800 transition-colors">

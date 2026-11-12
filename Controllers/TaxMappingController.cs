@@ -143,6 +143,11 @@ public class TaxMappingController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(TaxMappingRequest model, IFormFile? fileUpload)
     {
+        if (string.IsNullOrWhiteSpace(model.RequestNumber))
+        {
+            model.RequestNumber = $"TMR-{DateTime.Now.Year}-{new Random().Next(1000, 9999)}";
+        }
+        ModelState.Remove(nameof(TaxMappingRequest.RequestNumber));
         ModelState.Remove(nameof(TaxMappingRequest.Province));
         ModelState.Remove(nameof(TaxMappingRequest.CityMunicipality));
         ModelState.Remove(nameof(TaxMappingRequest.Barangay));
@@ -212,6 +217,7 @@ public class TaxMappingController : Controller
             return BadRequest();
         }
 
+        ModelState.Remove(nameof(TaxMappingRequest.RequestNumber));
         ModelState.Remove(nameof(TaxMappingRequest.Province));
         ModelState.Remove(nameof(TaxMappingRequest.CityMunicipality));
         ModelState.Remove(nameof(TaxMappingRequest.Barangay));

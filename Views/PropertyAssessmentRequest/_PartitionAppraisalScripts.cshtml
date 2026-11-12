@@ -105,20 +105,23 @@
         if (window.lucide) lucide.createIcons();
     }
 
-    function switchLandTab(tabId) {
+    window.switchLandTab = function(tabId) {
         $('.land-tab-content').addClass('hidden');
         $('#' + tabId).removeClass('hidden');
         $('.land-tab-btn').removeClass('bg-emerald-600 text-white shadow-sm').addClass('bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-400');
         $('#btn-' + tabId).removeClass('bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-400').addClass('bg-emerald-600 text-white shadow-sm');
-        if (tabId === 'land-tab-location') {
-            setTimeout(function () {
-                if (typeof initPartitionBarangayDropdowns === 'function') {
-                    initPartitionBarangayDropdowns();
-                }
-            }, 50);
-        }
+        setTimeout(function () {
+            if (typeof initPartitionBarangayDropdowns === 'function') {
+                initPartitionBarangayDropdowns();
+            }
+        }, 30);
+        setTimeout(function () {
+            if (typeof initPartitionBarangayDropdowns === 'function') {
+                initPartitionBarangayDropdowns();
+            }
+        }, 150);
         if (window.lucide) lucide.createIcons();
-    }
+    };
 
     // -------------------------------------------------------------
     // Table 1: Land Appraisal / Classification Rows
@@ -2666,21 +2669,25 @@
     }
 
     function initPartitionBarangayDropdowns() {
-        if (typeof $.fn.select2 === 'undefined') return;
+        if (typeof $ === 'undefined' || typeof $.fn.select2 === 'undefined') return;
         $('.select2-barangay').each(function () {
             const $el = $(this);
-            if ($el.data('select2')) {
-                $el.select2('destroy');
+            if ($el.hasClass('select2-hidden-accessible')) {
+                $el.next('.select2-container').css('width', '100%');
+                return;
             }
-            $el.select2({
-                width: '100%',
-                placeholder: 'Search & select Barangay...',
-                allowClear: false
-            }).on('change', function () {
-                syncCastArpAndTdnLive();
-            });
+            try {
+                $el.select2({
+                    width: '100%',
+                    placeholder: 'Search & select Barangay...',
+                    allowClear: false
+                }).off('change.syncCastLive').on('change.syncCastLive', function () {
+                    syncCastArpAndTdnLive();
+                });
+            } catch (e) { }
         });
     }
+    window.initPartitionBarangayDropdowns = initPartitionBarangayDropdowns;
 
     function syncCastArpAndTdnLive() {
         const k = ($('#inputKindHidden').val() || 'Land').toLowerCase();
