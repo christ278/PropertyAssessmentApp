@@ -965,10 +965,42 @@
             toastr.success(`Generated ${generatedPartitions.length} partition lots!`);
         }
 
+        function resolveCastBrgyCode(brgyVal, defaultCode = '0001') {
+            if (!brgyVal) return defaultCode;
+            const raw = String(brgyVal).trim();
+            if (/^\d+$/.test(raw)) return raw.slice(-4).padStart(4, '0');
+            const u = raw.toUpperCase();
+            const map = [
+                ['ZONE I', '0001'], ['ZONE 1', '0001'], ['ZONE II', '0002'], ['ZONE 2', '0002'],
+                ['ZONE III', '0003'], ['ZONE 3', '0003'], ['ZONE IV', '0004'], ['ZONE 4', '0004'],
+                ['ASSUMPTION', '0005'], ['AVANCEÑA', '0006'], ['AVANCENA', '0006'], ['CACUB', '0007'],
+                ['CALOOCAN', '0008'], ['CARPENTER HILL', '0009'], ['CONCEPCION', '0010'], ['ESPERANZA', '0011'],
+                ['GEN. P. SANTOS', '0012'], ['GEN. P SANTOS', '0012'], ['GEN P SANTOS', '0012'],
+                ['MABINI', '0013'], ['MAGSAYSAY', '0014'], ['MAMBUCAL', '0015'], ['MORALES', '0016'],
+                ['NAMNAMA', '0017'], ['NEW PANGASINAN', '0018'], ['PARAISO', '0019'], ['ROTONDA', '0020'],
+                ['SAN ISIDRO', '0021'], ['SAN JOSE', '0022'], ['SAN ROQUE', '0023'], ['SARAVIA', '0024'],
+                ['STA. CRUZ', '0025'], ['STA CRUZ', '0025'], ['STO. NIÑO', '0026'], ['STO. NINO', '0026'], ['STO NINO', '0026'],
+                ['TOPLAND', '0027'], ['CENTRAL', '0001'], ['POBLACION', '0001']
+            ];
+            for (const [k, c] of map) {
+                if (u.includes(k)) return c;
+            }
+            const digits = raw.replace(/\D/g, '');
+            if (digits.length > 0) return digits.slice(-4).padStart(4, '0');
+            return defaultCode;
+        }
+
+        // CAST Combination #2: [GR Year]-[Municipality Index]-[Barangay Code]-[Sequential Series]
+        // If not approved, Sequential Series is strictly zeros (00000) -> e.g. 2020-08-0012-00000
         function generateSystemTDN(letterSuffix, brgyVal, seqIndex) {
-            const revYearLastTwo = String(new Date().getFullYear() % 100).padStart(2, '0');
-            const seqNum = typeof seqIndex === 'number' && seqIndex > 0 ? seqIndex : 1;
-            return `${revYearLastTwo}-0001-${String(seqNum).padStart(5, '0')}`;
+            const grYear4 = new Date().getFullYear();
+            const mun2 = '08';
+            const brgy4 = resolveCastBrgyCode(brgyVal, '0001');
+            const isApproved = @((Model.Status == PropertyAssessmentApp.Models.RequestForInspectionStatus.Approval || Model.Status == PropertyAssessmentApp.Models.RequestForInspectionStatus.Printing || Model.Status == PropertyAssessmentApp.Models.RequestForInspectionStatus.Releasing) ? "true" : "false");
+            const seq5 = isApproved
+                ? String(typeof seqIndex === 'number' && seqIndex > 0 ? seqIndex : 1).padStart(5, '0')
+                : '00000';
+            return `${grYear4}-${mun2}-${brgy4}-${seq5}`;
         }
 
         function renderPartitionsTable() {

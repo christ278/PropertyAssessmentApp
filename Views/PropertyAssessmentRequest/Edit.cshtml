@@ -967,16 +967,27 @@
             return `${String(lgu).padStart(3, '0')}-${String(mun).padStart(2, '0')}-${brgy4}-${sec3}-${lot3}`;
         }
 
-        // CAST Combination #2: {RevisionYearLastTwoDigits:D2}-{BarangayCode:D4}-{DeclarationNo:D5}
+        // CAST Combination #2: [GR Year]-[Municipality Index]-[Barangay Code]-[Sequential Series]
+        // If not approved, Sequential Series is strictly zeros (00000) -> e.g. 2020-08-0012-00000
         function generateSystemTDN(letterSuffix, brgyVal, seqIndex) {
-            const revYearLastTwo = String(new Date().getFullYear() % 100).padStart(2, '0');
+            let grYear = new Date().getFullYear();
+            if (typeof selectedPropertyIds !== 'undefined' && selectedPropertyIds.length > 0 && typeof referencePropertiesData !== 'undefined') {
+                const base = referencePropertiesData[selectedPropertyIds[0]];
+                if (base && base.effectivityYear) {
+                    grYear = parseInt(base.effectivityYear, 10);
+                } else if (base && base.tdn) {
+                    const m = String(base.tdn).match(/^(\d{4})-/);
+                    if (m) grYear = parseInt(m[1], 10);
+                }
+            }
+            const grYear4 = grYear < 100 ? (2000 + grYear) : grYear;
+            const mun2 = '08';
             const brgy4 = resolveCastBrgyCode(brgyVal, '0001');
-            const baseCount = Object.keys(referencePropertiesData || {}).length;
-            const seqNum = typeof seqIndex === 'number' && seqIndex > 0
-                ? (baseCount + seqIndex)
-                : (baseCount + (generatedPartitions ? generatedPartitions.length + 1 : 1));
-            const declNo5 = String(seqNum).padStart(5, '0');
-            return `${revYearLastTwo}-${brgy4}-${declNo5}`;
+            const isApproved = @((Model.Status >= PropertyAssessmentApp.Models.PropertyAssessmentStatus.Approved && Model.Status != PropertyAssessmentApp.Models.PropertyAssessmentStatus.Deferred) ? "true" : "false");
+            const seq5 = isApproved
+                ? String(typeof seqIndex === 'number' && seqIndex > 0 ? seqIndex : 1).padStart(5, '0')
+                : '00000';
+            return `${grYear4}-${mun2}-${brgy4}-${seq5}`;
         }
 
         function regeneratePartitionTDN(idx) {

@@ -144,11 +144,14 @@ public class RequestForInspectionService : IRequestForInspectionService
                             : CastTdGenerator.FormatArpNumber(effBarangay, effSectionNo, effLotOrParcel);
                         p.ARPNo = partitionArpNo;
 
+                        bool isApprovedInspection = (request.Status == RequestForInspectionStatus.Approval || request.Status == RequestForInspectionStatus.Printing || request.Status == RequestForInspectionStatus.Releasing);
                         var partitionTDN = (!string.IsNullOrWhiteSpace(p.SystemGeneratedTDN)
                                             && !p.SystemGeneratedTDN.StartsWith("TD-", StringComparison.OrdinalIgnoreCase)
                                             && !p.SystemGeneratedTDN.StartsWith("TDN-", StringComparison.OrdinalIgnoreCase))
                             ? p.SystemGeneratedTDN
-                            : _assessmentService.GenerateCastTdNumber(effYear, effBarangay);
+                            : (isApprovedInspection
+                                ? _assessmentService.GenerateCastTdNumber(effYear, effBarangay)
+                                : CastTdGenerator.FormatUnapprovedTdNumber(effYear, effBarangay));
                         p.SystemGeneratedTDN = partitionTDN;
 
                         var partitionPIN = !string.IsNullOrWhiteSpace(p.PIN)

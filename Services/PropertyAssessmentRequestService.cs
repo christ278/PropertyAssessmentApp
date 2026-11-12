@@ -138,12 +138,15 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                             : CastTdGenerator.FormatArpNumber(effBarangay, effSectionNo, effLotOrParcel);
                         p.ARPNo = partitionArpNo;
 
-                        // CAST Combination #2 (Official TDN1: {RevYearLastTwo:D2}-{BarangayCode:D4}-{DeclarationNo:D5})
+                        // CAST TDN: {GRYear:D4}-{MunicipalityIndex:D2}-{BarangayCode:D4}-{SequentialSeries:D5}
+                        // Unapproved default: Sequential series is all zeros (00000)
                         var partitionTDN = (!string.IsNullOrWhiteSpace(p.SystemGeneratedTDN)
                                             && !p.SystemGeneratedTDN.StartsWith("TD-", StringComparison.OrdinalIgnoreCase)
                                             && !p.SystemGeneratedTDN.StartsWith("TDN-", StringComparison.OrdinalIgnoreCase))
                             ? p.SystemGeneratedTDN
-                            : _assessmentService.GenerateCastTdNumber(effYear, effBarangay);
+                            : ((request.Status >= PropertyAssessmentStatus.Approved && request.Status != PropertyAssessmentStatus.Deferred)
+                                ? _assessmentService.GenerateCastTdNumber(effYear, effBarangay)
+                                : CastTdGenerator.FormatUnapprovedTdNumber(effYear, effBarangay));
                         p.SystemGeneratedTDN = partitionTDN;
 
                         var partitionPIN = !string.IsNullOrWhiteSpace(p.PIN) 
@@ -567,11 +570,19 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                     matchingPartition.ARPNo = computedArp;
                 }
 
-                // 2. CAST Combination #2 (Post-Approval / Official TDN1: {RevYearLastTwo:D2}-{BarangayCode:D4}-{DeclarationNo:D5})
+                // 2. CAST TDN: {GRYear:D4}-{MunicipalityIndex:D2}-{BarangayCode:D4}-{SequentialSeries:D5}
                 var currentTd = td.TaxDeclarationNumber?.Trim() ?? string.Empty;
-                if (!CastTdGenerator.IsOfficialCastTdFormat(currentTd) || (request.Status >= PropertyAssessmentStatus.Approved && request.Status != PropertyAssessmentStatus.Deferred))
+                bool isApproved = request.Status >= PropertyAssessmentStatus.Approved && request.Status != PropertyAssessmentStatus.Deferred;
+
+                if (isApproved)
                 {
-                    if (!CastTdGenerator.IsOfficialCastTdFormat(currentTd))
+                    // Approved request: assign official positive sequential series (not 00000)
+                    bool needsSequence = string.IsNullOrWhiteSpace(currentTd)
+                                      || CastTdGenerator.IsUnapprovedCastTd(currentTd)
+                                      || !CastTdGenerator.IsOfficialCastTdFormat(currentTd)
+                                      || CastTdGenerator.ExtractSequenceNumber(currentTd) == 0;
+
+                    if (needsSequence)
                     {
                         var officialTd = _assessmentService.GenerateCastTdNumber(td.EffectivityYear, td.DistrictOrBarangay);
                         td.TaxDeclarationNumber = officialTd;
@@ -579,13 +590,20 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                     }
                     else
                     {
-                        var parts = currentTd.Split('-');
-                        if (int.TryParse(parts[2], out int seq))
-                        {
-                            var syncedTd = CastTdGenerator.FormatOfficialTdNumber(td.EffectivityYear, td.DistrictOrBarangay, seq);
-                            td.TaxDeclarationNumber = syncedTd;
-                            matchingPartition.SystemGeneratedTDN = syncedTd;
-                        }
+                        int seq = CastTdGenerator.ExtractSequenceNumber(currentTd);
+                        var syncedTd = CastTdGenerator.FormatOfficialTdNumber(td.EffectivityYear, td.DistrictOrBarangay, seq);
+                        td.TaxDeclarationNumber = syncedTd;
+                        matchingPartition.SystemGeneratedTDN = syncedTd;
+                    }
+                }
+                else
+                {
+                    // Unapproved request: sequential series is zeros (00000)
+                    if (string.IsNullOrWhiteSpace(currentTd) || !CastTdGenerator.IsOfficialCastTdFormat(currentTd) || !CastTdGenerator.IsUnapprovedCastTd(currentTd))
+                    {
+                        var unapprovedTd = CastTdGenerator.FormatUnapprovedTdNumber(td.EffectivityYear, td.DistrictOrBarangay);
+                        td.TaxDeclarationNumber = unapprovedTd;
+                        matchingPartition.SystemGeneratedTDN = unapprovedTd;
                     }
                 }
 
@@ -643,9 +661,19 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                 {
                     td.ARPNo = CastTdGenerator.FormatArpNumber(td.DistrictOrBarangay, td.SectionNo, lotOrParcel);
                 }
-                if (request.Status >= PropertyAssessmentStatus.Approved && request.Status != PropertyAssessmentStatus.Deferred && !CastTdGenerator.IsOfficialCastTdFormat(td.TaxDeclarationNumber))
+                if (request.Status >= PropertyAssessmentStatus.Approved && request.Status != PropertyAssessmentStatus.Deferred)
                 {
-                    td.TaxDeclarationNumber = _assessmentService.GenerateCastTdNumber(td.EffectivityYear, td.DistrictOrBarangay);
+                    if (string.IsNullOrWhiteSpace(td.TaxDeclarationNumber) || CastTdGenerator.IsUnapprovedCastTd(td.TaxDeclarationNumber) || !CastTdGenerator.IsOfficialCastTdFormat(td.TaxDeclarationNumber))
+                    {
+                        td.TaxDeclarationNumber = _assessmentService.GenerateCastTdNumber(td.EffectivityYear, td.DistrictOrBarangay);
+                    }
+                }
+                else
+                {
+                    if (string.IsNullOrWhiteSpace(td.TaxDeclarationNumber) || !CastTdGenerator.IsOfficialCastTdFormat(td.TaxDeclarationNumber))
+                    {
+                        td.TaxDeclarationNumber = CastTdGenerator.FormatUnapprovedTdNumber(td.EffectivityYear, td.DistrictOrBarangay);
+                    }
                 }
             }
         }
@@ -897,7 +925,9 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                                 && !conf.SystemGeneratedTDN.StartsWith("TD-", StringComparison.OrdinalIgnoreCase)
                                 && !conf.SystemGeneratedTDN.StartsWith("TDN-", StringComparison.OrdinalIgnoreCase))
                 ? conf.SystemGeneratedTDN
-                : _assessmentService.GenerateCastTdNumber(effYear, effBarangay);
+                : ((request.Status >= PropertyAssessmentStatus.Approved && request.Status != PropertyAssessmentStatus.Deferred)
+                    ? _assessmentService.GenerateCastTdNumber(effYear, effBarangay)
+                    : CastTdGenerator.FormatUnapprovedTdNumber(effYear, effBarangay));
             var isTransferTx = string.Equals(request.TransactionTypeCode, "TR", StringComparison.OrdinalIgnoreCase);
             var isReclassTx = string.Equals(request.TransactionTypeCode, "RC", StringComparison.OrdinalIgnoreCase);
             var partitionPIN = !string.IsNullOrWhiteSpace(conf?.PIN) 

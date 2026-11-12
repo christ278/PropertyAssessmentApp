@@ -512,9 +512,22 @@ public class PropertyAssessmentRequestController : Controller
             partition.Kind = kind.Trim();
         }
 
+        bool isRequestApproved = false;
         if (requestId.HasValue)
         {
             var req = _rpaService.GetById(requestId.Value);
+            if (req != null)
+            {
+                isRequestApproved = req.Status >= PropertyAssessmentStatus.Approved && req.Status != PropertyAssessmentStatus.Deferred;
+            }
+            else
+            {
+                var rfi = _context.RequestForInspections.AsNoTracking().FirstOrDefault(r => r.Id == requestId.Value);
+                if (rfi != null)
+                {
+                    isRequestApproved = rfi.Status == RequestForInspectionStatus.Approval || rfi.Status == RequestForInspectionStatus.Printing || rfi.Status == RequestForInspectionStatus.Releasing;
+                }
+            }
             var partitionsJson = req?.GeneratedPartitionsJson;
             if (string.IsNullOrWhiteSpace(partitionsJson))
             {
@@ -569,6 +582,8 @@ public class PropertyAssessmentRequestController : Controller
         {
             partition.DistrictOrBarangay = "BRGY. ZONE I";
         }
+
+        ViewBag.IsRequestApproved = isRequestApproved;
 
         return View(partition);
     }
@@ -838,18 +853,45 @@ public class PropertyAssessmentRequestController : Controller
             item.ARPNo = CastTdGenerator.FormatArpNumber(item.DistrictOrBarangay, item.SectionNo, lotOrParcel);
         }
         var effYear = item.EffectivityYear ?? DateTime.Now.Year;
+
+        bool isApprovedReq = false;
+        if (requestId.HasValue)
+        {
+            var req = _rpaService.GetById(requestId.Value);
+            if (req != null)
+            {
+                isApprovedReq = req.Status >= PropertyAssessmentStatus.Approved && req.Status != PropertyAssessmentStatus.Deferred;
+            }
+            else
+            {
+                var rfi = _context.RequestForInspections.AsNoTracking().FirstOrDefault(r => r.Id == requestId.Value);
+                if (rfi != null)
+                {
+                    isApprovedReq = rfi.Status == RequestForInspectionStatus.Approval || rfi.Status == RequestForInspectionStatus.Printing || rfi.Status == RequestForInspectionStatus.Releasing;
+                }
+            }
+        }
+
         if (string.IsNullOrWhiteSpace(item.SystemGeneratedTDN)
             || item.SystemGeneratedTDN.StartsWith("TD-", StringComparison.OrdinalIgnoreCase)
             || item.SystemGeneratedTDN.StartsWith("TDN-", StringComparison.OrdinalIgnoreCase))
         {
-            item.SystemGeneratedTDN = _assessmentService.GenerateCastTdNumber(effYear, item.DistrictOrBarangay);
+            item.SystemGeneratedTDN = isApprovedReq
+                ? _assessmentService.GenerateCastTdNumber(effYear, item.DistrictOrBarangay)
+                : CastTdGenerator.FormatUnapprovedTdNumber(effYear, item.DistrictOrBarangay);
         }
         else if (CastTdGenerator.IsOfficialCastTdFormat(item.SystemGeneratedTDN))
         {
-            var parts = item.SystemGeneratedTDN.Split('-');
-            if (int.TryParse(parts[2], out int seq))
+            int seq = CastTdGenerator.ExtractSequenceNumber(item.SystemGeneratedTDN);
+            if (isApprovedReq)
             {
-                item.SystemGeneratedTDN = CastTdGenerator.FormatOfficialTdNumber(effYear, item.DistrictOrBarangay, seq);
+                item.SystemGeneratedTDN = seq > 0
+                    ? CastTdGenerator.FormatOfficialTdNumber(effYear, item.DistrictOrBarangay, seq)
+                    : _assessmentService.GenerateCastTdNumber(effYear, item.DistrictOrBarangay);
+            }
+            else
+            {
+                item.SystemGeneratedTDN = CastTdGenerator.FormatUnapprovedTdNumber(effYear, item.DistrictOrBarangay);
             }
         }
 
