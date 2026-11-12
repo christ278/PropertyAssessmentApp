@@ -129,6 +129,7 @@ export const SyncProvider = ({ children }) => {
   const [cachedForms, setCachedForms] = useState({});
   const [downloadedForms, setDownloadedForms] = useState({});
   const [cachedTransactions, setCachedTransactions] = useState([]);
+  const [historyRecords, setHistoryRecords] = useState([]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState(null);
@@ -254,6 +255,18 @@ export const SyncProvider = ({ children }) => {
 
       const storedTime = await AsyncStorage.getItem('@fairtrack_last_sync');
       if (storedTime) setLastSyncTime(storedTime);
+
+      const storedHistory = await AsyncStorage.getItem('@fairtrack_history_records');
+      if (storedHistory) {
+        try {
+          const parsed = JSON.parse(storedHistory);
+          if (Array.isArray(parsed)) {
+            setHistoryRecords(parsed);
+          }
+        } catch (e) {
+          console.warn('Failed parsing @fairtrack_history_records:', e);
+        }
+      }
     } catch (err) {
       console.warn('Failed to load local sync queue:', err);
     }
@@ -487,11 +500,204 @@ export const SyncProvider = ({ children }) => {
     }
   };
 
-  // Mark transaction synced: clears pending syncQueue items, and if transferred, removes from downloadedForms
+  // =========================================================================
+  // PERMANENT LOCAL HISTORY STORE (@fairtrack_history_records)
+  // Preserves offline drafts, live syncs, and completed/transferred appraisals
+  // =========================================================================
+  const saveToHistory = async (payload, options = {}) => {
+    try {
+      if (!payload && !options.transItem) return;
+      const tdn = payload?.TDN || payload?.tdn || {};
+      const tdnLand = payload?.TDNLand || payload?.tdnLand || {};
+      const tdnBldg = payload?.TDNBuilding || payload?.tdnBuilding || {};
+      const tdnMach = payload?.TDNMachinery || payload?.tdnMachinery || {};
+
+      const trackingNo = (
+        options.trackingNo ||
+        tdn.TrackingNo ||
+        tdn.trackingNo ||
+        payload?.TrackingNo ||
+        payload?.trackingNo ||
+        options.transItem?.TrackingNo ||
+        ''
+      ).toString().trim();
+
+      const formWorkflowId =
+        options.formWorkflowId != null
+          ? options.formWorkflowId
+          : (tdn.FormWorkflowId ?? tdn.formWorkflowId ?? payload?.FormWorkflowId ?? payload?.formWorkflowId ?? options.transItem?.FormworkflowId);
+
+      const partitionIndex = parseInt(
+        options.partitionIndex ?? tdn.PartitionItemIndex ?? payload?.partitionIndex ?? 0,
+        10
+      ) || 0;
+
+      const partitionLetter =
+        options.partitionLetter ||
+        tdn.PartitionItemLetter ||
+        tdn.PartitionIndex ||
+        payload?.partitionLetter ||
+        payload?.partitionIndexLetter ||
+        String.fromCharCode(65 + partitionIndex);
+
+      let propertyKind = options.propertyKind;
+      if (!propertyKind) {
+        if (tdnLand && (tdnLand.CadastralSurveyNo || tdnLand.NorthBoundary || tdnLand.LandAppraisalDetailsJson || tdnLand.TDNLandId)) propertyKind = 'Land';
+        else if (tdnBldg && (tdnBldg.BuildingClassification || tdnBldg.StructuralType || tdnBldg.TotalFloorArea || tdnBldg.BuildingFloorsJson || tdnBldg.TDNBuildingId)) propertyKind = 'Building';
+        else if (tdnMach && (tdnMach.AppraisalDetailsJson || tdnMach.PropertyAssessmentsJson || tdnMach.TDNMachineId)) propertyKind = 'Machinery';
+        else if (options.transItem?.PropertyType) propertyKind = options.transItem.PropertyType;
+        else if (options.type) {
+          if (options.type.includes('LAND')) propertyKind = 'Land';
+          else if (options.type.includes('BUILDING')) propertyKind = 'Building';
+          else if (options.type.includes('MACHINERY')) propertyKind = 'Machinery';
+        }
+        if (!propertyKind) propertyKind = 'Property';
+      }
+
+      let marketValue = 0;
+      let assessedValue = 0;
+      if (tdn.TotalMarketValue != null) marketValue = parseFloat(tdn.TotalMarketValue) || 0;
+      else if (tdnLand.TotalMarketValue != null) marketValue = parseFloat(tdnLand.TotalMarketValue) || 0;
+      else if (tdnBldg.TotalMarketValue != null) marketValue = parseFloat(tdnBldg.TotalMarketValue) || 0;
+      else if (tdnMach.TotalMarketValue != null) marketValue = parseFloat(tdnMach.TotalMarketValue) || 0;
+
+      if (tdn.TotalAssessedValue != null) assessedValue = parseFloat(tdn.TotalAssessedValue) || 0;
+      else if (tdnLand.TotalAssessedValue != null) assessedValue = parseFloat(tdnLand.TotalAssessedValue) || 0;
+      else if (tdnBldg.TotalAssessedValue != null) assessedValue = parseFloat(tdnBldg.TotalAssessedValue) || 0;
+      else if (tdnMach.TotalAssessedValue != null) assessedValue = parseFloat(tdnMach.TotalAssessedValue) || 0;
+
+      const ownerName =
+        tdn.DisplayName ||
+        tdn.OwnerName ||
+        payload?.ownerName ||
+        options.transItem?.OwnerName ||
+        options.ownerName ||
+        'Unknown Owner';
+
+      const arpNo = tdn.ARPNo || tdn.ArpNo || payload?.arpNo || options.transItem?.ArpNo || 'N/A';
+      const pin = tdn.PIN || tdn.Pin || payload?.pin || options.transItem?.PIN || 'N/A';
+      const declarationNo = tdn.DeclarationNo || tdn.SystemGeneratedTDN || tdn.declarationNo || 'N/A';
+      const barangay = tdn.DistrictOrBarangay || tdn.Barangay || options.transItem?.Barangay || '';
+      const cityMunicipality = tdn.CityMunicipality || options.transItem?.CityMunicipality || 'Koronadal City';
+      const province = tdn.Province || options.transItem?.Province || 'South Cotabato';
+      const streetLocation = tdn.PropLocationStreet || tdn.Location || '';
+      const attachments = Array.isArray(tdn.Attachments) ? tdn.Attachments : (payload?.attachments || []);
+      const sketchUrl = tdn.FloorPlanSketchPath || payload?.sketchUrl || null;
+
+      const recordKey = `${(trackingNo || formWorkflowId || 'TX').toLowerCase()}_part_${partitionIndex}`;
+      const nowIso = new Date().toISOString();
+
+      const newRecord = {
+        id: `${trackingNo || 'TX'}_${partitionLetter}_${Date.now()}`,
+        recordKey,
+        trackingNo,
+        formWorkflowId,
+        propertyKind,
+        partitionIndex,
+        partitionLetter,
+        declarationNo,
+        ownerName,
+        arpNo,
+        pin,
+        barangay,
+        cityMunicipality,
+        province,
+        streetLocation,
+        marketValue,
+        assessedValue,
+        actionType: options.actionType || 'SYNCED', // 'TRANSFERRED' | 'SYNCED' | 'DRAFT' | 'DRAFT_TRANSFER'
+        statusLabel: options.statusLabel || (options.actionType === 'TRANSFERRED' ? 'Transferred to Assessor Review' : 'Synced to Office Web Portal'),
+        savedAt: nowIso,
+        attachmentsCount: attachments.length,
+        sketchUrl,
+        payload,
+        transItem: options.transItem || {
+          TrackingNo: trackingNo,
+          FormworkflowId: formWorkflowId,
+          OwnerName: ownerName,
+          Barangay: barangay,
+          PropertyType: propertyKind,
+          Status: options.statusLabel || 'Completed Field Assessment',
+          HasPartition: true,
+          PartitionCount: 1
+        }
+      };
+
+      setHistoryRecords(prev => {
+        const filtered = prev.filter(r => r.recordKey !== recordKey);
+        const updated = [newRecord, ...filtered];
+        AsyncStorage.setItem('@fairtrack_history_records', JSON.stringify(updated)).catch(e => {
+          console.warn('Failed to persist history records', e);
+        });
+        return updated;
+      });
+
+      return newRecord;
+    } catch (err) {
+      console.warn('saveToHistory error:', err);
+    }
+  };
+
+  const removeHistoryRecord = async (recordIdOrKey) => {
+    try {
+      const updated = historyRecords.filter(r => r.id !== recordIdOrKey && r.recordKey !== recordIdOrKey);
+      setHistoryRecords(updated);
+      await AsyncStorage.setItem('@fairtrack_history_records', JSON.stringify(updated));
+      return { success: true };
+    } catch (e) {
+      return { success: false, message: e?.message };
+    }
+  };
+
+  const clearHistoryRecords = async () => {
+    try {
+      setHistoryRecords([]);
+      await AsyncStorage.removeItem('@fairtrack_history_records');
+      return { success: true };
+    } catch (e) {
+      return { success: false, message: e?.message };
+    }
+  };
+
+  // Mark transaction synced: clears pending syncQueue items, saves to History, and if transferred, removes from downloadedForms
   const markTransactionSynced = async (trackingNo, formWorkflowId, isTransferred = false, payload = null) => {
     try {
       const cleanTrack = (trackingNo || '').toString().trim().toLowerCase();
       const cleanWf = formWorkflowId != null ? formWorkflowId.toString().trim() : '';
+
+      // Find existing downloaded record before removing if payload was not provided
+      let effectivePayload = payload;
+      let existingDownloaded = null;
+      if (downloadedForms) {
+        if (trackingNo && downloadedForms[trackingNo]) existingDownloaded = downloadedForms[trackingNo];
+        else if (formWorkflowId && downloadedForms[formWorkflowId.toString()]) existingDownloaded = downloadedForms[formWorkflowId.toString()];
+        else {
+          for (const [k, item] of Object.entries(downloadedForms)) {
+            const keyLower = k.toLowerCase();
+            const itemTNo = (item?.transItem?.TrackingNo || item?.trackingNo || '').toString().trim().toLowerCase();
+            const itemWfId = (item?.transItem?.FormworkflowId || item?.formWorkflowId || '').toString().trim();
+            if ((cleanTrack && (keyLower === cleanTrack || itemTNo === cleanTrack)) || (cleanWf && (k === cleanWf || itemWfId === cleanWf))) {
+              existingDownloaded = item;
+              break;
+            }
+          }
+        }
+      }
+
+      if (!effectivePayload && existingDownloaded) {
+        effectivePayload = existingDownloaded.formData || existingDownloaded;
+      }
+
+      // Save permanently to History before purging
+      if (effectivePayload || existingDownloaded) {
+        await saveToHistory(effectivePayload, {
+          trackingNo,
+          formWorkflowId,
+          actionType: isTransferred ? 'TRANSFERRED' : 'SYNCED',
+          statusLabel: isTransferred ? 'Transferred to Assessor Review' : 'Synced to Office Web Portal',
+          transItem: existingDownloaded?.transItem || null
+        });
+      }
 
       // 1. Remove from syncQueue
       const filteredQueue = syncQueue.filter(item => {
@@ -513,7 +719,7 @@ export const SyncProvider = ({ children }) => {
         await updateDownloadedFormWithPayload(trackingNo, formWorkflowId, payload);
       }
     } catch (e) {
-      // Handled silently
+      console.warn('markTransactionSynced error:', e);
     }
   };
 
@@ -686,7 +892,102 @@ export const SyncProvider = ({ children }) => {
       }
     }
 
-    if (!found && !pendingDraft) return null;
+    if (!found && !pendingDraft) {
+      if (historyRecords && historyRecords.length > 0) {
+        const histMatch = historyRecords.find(h => {
+          const hTrack = (h.trackingNo || '').toString().trim().toLowerCase();
+          const hWf = (h.formWorkflowId || '').toString().trim();
+          const hIdx = parseInt(h.partitionIndex ?? 0, 10) || 0;
+          const trackMatches = tNo && hTrack && tNo === hTrack;
+          const wfMatches = wfId && hWf && wfId === hWf;
+          return (trackMatches || wfMatches) && hIdx === targetIdx;
+        }) || historyRecords.find(h => {
+          const hTrack = (h.trackingNo || '').toString().trim().toLowerCase();
+          const hWf = (h.formWorkflowId || '').toString().trim();
+          const trackMatches = tNo && hTrack && tNo === hTrack;
+          const wfMatches = wfId && hWf && wfId === hWf;
+          return trackMatches || wfMatches;
+        });
+
+        if (histMatch) {
+          const histPayload = histMatch.payload ? withPascalCaseKeys(histMatch.payload) : {};
+          const tdn = histPayload?.TDN || histPayload?.tdn || {};
+          const tdnLand = histPayload?.TDNLand || histPayload?.tdnLand || {};
+          const tdnBldg = histPayload?.TDNBuilding || histPayload?.tdnBuilding || {};
+          const tdnMach = histPayload?.TDNMachinery || histPayload?.tdnMachinery || {};
+
+          return {
+            trackingNo: histMatch.trackingNo,
+            formWorkflowId: histMatch.formWorkflowId,
+            owner: histMatch.ownerName,
+            arpNo: histMatch.arpNo,
+            pin: histMatch.pin,
+            tdnId: tdn?.TDNId || tdn?.tdnId,
+            sketchUrl: histMatch.sketchUrl || tdn?.FloorPlanSketchPath,
+            attachments: tdn?.Attachments || histPayload?.attachments || [],
+            isHistorySnapshot: true,
+            historyActionType: histMatch.actionType,
+            historySavedAt: histMatch.savedAt,
+            transItem: histMatch.transItem || {
+              TrackingNo: histMatch.trackingNo,
+              FormworkflowId: histMatch.formWorkflowId,
+              OwnerName: histMatch.ownerName,
+              Barangay: histMatch.barangay,
+              PropertyType: histMatch.propertyKind,
+              Status: histMatch.statusLabel,
+              HasPartition: true,
+              PartitionCount: 1
+            },
+            formData: histPayload,
+            currentPartition: {
+              partitionLetter: histMatch.partitionLetter || 'A',
+              systemGeneratedTDN: tdn?.SystemGeneratedTDN || tdn?.DeclarationNo || histMatch.declarationNo || '',
+              arpNo: histMatch.arpNo,
+              pin: histMatch.pin,
+              ownerName: histMatch.ownerName,
+              ownerAddress: tdn?.OwnerAddress,
+              ownerTin: tdn?.OwnerTIN || tdn?.OwnerTin,
+              ownerContactNo: tdn?.OwnerContactNo,
+              ownerEmail: tdn?.OwnerEmail,
+              ownerGender: tdn?.OwnerGender || 'Male',
+              districtOrBarangay: histMatch.barangay,
+              cityMunicipality: histMatch.cityMunicipality,
+              province: histMatch.province,
+              streetLocation: histMatch.streetLocation,
+              sketchUrl: histMatch.sketchUrl || tdn?.FloorPlanSketchPath,
+              attachments: tdn?.Attachments || histPayload?.attachments || [],
+              boundaryNorth: tdnLand?.NorthBoundary,
+              nremarks: tdnLand?.Nremarks,
+              boundarySouth: tdnLand?.SouthBoundary,
+              sremarks: tdnLand?.Sremarks,
+              boundaryEast: tdnLand?.EastBoundary,
+              eremarks: tdnLand?.Eremarks,
+              boundaryWest: tdnLand?.WestBoundary,
+              wremarks: tdnLand?.Wremarks,
+              landAppraisalDetailsJson: tdn?.LandAppraisalDetailsJson || tdnLand?.LandAppraisalDetailsJson,
+              landImprovementsJson: tdn?.LandImprovementsJson || tdnLand?.LandImprovementsJson,
+              landAdjustmentsJson: tdn?.LandAdjustmentsJson || tdnLand?.LandAdjustmentsJson,
+              landPropertyAssessmentsJson: tdn?.LandPropertyAssessmentsJson || tdnLand?.LandPropertyAssessmentsJson,
+              buildingType: tdnBldg?.BuildingClassification || tdnBldg?.BuildingType,
+              structuralType: tdnBldg?.StucturalType || tdnBldg?.StructuralType,
+              areaSqMeters: tdnBldg?.TotalbldgArea || tdnBldg?.TotalFloorArea,
+              buildingFloorsJson: tdnBldg?.BuildingFloorsJson,
+              additionalItemsJson: tdnBldg?.AdditionalItemsJson,
+              machineryAppraisalDetailsJson: tdn?.MachineryAppraisalDetailsJson || tdnMach?.MachineryAppraisalDetailsJson || tdn?.AppraisalDetailsJson || tdnMach?.AppraisalDetailsJson,
+              machineryPropertyAssessmentsJson: tdn?.MachineryPropertyAssessmentsJson || tdnMach?.MachineryPropertyAssessmentsJson || tdn?.PropertyAssessmentsJson || tdnMach?.PropertyAssessmentsJson,
+              formData: histPayload
+            },
+            partitions: [
+              {
+                partitionLetter: histMatch.partitionLetter || 'A',
+                formData: histPayload
+              }
+            ]
+          };
+        }
+      }
+      return null;
+    }
 
     if (found && Array.isArray(found.partitions) && found.partitions.length > targetIdx && found.partitions[targetIdx]) {
       const partObj = { ...found.partitions[targetIdx] };
@@ -829,6 +1130,13 @@ export const SyncProvider = ({ children }) => {
 
     const updated = [queueItem, ...filteredQueue];
     await saveQueue(updated);
+
+    // Save to permanent device history as offline draft
+    await saveToHistory(payload, {
+      type,
+      actionType: workflowForwardPayload ? 'DRAFT_TRANSFER' : 'DRAFT',
+      statusLabel: workflowForwardPayload ? 'Queued to Transfer (Offline)' : 'Saved Offline Draft'
+    });
 
     // Update cachedForms
     const cacheId = tdn?.TDNId || tracking || wfId || 'temp';
@@ -976,12 +1284,26 @@ export const SyncProvider = ({ children }) => {
             const tdn = p?.TDN || p?.tdn;
             const itemTrack = tdn?.TrackingNo || tdn?.trackingNo;
             const itemWf = tdn?.FormWorkflowId || tdn?.formWorkflowId;
+            await saveToHistory(p, {
+              type: item.type,
+              trackingNo: itemTrack,
+              formWorkflowId: itemWf,
+              actionType: 'TRANSFERRED',
+              statusLabel: 'Transferred to Assessor Review'
+            });
             await removeDownloadedTransaction(itemTrack, itemWf);
           } else {
             const p = item.payload;
             const tdn = p?.TDN || p?.tdn;
             const itemTrack = tdn?.TrackingNo || tdn?.trackingNo;
             const itemWf = tdn?.FormWorkflowId || tdn?.formWorkflowId;
+            await saveToHistory(p, {
+              type: item.type,
+              trackingNo: itemTrack,
+              formWorkflowId: itemWf,
+              actionType: 'SYNCED',
+              statusLabel: 'Synced to Office Web Portal'
+            });
             await updateDownloadedFormWithPayload(itemTrack, itemWf, p);
           }
 
@@ -1081,7 +1403,12 @@ export const SyncProvider = ({ children }) => {
         syncAllToServer,
         removeQueueItem,
         clearQueue,
-        clearAllOfflineData
+        clearAllOfflineData,
+        historyRecords,
+        historyCount: historyRecords.length,
+        saveToHistory,
+        removeHistoryRecord,
+        clearHistoryRecords
       }}
     >
       {children}

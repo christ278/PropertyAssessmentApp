@@ -26,7 +26,8 @@ export const DashboardScreen = ({ navigation }) => {
     lastSyncTime,
     downloadedCount,
     downloadedForms,
-    cachedTransactions
+    cachedTransactions,
+    historyCount
   } = useContext(SyncContext);
   const { colors, isDarkMode, shadows } = useTheme();
 
@@ -457,6 +458,36 @@ export const DashboardScreen = ({ navigation }) => {
             <View style={styles.actionDetails}>
               <Text style={[styles.actionTitle, { color: colors.textDark }]}>Machinery Assessment</Text>
               <Text style={[styles.actionSubtitle, { color: colors.textMuted }]}>Acquisition cost, depreciation, and appraisal</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.actionCard,
+              {
+                backgroundColor: colors.cardBg,
+                borderColor: colors.border
+              },
+              shadows.card
+            ]}
+            onPress={() => navigation.navigate('Main', { screen: 'HistoryTab' })}
+          >
+            <View
+              style={[
+                styles.actionIcon,
+                { backgroundColor: isDarkMode ? '#1e1b4b' : '#ede9fe' }
+              ]}
+            >
+              <Ionicons name="time" size={24} color="#8b5cf6" />
+            </View>
+            <View style={styles.actionDetails}>
+              <Text style={[styles.actionTitle, { color: colors.textDark }]}>Appraisal History</Text>
+              <Text style={[styles.actionSubtitle, { color: colors.textMuted }]}>
+                {historyCount > 0
+                  ? `${historyCount} permanent snapshot(s) saved on phone`
+                  : 'View permanent log of saved and transferred appraisals'}
+              </Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
           </TouchableOpacity>

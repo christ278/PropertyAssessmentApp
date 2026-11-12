@@ -18,6 +18,7 @@ import { BuildingFormScreen } from './src/screens/BuildingFormScreen';
 import { LandFormScreen } from './src/screens/LandFormScreen';
 import { MachineryFormScreen } from './src/screens/MachineryFormScreen';
 import { SyncQueueScreen } from './src/screens/SyncQueueScreen';
+import { HistoryScreen } from './src/screens/HistoryScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 
 const Stack = createNativeStackNavigator();
@@ -52,6 +53,8 @@ const MainTabs = () => {
             iconName = focused ? 'home' : 'home-outline';
           } else if (route.name === 'Feed') {
             iconName = focused ? 'list' : 'list-outline';
+          } else if (route.name === 'HistoryTab') {
+            iconName = focused ? 'time' : 'time-outline';
           } else if (route.name === 'SyncCenter') {
             iconName = focused ? 'cloud-upload' : 'cloud-upload-outline';
           } else if (route.name === 'ProfileTab') {
@@ -63,6 +66,7 @@ const MainTabs = () => {
     >
       <Tab.Screen name="Home" component={DashboardScreen} options={{ tabBarLabel: 'Dashboard' }} />
       <Tab.Screen name="Feed" component={TransactionsScreen} options={{ tabBarLabel: 'Transactions' }} />
+      <Tab.Screen name="HistoryTab" component={HistoryScreen} options={{ tabBarLabel: 'History' }} />
       <Tab.Screen
         name="SyncCenter"
         component={SyncQueueScreen}
@@ -101,6 +105,7 @@ const RootNavigator = () => {
           <Stack.Screen name="Main" component={MainTabs} />
           <Stack.Screen name="Profile" component={ProfileScreen} />
           <Stack.Screen name="Transactions" component={TransactionsScreen} />
+          <Stack.Screen name="History" component={HistoryScreen} />
           <Stack.Screen name="BuildingForm" component={BuildingFormScreen} />
           <Stack.Screen name="LandForm" component={LandFormScreen} />
           <Stack.Screen name="MachineryForm" component={MachineryFormScreen} />
