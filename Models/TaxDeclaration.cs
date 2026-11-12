@@ -1272,12 +1272,13 @@ public class MachineryPropertyAssessmentItemDto
 /// <summary>
 /// Centralized CAST Tax Declaration (TDN1) & ARP Number Generator implementing both CAST combinations:
 /// 1. Combination #1 (FAAS / Partition Encoding ARPNo): {LGUCode}-{DistrictMunicipalityCode}-{BarangayCode:D4}-{SectionNo:D3}-{LotOrParcelNo:D3} (e.g., 187-00-0001-002-015)
-/// 2. Combination #2 (Post-Approval / Official TDN1): {RevisionYearLastTwoDigits:D2}-{BarangayCode:D4}-{DeclarationNo:D5} (e.g., 26-0001-00001)
+/// 2. Combination #2 (Official TDN1): {GRYear:D4}-{MunicipalityIndex:D2}-{BarangayCode:D4}-{SequentialSeries:D5} (e.g., 2020-08-0012-00512; unapproved default: 2020-08-0012-00000)
 /// </summary>
 public static class CastTdGenerator
 {
     public const string DefaultLguCode = "187";
     public const string DefaultDistrictMunicipalCode = "00";
+    public const string DefaultMunicipalityIndex = "08";
     public const string DefaultArpNumber = "187-00-0000-000-000";
 
     private static readonly (string Keyword, string Code)[] BarangayCodeMappings = new[]
@@ -1438,32 +1439,92 @@ public static class CastTdGenerator
     }
 
     /// <summary>
-    /// CAST Combination #2 (Post-Approval / Official TDN1 & DeclarationNo):
-    /// {RevisionYearLastTwoDigits:D2}-{BarangayCode:D4}-{DeclarationNo:D5}
-    /// Example: 26-0001-00001
+    /// CAST Combination #2 (Official TDN1):
+    /// {GRYear:D4}-{MunicipalityIndex:D2}-{BarangayCode:D4}-{DeclarationNo:D5}
+    /// Example: 2020-08-0012-00512
     /// </summary>
-    public static string FormatOfficialTdNumber(int revisionOrEffectivityYear, string? barangay, int sequenceNumber)
+    public static string FormatOfficialTdNumber(int revisionOrEffectivityYear, string? barangay, int sequenceNumber, string municipalityIndex = DefaultMunicipalityIndex)
     {
-        int year = revisionOrEffectivityYear > 1900 ? revisionOrEffectivityYear : DateTime.Now.Year;
-        string revYearLastTwo = (year % 100).ToString("D2");
+        int year = revisionOrEffectivityYear > 1900 ? revisionOrEffectivityYear : (revisionOrEffectivityYear > 0 && revisionOrEffectivityYear < 100 ? 2000 + revisionOrEffectivityYear : DateTime.Now.Year);
+        string munCode = string.IsNullOrWhiteSpace(municipalityIndex) ? DefaultMunicipalityIndex : municipalityIndex.Trim().PadLeft(2, '0');
         string brgyCode = ResolveBarangayCode(barangay, "0001");
         int safeSeq = Math.Max(1, sequenceNumber);
         string declarationNo = safeSeq.ToString("D5");
 
-        return $"{revYearLastTwo}-{brgyCode}-{declarationNo}";
+        return $"{year:D4}-{munCode}-{brgyCode}-{declarationNo}";
     }
 
     /// <summary>
-    /// Checks whether a Tax Declaration number is already in official CAST Combination #2 format (YY-BBBB-NNNNN).
+    /// CAST Unapproved TDN (Sequential Series is all zeros):
+    /// {GRYear:D4}-{MunicipalityIndex:D2}-{BarangayCode:D4}-00000
+    /// Example: 2020-08-0012-00000
+    /// </summary>
+    public static string FormatUnapprovedTdNumber(int revisionOrEffectivityYear, string? barangay, string municipalityIndex = DefaultMunicipalityIndex)
+    {
+        int year = revisionOrEffectivityYear > 1900 ? revisionOrEffectivityYear : (revisionOrEffectivityYear > 0 && revisionOrEffectivityYear < 100 ? 2000 + revisionOrEffectivityYear : DateTime.Now.Year);
+        string munCode = string.IsNullOrWhiteSpace(municipalityIndex) ? DefaultMunicipalityIndex : municipalityIndex.Trim().PadLeft(2, '0');
+        string brgyCode = ResolveBarangayCode(barangay, "0001");
+
+        return $"{year:D4}-{munCode}-{brgyCode}-00000";
+    }
+
+    /// <summary>
+    /// Checks whether a Tax Declaration number matches official CAST format (4 segments: YYYY-MM-BBBB-NNNNN, or legacy 3 segments: YY-BBBB-NNNNN).
     /// </summary>
     public static bool IsOfficialCastTdFormat(string? tdNo)
     {
         if (string.IsNullOrWhiteSpace(tdNo)) return false;
         var parts = tdNo.Trim().Split('-');
+        // 4 segments: 2020-08-0012-00512
+        if (parts.Length == 4
+            && parts[0].Length == 4 && parts[0].All(char.IsDigit)
+            && parts[1].Length == 2 && parts[1].All(char.IsDigit)
+            && parts[2].Length == 4 && parts[2].All(char.IsDigit)
+            && parts[3].Length == 5 && parts[3].All(char.IsDigit))
+        {
+            return true;
+        }
+        // Legacy 3 segments: 26-0001-00001
         return parts.Length == 3
             && parts[0].Length == 2 && parts[0].All(char.IsDigit)
             && parts[1].Length == 4 && parts[1].All(char.IsDigit)
             && parts[2].Length == 5 && parts[2].All(char.IsDigit);
+    }
+
+    /// <summary>
+    /// Checks whether a Tax Declaration number is unapproved (ends in 00000).
+    /// </summary>
+    public static bool IsUnapprovedCastTd(string? tdNo)
+    {
+        if (string.IsNullOrWhiteSpace(tdNo)) return false;
+        var parts = tdNo.Trim().Split('-');
+        if (parts.Length == 4)
+        {
+            return parts[3] == "00000";
+        }
+        if (parts.Length == 3)
+        {
+            return parts[2] == "00000";
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Extracts the sequential series number (returns 0 if 00000 or unparseable).
+    /// </summary>
+    public static int ExtractSequenceNumber(string? tdNo)
+    {
+        if (string.IsNullOrWhiteSpace(tdNo)) return 0;
+        var parts = tdNo.Trim().Split('-');
+        if (parts.Length == 4 && int.TryParse(parts[3], out int seq4))
+        {
+            return seq4;
+        }
+        if (parts.Length == 3 && int.TryParse(parts[2], out int seq3))
+        {
+            return seq3;
+        }
+        return 0;
     }
 
     /// <summary>

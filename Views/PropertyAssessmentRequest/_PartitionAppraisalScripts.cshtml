@@ -2681,18 +2681,37 @@
         return `${lgu3}-${mun2}-${brgy4}-${sec3}-${lot3}`;
     }
 
+    // CAST Combination #2: [GR Year]-[Municipality Index]-[Barangay Code]-[Sequential Series]
+    // Example: 2020-08-0012-00512 (Approved) or 2020-08-0012-00000 (Unapproved)
     function formatOfficialTDN(effYear, brgyVal, currentTdn, fallbackSeq) {
         const yr = parseInt(effYear, 10) || new Date().getFullYear();
-        const revYearLastTwo = String(yr % 100).padStart(2, '0');
+        const grYear4 = yr < 100 ? (2000 + yr) : yr;
+        const mun2 = '08';
         const brgy4 = resolveCastBrgyCode(brgyVal, '0001');
-        let seq5 = String((typeof fallbackSeq === 'number' && fallbackSeq > 0) ? fallbackSeq : (partitionIndex + 1)).padStart(5, '0');
+        const isApproved = @((ViewBag.IsRequestApproved == true) ? "true" : "false");
+        let seq5 = '00000';
+
         if (currentTdn) {
             const parts = String(currentTdn).trim().split('-');
-            if (parts.length === 3 && /^\d{5}$/.test(parts[2])) {
-                seq5 = parts[2];
+            if (parts.length === 4 && /^\d{5}$/.test(parts[3])) {
+                if (isApproved || parts[3] !== '00000') {
+                    seq5 = parts[3];
+                }
+            } else if (parts.length === 3 && /^\d{5}$/.test(parts[2])) {
+                if (isApproved || parts[2] !== '00000') {
+                    seq5 = parts[2];
+                }
             }
         }
-        return `${revYearLastTwo}-${brgy4}-${seq5}`;
+
+        if (isApproved && seq5 === '00000') {
+            const safeSeq = typeof fallbackSeq === 'number' && fallbackSeq > 0 ? fallbackSeq : (partitionIndex + 1);
+            seq5 = String(safeSeq).padStart(5, '0');
+        } else if (!isApproved) {
+            seq5 = '00000';
+        }
+
+        return `${grYear4}-${mun2}-${brgy4}-${seq5}`;
     }
 
     function initPartitionBarangayDropdowns() {

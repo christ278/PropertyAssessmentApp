@@ -215,14 +215,15 @@ public class AssessmentService : IAssessmentService
     public string GenerateCastTdNumber(int targetYear, string? barangay)
     {
         int year = targetYear > 1900 ? targetYear : DateTime.Now.Year;
+        string yearPrefix4 = $"{year:D4}-";
         string revYearLastTwo = (year % 100).ToString("D2");
-        var yearPrefix = $"{revYearLastTwo}-";
+        var yearPrefix2 = $"{revYearLastTwo}-";
         var legacyPrefix = $"TD-{year}-";
 
         int countForYear = _context.TaxDeclarations
             .AsNoTracking()
             .Count(t => t.TaxDeclarationNumber != null && 
-                       (t.TaxDeclarationNumber.StartsWith(yearPrefix) || t.TaxDeclarationNumber.StartsWith(legacyPrefix)));
+                       (t.TaxDeclarationNumber.StartsWith(yearPrefix4) || t.TaxDeclarationNumber.StartsWith(yearPrefix2) || t.TaxDeclarationNumber.StartsWith(legacyPrefix)));
 
         int nextSeq = countForYear + 1;
         string candidate = CastTdGenerator.FormatOfficialTdNumber(year, barangay, nextSeq);
@@ -253,30 +254,47 @@ public class AssessmentService : IAssessmentService
             declaration.ARPNo = computedArp;
         }
 
-        // 2. Combination #2 (TaxDeclarationNumber / Official TDN1: {RevYearLastTwo:D2}-{BarangayCode:D4}-{DeclarationNo:D5})
+        // 2. Combination #2 (Official TDN: {GRYear:D4}-{MunicipalityIndex:D2}-{BarangayCode:D4}-{SequentialSeries:D5})
         var currentTd = declaration.TaxDeclarationNumber?.Trim() ?? string.Empty;
         bool isLegacyPlaceholder = string.IsNullOrWhiteSpace(currentTd)
             || currentTd.StartsWith("TD-", StringComparison.OrdinalIgnoreCase)
             || currentTd.StartsWith("TDN-", StringComparison.OrdinalIgnoreCase)
             || currentTd.Contains("Pending", StringComparison.OrdinalIgnoreCase);
 
-        if (isLegacyPlaceholder || (declaration.Status == AssessmentStatus.Active && CastTdGenerator.IsCastArpFormat(currentTd)))
+        bool isUnapproved = CastTdGenerator.IsUnapprovedCastTd(currentTd);
+
+        if (declaration.Status == AssessmentStatus.Active)
         {
-            declaration.TaxDeclarationNumber = GenerateCastTdNumber(declaration.EffectivityYear, declaration.DistrictOrBarangay);
-        }
-        else if (CastTdGenerator.IsOfficialCastTdFormat(currentTd))
-        {
-            // Keep existing sequence number (last 5 digits), but sync RevisionYear & BarangayCode if updated
-            var parts = currentTd.Split('-');
-            if (int.TryParse(parts[2], out int existingSeq))
+            // Approved / Active roll requires an official assigned sequence number (> 0)
+            if (isLegacyPlaceholder || isUnapproved || CastTdGenerator.IsCastArpFormat(currentTd) || !CastTdGenerator.IsOfficialCastTdFormat(currentTd))
             {
-                int year = declaration.EffectivityYear > 1900 ? declaration.EffectivityYear : DateTime.Now.Year;
-                var syncedTd = CastTdGenerator.FormatOfficialTdNumber(year, declaration.DistrictOrBarangay, existingSeq);
-                if (!string.Equals(syncedTd, currentTd, StringComparison.OrdinalIgnoreCase) &&
-                    !_context.TaxDeclarations.AsNoTracking().Any(t => t.Id != declaration.Id && t.TaxDeclarationNumber == syncedTd))
+                declaration.TaxDeclarationNumber = GenerateCastTdNumber(declaration.EffectivityYear, declaration.DistrictOrBarangay);
+            }
+            else
+            {
+                int seq = CastTdGenerator.ExtractSequenceNumber(currentTd);
+                if (seq > 0)
                 {
-                    declaration.TaxDeclarationNumber = syncedTd;
+                    int year = declaration.EffectivityYear > 1900 ? declaration.EffectivityYear : DateTime.Now.Year;
+                    var syncedTd = CastTdGenerator.FormatOfficialTdNumber(year, declaration.DistrictOrBarangay, seq);
+                    if (!string.Equals(syncedTd, currentTd, StringComparison.OrdinalIgnoreCase) &&
+                        !_context.TaxDeclarations.AsNoTracking().Any(t => t.Id != declaration.Id && t.TaxDeclarationNumber == syncedTd))
+                    {
+                        declaration.TaxDeclarationNumber = syncedTd;
+                    }
                 }
+                else
+                {
+                    declaration.TaxDeclarationNumber = GenerateCastTdNumber(declaration.EffectivityYear, declaration.DistrictOrBarangay);
+                }
+            }
+        }
+        else
+        {
+            // Unapproved / Pending declaration default sequential series is zeros (00000)
+            if (isLegacyPlaceholder || CastTdGenerator.IsCastArpFormat(currentTd) || !CastTdGenerator.IsOfficialCastTdFormat(currentTd))
+            {
+                declaration.TaxDeclarationNumber = CastTdGenerator.FormatUnapprovedTdNumber(declaration.EffectivityYear, declaration.DistrictOrBarangay);
             }
         }
     }
