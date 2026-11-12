@@ -1319,17 +1319,32 @@
             }
         }).trigger('change');
 
-        $('#isAdminSwitch').on('change', function () {
+        // Mutual exclusivity with uncheck support: only 1 can be checked, but clicking checked one unchecks it
+        $('#isBldgAdminSwitch, #isAdminSwitch').on('change', function () {
             if ($(this).is(':checked')) {
-                $('#divOwnerName').addClass('hidden');
-                $('#divAdminName').removeClass('hidden');
-                $('#adminBadge').text('Flagged as Administrator').removeClass('text-slate-400').addClass('text-emerald-600 font-bold');
-            } else {
-                $('#divOwnerName').removeClass('hidden');
-                $('#divAdminName').addClass('hidden');
-                $('#adminBadge').text('Optional / If Flagged').removeClass('text-emerald-600 font-bold').addClass('text-slate-400');
+                $('#isBldgPossessorSwitch').prop('checked', false);
             }
-        }).trigger('change');
+            syncBldgAdminVisibility();
+        });
+
+        $('#isBldgPossessorSwitch').on('change', function () {
+            if ($(this).is(':checked')) {
+                $('#isBldgAdminSwitch, #isAdminSwitch').prop('checked', false);
+            }
+            syncBldgAdminVisibility();
+        });
+
+        function syncBldgAdminVisibility() {
+            const anyRoleChecked = $('#isBldgAdminSwitch').is(':checked') ||
+                                   $('#isAdminSwitch').is(':checked') ||
+                                   $('#isBldgPossessorSwitch').is(':checked');
+            if (anyRoleChecked) {
+                $('#divBldgAdminSection').removeClass('hidden');
+            } else {
+                $('#divBldgAdminSection').addClass('hidden');
+            }
+        }
+        syncBldgAdminVisibility();
 
         $('#inputAssessedArea').on('input', function () {
             $('#inputValuationAssessedArea').val($(this).val());
@@ -1353,8 +1368,18 @@
         const civilStatusVal = isCorp ? 'N/A (Corporate / Entity)' : 'Single';
 
         // 1. Building Owner & Administrator Demographics
-        if ($('#isAdminSwitch').is(':checked')) {
+        const anyBldgAdminChecked = $('#isBldgAdminSwitch').is(':checked') ||
+                                   $('#isAdminSwitch').is(':checked') ||
+                                   $('#isBldgPossessorSwitch').is(':checked');
+        if (anyBldgAdminChecked) {
+            $('#inputBldgAdminName').val(ownerName);
             $('#inputAdminName').val(ownerName);
+            $('#selectBldgAdminGender').val(genderVal);
+            $('#selectBldgAdminCivilStatus').val(civilStatusVal);
+            $('#inputBldgAdminTin').val(ownerTin);
+            $('#inputBldgAdminPhone').val(ownerPhone);
+            $('#inputBldgAdminEmail').val(ownerEmail);
+            $('#inputBldgAdminAddress').val(ownerAddress);
             if (!$('#inputOwnerName').val()) {
                 $('#inputOwnerName').val(ownerName);
             }
@@ -2489,11 +2514,10 @@
         updatedPartition.assessmentLevel = parseFloat($('#inputAssessLevel').val()) || 20;
         updatedPartition.assessedValue = parseFloat($('#inputAssessedValue').val()) || 0;
 
-        const isAdministratorUser = $('#isAdminSwitch').is(':checked');
-        const effectiveOwnerName = isAdministratorUser ? ($('#inputAdminName').val() || '') : ($('#inputOwnerName').val() || '');
+        // Declarant / Owner Demographics (mirrors Land form)
         updatedPartition.ownerId = $('#inputPartitionOwnerId').val() || null;
-        updatedPartition.newOwnerName = effectiveOwnerName;
-        updatedPartition.declarantName = effectiveOwnerName;
+        updatedPartition.newOwnerName = $('#inputOwnerName').val() || '';
+        updatedPartition.declarantName = updatedPartition.newOwnerName;
         updatedPartition.ownerAddress = $('#inputBldgOwnerAddress').val();
         updatedPartition.declarantAddress = $('#inputBldgOwnerAddress').val();
         updatedPartition.ownerContactNo = $('#inputBldgOwnerPhone').val();
@@ -2520,14 +2544,17 @@
         updatedPartition.cctTitleNo = $('input[name="CctTitleNo"]').val();
         updatedPartition.cctDateRegistered = $('input[name="CctDateRegistered"]').val();
         updatedPartition.ownerNameReflectedInCct = $('input[name="OwnerNameReflectedInCct"]').val();
-        updatedPartition.isAdministrator = $('#isAdminSwitch').is(':checked');
-        updatedPartition.administratorName = $('#inputAdminName').val();
-        updatedPartition.administratorGender = $('#selectBldgOwnerGender').val();
-        updatedPartition.administratorCivilStatus = $('#selectBldgOwnerCivilStatus').val();
-        updatedPartition.administratorTin = $('#inputBldgOwnerTin').val();
-        updatedPartition.administratorContactNo = $('#inputBldgOwnerPhone').val();
-        updatedPartition.administratorEmail = $('#inputBldgOwnerEmail').val();
-        updatedPartition.administratorAddress = $('#inputBldgOwnerAddress').val();
+        // Administrator Flagging & Normalized Demographics (mirrors Land form)
+        updatedPartition.isAdministrator = $('#isBldgAdminSwitch').is(':checked') || $('#isAdminSwitch').is(':checked');
+        updatedPartition.isBeneficialUser = false;
+        updatedPartition.isPossessor = $('#isBldgPossessorSwitch').is(':checked');
+        updatedPartition.administratorName = $('#inputBldgAdminName').val() || $('#inputAdminName').val() || '';
+        updatedPartition.administratorGender = $('#selectBldgAdminGender').val() || 'Male';
+        updatedPartition.administratorCivilStatus = $('#selectBldgAdminCivilStatus').val() || 'Single';
+        updatedPartition.administratorTin = $('#inputBldgAdminTin').val() || '';
+        updatedPartition.administratorContactNo = $('#inputBldgAdminPhone').val() || '';
+        updatedPartition.administratorEmail = $('#inputBldgAdminEmail').val() || '';
+        updatedPartition.administratorAddress = $('#inputBldgAdminAddress').val() || '';
 
         updatedPartition.buildingFloorPlanSketchPath = $('#BuildingFloorPlanSketchPath').val();
         updatedPartition.buildingFloorPlanSketchBase64 = null;
@@ -2773,7 +2800,35 @@
 
         window.loadedPartitionData = loadedPartition;
 
-        // Bind Land & Machinery role switches unconditionally so switching kinds works dynamically
+        // Bind Building, Land & Machinery role switches unconditionally so switching kinds works dynamically
+        $('#isBldgAdminSwitch, #isAdminSwitch').on('change', function() {
+            if ($(this).is(':checked')) {
+                $('#isBldgPossessorSwitch').prop('checked', false);
+            }
+            const anyRoleChecked = $('#isBldgAdminSwitch').is(':checked') ||
+                                   $('#isAdminSwitch').is(':checked') ||
+                                   $('#isBldgPossessorSwitch').is(':checked');
+            if (anyRoleChecked) {
+                $('#divBldgAdminSection').removeClass('hidden');
+            } else {
+                $('#divBldgAdminSection').addClass('hidden');
+            }
+        });
+
+        $('#isBldgPossessorSwitch').on('change', function() {
+            if ($(this).is(':checked')) {
+                $('#isBldgAdminSwitch, #isAdminSwitch').prop('checked', false);
+            }
+            const anyRoleChecked = $('#isBldgAdminSwitch').is(':checked') ||
+                                   $('#isAdminSwitch').is(':checked') ||
+                                   $('#isBldgPossessorSwitch').is(':checked');
+            if (anyRoleChecked) {
+                $('#divBldgAdminSection').removeClass('hidden');
+            } else {
+                $('#divBldgAdminSection').addClass('hidden');
+            }
+        });
+
         $('#isLandAdminSwitch, #isLandBeneficialSwitch, #isLandPossessorSwitch').on('change', function() {
             const anyRoleChecked = $('#isLandAdminSwitch').is(':checked') ||
                                    $('#isLandBeneficialSwitch').is(':checked') ||
@@ -2934,6 +2989,29 @@
             if (p.backTaxesYearFrom) $('#inputMachineryBackTaxesFrom').val(p.backTaxesYearFrom);
             if (p.backTaxesYearTo) $('#inputMachineryBackTaxesTo').val(p.backTaxesYearTo);
             if (p.memoranda) $('#textareaMachineryMemoranda').val(p.memoranda);
+
+            // Populate Building Administrator & Demographics fields (mirrors Land form)
+            if (p.isAdministrator) {
+                $('#isBldgAdminSwitch, #isAdminSwitch').prop('checked', true);
+                $('#isBldgPossessorSwitch').prop('checked', false);
+            } else if (p.isPossessor) {
+                $('#isBldgPossessorSwitch').prop('checked', true);
+                $('#isBldgAdminSwitch, #isAdminSwitch').prop('checked', false);
+            }
+            if (p.isAdministrator || p.isPossessor || p.administratorName) {
+                $('#divBldgAdminSection').removeClass('hidden');
+            }
+            if (p.administratorName) {
+                $('#inputBldgAdminName').val(p.administratorName);
+                $('#inputAdminName').val(p.administratorName);
+            }
+            if (p.administratorGender) $('#selectBldgAdminGender').val(p.administratorGender);
+            if (p.administratorCivilStatus) $('#selectBldgAdminCivilStatus').val(p.administratorCivilStatus);
+            if (p.administratorTin) $('#inputBldgAdminTin').val(p.administratorTin);
+            if (p.administratorContactNo) $('#inputBldgAdminPhone').val(p.administratorContactNo);
+            if (p.administratorEmail) $('#inputBldgAdminEmail').val(p.administratorEmail);
+            if (p.administratorAddress) $('#inputBldgAdminAddress').val(p.administratorAddress);
+
             const rawPropImgs = p.propertyImagesJson || p.PropertyImagesJson || $('.property-images-json-input').first().val() || '';
             if (rawPropImgs && rawPropImgs.trim().startsWith('[')) {
                 try {
