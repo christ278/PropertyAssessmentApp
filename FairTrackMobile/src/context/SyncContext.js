@@ -403,37 +403,81 @@ export const SyncProvider = ({ children }) => {
       const itemRecord = { ...downloadedForms[dKey] };
       const tdn = payload.TDN || payload.tdn;
       const partIdx = tdn?.PartitionItemIndex != null ? parseInt(tdn.PartitionItemIndex, 10) : 0;
+      const tdnBldg = payload.CAST_TDNBuildingDTO || payload.cast_TDNBuildingDTO || payload.TDNBuilding || payload.tdnBuilding || {};
+      const tdnLand = payload.TDNLand || payload.tdnLand || {};
 
-      const cp = itemRecord.currentPartition ? { ...itemRecord.currentPartition } : {};
-      if (tdn?.LotNo) { cp.lotNo = tdn.LotNo; cp.lotNumber = tdn.LotNo; }
-      if (tdn?.BlockNo) { cp.blockNo = tdn.BlockNo; cp.blockNumber = tdn.BlockNo; }
-      if (tdn?.SurveyNo) { cp.surveyNo = tdn.SurveyNo; cp.surveyNumber = tdn.SurveyNo; }
-      if (tdn?.CadastralSurveyNo) cp.cadastralSurveyNo = tdn.CadastralSurveyNo;
-      if (tdn?.SectionNo) cp.sectionNo = tdn.SectionNo;
-      if (tdn?.ParcelNo) cp.parcelNo = tdn.ParcelNo;
-      if (tdn?.PropLocationStreet) { cp.streetLocation = tdn.PropLocationStreet; cp.streetNo = tdn.PropLocationStreet; }
-      if (tdn?.Location) cp.location = tdn.Location;
-      if (tdn?.Purok) cp.purok = tdn.Purok;
-      if (tdn?.DistrictOrBarangay) cp.districtOrBarangay = tdn.DistrictOrBarangay;
-      if (tdn?.CityMunicipality) cp.cityMunicipality = tdn.CityMunicipality;
-      if (tdn?.Province) cp.province = tdn.Province;
-      if (tdn?.DisplayName) cp.owner = tdn.DisplayName;
-      if (tdn?.OwnerAddress) cp.ownerAddress = tdn.OwnerAddress;
-      if (tdn?.OwnerTIN) cp.ownerTin = tdn.OwnerTIN;
-      if (tdn?.TotalArea) cp.area = tdn.TotalArea;
-      if (tdn?.TotalMarketValue) cp.marketValue = tdn.TotalMarketValue;
-      if (tdn?.TotalAssessedValue) cp.assessedValue = tdn.TotalAssessedValue;
-      itemRecord.currentPartition = cp;
+      const pascalPayload = withPascalCaseKeys(payload);
 
       if (Array.isArray(itemRecord.partitions) && itemRecord.partitions.length > partIdx) {
         const updatedPartitions = [...itemRecord.partitions];
-        updatedPartitions[partIdx] = {
-          ...updatedPartitions[partIdx],
-          ...cp
-        };
-        itemRecord.partitions = updatedPartitions;
-      }
+        const existingPart = { ...(updatedPartitions[partIdx] || {}) };
 
+        if (tdn?.LotNo) { existingPart.lotNo = tdn.LotNo; existingPart.lotNumber = tdn.LotNo; }
+        if (tdn?.BlockNo) { existingPart.blockNo = tdn.BlockNo; existingPart.blockNumber = tdn.BlockNo; }
+        if (tdn?.SurveyNo) { existingPart.surveyNo = tdn.SurveyNo; existingPart.surveyNumber = tdn.SurveyNo; }
+        if (tdn?.CadastralSurveyNo) existingPart.cadastralSurveyNo = tdn.CadastralSurveyNo;
+        if (tdn?.SectionNo) existingPart.sectionNo = tdn.SectionNo;
+        if (tdn?.ParcelNo) existingPart.parcelNo = tdn.ParcelNo;
+        if (tdn?.PropLocationStreet) { existingPart.streetLocation = tdn.PropLocationStreet; existingPart.streetNo = tdn.PropLocationStreet; existingPart.buildingNo = tdn.PropLocationStreet; }
+        if (tdn?.Location) existingPart.location = tdn.Location;
+        if (tdn?.Purok) existingPart.purok = tdn.Purok;
+        if (tdn?.DistrictOrBarangay) existingPart.districtOrBarangay = tdn.DistrictOrBarangay;
+        if (tdn?.CityMunicipality) existingPart.cityMunicipality = tdn.CityMunicipality;
+        if (tdn?.Province) existingPart.province = tdn.Province;
+        if (tdn?.DisplayName) { existingPart.owner = tdn.DisplayName; existingPart.ownerName = tdn.DisplayName; existingPart.newOwnerName = tdn.DisplayName; }
+        if (tdn?.OwnerAddress) existingPart.ownerAddress = tdn.OwnerAddress;
+        if (tdn?.OwnerTIN) existingPart.ownerTin = tdn.OwnerTIN;
+        if (tdn?.OwnerContactNo) existingPart.ownerContactNo = tdn.OwnerContactNo;
+        if (tdn?.OwnerEmail) existingPart.ownerEmail = tdn.OwnerEmail;
+        if (tdn?.OwnerGender) existingPart.ownerGender = tdn.OwnerGender;
+        if (tdn?.OwnerCivilStatus) existingPart.ownerCivilStatus = tdn.OwnerCivilStatus;
+        if (tdn?.TotalArea) existingPart.area = tdn.TotalArea;
+        if (tdn?.TotalMarketValue) existingPart.marketValue = tdn.TotalMarketValue;
+        if (tdn?.TotalAssessedValue) existingPart.assessedValue = tdn.TotalAssessedValue;
+        if (tdn?.FloorPlanSketchPath) existingPart.sketchUrl = tdn.FloorPlanSketchPath;
+        if (tdn?.Attachments && Array.isArray(tdn.Attachments)) existingPart.attachments = tdn.Attachments;
+
+        // Land boundaries & schedules
+        if (tdnLand.NorthBoundary !== undefined) existingPart.boundaryNorth = tdnLand.NorthBoundary;
+        if (tdnLand.Nremarks !== undefined) existingPart.nremarks = tdnLand.Nremarks;
+        if (tdnLand.SouthBoundary !== undefined) existingPart.boundarySouth = tdnLand.SouthBoundary;
+        if (tdnLand.Sremarks !== undefined) existingPart.sremarks = tdnLand.Sremarks;
+        if (tdnLand.EastBoundary !== undefined) existingPart.boundaryEast = tdnLand.EastBoundary;
+        if (tdnLand.Eremarks !== undefined) existingPart.eremarks = tdnLand.Eremarks;
+        if (tdnLand.WestBoundary !== undefined) existingPart.boundaryWest = tdnLand.WestBoundary;
+        if (tdnLand.Wremarks !== undefined) existingPart.wremarks = tdnLand.Wremarks;
+        if (tdn?.LandAppraisalDetailsJson || tdnLand.LandAppraisalDetailsJson) {
+          existingPart.landAppraisalDetailsJson = tdn?.LandAppraisalDetailsJson || tdnLand.LandAppraisalDetailsJson;
+        }
+        if (tdn?.LandImprovementsJson || tdnLand.LandImprovementsJson) {
+          existingPart.landImprovementsJson = tdn?.LandImprovementsJson || tdnLand.LandImprovementsJson;
+        }
+        if (tdn?.LandAdjustmentsJson || tdnLand.LandAdjustmentsJson) {
+          existingPart.landAdjustmentsJson = tdn?.LandAdjustmentsJson || tdnLand.LandAdjustmentsJson;
+        }
+        if (tdn?.LandPropertyAssessmentsJson || tdnLand.LandPropertyAssessmentsJson) {
+          existingPart.landPropertyAssessmentsJson = tdn?.LandPropertyAssessmentsJson || tdnLand.LandPropertyAssessmentsJson;
+        }
+
+        // Building specifics
+        if (tdnBldg.StucturalType || tdnBldg.StructuralType) existingPart.structuralType = tdnBldg.StucturalType || tdnBldg.StructuralType;
+        if (tdnBldg.BuildingClassification) existingPart.buildingClassification = tdnBldg.BuildingClassification;
+        if (tdnBldg.TotalbldgArea || tdnBldg.TotalFloorArea) {
+          existingPart.areaSqMeters = tdnBldg.TotalbldgArea || tdnBldg.TotalFloorArea;
+          existingPart.area = tdnBldg.TotalbldgArea || tdnBldg.TotalFloorArea;
+        }
+        if (tdnBldg.TotalMarketVal) existingPart.marketValue = tdnBldg.TotalMarketVal;
+        if (tdnBldg.TotalAssessedVal) existingPart.assessedValue = tdnBldg.TotalAssessedVal;
+
+        existingPart.formData = pascalPayload;
+        updatedPartitions[partIdx] = existingPart;
+        itemRecord.partitions = updatedPartitions;
+
+        if (partIdx === 0) {
+          itemRecord.currentPartition = existingPart;
+          itemRecord.formData = pascalPayload;
+        }
+      }
       if (tdn?.DisplayName) itemRecord.owner = tdn.DisplayName;
 
       const newDownloads = { ...downloadedForms, [dKey]: itemRecord };
@@ -646,7 +690,8 @@ export const SyncProvider = ({ children }) => {
 
     if (found && Array.isArray(found.partitions) && found.partitions.length > targetIdx && found.partitions[targetIdx]) {
       const partObj = { ...found.partitions[targetIdx] };
-      let partFormData = partObj.formData ? withPascalCaseKeys(partObj.formData) : (found.formData ? withPascalCaseKeys(found.formData) : null);
+      // Strict isolation: partition must only use its own formData, never cross-pollinate from another partition
+      let partFormData = partObj.formData ? withPascalCaseKeys(partObj.formData) : null;
 
       // If an unsynced draft exists in syncQueue, overlay it into partFormData and partObj!
       if (pendingDraft) {
@@ -730,7 +775,7 @@ export const SyncProvider = ({ children }) => {
       };
     }
 
-    if (found && found.formData) {
+    if (found && found.formData && targetIdx === 0) {
       return {
         ...found,
         formData: withPascalCaseKeys(found.formData)
@@ -844,19 +889,21 @@ export const SyncProvider = ({ children }) => {
           landImprovementsJson: tdn?.LandImprovementsJson || tdnLand.LandImprovementsJson || existingPart.landImprovementsJson,
           landAdjustmentsJson: tdn?.LandAdjustmentsJson || tdnLand.LandAdjustmentsJson || existingPart.landAdjustmentsJson,
           landPropertyAssessmentsJson: tdn?.LandPropertyAssessmentsJson || tdnLand.LandPropertyAssessmentsJson || existingPart.landPropertyAssessmentsJson,
-          buildingType: tdnBldg.BuildingType || existingPart.buildingType,
-          structuralType: tdnBldg.StructuralType || existingPart.structuralType,
-          areaSqMeters: tdnBldg.TotalFloorArea || existingPart.areaSqMeters,
+          buildingType: tdnBldg.BuildingClassification || tdnBldg.BuildingType || existingPart.buildingType,
+          buildingClassification: tdnBldg.BuildingClassification || existingPart.buildingClassification,
+          structuralType: tdnBldg.StucturalType || tdnBldg.StructuralType || existingPart.structuralType,
+          areaSqMeters: tdnBldg.TotalbldgArea || tdnBldg.TotalFloorArea || existingPart.areaSqMeters,
           quarterEffectivity: tdn?.QuarterEffectivity ? (typeof tdn.QuarterEffectivity === 'number' ? `${tdn.QuarterEffectivity}${tdn.QuarterEffectivity === 1 ? 'st' : tdn.QuarterEffectivity === 2 ? 'nd' : tdn.QuarterEffectivity === 3 ? 'rd' : 'th'} Quarter` : tdn.QuarterEffectivity) : existingPart.quarterEffectivity,
           yearEffectivity: tdn?.YearEffectivity ? tdn.YearEffectivity.toString() : existingPart.yearEffectivity,
           taxability: tdn?.Taxability !== undefined ? (tdn.Taxability ? 'Taxable' : 'Exempt') : existingPart.taxability,
           assessmentBasis: tdn?.AssessmentBasis || existingPart.assessmentBasis,
-          memoranda: tdn?.Memoranda || existingPart.memoranda
+          memoranda: tdn?.Memoranda || existingPart.memoranda,
+          formData: withPascalCaseKeys(payload)
         };
         itemRecord.partitions = updatedPartitions;
       }
-      if (partIdx === 0) {
-        itemRecord.formData = payload;
+      if (partIdx === 0 && !itemRecord.formData) {
+        itemRecord.formData = withPascalCaseKeys(payload);
         if (tdn?.DisplayName) itemRecord.owner = tdn.DisplayName;
       }
       const newDownloads = { ...downloadedForms, [dKey]: itemRecord };
@@ -1029,6 +1076,7 @@ export const SyncProvider = ({ children }) => {
         isTransactionDownloaded,
         hasPendingEdits,
         getDownloadedFormData,
+        updateDownloadedFormWithPayload,
         queueOfflineUpdate,
         syncAllToServer,
         removeQueueItem,

@@ -28,7 +28,7 @@ export const HeaderBar = ({
   isRefreshing = false
 }) => {
   const insets = useSafeAreaInsets();
-  const { pendingCount, isSyncing, syncAllToServer } = useContext(SyncContext);
+  const { pendingCount, isSyncing, syncAllToServer, isOnline, checkConnectivity } = useContext(SyncContext);
   const { user, logout } = useContext(AuthContext);
   const { isDarkMode, colors, shadows, setThemeMode } = useTheme();
 
@@ -100,6 +100,21 @@ export const HeaderBar = ({
       </View>
 
       <View style={styles.actionsContainer}>
+        {/* Live Network Connectivity Status Tag */}
+        <TouchableOpacity
+          style={[
+            styles.networkStatusTag,
+            isOnline ? styles.networkOnlineTag : styles.networkOfflineTag
+          ]}
+          onPress={() => checkConnectivity && checkConnectivity()}
+          accessibilityLabel={`Network Status: ${isOnline ? 'Online' : 'Offline'}. Tap to refresh.`}
+        >
+          <View style={[styles.networkDot, isOnline ? styles.networkDotOnline : styles.networkDotOffline]} />
+          <Text style={[styles.networkTagText, isOnline ? styles.networkTextOnline : styles.networkTextOffline]}>
+            {isOnline ? 'ONLINE' : 'OFFLINE'}
+          </Text>
+        </TouchableOpacity>
+
         {/* Refresh / Update List from Web Server Button */}
         {onRefresh ? (
           <TouchableOpacity
@@ -405,6 +420,45 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8
+  },
+  networkStatusTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 5
+  },
+  networkOnlineTag: {
+    backgroundColor: '#ecfdf5',
+    borderColor: '#a7f3d0'
+  },
+  networkOfflineTag: {
+    backgroundColor: '#fffbeb',
+    borderColor: '#fde68a'
+  },
+  networkDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3
+  },
+  networkDotOnline: {
+    backgroundColor: '#059669'
+  },
+  networkDotOffline: {
+    backgroundColor: '#d97706'
+  },
+  networkTagText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5
+  },
+  networkTextOnline: {
+    color: '#059669'
+  },
+  networkTextOffline: {
+    color: '#d97706'
   },
   syncButton: {
     width: 40,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,17 +10,64 @@ import {
   ActivityIndicator,
   Platform,
   Switch,
-  Modal
+  Modal,
+  KeyboardAvoidingView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SyncContext } from '../context/SyncContext';
 import { useTheme } from '../context/ThemeContext';
 import { MobileApi } from '../api/mobileApi';
 import { HeaderBar } from '../components/HeaderBar';
+import { ActionModal } from '../components/ActionModal';
 import { DiscardChangesModal } from '../components/DiscardChangesModal';
 import { AttachmentsSection } from '../components/AttachmentsSection';
 import { DatePickerModal } from '../components/DatePickerModal';
 import { BARANGAY_OPTIONS, normalizeBarangay } from '../constants/locationData';
+
+const TABS = [
+  { label: '1. Property Info & Taxpayer (CCT)', icon: 'information-circle-outline' },
+  { label: '2. Structural Specs & 17 Materials', icon: 'business-outline' },
+  { label: '3. Floor Levels, Additions & Valuation', icon: 'calculator-outline' },
+  { label: '4. Back Taxes, Effectivity & Notes', icon: 'document-text-outline' },
+  { label: '5. Field Photos & Attachments', icon: 'images-outline' },
+];
+
+const FLOOR_LEVEL_OPTIONS = [
+  '1st Floor',
+  '2nd Floor',
+  '3rd Floor',
+  '4th Floor',
+  '5th Floor',
+  '6th Floor',
+  'Basement',
+  'Mezzanine',
+  'Roof Deck',
+  'Penthouse'
+];
+
+const RATE_MODE_OPTIONS = ['Min', 'Average', 'Max'];
+
+const STANDARD_ADDITIONAL_ITEMS = [
+  { desc: 'Fence (Concrete Hollow Block / Iron Grill)', rate: 1200 },
+  { desc: 'Terrace / Open Balcony', rate: 4500 },
+  { desc: 'Covered Carport / Garage', rate: 3500 },
+  { desc: 'Mezzanine / Loft Structure', rate: 5500 },
+  { desc: 'Pavement / Concrete Driveway', rate: 850 },
+  { desc: 'Swimming Pool & Pump Structure', rate: 9500 },
+  { desc: 'Water Tank & Elevated Tower', rate: 15000 },
+  { desc: 'Custom Additional Item', rate: 1000 }
+];
+
+const GENDER_OPTIONS = ['Male', 'Female'];
+
+const CIVIL_STATUS_OPTIONS = [
+  'Single',
+  'Married',
+  'Widowed',
+  'Divorced',
+  'Legally Separated',
+  'N/A (Corporate / Entity)'
+];
 
 const BUILDING_PROPERTY_TYPES = [
   'Residential Condominium',
@@ -150,8 +197,9 @@ export const BuildingFormScreen = ({ route, navigation }) => {
   const [discardModalVisible, setDiscardModalVisible] = useState(false);
   const isDownloaded = isTransactionDownloaded(trackingNoParam, formWorkflowIdParam);
 
-  // Active section tab (0: Property Info, 1: Structural, 2: Valuation, 3: Back Taxes, 4: Photos & Sketch)
+  // Active section tab (0: Property Info & Taxpayer (CCT), 1: Structural Specs, 2: Valuation, 3: Back Taxes & Notes)
   const [activeTab, setActiveTab] = useState(0);
+  const tabScrollRef = useRef(null);
 
   // Reusable Picker Modal State
   const [pickerModal, setPickerModal] = useState({
@@ -183,16 +231,25 @@ export const BuildingFormScreen = ({ route, navigation }) => {
   const [otherPropertyTypeAccordUse, setOtherPropertyTypeAccordUse] = useState('');
   const [areaSqMeters, setAreaSqMeters] = useState('');
   const [ownerName, setOwnerName] = useState('');
-  const [ownerAddress, setOwnerAddress] = useState('');
+  const [isAdministrator, setIsAdministrator] = useState(false);
+  const [adminName, setAdminName] = useState('');
+  const [ownerGender, setOwnerGender] = useState('Male');
+  const [ownerCivilStatus, setOwnerCivilStatus] = useState('Single');
   const [ownerTin, setOwnerTin] = useState('');
   const [ownerContact, setOwnerContact] = useState('');
-  const [adminName, setAdminName] = useState('');
-  const [adminAddress, setAdminAddress] = useState('');
-  const [adminContact, setAdminContact] = useState('');
+  const [ownerEmail, setOwnerEmail] = useState('');
+  const [ownerAddress, setOwnerAddress] = useState('');
   const [streetLocation, setStreetLocation] = useState('');
   const [districtOrBarangay, setDistrictOrBarangay] = useState('');
-  const [cityMunicipality, setCityMunicipality] = useState('');
-  const [province, setProvince] = useState('');
+  const [cityMunicipality, setCityMunicipality] = useState('Koronadal City');
+  const [province, setProvince] = useState('South Cotabato');
+  const [landOwnerName, setLandOwnerName] = useState('');
+  const [landTdNo, setLandTdNo] = useState('');
+  const [landPin, setLandPin] = useState('');
+  const [isCct, setIsCct] = useState(false);
+  const [cctTitleNo, setCctTitleNo] = useState('');
+  const [cctDateRegistered, setCctDateRegistered] = useState('');
+  const [ownerNameReflectedInCct, setOwnerNameReflectedInCct] = useState('');
   const [buildingClassification, setBuildingClassification] = useState('Class A - Reinforced Concrete');
   const [occupancyPermitNo, setOccupancyPermitNo] = useState('');
 
@@ -249,11 +306,191 @@ export const BuildingFormScreen = ({ route, navigation }) => {
   const [depreciationAccumulated, setDepreciationAccumulated] = useState('');
   const [depreciationMarketval, setDepreciationMarketval] = useState('');
   const [marketValue, setMarketValue] = useState('');
-  const [assessmentLevel, setAssessmentLevel] = useState('');
+  const [assessmentLevel, setAssessmentLevel] = useState('20');
   const [assessedValue, setAssessedValue] = useState('');
   const [taxability, setTaxability] = useState(true);
   const [sketchUrl, setSketchUrl] = useState('');
   const [attachments, setAttachments] = useState([]);
+
+  // Floor Levels & Additional Improvements (CAST Dynamic Schedules)
+  const [buildingFloors, setBuildingFloors] = useState([]);
+  const [buildingAdditions, setBuildingAdditions] = useState([]);
+
+  // Floor Modal States
+  const [floorModalVisible, setFloorModalVisible] = useState(false);
+  const [editingFloorIndex, setEditingFloorIndex] = useState(null);
+  const [floorLevel, setFloorLevel] = useState('1st Floor');
+  const [floorBuildingClass, setFloorBuildingClass] = useState('Class A - Reinforced Concrete');
+  const [floorRateMode, setFloorRateMode] = useState('Min');
+  const [floorArea, setFloorArea] = useState('');
+  const [floorUnitCost, setFloorUnitCost] = useState('10000');
+  const [floorDesc, setFloorDesc] = useState('');
+
+  // Addition Modal States
+  const [additionModalVisible, setAdditionModalVisible] = useState(false);
+  const [editingAdditionIndex, setEditingAdditionIndex] = useState(null);
+  const [additionDesc, setAdditionDesc] = useState(STANDARD_ADDITIONAL_ITEMS[0].desc);
+  const [additionQuantity, setAdditionQuantity] = useState('1');
+  const [additionRate, setAdditionRate] = useState(STANDARD_ADDITIONAL_ITEMS[0].rate.toString());
+  const [additionMultiplier, setAdditionMultiplier] = useState('100');
+
+  const safeParseArray = (val) => {
+    if (!val) return null;
+    try {
+      const parsed = typeof val === 'string' ? JSON.parse(val) : val;
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    } catch (e) {}
+    return null;
+  };
+
+  // Live Valuation Calculations (CAST Aligned)
+  const totalFloorAreaComputed = React.useMemo(() => {
+    if (buildingFloors.length > 0) {
+      return buildingFloors.reduce((sum, f) => sum + (parseFloat(f.floorAreaSqm) || 0), 0);
+    }
+    return parseFloat(totalFloorArea || areaSqMeters) || 0;
+  }, [buildingFloors, totalFloorArea, areaSqMeters]);
+
+  const baseRcnComputed = React.useMemo(() => {
+    if (buildingFloors.length > 0) {
+      return buildingFloors.reduce((sum, f) => sum + (parseFloat(f.marketValue) || 0), 0);
+    }
+    const a = parseFloat(totalFloorArea || areaSqMeters) || 0;
+    const u = parseFloat(unitValue) || 0;
+    return a * u || (parseFloat(subtotalValCompArea) || 0);
+  }, [buildingFloors, totalFloorArea, areaSqMeters, unitValue, subtotalValCompArea]);
+
+  const totalAdditionsComputed = React.useMemo(() => {
+    if (buildingAdditions.length > 0) {
+      return buildingAdditions.reduce((sum, a) => sum + (parseFloat(a.totalValue) || 0), 0);
+    }
+    return parseFloat(totalAddItem) || 0;
+  }, [buildingAdditions, totalAddItem]);
+
+  const deprRateNum = parseFloat(depreciationRate) || 0;
+  const accDeprComputed = Math.round(baseRcnComputed * (deprRateNum / 100) * 100) / 100;
+  const depreciatedCoreComputed = Math.max(0, Math.round((baseRcnComputed - accDeprComputed) * 100) / 100);
+  const grandMarketValueComputed = Math.round((depreciatedCoreComputed + totalAdditionsComputed) * 100) / 100;
+
+  const assessLevelNum = parseFloat(assessmentLevel) || 20;
+  const assessedValueComputed = Math.round(grandMarketValueComputed * (assessLevelNum / 100) * 100) / 100;
+
+  const basicRptComputed = Math.round(assessedValueComputed * 0.02 * 100) / 100;
+  const sefTaxComputed = Math.round(assessedValueComputed * 0.01 * 100) / 100;
+  const annualTaxDueComputed = Math.round((basicRptComputed + sefTaxComputed) * 100) / 100;
+
+  const openAddFloorModal = () => {
+    setEditingFloorIndex(null);
+    const nextNum = buildingFloors.length + 1;
+    const levelStr = nextNum === 1 ? '1st Floor' : nextNum === 2 ? '2nd Floor' : nextNum === 3 ? '3rd Floor' : `${nextNum}th Floor`;
+    setFloorLevel(levelStr);
+    setFloorBuildingClass(buildingClassification || 'Class A - Reinforced Concrete');
+    setFloorRateMode('Min');
+    setFloorArea('');
+    setFloorUnitCost(unitValue || '10000');
+    setFloorDesc(`${levelStr} (${buildingClassification || 'General Structure'})`);
+    setFloorModalVisible(true);
+  };
+
+  const openEditFloorModal = (index) => {
+    const f = buildingFloors[index];
+    if (!f) return;
+    setEditingFloorIndex(index);
+    setFloorLevel(f.floorNumber || '1st Floor');
+    setFloorBuildingClass(f.buildingClassification || buildingClassification || 'Class A - Reinforced Concrete');
+    setFloorRateMode(f.rateMode || 'Min');
+    setFloorArea((f.floorAreaSqm || '').toString());
+    setFloorUnitCost((f.baseUnitCost || '').toString());
+    setFloorDesc(f.description || '');
+    setFloorModalVisible(true);
+  };
+
+  const saveFloorLevel = () => {
+    const a = parseFloat(floorArea) || 0;
+    const u = parseFloat(floorUnitCost) || 0;
+    if (a <= 0) {
+      Alert.alert('Required', 'Please enter a valid floor area in sq.m.');
+      return;
+    }
+    const mv = Math.round(a * u * 100) / 100;
+    const newFloor = {
+      id: editingFloorIndex !== null && buildingFloors[editingFloorIndex]?.id ? buildingFloors[editingFloorIndex].id : 'flr_' + Date.now(),
+      floorNumber: floorLevel,
+      buildingClassification: floorBuildingClass,
+      rateMode: floorRateMode,
+      description: floorDesc || `${floorLevel} (${floorBuildingClass})`,
+      floorAreaSqm: a,
+      baseUnitCost: u,
+      marketValue: mv
+    };
+    let updated;
+    if (editingFloorIndex !== null) {
+      updated = [...buildingFloors];
+      updated[editingFloorIndex] = newFloor;
+    } else {
+      updated = [...buildingFloors, newFloor];
+    }
+    setBuildingFloors(updated);
+    if (updated.length > parseInt(storeyNo || '1', 10)) {
+      setStoreyNo(updated.length.toString());
+    }
+    setFloorModalVisible(false);
+  };
+
+  const removeFloor = (index) => {
+    const updated = buildingFloors.filter((_, idx) => idx !== index);
+    setBuildingFloors(updated);
+  };
+
+  const openAddAdditionModal = () => {
+    setEditingAdditionIndex(null);
+    setAdditionDesc(STANDARD_ADDITIONAL_ITEMS[0].desc);
+    setAdditionQuantity('1');
+    setAdditionRate(STANDARD_ADDITIONAL_ITEMS[0].rate.toString());
+    setAdditionMultiplier('100');
+    setAdditionModalVisible(true);
+  };
+
+  const openEditAdditionModal = (index) => {
+    const a = buildingAdditions[index];
+    if (!a) return;
+    setEditingAdditionIndex(index);
+    setAdditionDesc(a.description || '');
+    setAdditionQuantity((a.quantity || '1').toString());
+    setAdditionRate((a.unitRate || '0').toString());
+    setAdditionMultiplier((a.multiplier || '100').toString());
+    setAdditionModalVisible(true);
+  };
+
+  const saveAdditionItem = () => {
+    const q = parseFloat(additionQuantity) || 1;
+    const r = parseFloat(additionRate) || 0;
+    const m = parseFloat(additionMultiplier) || 100;
+    const total = Math.round((q * r) * (m / 100.0) * 100) / 100;
+
+    const newItem = {
+      id: editingAdditionIndex !== null && buildingAdditions[editingAdditionIndex]?.id ? buildingAdditions[editingAdditionIndex].id : 'add_' + Date.now(),
+      description: additionDesc || 'Additional Item',
+      quantity: q,
+      unitRate: r,
+      multiplier: m,
+      totalValue: total
+    };
+    let updated;
+    if (editingAdditionIndex !== null) {
+      updated = [...buildingAdditions];
+      updated[editingAdditionIndex] = newItem;
+    } else {
+      updated = [...buildingAdditions, newItem];
+    }
+    setBuildingAdditions(updated);
+    setAdditionModalVisible(false);
+  };
+
+  const removeAddition = (index) => {
+    const updated = buildingAdditions.filter((_, idx) => idx !== index);
+    setBuildingAdditions(updated);
+  };
 
   // 4. Effectivity & Memoranda
   const [yearEffectivity, setYearEffectivity] = useState(new Date().getFullYear().toString());
@@ -312,6 +549,16 @@ export const BuildingFormScreen = ({ route, navigation }) => {
       if (downloaded.tdnId) setTdnId(downloaded.tdnId);
       if (downloaded.sketchUrl) setSketchUrl(downloaded.sketchUrl);
       if (downloaded.attachments && Array.isArray(downloaded.attachments)) setAttachments(downloaded.attachments);
+      if (downloaded.trackingNo && !trackingNo) setTrackingNo(downloaded.trackingNo);
+      if (downloaded.transItem?.TrackingNo && !trackingNo) setTrackingNo(downloaded.transItem.TrackingNo);
+
+      // Populate downloaded.formData first so partition-specific fields can cleanly override defaults
+      if (downloaded.formData) {
+        populateFieldsFromDTO(downloaded.formData);
+        if (downloaded.formData.TDN) {
+          hydrateEffectivityAndNotes(downloaded.formData.TDN);
+        }
+      }
 
       if (downloaded.currentPartition) {
         const cp = downloaded.currentPartition;
@@ -326,25 +573,44 @@ export const BuildingFormScreen = ({ route, navigation }) => {
         if (cp.propertyTypeAccordUse) setPropertyTypeAccordUse(cp.propertyTypeAccordUse);
         if (cp.otherPropertyTypeAccordUse) setOtherPropertyTypeAccordUse(cp.otherPropertyTypeAccordUse);
         if (cp.pin) setPin(cp.pin);
-        if (cp.surveyNo || cp.surveyNumber) setSurveyNo(cp.surveyNo || cp.surveyNumber);
-        if (cp.lotNo || cp.lotNumber) setLotNo(cp.lotNo || cp.lotNumber);
-        if (cp.titleNo) setTctNo(cp.titleNo);
-        if (cp.sectionNo) setSectionNo(cp.sectionNo);
+        const targetPartIdx = parseInt(partitionIndexParam, 10) || 0;
+        if (targetPartIdx > 0) {
+          setSurveyNo(cp.surveyNo || cp.surveyNumber || '');
+          setLotNo(cp.lotNo || cp.lotNumber || '');
+          setTctNo(cp.titleNo || '');
+          setSectionNo(cp.sectionNo || '');
+        } else {
+          if (cp.surveyNo || cp.surveyNumber) setSurveyNo(cp.surveyNo || cp.surveyNumber);
+          if (cp.lotNo || cp.lotNumber) setLotNo(cp.lotNo || cp.lotNumber);
+          if (cp.titleNo) setTctNo(cp.titleNo);
+          if (cp.sectionNo) setSectionNo(cp.sectionNo);
+        }
         if (cp.arpNo) setArpNo(cp.arpNo);
         if (cp.systemGeneratedTDN) setDeclarationNo(cp.systemGeneratedTDN);
+        if (cp.isAdministrator != null) setIsAdministrator(!!cp.isAdministrator);
+        if (cp.administratorName) {
+          setAdminName(cp.administratorName);
+          setIsAdministrator(true);
+        }
+        if (cp.ownerGender) setOwnerGender(cp.ownerGender);
+        if (cp.ownerCivilStatus) setOwnerCivilStatus(cp.ownerCivilStatus);
+        if (cp.ownerTin) setOwnerTin(cp.ownerTin);
+        if (cp.ownerContactNo || cp.ownerContact) setOwnerContact(cp.ownerContactNo || cp.ownerContact);
+        if (cp.ownerEmail) setOwnerEmail(cp.ownerEmail);
+        if (cp.ownerAddress) setOwnerAddress(cp.ownerAddress);
+        if (cp.landOwnerName) setLandOwnerName(cp.landOwnerName);
+        if (cp.landTdNo) setLandTdNo(cp.landTdNo);
+        if (cp.landPin) setLandPin(cp.landPin);
+        if (cp.isCct != null) setIsCct(!!cp.isCct);
+        if (cp.cctTitleNo) setCctTitleNo(cp.cctTitleNo);
+        if (cp.cctDateRegistered) setCctDateRegistered(cp.cctDateRegistered.toString().substring(0, 10));
+        if (cp.ownerNameReflectedInCct) setOwnerNameReflectedInCct(cp.ownerNameReflectedInCct);
         if (cp.areaSqMeters != null && cp.areaSqMeters > 0) {
           setAreaSqMeters(cp.areaSqMeters.toString());
           setTotalFloorArea(cp.areaSqMeters.toString());
         }
         hydrateEffectivityAndNotes(cp);
-      }
-
-      if (downloaded.formData) {
-        populateFieldsFromDTO(downloaded.formData);
-        if (downloaded.formData.TDN) {
-          hydrateEffectivityAndNotes(downloaded.formData.TDN);
-        }
-        if (downloaded.currentPartition?.systemGeneratedTDN) setDeclarationNo(downloaded.currentPartition.systemGeneratedTDN);
+        if (cp.systemGeneratedTDN) setDeclarationNo(cp.systemGeneratedTDN);
       }
     }
 
@@ -353,7 +619,7 @@ export const BuildingFormScreen = ({ route, navigation }) => {
     if (!hasUnsynced && (trackingNoParam || formWorkflowIdParam)) {
       try {
         if (!downloaded) setLoading(true);
-        const liveRes = await MobileApi.downloadTransactionDetails(formWorkflowIdParam, trackingNoParam);
+        const liveRes = await MobileApi.downloadTransactionDetails(formWorkflowIdParam, trackingNoParam, partitionIndexParam);
         if (liveRes && liveRes.success) {
           const targetIdx = parseInt(partitionIndexParam, 10) || 0;
           const livePart = (liveRes.partitions && liveRes.partitions[targetIdx]) || null;
@@ -362,7 +628,36 @@ export const BuildingFormScreen = ({ route, navigation }) => {
 
           if (liveSketch) setSketchUrl(liveSketch);
           if (Array.isArray(liveAtts)) setAttachments(liveAtts);
+          if (liveRes.tdnId) setTdnId(liveRes.tdnId);
+
           if (livePart) {
+            if (livePart.tdnId) setTdnId(livePart.tdnId);
+            if (livePart.castTdnBuildingId) setCastTdnBuildingId(livePart.castTdnBuildingId);
+            else if (livePart.formData?.CAST_TDNBuildingDTO?.CAST_TDNBuildingId) setCastTdnBuildingId(livePart.formData.CAST_TDNBuildingDTO.CAST_TDNBuildingId);
+            if (livePart.systemGeneratedTDN) setDeclarationNo(livePart.systemGeneratedTDN);
+            if (livePart.arpNo) setArpNo(livePart.arpNo);
+            if (livePart.pin) setPin(livePart.pin);
+            if (targetIdx > 0) {
+              setSurveyNo(livePart.surveyNo || livePart.surveyNumber || '');
+              setLotNo(livePart.lotNo || livePart.lotNumber || '');
+              setTctNo(livePart.titleNo || '');
+              setSectionNo(livePart.sectionNo || '');
+            } else {
+              if (livePart.surveyNo || livePart.surveyNumber) setSurveyNo(livePart.surveyNo || livePart.surveyNumber);
+              if (livePart.lotNo || livePart.lotNumber) setLotNo(livePart.lotNo || livePart.lotNumber);
+              if (livePart.titleNo) setTctNo(livePart.titleNo);
+              if (livePart.sectionNo) setSectionNo(livePart.sectionNo);
+            }
+            if (livePart.ownerGender) setOwnerGender(livePart.ownerGender);
+            if (livePart.ownerCivilStatus) setOwnerCivilStatus(livePart.ownerCivilStatus);
+            if (livePart.ownerEmail) setOwnerEmail(livePart.ownerEmail);
+            if (livePart.landOwnerName) setLandOwnerName(livePart.landOwnerName);
+            if (livePart.landTdNo) setLandTdNo(livePart.landTdNo);
+            if (livePart.landPin) setLandPin(livePart.landPin);
+            if (livePart.isCct != null) setIsCct(!!livePart.isCct);
+            if (livePart.cctTitleNo) setCctTitleNo(livePart.cctTitleNo);
+            if (livePart.cctDateRegistered) setCctDateRegistered(livePart.cctDateRegistered.toString().substring(0, 10));
+            if (livePart.ownerNameReflectedInCct) setOwnerNameReflectedInCct(livePart.ownerNameReflectedInCct);
             hydrateEffectivityAndNotes(livePart);
           }
 
@@ -403,9 +698,16 @@ export const BuildingFormScreen = ({ route, navigation }) => {
       }
       if (t.DisplayName) setOwnerName(t.DisplayName);
       if (t.OwnerAddress) setOwnerAddress(t.OwnerAddress);
-      if (t.PropAdminName) setAdminName(t.PropAdminName);
-      if (t.PropAdminAddress) setAdminAddress(t.PropAdminAddress);
-      if (t.PropAdminContactNo) setAdminContact(t.PropAdminContactNo);
+      if (t.OwnerGender) setOwnerGender(t.OwnerGender);
+      if (t.OwnerCivilStatus) setOwnerCivilStatus(t.OwnerCivilStatus);
+      if (t.OwnerTIN) setOwnerTin(t.OwnerTIN);
+      if (t.OwnerContactNo) setOwnerContact(t.OwnerContactNo);
+      if (t.OwnerEmail) setOwnerEmail(t.OwnerEmail);
+      if (t.IsAdministrator != null) setIsAdministrator(!!t.IsAdministrator);
+      if (t.PropAdminName || t.AdministratorName) {
+        setAdminName(t.PropAdminName || t.AdministratorName);
+        setIsAdministrator(true);
+      }
       if (t.PropLocationStreet) setStreetLocation(t.PropLocationStreet);
       else if (t.Location && !t.Location.includes(',')) setStreetLocation(t.Location);
       if (t.DistrictOrBarangay || t.Barangay) setDistrictOrBarangay(normalizeBarangay(t.DistrictOrBarangay || t.Barangay));
@@ -433,8 +735,11 @@ export const BuildingFormScreen = ({ route, navigation }) => {
     if (d.refOwner) {
       const o = d.refOwner;
       if (!ownerName && (o.OwnerName || o.FullName)) setOwnerName(o.OwnerName || o.FullName);
+      if (o.Gender && !ownerGender) setOwnerGender(o.Gender);
+      if (o.CivilStatus && !ownerCivilStatus) setOwnerCivilStatus(o.CivilStatus);
       if (o.TaxIdentNo) setOwnerTin(o.TaxIdentNo);
       if (o.ContactNo) setOwnerContact(o.ContactNo);
+      if (o.Email && !ownerEmail) setOwnerEmail(o.Email);
     }
 
     if (d.CAST_TDNBuildingDTO) {
@@ -446,6 +751,13 @@ export const BuildingFormScreen = ({ route, navigation }) => {
       if (b.LotNo && !lotNo) setLotNo(b.LotNo);
       if (b.TCTNo && !tctNo) setTctNo(b.TCTNo);
       if (b.ARPNo && !arpNo) setArpNo(b.ARPNo);
+      if (b.LandOwnerName) setLandOwnerName(b.LandOwnerName);
+      if (b.LandTdNo) setLandTdNo(b.LandTdNo);
+      if (b.LandPin) setLandPin(b.LandPin);
+      if (b.IsCct != null) setIsCct(!!b.IsCct);
+      if (b.CctTitleNo) setCctTitleNo(b.CctTitleNo);
+      if (b.CctDateRegistered) setCctDateRegistered(b.CctDateRegistered.toString().substring(0, 10));
+      if (b.OwnerNameReflectedInCct) setOwnerNameReflectedInCct(b.OwnerNameReflectedInCct);
       if (b.StucturalType) setStructuralType(b.StucturalType);
       if (b.BuildingClassification) setBuildingClassification(b.BuildingClassification);
       if (b.OccupancyPermitNo) setOccupancyPermitNo(b.OccupancyPermitNo);
@@ -485,6 +797,12 @@ export const BuildingFormScreen = ({ route, navigation }) => {
       if (b.TotalMarketVal != null) setMarketValue(b.TotalMarketVal.toString());
       if (b.TotalAssessedVal != null) setAssessedValue(b.TotalAssessedVal.toString());
       if (b.STREET && !streetLocation) setStreetLocation(b.STREET);
+      if (b.MailingAddress && !ownerAddress) setOwnerAddress(b.MailingAddress);
+      if (b.TIN && !ownerTin) setOwnerTin(b.TIN);
+      if (b.MobileNo && !ownerContact) setOwnerContact(b.MobileNo);
+      if (b.Email && !ownerEmail) setOwnerEmail(b.Email);
+      if (b.Gender && !ownerGender) setOwnerGender(b.Gender);
+      if (b.CivilStatus && !ownerCivilStatus) setOwnerCivilStatus(b.CivilStatus);
     }
 
     if (d.currentPartition) {
@@ -493,7 +811,70 @@ export const BuildingFormScreen = ({ route, navigation }) => {
       if (cp.districtOrBarangay) setDistrictOrBarangay(normalizeBarangay(cp.districtOrBarangay));
       if (cp.cityMunicipality) setCityMunicipality(cp.cityMunicipality);
       if (cp.province) setProvince(cp.province);
+      if (cp.isAdministrator != null) setIsAdministrator(!!cp.isAdministrator);
+      if (cp.administratorName) {
+        setAdminName(cp.administratorName);
+        setIsAdministrator(true);
+      }
+      if (cp.ownerGender) setOwnerGender(cp.ownerGender);
+      if (cp.ownerCivilStatus) setOwnerCivilStatus(cp.ownerCivilStatus);
+      if (cp.ownerTin) setOwnerTin(cp.ownerTin);
+      if (cp.ownerContactNo || cp.ownerContact) setOwnerContact(cp.ownerContactNo || cp.ownerContact);
+      if (cp.ownerEmail) setOwnerEmail(cp.ownerEmail);
+      if (cp.ownerAddress) setOwnerAddress(cp.ownerAddress);
+      if (cp.landOwnerName) setLandOwnerName(cp.landOwnerName);
+      if (cp.landTdNo) setLandTdNo(cp.landTdNo);
+      if (cp.landPin) setLandPin(cp.landPin);
+      if (cp.isCct != null) setIsCct(!!cp.isCct);
+      if (cp.cctTitleNo) setCctTitleNo(cp.cctTitleNo);
+      if (cp.cctDateRegistered) setCctDateRegistered(cp.cctDateRegistered.toString().substring(0, 10));
+      if (cp.ownerNameReflectedInCct) setOwnerNameReflectedInCct(cp.ownerNameReflectedInCct);
       hydrateEffectivityAndNotes(cp);
+    }
+
+    // Hydrate Floor Levels & Additional Improvements (CAST Schedules)
+    const rawFloors = d?.CAST_TDNBuildingDTO?.FloorBreakdownJson || d?.currentPartition?.buildingFloorBreakdownJson || d?.currentPartition?.BuildingFloorBreakdownJson || d?.TDN?.FloorBreakdownJson;
+    const rawAdditions = d?.CAST_TDNBuildingDTO?.AdditionalItemsJson || d?.currentPartition?.buildingAdditionalItemsJson || d?.currentPartition?.BuildingAdditionalItemsJson || d?.TDN?.AdditionalItemsJson;
+
+    const parsedFloors = safeParseArray(rawFloors);
+    if (parsedFloors && parsedFloors.length > 0) {
+      setBuildingFloors(parsedFloors.map((f, idx) => ({
+        id: f.id || ('flr_' + idx),
+        floorNumber: f.floorNumber || f.floorLevel || `Storey ${idx + 1}`,
+        buildingClassification: f.buildingClassification || buildingClassification,
+        rateMode: f.rateMode || 'Min',
+        description: f.description || '',
+        floorAreaSqm: parseFloat(f.floorAreaSqm || f.floorArea || 0),
+        baseUnitCost: parseFloat(f.baseUnitCost || f.unitRate || 0),
+        marketValue: parseFloat(f.marketValue || ((f.floorAreaSqm || 0) * (f.baseUnitCost || 0)))
+      })));
+    } else if (d?.CAST_TDNBuildingDTO?.TotalbldgArea || d?.TDN?.TotalArea) {
+      const a = parseFloat(d?.CAST_TDNBuildingDTO?.TotalbldgArea || d?.TDN?.TotalArea || 0);
+      const u = parseFloat(d?.TDN?.UnitValue || (d?.CAST_TDNBuildingDTO?.SubtotalValCompArea ? ((d?.CAST_TDNBuildingDTO?.SubtotalValCompArea || 0) / (a || 1)) : 10000));
+      if (a > 0) {
+        setBuildingFloors([{
+          id: 'flr_default',
+          floorNumber: '1st Floor',
+          buildingClassification: buildingClassification || 'Class A - Reinforced Concrete',
+          rateMode: 'Min',
+          description: 'Ground Floor / Main Structure',
+          floorAreaSqm: a,
+          baseUnitCost: u > 0 ? u : 10000,
+          marketValue: a * (u > 0 ? u : 10000)
+        }]);
+      }
+    }
+
+    const parsedAdditions = safeParseArray(rawAdditions);
+    if (parsedAdditions && parsedAdditions.length > 0) {
+      setBuildingAdditions(parsedAdditions.map((a, idx) => ({
+        id: a.id || ('add_' + idx),
+        description: a.description || a.itemDescription || 'Additional Item',
+        quantity: parseFloat(a.quantity || a.area || 1),
+        unitRate: parseFloat(a.unitRate || a.rate || 0),
+        multiplier: parseFloat(a.multiplier || a.multiplierPercent || 100),
+        totalValue: parseFloat(a.totalValue || a.total || 0)
+      })));
     }
   };
 
@@ -506,15 +887,22 @@ export const BuildingFormScreen = ({ route, navigation }) => {
     }
   };
 
-  const showCompleteAlertAndGoBack = (title, message) => {
-    if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && typeof window.alert === 'function') {
-        window.alert(`${title}\n\n${message}`);
-      }
-      navigateBack();
-    } else {
-      Alert.alert(title, message, [{ text: 'OK', onPress: navigateBack }]);
-    }
+  const [completeModalConfig, setCompleteModalConfig] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    icon: 'cloud-done-outline',
+    iconType: 'success'
+  });
+
+  const showCompleteModalAndGoBack = (title, message, iconType = 'success', icon = 'cloud-done-outline') => {
+    setCompleteModalConfig({
+      visible: true,
+      title,
+      message,
+      icon,
+      iconType
+    });
   };
 
   const handleCancel = () => {
@@ -538,15 +926,27 @@ export const BuildingFormScreen = ({ route, navigation }) => {
         TitleNo: tctNo,
         SurveyNo: surveyNo,
         DisplayName: ownerName,
+        OwnerGender: ownerGender,
+        OwnerCivilStatus: ownerCivilStatus,
+        OwnerTIN: ownerTin,
+        OwnerContactNo: ownerContact,
+        OwnerEmail: ownerEmail,
         OwnerAddress: ownerAddress,
-        PropAdminName: adminName,
-        PropAdminAddress: adminAddress,
-        PropAdminContactNo: adminContact,
+        IsAdministrator: isAdministrator,
+        AdministratorName: isAdministrator ? adminName : '',
+        PropAdminName: isAdministrator ? adminName : '',
         PropLocationStreet: streetLocation,
         Location: streetLocation,
         DistrictOrBarangay: districtOrBarangay,
         CityMunicipality: cityMunicipality,
         Province: province,
+        LandOwnerName: landOwnerName,
+        LandTdNo: landTdNo,
+        LandPin: landPin,
+        IsCct: isCct,
+        CctTitleNo: cctTitleNo,
+        CctDateRegistered: cctDateRegistered,
+        OwnerNameReflectedInCct: ownerNameReflectedInCct,
         AssessmentBasis: assessmentBasis,
         BackTaxesYearFrom: parseInt(backTaxesYearFrom) || null,
         BackTaxesYearTo: parseInt(backTaxesYearTo) || null,
@@ -561,14 +961,18 @@ export const BuildingFormScreen = ({ route, navigation }) => {
         QuarterEffectivity: parseInt(quarterEffectivity) || null,
         Memoranda: memoranda,
         Taxability: taxability,
-        TotalMarketValue: parseFloat(marketValue) || 0,
-        TotalAssessedValue: parseFloat(assessedValue) || 0,
+        AssessmentLevelPercent: parseFloat(assessmentLevel) || 20,
+        TotalMarketValue: grandMarketValueComputed > 0 ? grandMarketValueComputed : (parseFloat(marketValue) || 0),
+        TotalAssessedValue: assessedValueComputed > 0 ? assessedValueComputed : (parseFloat(assessedValue) || 0),
+        FloorBreakdownJson: JSON.stringify(buildingFloors),
+        AdditionalItemsJson: JSON.stringify(buildingAdditions),
         FloorPlanSketchPath: sketchUrl,
         Attachments: attachments
       },
       CAST_TDNBuildingDTO: {
         CAST_TDNBuildingId: parseInt(castTdnBuildingId) || 0,
         TDNId: parseInt(tdnId) || 0,
+        AssessmentLevelPercent: parseFloat(assessmentLevel) || 20,
         PropertyTypeAccordUse: propertyTypeAccordUse,
         OtherPropertyTypeAccordUse: otherPropertyTypeAccordUse,
         StucturalType: structuralType,
@@ -597,19 +1001,21 @@ export const BuildingFormScreen = ({ route, navigation }) => {
         DateConstructed: dateConstructed,
         DateCompleted: dateCompleted,
         DateOccupied: dateOccupied,
-        StoreyNo: parseInt(storeyNo) || 1,
-        AreaPerFloor: parseFloat(areaPerFloor) || null,
-        TotalbldgArea: parseFloat(totalFloorArea || areaSqMeters) || 0,
+        StoreyNo: buildingFloors.length > 0 ? buildingFloors.length : (parseInt(storeyNo) || 1),
+        AreaPerFloor: buildingFloors.length > 0 ? Math.round((totalFloorAreaComputed / buildingFloors.length) * 100) / 100 : (parseFloat(areaPerFloor) || null),
+        TotalbldgArea: totalFloorAreaComputed > 0 ? totalFloorAreaComputed : (parseFloat(totalFloorArea || areaSqMeters) || 0),
         ARPNo: arpNo,
         LandArea: landArea,
         Age: parseInt(age) || null,
-        SubtotalValCompArea: parseFloat(subtotalValCompArea) || null,
-        TotalAddItem: parseFloat(totalAddItem) || null,
+        SubtotalValCompArea: baseRcnComputed,
+        TotalAddItem: totalAdditionsComputed,
         DepreciationRate: parseFloat(depreciationRate) || null,
-        DepreciationAccumulated: parseFloat(depreciationAccumulated) || null,
-        DepreciationMarketval: parseFloat(depreciationMarketval) || null,
-        TotalMarketVal: parseFloat(marketValue) || 0,
-        TotalAssessedVal: parseFloat(assessedValue) || 0,
+        DepreciationAccumulated: accDeprComputed,
+        DepreciationMarketval: depreciatedCoreComputed,
+        TotalMarketVal: grandMarketValueComputed > 0 ? grandMarketValueComputed : (parseFloat(marketValue) || 0),
+        TotalAssessedVal: assessedValueComputed > 0 ? assessedValueComputed : (parseFloat(assessedValue) || 0),
+        FloorBreakdownJson: JSON.stringify(buildingFloors),
+        AdditionalItemsJson: JSON.stringify(buildingAdditions),
         TCTNo: tctNo,
         LotNo: lotNo,
         SurveyNo: surveyNo,
@@ -617,6 +1023,18 @@ export const BuildingFormScreen = ({ route, navigation }) => {
         MailingAddress: ownerAddress,
         TIN: ownerTin,
         MobileNo: ownerContact,
+        Email: ownerEmail,
+        Gender: ownerGender,
+        CivilStatus: ownerCivilStatus,
+        IsAdministrator: isAdministrator,
+        AdministratorName: isAdministrator ? adminName : '',
+        LandOwnerName: landOwnerName,
+        LandTdNo: landTdNo,
+        LandPin: landPin,
+        IsCct: isCct,
+        CctTitleNo: cctTitleNo,
+        CctDateRegistered: cctDateRegistered,
+        OwnerNameReflectedInCct: ownerNameReflectedInCct,
         TransactionCode: transactionCode
       }
     };
@@ -636,7 +1054,12 @@ export const BuildingFormScreen = ({ route, navigation }) => {
         workflowForwardPayload
       );
       setSaving(false);
-      navigateBack();
+      showCompleteModalAndGoBack(
+        'Saved to Offline Queue',
+        `Edits for Partition ${partitionLetterParam} have been saved locally in the offline queue and will sync to the Web Portal once you are online.`,
+        'warning',
+        'cloud-offline-outline'
+      );
       return;
     }
 
@@ -660,14 +1083,50 @@ export const BuildingFormScreen = ({ route, navigation }) => {
           await markTransactionSynced(trackingNo || trackingNoParam, formWorkflowIdParam, transferStage, payload);
         }
         setSaving(false);
-        navigateBack();
+        showCompleteModalAndGoBack(
+          'Building FAAS Saved & Synced',
+          `Partition ${partitionLetterParam} updates were successfully saved and synchronized directly with the City Assessor Web Portal.`,
+          'success',
+          'cloud-done-outline'
+        );
+        return;
+      } else {
+        // Server rejected live sync: preserve all data safely in the offline queue
+        await queueOfflineUpdate(
+          'UPDATE_BUILDING',
+          payload,
+          `Building FAAS [Part ${partitionLetterParam}]: ${trackingNo || arpNo} (${ownerName || 'Owner'})`,
+          workflowForwardPayload
+        );
+        setSaving(false);
+        showCompleteModalAndGoBack(
+          'Saved to Offline Queue (Sync Rejected)',
+          `Live sync could not complete (${res?.message || 'Server rejected the building form update'}). Your edits have been safely preserved in the offline queue and can be re-synced anytime.`,
+          'warning',
+          'cloud-offline-outline'
+        );
         return;
       }
     } catch (err) {
-      // Fallback to offline queue
+      const serverMsg = err.response?.data?.message || err.response?.data || err.message || 'Server returned an error.';
+      // Live sync failed with error: preserve all data safely in the offline queue
+      await queueOfflineUpdate(
+        'UPDATE_BUILDING',
+        payload,
+        `Building FAAS [Part ${partitionLetterParam}]: ${trackingNo || arpNo} (${ownerName || 'Owner'})`,
+        workflowForwardPayload
+      );
+      setSaving(false);
+      showCompleteModalAndGoBack(
+        'Saved to Offline Queue (Sync Failed)',
+        `Live sync failed (${serverMsg}). Your edits have been safely preserved in the offline queue and can be re-synced anytime.`,
+        'warning',
+        'cloud-offline-outline'
+      );
+      return;
     }
 
-    // Offline fallback: Queue automatically without alert
+    // Offline fallback: Only queue offline if completely unreachable or network disconnected
     await queueOfflineUpdate(
       'UPDATE_BUILDING',
       payload,
@@ -675,7 +1134,12 @@ export const BuildingFormScreen = ({ route, navigation }) => {
       workflowForwardPayload
     );
     setSaving(false);
-    navigateBack();
+    showCompleteModalAndGoBack(
+      'Saved to Offline Queue',
+      `Device is currently offline or the server was unreachable. Your Partition ${partitionLetterParam} edits have been stored safely in the offline queue and will automatically sync once connected.`,
+      'warning',
+      'cloud-offline-outline'
+    );
   };
 
   const renderSelectField = (label, value, options, onSelect) => (
@@ -705,44 +1169,77 @@ export const BuildingFormScreen = ({ route, navigation }) => {
 
       {/* Offline Status Ribbon */}
       <View style={[styles.ribbon, isDownloaded ? styles.ribbonDownloaded : styles.ribbonStandard]}>
-        <Ionicons
-          name={isDownloaded ? 'shield-checkmark' : 'cloud-outline'}
-          size={16}
-          color={isDownloaded ? (isDarkMode ? '#34d399' : '#15803d') : colors.primary}
-        />
-        <Text style={[styles.ribbonText, isDownloaded && { color: isDarkMode ? '#34d399' : '#15803d' }]}>
-          {isDownloaded ? 'Downloaded Form • 100% Offline Field Ready' : 'Live Online Form'}
-        </Text>
-      </View>
+        <View style={styles.ribbonLeft}>
+          <Ionicons
+            name={isDownloaded ? 'shield-checkmark' : 'cloud-outline'}
+            size={16}
+            color={isDownloaded ? (isDarkMode ? '#34d399' : '#15803d') : colors.primary}
+          />
+          <Text style={[styles.ribbonText, isDownloaded && { color: isDarkMode ? '#34d399' : '#15803d' }]}>
+            {isDownloaded ? 'Downloaded Form • 100% Offline Field Ready' : 'Live Online Form'}
+          </Text>
+        </View>
 
-      {/* Form Navigation Tabs */}
-      <View style={styles.sectionTabs}>
+        {/* Live Network Status Tag */}
         <TouchableOpacity
-          style={[styles.sectionTabBtn, activeTab === 0 && styles.sectionTabBtnActive]}
-          onPress={() => setActiveTab(0)}
+          style={[styles.ribbonNetTag, isOnline ? styles.ribbonNetOnline : styles.ribbonNetOffline]}
+          onPress={() => checkConnectivity && checkConnectivity()}
+          accessibilityLabel={`Network Status: ${isOnline ? 'Online' : 'Offline'}. Tap to test.`}
         >
-          <Text style={[styles.sectionTabText, activeTab === 0 && styles.sectionTabTextActive]}>
-            1. Property Info & Photos {attachments && attachments.length > 0 ? `(${attachments.length})` : ''}
+          <View style={[styles.ribbonNetDot, isOnline ? styles.ribbonNetDotOnline : styles.ribbonNetDotOffline]} />
+          <Text style={[styles.ribbonNetText, isOnline ? styles.ribbonNetTextOnline : styles.ribbonNetTextOffline]}>
+            {isOnline ? 'ONLINE' : 'OFFLINE'}
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.sectionTabBtn, activeTab === 1 && styles.sectionTabBtnActive]}
-          onPress={() => setActiveTab(1)}
+      </View>
+
+      {/* Sticky, Well-Positioned Tab Bar Header */}
+      <View style={styles.topTabsWrapper}>
+        {/* Banner summary bar */}
+        <View style={styles.bannerInfoBox}>
+          <View style={styles.bannerInfoItem}>
+            <Text style={styles.bannerInfoLabel}>TDN:</Text>
+            <Text style={styles.bannerInfoValue}>{declarationNo || 'TDN System Pending'}</Text>
+          </View>
+          <View style={styles.bannerInfoItem}>
+            <Text style={styles.bannerInfoLabel}>• ARP NO:</Text>
+            <Text style={styles.bannerInfoValue}>{arpNo || '187-00-0000-000-000'}</Text>
+          </View>
+          <View style={styles.bannerInfoItem}>
+            <Text style={styles.bannerInfoLabel}>• PIN:</Text>
+            <Text style={styles.bannerInfoValue}>{pin || '126-00-0000-000'}</Text>
+          </View>
+        </View>
+
+        {/* Scrollable Tab Pills */}
+        <ScrollView
+          ref={tabScrollRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.sectionTabsScroll}
+          style={styles.sectionTabsContainer}
         >
-          <Text style={[styles.sectionTabText, activeTab === 1 && styles.sectionTabTextActive]}>2. Structural Specs & 17 Materials</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.sectionTabBtn, activeTab === 2 && styles.sectionTabBtnActive]}
-          onPress={() => setActiveTab(2)}
-        >
-          <Text style={[styles.sectionTabText, activeTab === 2 && styles.sectionTabTextActive]}>3. Floor Levels, Additions & Valuation</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.sectionTabBtn, activeTab === 3 && styles.sectionTabBtnActive]}
-          onPress={() => setActiveTab(3)}
-        >
-          <Text style={[styles.sectionTabText, activeTab === 3 && styles.sectionTabTextActive]}>4. Back Taxes, Effectivity & Notes</Text>
-        </TouchableOpacity>
+          {TABS.map((tab, idx) => {
+            const isActive = activeTab === idx;
+            return (
+              <TouchableOpacity
+                key={tab.label}
+                style={[styles.sectionTabBtn, isActive && styles.sectionTabBtnActive]}
+                onPress={() => setActiveTab(idx)}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={tab.icon}
+                  size={15}
+                  color={isActive ? '#ffffff' : (isDarkMode ? colors.textDark : '#475569')}
+                />
+                <Text style={[styles.sectionTabText, isActive && styles.sectionTabTextActive]}>
+                  {tab.label} {idx === 3 && attachments && attachments.length > 0 ? `(${attachments.length})` : ''}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -768,23 +1265,25 @@ export const BuildingFormScreen = ({ route, navigation }) => {
                 <View style={[styles.card, shadows.card]}>
                   <Text style={styles.cardHeaderTitle}>Property Identification & Partition TDN</Text>
 
+                  {/* Readonly Numbers: ARP No & TDN */}
                   <View style={styles.rowInputs}>
                     <View style={[styles.inputGroup, { flex: 1 }]}>
-                      <Text style={styles.inputLabel}>PARTITION LOT</Text>
+                      <Text style={styles.inputLabel}>ARP NO.</Text>
                       <TextInput
-                        style={styles.input}
-                        value={`Partition Lot ${partitionLetterParam}`}
+                        style={[styles.input, styles.inputDisabled]}
+                        value={arpNo}
                         editable={false}
+                        placeholder="187-00-0000-000-000"
                         placeholderTextColor={colors.placeholder}
                       />
                     </View>
                     <View style={[styles.inputGroup, { flex: 1 }]}>
-                      <Text style={styles.inputLabel}>TDN (WEB PORTAL)</Text>
+                      <Text style={styles.inputLabel}>TAX DECLARATION NO. (TDN)</Text>
                       <TextInput
-                        style={styles.input}
+                        style={[styles.input, styles.inputDisabled]}
                         value={declarationNo}
                         editable={false}
-                        placeholder="TDN System Pending"
+                        placeholder="Generated by Web Portal"
                         placeholderTextColor={colors.placeholder}
                       />
                     </View>
@@ -890,21 +1389,25 @@ export const BuildingFormScreen = ({ route, navigation }) => {
                       />
                     </View>
                   </View>
-
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>ARP NO. (CAST FORMAT: LGU-DIST-BRGY-SEC-LOT)</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={arpNo}
-                      onChangeText={setArpNo}
-                      placeholder="187-00-0000-000-000"
-                      placeholderTextColor={colors.placeholder}
-                    />
-                  </View>
                 </View>
 
                 <View style={[styles.card, shadows.card]}>
-                  <Text style={styles.cardHeaderTitle}>Owner & Administrator Demographics</Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 8, marginBottom: 12 }}>
+                    <Text style={[styles.cardHeaderTitle, { borderBottomWidth: 0, paddingBottom: 0, marginBottom: 0 }]}>
+                      Owner & Administrator Demographics
+                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={{ fontSize: 10, fontWeight: '700', color: colors.textSecondary }}>
+                        IS ADMINISTRATOR / BENEFICIAL USER
+                      </Text>
+                      <Switch
+                        value={isAdministrator}
+                        onValueChange={setIsAdministrator}
+                        trackColor={{ false: colors.borderDark || '#cbd5e1', true: colors.primary }}
+                        thumbColor={isAdministrator ? '#ffffff' : '#f8fafc'}
+                      />
+                    </View>
+                  </View>
 
                   <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>OWNER / DECLARANT NAME</Text>
@@ -917,15 +1420,31 @@ export const BuildingFormScreen = ({ route, navigation }) => {
                     />
                   </View>
 
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>ADMINISTRATOR NAME</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={adminName}
-                      onChangeText={setAdminName}
-                      placeholder="Administrator name (if applicable)"
-                      placeholderTextColor={colors.placeholder}
-                    />
+                  {isAdministrator && (
+                    <View style={styles.inputGroup}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                        <Text style={styles.inputLabel}>ADMINISTRATOR NAME</Text>
+                        <Text style={{ fontSize: 10, fontFamily: 'monospace', fontWeight: 'bold', color: colors.primary, textTransform: 'uppercase' }}>
+                          Administrator / Beneficial User
+                        </Text>
+                      </View>
+                      <TextInput
+                        style={styles.input}
+                        value={adminName}
+                        onChangeText={setAdminName}
+                        placeholder="Administrator name (if flagged as administrator)"
+                        placeholderTextColor={colors.placeholder}
+                      />
+                    </View>
+                  )}
+
+                  <View style={styles.rowInputs}>
+                    <View style={{ flex: 1 }}>
+                      {renderSelectField('GENDER / SEX', ownerGender, GENDER_OPTIONS, setOwnerGender)}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      {renderSelectField('CIVIL STATUS', ownerCivilStatus, CIVIL_STATUS_OPTIONS, setOwnerCivilStatus)}
+                    </View>
                   </View>
 
                   <View style={styles.rowInputs}>
@@ -952,6 +1471,18 @@ export const BuildingFormScreen = ({ route, navigation }) => {
                   </View>
 
                   <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={ownerEmail}
+                      onChangeText={setOwnerEmail}
+                      placeholder="email@example.com"
+                      placeholderTextColor={colors.placeholder}
+                      keyboardType="email-address"
+                    />
+                  </View>
+
+                  <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>MAILING ADDRESS</Text>
                     <TextInput
                       style={styles.input}
@@ -960,29 +1491,6 @@ export const BuildingFormScreen = ({ route, navigation }) => {
                       placeholder="House / Unit No., Street, Barangay, City, Province"
                       placeholderTextColor={colors.placeholder}
                     />
-                  </View>
-
-                  <View style={styles.rowInputs}>
-                    <View style={[styles.inputGroup, { flex: 2 }]}>
-                      <Text style={styles.inputLabel}>ADMINISTRATOR ADDRESS</Text>
-                      <TextInput
-                        style={styles.input}
-                        value={adminAddress}
-                        onChangeText={setAdminAddress}
-                        placeholder="Administrator mailing address"
-                        placeholderTextColor={colors.placeholder}
-                      />
-                    </View>
-                    <View style={[styles.inputGroup, { flex: 1 }]}>
-                      <Text style={styles.inputLabel}>ADMIN CONTACT</Text>
-                      <TextInput
-                        style={styles.input}
-                        value={adminContact}
-                        onChangeText={setAdminContact}
-                        placeholder="09XXXXXXXXX"
-                        placeholderTextColor={colors.placeholder}
-                      />
-                    </View>
                   </View>
                 </View>
 
@@ -1017,11 +1525,9 @@ export const BuildingFormScreen = ({ route, navigation }) => {
                     <View style={[styles.inputGroup, { flex: 1 }]}>
                       <Text style={styles.inputLabel}>CITY / MUNICIPALITY</Text>
                       <TextInput
-                        style={styles.input}
-                        value={cityMunicipality}
-                        onChangeText={setCityMunicipality}
-                        placeholder="e.g. General Santos City"
-                        placeholderTextColor={colors.placeholder}
+                        style={[styles.input, styles.inputDisabled]}
+                        value={cityMunicipality || 'Koronadal City'}
+                        editable={false}
                       />
                     </View>
                   </View>
@@ -1029,22 +1535,102 @@ export const BuildingFormScreen = ({ route, navigation }) => {
                   <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>PROVINCE</Text>
                     <TextInput
-                      style={styles.input}
-                      value={province}
-                      onChangeText={setProvince}
-                      placeholder="e.g. South Cotabato"
-                      placeholderTextColor={colors.placeholder}
+                      style={[styles.input, styles.inputDisabled]}
+                      value={province || 'South Cotabato'}
+                      editable={false}
                     />
                   </View>
                 </View>
 
-                <AttachmentsSection
-                  trackingNo={trackingNo || trackingNoParam}
-                  sketchUrl={sketchUrl}
-                  attachments={attachments}
-                  onAttachmentsChange={setAttachments}
-                  propertyKind="Building"
-                />
+                <View style={[styles.card, shadows.card]}>
+                  <Text style={styles.cardHeaderTitle}>Land Reference (Where Erected)</Text>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>LAND OWNER NAME</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={landOwnerName}
+                      onChangeText={setLandOwnerName}
+                      placeholder="Land owner name"
+                      placeholderTextColor={colors.placeholder}
+                    />
+                  </View>
+
+                  <View style={styles.rowInputs}>
+                    <View style={[styles.inputGroup, { flex: 1 }]}>
+                      <Text style={styles.inputLabel}>LAND TD NO.</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={landTdNo}
+                        onChangeText={setLandTdNo}
+                        placeholder="TD-XXXX-XXXX"
+                        placeholderTextColor={colors.placeholder}
+                      />
+                    </View>
+                    <View style={[styles.inputGroup, { flex: 1 }]}>
+                      <Text style={styles.inputLabel}>LAND PIN</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={landPin}
+                        onChangeText={setLandPin}
+                        placeholder="126-00-XXXX"
+                        placeholderTextColor={colors.placeholder}
+                      />
+                    </View>
+                  </View>
+                </View>
+
+                <View style={[styles.card, shadows.card]}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 8 }}>
+                    <Text style={[styles.cardHeaderTitle, { borderBottomWidth: 0, paddingBottom: 0 }]}>Condominium Title (CCT)</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={[styles.inputLabel, { fontSize: 11 }]}>CONDOMINIUM UNIT (CCT)</Text>
+                      <Switch
+                        value={isCct}
+                        onValueChange={setIsCct}
+                        trackColor={{ false: colors.borderDark, true: colors.primary }}
+                      />
+                    </View>
+                  </View>
+
+                  {isCct && (
+                    <>
+                      <View style={styles.inputGroup}>
+                        <Text style={styles.inputLabel}>CCT TITLE NO.</Text>
+                        <TextInput
+                          style={styles.input}
+                          value={cctTitleNo}
+                          onChangeText={setCctTitleNo}
+                          placeholder="e.g. CCT-00123"
+                          placeholderTextColor={colors.placeholder}
+                        />
+                      </View>
+
+                      <View style={styles.rowInputs}>
+                        <View style={[styles.inputGroup, { flex: 1 }]}>
+                          <Text style={styles.inputLabel}>DATE REGISTERED</Text>
+                          <TextInput
+                            style={styles.input}
+                            value={cctDateRegistered}
+                            onChangeText={setCctDateRegistered}
+                            placeholder="YYYY-MM-DD"
+                            placeholderTextColor={colors.placeholder}
+                          />
+                        </View>
+                        <View style={[styles.inputGroup, { flex: 1 }]}>
+                          <Text style={styles.inputLabel}>OWNER REFLECTED IN CCT</Text>
+                          <TextInput
+                            style={styles.input}
+                            value={ownerNameReflectedInCct}
+                            onChangeText={setOwnerNameReflectedInCct}
+                            placeholder="Name as shown on CCT"
+                            placeholderTextColor={colors.placeholder}
+                          />
+                        </View>
+                      </View>
+                    </>
+                  )}
+                </View>
               </View>
             )}
 
@@ -1111,31 +1697,6 @@ export const BuildingFormScreen = ({ route, navigation }) => {
                         value={occupancyPermitNo}
                         onChangeText={setOccupancyPermitNo}
                         placeholder="OP-XXXX-XXXX"
-                        placeholderTextColor={colors.placeholder}
-                      />
-                    </View>
-                  </View>
-
-                  <View style={styles.rowInputs}>
-                    <View style={[styles.inputGroup, { flex: 1 }]}>
-                      <Text style={styles.inputLabel}>TOTAL FLOOR AREA (SQ.M.)</Text>
-                      <TextInput
-                        style={styles.input}
-                        value={totalFloorArea}
-                        onChangeText={setTotalFloorArea}
-                        keyboardType="numeric"
-                        placeholder="0.00"
-                        placeholderTextColor={colors.placeholder}
-                      />
-                    </View>
-                    <View style={[styles.inputGroup, { flex: 1 }]}>
-                      <Text style={styles.inputLabel}>AREA PER FLOOR (SQ.M.)</Text>
-                      <TextInput
-                        style={styles.input}
-                        value={areaPerFloor}
-                        onChangeText={setAreaPerFloor}
-                        keyboardType="numeric"
-                        placeholder="0.00"
                         placeholderTextColor={colors.placeholder}
                       />
                     </View>
@@ -1245,49 +1806,253 @@ export const BuildingFormScreen = ({ route, navigation }) => {
               </View>
             )}
 
-            {/* TAB 2: 3. Floor Levels, Additions & Valuation */}
+            {/* TAB 2: 3. Floor Levels, Additions & Valuation (CAST Standard) */}
             {activeTab === 2 && (
               <View style={styles.tabContentBlock}>
-                <View style={[styles.card, shadows.card]}>
-                  <Text style={styles.cardHeaderTitle}>Base Construction & Additional Costs</Text>
-
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>REPLACEMENT COST NEW (RCN) / SUBTOTAL (PHP)</Text>
-                    <TextInput
-                      style={[styles.input, styles.valuationInput]}
-                      value={subtotalValCompArea}
-                      onChangeText={setSubtotalValCompArea}
-                      keyboardType="numeric"
-                      placeholder="0.00"
-                      placeholderTextColor={colors.placeholder}
-                    />
+                {/* LIVE VALUATION KPI OVERVIEW (CAST ALIGNED) */}
+                <View style={styles.kpiGrid}>
+                  <View style={styles.kpiCard}>
+                    <Text style={styles.kpiLabel}>Base RCN</Text>
+                    <Text style={styles.kpiValue}>
+                      ₱{baseRcnComputed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </Text>
                   </View>
-
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>ADDITIONAL IMPROVEMENTS SUB-TOTAL (PHP)</Text>
-                    <TextInput
-                      style={[styles.input, styles.valuationInput]}
-                      value={totalAddItem}
-                      onChangeText={setTotalAddItem}
-                      keyboardType="numeric"
-                      placeholder="0.00"
-                      placeholderTextColor={colors.placeholder}
-                    />
+                  <View style={styles.kpiCard}>
+                    <Text style={styles.kpiLabel}>Accumulated Depr.</Text>
+                    <Text style={[styles.kpiValue, { color: '#ef4444' }]}>
+                      -₱{accDeprComputed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({deprRateNum}%)
+                    </Text>
                   </View>
-
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>BASE UNIT VALUE (PHP/SQ.M.)</Text>
-                    <TextInput
-                      style={[styles.input, styles.valuationInput]}
-                      value={unitValue}
-                      onChangeText={setUnitValue}
-                      keyboardType="numeric"
-                      placeholder="0.00"
-                      placeholderTextColor={colors.placeholder}
-                    />
+                  <View style={styles.kpiCard}>
+                    <Text style={styles.kpiLabel}>Depreciated Core MV</Text>
+                    <Text style={[styles.kpiValue, { color: isDarkMode ? '#34d399' : '#059669' }]}>
+                      ₱{depreciatedCoreComputed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </Text>
+                  </View>
+                  <View style={styles.kpiCard}>
+                    <Text style={styles.kpiLabel}>Standard Additions</Text>
+                    <Text style={[styles.kpiValue, { color: isDarkMode ? '#38bdf8' : '#0284c7' }]}>
+                      +₱{totalAdditionsComputed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </Text>
+                  </View>
+                  <View style={styles.kpiCard}>
+                    <Text style={styles.kpiLabel}>Grand Combined FMV</Text>
+                    <Text style={[styles.kpiValue, { color: isDarkMode ? '#34d399' : '#059669' }]}>
+                      ₱{grandMarketValueComputed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </Text>
+                  </View>
+                  <View style={styles.kpiCard}>
+                    <Text style={styles.kpiLabel}>Assessed Value (AV)</Text>
+                    <Text style={[styles.kpiValue, { color: isDarkMode ? '#fbbf24' : '#d97706' }]}>
+                      ₱{assessedValueComputed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({assessLevelNum}%)
+                    </Text>
+                  </View>
+                  <View style={styles.kpiCard}>
+                    <Text style={styles.kpiLabel}>Basic RPT (2%) / SEF (1%)</Text>
+                    <Text style={[styles.kpiValue, { fontSize: 11 }]}>
+                      ₱{basicRptComputed.toLocaleString('en-US', { minimumFractionDigits: 2 })} / ₱{sefTaxComputed.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </Text>
+                  </View>
+                  <View style={styles.kpiCard}>
+                    <Text style={styles.kpiLabel}>Annual Tax Due (3%)</Text>
+                    <Text style={[styles.kpiValue, { color: isDarkMode ? '#38bdf8' : '#0284c7' }]}>
+                      ₱{annualTaxDueComputed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </Text>
                   </View>
                 </View>
 
+                {/* 1. Floor-by-Floor Breakdown Table */}
+                <View style={[styles.card, shadows.card]}>
+                  <View style={styles.tableHeaderRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.cardHeaderTitle}>Table 1: Floor Levels & BUCC Rate Schedule</Text>
+                      <Text style={styles.tableHeaderSubtitle}>Specify floor areas and base construction unit costs</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.btnSm, styles.btnSmPrimary]}
+                      onPress={openAddFloorModal}
+                    >
+                      <Ionicons name="add-circle-outline" size={16} color="#ffffff" />
+                      <Text style={styles.btnSmText}>Add Floor</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {buildingFloors.length === 0 ? (
+                    <View style={styles.tableEmptyCard}>
+                      <Ionicons name="layers-outline" size={32} color={colors.textMuted} />
+                      <Text style={styles.tableEmptyTitle}>No Floor Levels Added</Text>
+                      <Text style={styles.tableEmptySubtitle}>Tap "+ Add Floor" above to add floor levels and BUCC rates.</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.compactTableList}>
+                      {buildingFloors.map((floor, idx) => (
+                        <TouchableOpacity
+                          key={floor.id || idx}
+                          style={styles.compactTableRow}
+                          onPress={() => openEditFloorModal(idx)}
+                          activeOpacity={0.7}
+                        >
+                          <View style={styles.compactRowMain}>
+                            <View style={styles.compactRowHeader}>
+                              <View style={styles.compactIndexBadge}>
+                                <Text style={styles.compactIndexText}>#{idx + 1}</Text>
+                              </View>
+                              <View style={styles.compactBadge}>
+                                <Text style={styles.compactBadgeText} numberOfLines={1}>
+                                  {floor.floorNumber}
+                                </Text>
+                              </View>
+                              <View style={[styles.compactBadge, { backgroundColor: isDarkMode ? '#064e3b' : '#ecfdf5' }]}>
+                                <Text style={[styles.compactBadgeText, { color: isDarkMode ? '#34d399' : '#047857' }]} numberOfLines={1}>
+                                  {floor.rateMode || 'Min'}
+                                </Text>
+                              </View>
+                            </View>
+                            <Text style={styles.compactRowSubtext}>
+                              {floor.buildingClassification || 'Class A'} • {floor.floorAreaSqm} sq.m. @ ₱{(parseFloat(floor.baseUnitCost) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                            </Text>
+                            <Text style={[styles.compactRowValue, { color: isDarkMode ? '#34d399' : '#059669' }]}>
+                              ₱{(parseFloat(floor.marketValue) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </Text>
+                          </View>
+                          <View style={styles.compactRowActions}>
+                            <TouchableOpacity
+                              style={styles.compactActionBtn}
+                              onPress={() => openEditFloorModal(idx)}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            >
+                              <Ionicons name="pencil-outline" size={16} color={colors.primary} />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={styles.compactActionBtnDanger}
+                              onPress={() => removeFloor(idx)}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            >
+                              <Ionicons name="trash-outline" size={16} color="#ef4444" />
+                            </TouchableOpacity>
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+
+                  <View style={styles.tableSummaryBox}>
+                    <View style={styles.tableSummaryRow}>
+                      <Text style={styles.tableSummaryLabel}>Total Floor Area:</Text>
+                      <Text style={styles.tableSummaryVal}>
+                        {totalFloorAreaComputed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} sq.m.
+                      </Text>
+                    </View>
+                    <View style={styles.tableSummaryRow}>
+                      <Text style={styles.tableSummaryLabel}>Base RCN:</Text>
+                      <Text style={[styles.tableSummaryVal, { color: isDarkMode ? '#34d399' : '#059669', fontWeight: '900' }]}>
+                        ₱{baseRcnComputed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.rowInputs}>
+                    <View style={[styles.inputGroup, { flex: 1 }]}>
+                      <Text style={styles.inputLabel}>PARTITION ASSESSED AREA (SQ.M.)</Text>
+                      <TextInput
+                        style={[styles.input, styles.inputDisabled]}
+                        value={totalFloorAreaComputed.toFixed(2)}
+                        editable={false}
+                      />
+                    </View>
+                    <View style={[styles.inputGroup, { flex: 1 }]}>
+                      <Text style={styles.inputLabel}>BASE UNIT VALUE (PHP/SQ.M.)</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={unitValue}
+                        onChangeText={setUnitValue}
+                        keyboardType="numeric"
+                        placeholder="0.00"
+                        placeholderTextColor={colors.placeholder}
+                      />
+                    </View>
+                  </View>
+                </View>
+
+                {/* 2. Additional Items & Improvements Table */}
+                <View style={[styles.card, shadows.card]}>
+                  <View style={styles.tableHeaderRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.cardHeaderTitle}>Table 2: Additional Items & Improvements</Text>
+                      <Text style={styles.tableHeaderSubtitle}>Standard items (Fence, Terraces, Balconies, Tiles, Carports)</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.btnSm, styles.btnSmPrimary, { backgroundColor: '#0284c7' }]}
+                      onPress={openAddAdditionModal}
+                    >
+                      <Ionicons name="add-circle-outline" size={16} color="#ffffff" />
+                      <Text style={styles.btnSmText}>Add Item</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {buildingAdditions.length === 0 ? (
+                    <View style={styles.tableEmptyCard}>
+                      <Ionicons name="cube-outline" size={32} color={colors.textMuted} />
+                      <Text style={styles.tableEmptyTitle}>No Additional Items Added</Text>
+                      <Text style={styles.tableEmptySubtitle}>Tap "+ Add Item" above to add fences, terraces, or carports.</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.compactTableList}>
+                      {buildingAdditions.map((item, idx) => (
+                        <TouchableOpacity
+                          key={item.id || idx}
+                          style={styles.compactTableRow}
+                          onPress={() => openEditAdditionModal(idx)}
+                          activeOpacity={0.7}
+                        >
+                          <View style={styles.compactRowMain}>
+                            <View style={styles.compactRowHeader}>
+                              <View style={[styles.compactIndexBadge, { backgroundColor: '#0284c7' }]}>
+                                <Text style={styles.compactIndexText}>#{idx + 1}</Text>
+                              </View>
+                              <Text style={[styles.compactRowSubtext, { fontWeight: '800', color: colors.textDark, flex: 1 }]} numberOfLines={1}>
+                                {item.description}
+                              </Text>
+                            </View>
+                            <Text style={styles.compactRowSubtext}>
+                              Qty: {item.quantity} • Rate: ₱{(parseFloat(item.unitRate) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} • Multiplier: {item.multiplier}%
+                            </Text>
+                            <Text style={[styles.compactRowValue, { color: isDarkMode ? '#38bdf8' : '#0284c7' }]}>
+                              ₱{(parseFloat(item.totalValue) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </Text>
+                          </View>
+                          <View style={styles.compactRowActions}>
+                            <TouchableOpacity
+                              style={styles.compactActionBtn}
+                              onPress={() => openEditAdditionModal(idx)}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            >
+                              <Ionicons name="pencil-outline" size={16} color={colors.primary} />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={styles.compactActionBtnDanger}
+                              onPress={() => removeAddition(idx)}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            >
+                              <Ionicons name="trash-outline" size={16} color="#ef4444" />
+                            </TouchableOpacity>
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+
+                  <View style={styles.tableSummaryBox}>
+                    <View style={styles.tableSummaryRow}>
+                      <Text style={styles.tableSummaryLabel}>Subtotal Standard Additions:</Text>
+                      <Text style={[styles.tableSummaryVal, { color: isDarkMode ? '#38bdf8' : '#0284c7', fontWeight: '900' }]}>
+                        ₱{totalAdditionsComputed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* 3. Building Depreciation & Final Assessment Roll */}
                 <View style={[styles.card, shadows.card]}>
                   <Text style={styles.cardHeaderTitle}>Depreciation & Final Assessed Value Roll</Text>
 
@@ -1304,14 +2069,11 @@ export const BuildingFormScreen = ({ route, navigation }) => {
                       />
                     </View>
                     <View style={[styles.inputGroup, { flex: 1 }]}>
-                      <Text style={styles.inputLabel}>ACCUMULATED DEPRECIATION (PHP)</Text>
+                      <Text style={styles.inputLabel}>ACCUMULATED DEPR. (PHP)</Text>
                       <TextInput
-                        style={styles.input}
-                        value={depreciationAccumulated}
-                        onChangeText={setDepreciationAccumulated}
-                        keyboardType="numeric"
-                        placeholder="0.00"
-                        placeholderTextColor={colors.placeholder}
+                        style={[styles.input, styles.inputDisabled]}
+                        value={accDeprComputed.toFixed(2)}
+                        editable={false}
                       />
                     </View>
                   </View>
@@ -1320,7 +2082,7 @@ export const BuildingFormScreen = ({ route, navigation }) => {
                     <Text style={styles.inputLabel}>FINAL MARKET VALUE (FMV)</Text>
                     <TextInput
                       style={[styles.input, styles.valuationInput]}
-                      value={marketValue}
+                      value={marketValue || grandMarketValueComputed.toFixed(2)}
                       onChangeText={setMarketValue}
                       keyboardType="numeric"
                       placeholder="0.00"
@@ -1336,7 +2098,7 @@ export const BuildingFormScreen = ({ route, navigation }) => {
                         value={assessmentLevel}
                         onChangeText={setAssessmentLevel}
                         keyboardType="numeric"
-                        placeholder="0.0"
+                        placeholder="20"
                         placeholderTextColor={colors.placeholder}
                       />
                     </View>
@@ -1344,7 +2106,7 @@ export const BuildingFormScreen = ({ route, navigation }) => {
                       <Text style={styles.inputLabel}>ASSESSED VALUE (AV)</Text>
                       <TextInput
                         style={[styles.input, styles.valuationInput]}
-                        value={assessedValue}
+                        value={assessedValue || assessedValueComputed.toFixed(2)}
                         onChangeText={setAssessedValue}
                         keyboardType="numeric"
                         placeholder="0.00"
@@ -1355,8 +2117,8 @@ export const BuildingFormScreen = ({ route, navigation }) => {
 
                   <View style={styles.switchRow}>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.switchTitle}>TAXABILITY STATUS</Text>
-                      <Text style={styles.switchSubtitle}>{taxability ? 'TAXABLE Property' : 'EXEMPT from Real Property Tax'}</Text>
+                      <Text style={styles.switchTitle}>PROPERTY TAXABILITY</Text>
+                      <Text style={styles.switchSubtitle}>{taxability ? 'Taxable (Standard Real Property Tax)' : 'Exempt from Real Property Tax'}</Text>
                     </View>
                     <Switch
                       value={taxability}
@@ -1487,6 +2249,19 @@ export const BuildingFormScreen = ({ route, navigation }) => {
                     </View>
                   )}
                 </View>
+              </View>
+            )}
+
+            {/* TAB 4: 5. Field Photos & Attachments */}
+            {activeTab === 4 && (
+              <View style={styles.tabContentBlock}>
+                <AttachmentsSection
+                  trackingNo={trackingNo || trackingNoParam}
+                  sketchUrl={sketchUrl}
+                  attachments={attachments}
+                  onAttachmentsChange={setAttachments}
+                  propertyKind="Building"
+                />
               </View>
             )}
 
@@ -1633,6 +2408,347 @@ export const BuildingFormScreen = ({ route, navigation }) => {
         onConfirmDiscard={navigateBack}
         partitionLetter={partitionLetterParam}
       />
+
+      {/* Floor Level & BUCC Rate Schedule Modal */}
+      <Modal
+        visible={floorModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setFloorModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ flex: 1 }}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setFloorModalVisible(false)}
+          >
+            <TouchableOpacity
+              activeOpacity={1}
+              style={[styles.modalContent, { maxHeight: '90%' }]}
+              onPress={(e) => e.stopPropagation()}
+            >
+              <View style={styles.modalHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.modalTitle}>
+                    {editingFloorIndex !== null ? `Edit Floor Level #${editingFloorIndex + 1}` : 'Add Floor Level & BUCC Rate'}
+                  </Text>
+                  <Text style={styles.tableHeaderSubtitle}>BUCC Schedule of Unit Base Construction Costs</Text>
+                </View>
+                <TouchableOpacity onPress={() => setFloorModalVisible(false)}>
+                  <Ionicons name="close" size={24} color={colors.textMuted} />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingVertical: 4 }}>
+                {/* Storey / Floor Level */}
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>STOREY / FLOOR LEVEL</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 2 }}>
+                    {FLOOR_LEVEL_OPTIONS.map((lvl) => {
+                      const isSel = floorLevel === lvl;
+                      return (
+                        <TouchableOpacity
+                          key={lvl}
+                          style={[styles.pillOption, isSel && styles.pillOptionSelected]}
+                          onPress={() => {
+                            setFloorLevel(lvl);
+                            if (!floorDesc || FLOOR_LEVEL_OPTIONS.some(o => floorDesc.startsWith(o))) {
+                              setFloorDesc(`${lvl} (${floorBuildingClass || 'General Structure'})`);
+                            }
+                          }}
+                        >
+                          <Text style={[styles.pillOptionText, isSel && styles.pillOptionTextSelected]}>{lvl}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                  <TextInput
+                    style={styles.input}
+                    value={floorLevel}
+                    onChangeText={setFloorLevel}
+                    placeholder="e.g. 1st Floor, Mezzanine, Ground Floor..."
+                    placeholderTextColor={colors.placeholder}
+                  />
+                </View>
+
+                {/* Building Classification */}
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>BUILDING CLASSIFICATION</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 2 }}>
+                    {BUILDING_CLASSIFICATIONS.map((cls) => {
+                      const isSel = floorBuildingClass === cls;
+                      return (
+                        <TouchableOpacity
+                          key={cls}
+                          style={[styles.pillOption, isSel && styles.pillOptionSelected]}
+                          onPress={() => {
+                            setFloorBuildingClass(cls);
+                            if (floorLevel) {
+                              setFloorDesc(`${floorLevel} (${cls})`);
+                            }
+                          }}
+                        >
+                          <Text style={[styles.pillOptionText, isSel && styles.pillOptionTextSelected]} numberOfLines={1}>{cls.split(' - ')[0]}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                  <TextInput
+                    style={styles.input}
+                    value={floorBuildingClass}
+                    onChangeText={setFloorBuildingClass}
+                    placeholder="Class A, Class B..."
+                    placeholderTextColor={colors.placeholder}
+                  />
+                </View>
+
+                {/* Rate Mode */}
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>BUCC RATE MODE</Text>
+                  <View style={styles.segmentedRow}>
+                    {RATE_MODE_OPTIONS.map((mode) => {
+                      const isSel = floorRateMode === mode;
+                      return (
+                        <TouchableOpacity
+                          key={mode}
+                          style={[styles.segmentedBtn, isSel && styles.segmentedBtnSelected]}
+                          onPress={() => setFloorRateMode(mode)}
+                        >
+                          <Text style={[styles.segmentedBtnText, isSel && styles.segmentedBtnTextSelected]}>{mode}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                {/* Area & Unit Cost */}
+                <View style={styles.rowInputs}>
+                  <View style={[styles.inputGroup, { flex: 1 }]}>
+                    <Text style={styles.inputLabel}>FLOOR AREA (SQ.M.) *</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={floorArea}
+                      onChangeText={setFloorArea}
+                      keyboardType="numeric"
+                      placeholder="0.00"
+                      placeholderTextColor={colors.placeholder}
+                    />
+                  </View>
+                  <View style={[styles.inputGroup, { flex: 1 }]}>
+                    <Text style={styles.inputLabel}>BASE UNIT COST (₱/SQ.M.)</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={floorUnitCost}
+                      onChangeText={setFloorUnitCost}
+                      keyboardType="numeric"
+                      placeholder="10000"
+                      placeholderTextColor={colors.placeholder}
+                    />
+                  </View>
+                </View>
+
+                {/* Description / Specific Use */}
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>DESCRIPTION / USAGE</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={floorDesc}
+                    onChangeText={setFloorDesc}
+                    placeholder="e.g. Ground Floor Living / Commercial Area"
+                    placeholderTextColor={colors.placeholder}
+                  />
+                </View>
+
+                {/* Calculated Floor Market Value */}
+                <View style={styles.calculatedBox}>
+                  <Text style={styles.calculatedLabel}>CALCULATED BASE VALUE (RCN):</Text>
+                  <Text style={styles.calculatedValue}>
+                    ₱{((parseFloat(floorArea) || 0) * (parseFloat(floorUnitCost) || 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </Text>
+                </View>
+
+                {/* Modal Footer Buttons */}
+                <View style={styles.modalFooterBtnRow}>
+                  <TouchableOpacity
+                    style={styles.modalCancelBtn}
+                    onPress={() => setFloorModalVisible(false)}
+                  >
+                    <Text style={styles.modalCancelBtnText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.modalSaveBtn}
+                    onPress={saveFloorLevel}
+                  >
+                    <Ionicons name="checkmark-circle-outline" size={18} color="#ffffff" />
+                    <Text style={styles.modalSaveBtnText}>Save Floor Level</Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Additional Improvement Item Modal */}
+      <Modal
+        visible={additionModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setAdditionModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ flex: 1 }}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setAdditionModalVisible(false)}
+          >
+            <TouchableOpacity
+              activeOpacity={1}
+              style={[styles.modalContent, { maxHeight: '90%' }]}
+              onPress={(e) => e.stopPropagation()}
+            >
+              <View style={styles.modalHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.modalTitle}>
+                    {editingAdditionIndex !== null ? `Edit Additional Item #${editingAdditionIndex + 1}` : 'Add Additional Improvement Item'}
+                  </Text>
+                  <Text style={styles.tableHeaderSubtitle}>Fences, balconies, carports, swimming pools, paving</Text>
+                </View>
+                <TouchableOpacity onPress={() => setAdditionModalVisible(false)}>
+                  <Ionicons name="close" size={24} color={colors.textMuted} />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingVertical: 4 }}>
+                {/* Standard Preset Chips */}
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>QUICK SELECT PRESET</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 2 }}>
+                    {STANDARD_ADDITIONAL_ITEMS.map((item, idx) => {
+                      const isSel = additionDesc === item.desc;
+                      return (
+                        <TouchableOpacity
+                          key={idx}
+                          style={[styles.pillOption, isSel && styles.pillOptionSelected]}
+                          onPress={() => {
+                            setAdditionDesc(item.desc);
+                            setAdditionRate(item.rate.toString());
+                          }}
+                        >
+                          <Text style={[styles.pillOptionText, isSel && styles.pillOptionTextSelected]}>{item.desc.split(' (')[0]}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+
+                {/* Item Description */}
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>ITEM DESCRIPTION *</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={additionDesc}
+                    onChangeText={setAdditionDesc}
+                    placeholder="Enter item description..."
+                    placeholderTextColor={colors.placeholder}
+                  />
+                </View>
+
+                {/* Quantity, Unit Rate & Multiplier */}
+                <View style={styles.rowInputs}>
+                  <View style={[styles.inputGroup, { flex: 1 }]}>
+                    <Text style={styles.inputLabel}>QUANTITY / AREA</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={additionQuantity}
+                      onChangeText={setAdditionQuantity}
+                      keyboardType="numeric"
+                      placeholder="1"
+                      placeholderTextColor={colors.placeholder}
+                    />
+                  </View>
+                  <View style={[styles.inputGroup, { flex: 1.2 }]}>
+                    <Text style={styles.inputLabel}>UNIT RATE (₱)</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={additionRate}
+                      onChangeText={setAdditionRate}
+                      keyboardType="numeric"
+                      placeholder="0.00"
+                      placeholderTextColor={colors.placeholder}
+                    />
+                  </View>
+                  <View style={[styles.inputGroup, { flex: 1 }]}>
+                    <Text style={styles.inputLabel}>MULTIPLIER (%)</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={additionMultiplier}
+                      onChangeText={setAdditionMultiplier}
+                      keyboardType="numeric"
+                      placeholder="100"
+                      placeholderTextColor={colors.placeholder}
+                    />
+                  </View>
+                </View>
+
+                {/* Calculated Item Total Value */}
+                <View style={styles.calculatedBox}>
+                  <Text style={styles.calculatedLabel}>CALCULATED ITEM VALUE:</Text>
+                  <Text style={styles.calculatedValue}>
+                    ₱{(((parseFloat(additionQuantity) || 0) * (parseFloat(additionRate) || 0)) * ((parseFloat(additionMultiplier) || 100) / 100)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </Text>
+                </View>
+
+                {/* Modal Footer Buttons */}
+                <View style={styles.modalFooterBtnRow}>
+                  <TouchableOpacity
+                    style={styles.modalCancelBtn}
+                    onPress={() => setAdditionModalVisible(false)}
+                  >
+                    <Text style={styles.modalCancelBtnText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.modalSaveBtn}
+                    onPress={saveAdditionItem}
+                  >
+                    <Ionicons name="checkmark-circle-outline" size={18} color="#ffffff" />
+                    <Text style={styles.modalSaveBtnText}>Save Item</Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Save & Offline Queue Completion Modal */}
+      <ActionModal
+        visible={completeModalConfig.visible}
+        title={completeModalConfig.title}
+        message={completeModalConfig.message}
+        icon={completeModalConfig.icon}
+        iconType={completeModalConfig.iconType}
+        buttons={[
+          {
+            text: 'OK',
+            style: 'primary',
+            onPress: () => {
+              setCompleteModalConfig(prev => ({ ...prev, visible: false }));
+              navigateBack();
+            }
+          }
+        ]}
+        onClose={() => {
+          setCompleteModalConfig(prev => ({ ...prev, visible: false }));
+          navigateBack();
+        }}
+      />
     </View>
   );
 };
@@ -1645,10 +2761,56 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
   ribbon: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 8,
     gap: 8,
     borderBottomWidth: 1
+  },
+  ribbonLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1
+  },
+  ribbonNetTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 4
+  },
+  ribbonNetOnline: {
+    backgroundColor: isDarkMode ? 'rgba(5, 150, 105, 0.2)' : '#ecfdf5',
+    borderColor: isDarkMode ? '#059669' : '#a7f3d0'
+  },
+  ribbonNetOffline: {
+    backgroundColor: isDarkMode ? 'rgba(217, 119, 6, 0.2)' : '#fffbeb',
+    borderColor: isDarkMode ? '#d97706' : '#fde68a'
+  },
+  ribbonNetDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3
+  },
+  ribbonNetDotOnline: {
+    backgroundColor: '#059669'
+  },
+  ribbonNetDotOffline: {
+    backgroundColor: '#d97706'
+  },
+  ribbonNetText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5
+  },
+  ribbonNetTextOnline: {
+    color: isDarkMode ? '#34d399' : '#059669'
+  },
+  ribbonNetTextOffline: {
+    color: isDarkMode ? '#fbbf24' : '#d97706'
   },
   ribbonDownloaded: {
     backgroundColor: isDarkMode ? '#064e3b' : '#dcfce7',
@@ -1663,35 +2825,87 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
     fontWeight: '800',
     color: isDarkMode ? '#38bdf8' : colors.primaryDark
   },
-  sectionTabs: {
-    flexDirection: 'row',
+  topTabsWrapper: {
     backgroundColor: colors.cardBg,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-    paddingHorizontal: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: isDarkMode ? 0.3 : 0.06,
+    shadowRadius: 3,
+    elevation: 3,
+    zIndex: 10
+  },
+  bannerInfoBox: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingHorizontal: 16,
     paddingVertical: 6,
-    gap: 6
+    backgroundColor: isDarkMode ? '#064e3b22' : '#ecfdf5',
+    borderBottomWidth: 1,
+    borderBottomColor: isDarkMode ? '#065f4633' : '#a7f3d0'
+  },
+  bannerInfoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4
+  },
+  bannerInfoLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: isDarkMode ? '#6ee7b7' : '#047857'
+  },
+  bannerInfoValue: {
+    fontSize: 11,
+    fontWeight: '800',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    color: isDarkMode ? '#a7f3d0' : '#065f46'
+  },
+  sectionTabsContainer: {
+    backgroundColor: colors.cardBg
+  },
+  sectionTabsScroll: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    gap: 8,
+    alignItems: 'center'
   },
   sectionTabBtn: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 8
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: isDarkMode ? colors.surfaceSecondary : '#f1f5f9',
+    borderWidth: 1,
+    borderColor: isDarkMode ? colors.border : '#e2e8f0'
   },
   sectionTabBtnActive: {
-    backgroundColor: colors.primaryLight
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3
   },
   sectionTabText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
-    color: colors.textMuted,
-    textAlign: 'center'
+    color: isDarkMode ? colors.textDark : '#475569'
   },
   sectionTabTextActive: {
-    color: isDarkMode ? colors.primary : colors.primaryDark,
+    color: '#ffffff',
     fontWeight: '800'
+  },
+  inputDisabled: {
+    backgroundColor: isDarkMode ? '#1e293b66' : '#f1f5f9',
+    borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+    color: isDarkMode ? '#94a3b8' : '#64748b',
+    fontWeight: '700',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace'
   },
   scrollContent: {
     padding: 16,
@@ -1947,5 +3161,298 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
   typeOptionTextSelected: {
     color: isDarkMode ? colors.primary : colors.primaryDark,
     fontWeight: '800'
+  },
+  pillOption: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: isDarkMode ? colors.surfaceSecondary : '#f1f5f9',
+    borderWidth: 1,
+    borderColor: isDarkMode ? colors.border : '#e2e8f0'
+  },
+  pillOptionSelected: {
+    backgroundColor: isDarkMode ? '#065f46' : '#dcfce7',
+    borderColor: colors.primary
+  },
+  pillOptionText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textMuted
+  },
+  pillOptionTextSelected: {
+    color: isDarkMode ? '#34d399' : '#047857',
+    fontWeight: '800'
+  },
+  segmentedRow: {
+    flexDirection: 'row',
+    gap: 8
+  },
+  segmentedBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+    backgroundColor: isDarkMode ? colors.surfaceSecondary : '#f1f5f9',
+    borderWidth: 1,
+    borderColor: isDarkMode ? colors.border : '#e2e8f0'
+  },
+  segmentedBtnSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary
+  },
+  segmentedBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textMuted
+  },
+  segmentedBtnTextSelected: {
+    color: '#ffffff',
+    fontWeight: '800'
+  },
+  kpiGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8
+  },
+  kpiCard: {
+    flex: 1,
+    minWidth: '45%',
+    backgroundColor: isDarkMode ? colors.surfaceSecondary : '#f8fafc',
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: colors.border
+  },
+  kpiLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    marginBottom: 2
+  },
+  kpiValue: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: colors.textDark,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace'
+  },
+  tableHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingBottom: 8,
+    gap: 8
+  },
+  tableHeaderSubtitle: {
+    fontSize: 11,
+    color: colors.textMuted,
+    marginTop: 2
+  },
+  tableEmptyCard: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 24,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: isDarkMode ? colors.surfaceSecondary : '#f8fafc',
+    borderWidth: 1,
+    borderColor: isDarkMode ? colors.border : '#e2e8f0',
+    borderStyle: 'dashed',
+    marginTop: 8,
+    gap: 6
+  },
+  tableEmptyTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: colors.textDark,
+    marginTop: 4
+  },
+  tableEmptySubtitle: {
+    fontSize: 11,
+    color: colors.textMuted,
+    textAlign: 'center',
+    lineHeight: 16
+  },
+  compactTableList: {
+    gap: 8,
+    marginTop: 8
+  },
+  compactTableRow: {
+    backgroundColor: isDarkMode ? colors.surfaceSecondary : '#ffffff',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: isDarkMode ? colors.border : '#e2e8f0',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10
+  },
+  compactRowMain: {
+    flex: 1,
+    gap: 4
+  },
+  compactRowHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6
+  },
+  compactIndexBadge: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6
+  },
+  compactIndexText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '800'
+  },
+  compactBadge: {
+    backgroundColor: isDarkMode ? '#1e293b' : '#f1f5f9',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: isDarkMode ? '#334155' : '#cbd5e1'
+  },
+  compactBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.textDark
+  },
+  compactRowSubtext: {
+    fontSize: 11,
+    color: colors.textMuted
+  },
+  compactRowValue: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: isDarkMode ? '#34d399' : '#059669',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace'
+  },
+  compactRowActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6
+  },
+  compactActionBtn: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: isDarkMode ? '#1e293b' : '#f1f5f9',
+    borderWidth: 1,
+    borderColor: isDarkMode ? colors.border : '#e2e8f0'
+  },
+  compactActionBtnDanger: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: isDarkMode ? '#450a0a' : '#fee2e2',
+    borderWidth: 1,
+    borderColor: isDarkMode ? '#7f1d1d' : '#fecaca'
+  },
+  tableSummaryBox: {
+    backgroundColor: isDarkMode ? colors.surfaceSecondary : '#f1f5f9',
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 6,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: isDarkMode ? colors.border : '#e2e8f0'
+  },
+  tableSummaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center'
+  },
+  tableSummaryLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.textMuted
+  },
+  tableSummaryVal: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: colors.textDark,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace'
+  },
+  calculatedBox: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: isDarkMode ? '#064e3b33' : '#ecfdf5',
+    borderWidth: 1,
+    borderColor: isDarkMode ? '#065f4655' : '#a7f3d0'
+  },
+  calculatedLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: isDarkMode ? '#6ee7b7' : '#047857',
+    textTransform: 'uppercase'
+  },
+  calculatedValue: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: isDarkMode ? '#34d399' : '#047857',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace'
+  },
+  btnSm: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8
+  },
+  btnSmPrimary: {
+    backgroundColor: colors.primary
+  },
+  btnSmText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '800'
+  },
+  modalFooterBtnRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 8,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.border
+  },
+  modalCancelBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: isDarkMode ? colors.surfaceSecondary : '#f8fafc'
+  },
+  modalCancelBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.textMuted
+  },
+  modalSaveBtn: {
+    flex: 2,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 6
+  },
+  modalSaveBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#ffffff'
   }
 });

@@ -18,6 +18,7 @@ import { SyncContext } from '../context/SyncContext';
 import { useTheme } from '../context/ThemeContext';
 import { MobileApi } from '../api/mobileApi';
 import { HeaderBar } from '../components/HeaderBar';
+import { ActionModal } from '../components/ActionModal';
 import { DiscardChangesModal } from '../components/DiscardChangesModal';
 import { DatePickerModal } from '../components/DatePickerModal';
 import { AttachmentsSection } from '../components/AttachmentsSection';
@@ -49,13 +50,14 @@ const cleanTitleType = (val) => {
   return 'TCT';
 };
 
+const GENDER_OPTIONS = ['Male', 'Female'];
+
 const TABS = [
   { id: 0, label: '1. Cadastral & Title', icon: 'map-outline' },
   { id: 1, label: '2. Location & Boundaries', icon: 'compass-outline' },
   { id: 2, label: '3. Owner & Demographics', icon: 'people-outline' },
   { id: 3, label: '4. Valuation (CAST)', icon: 'calculator-outline' },
-  { id: 4, label: '5. Effectivity & Notes', icon: 'calendar-outline' },
-  { id: 5, label: '6. Field Photos & Sketch', icon: 'images-outline' }
+  { id: 4, label: '5. Effectivity & Attachments', icon: 'calendar-outline' }
 ];
 
 export const LandFormScreen = ({ route, navigation }) => {
@@ -84,9 +86,16 @@ export const LandFormScreen = ({ route, navigation }) => {
   const [discardModalVisible, setDiscardModalVisible] = useState(false);
   const [datePickerVisible, setDatePickerVisible] = useState(false);
   const [barangayModalVisible, setBarangayModalVisible] = useState(false);
+  const [genderPickerVisible, setGenderPickerVisible] = useState(false);
+  const [genderPickerTarget, setGenderPickerTarget] = useState('owner'); // 'owner' or 'admin'
+
+  const openGenderPicker = (target) => {
+    setGenderPickerTarget(target);
+    setGenderPickerVisible(true);
+  };
   const isDownloaded = isTransactionDownloaded(trackingNoParam, formWorkflowIdParam);
 
-  // Active section tab (0 to 5)
+  // Active section tab (0 to 4)
   const [activeTab, setActiveTab] = useState(0);
 
   // 1. Cadastral & Title Registration (CAST Reference)
@@ -111,8 +120,8 @@ export const LandFormScreen = ({ route, navigation }) => {
   // 2. Property Location & Boundaries (CAST Reference)
   const [streetLocation, setStreetLocation] = useState('');
   const [purok, setPurok] = useState('');
-  const [districtOrBarangay, setDistrictOrBarangay] = useState('Brgy. Central');
-  const [cityMunicipality, setCityMunicipality] = useState('General Santos City');
+  const [districtOrBarangay, setDistrictOrBarangay] = useState('BRGY. ZONE I');
+  const [cityMunicipality, setCityMunicipality] = useState('Koronadal City');
   const [province, setProvince] = useState('South Cotabato');
 
   const [northBoundary, setNorthBoundary] = useState('');
@@ -227,7 +236,7 @@ export const LandFormScreen = ({ route, navigation }) => {
     try {
       const parsed = typeof val === 'string' ? JSON.parse(val) : val;
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    } catch (e) {}
+    } catch (e) { }
     return null;
   };
 
@@ -267,7 +276,7 @@ export const LandFormScreen = ({ route, navigation }) => {
     }
 
     const parsedImp = safeParseArray(rawImp);
-    if (parsedImp) {
+    if (parsedImp && parsedImp.length > 0) {
       setImprovementRows(parsedImp.map((i, idx) => ({
         id: i.id || ('imp_' + idx),
         typeId: i.TypeId || i.typeId || 1,
@@ -278,10 +287,12 @@ export const LandFormScreen = ({ route, navigation }) => {
         unitValue: i.UnitValue || i.unitValue || 120,
         marketValue: i.MarketValue || i.marketValue || ((i.Quantity || 1) * (i.UnitValue || 120))
       })));
+    } else {
+      setImprovementRows([]);
     }
 
     const parsedAdj = safeParseArray(rawAdj);
-    if (parsedAdj) {
+    if (parsedAdj && parsedAdj.length > 0) {
       setAdjustmentRows(parsedAdj.map((a, idx) => ({
         id: a.id || ('adj_' + idx),
         classificationName: a.ClassificationName || a.classificationName || 'RESIDENTIAL',
@@ -292,6 +303,8 @@ export const LandFormScreen = ({ route, navigation }) => {
         valueAdjustment: a.ValueAdjustment !== undefined ? a.ValueAdjustment : (a.valueAdjustment || 0),
         adjustedMarketValue: a.AdjustedMarketValue || a.adjustedMarketValue || 78000
       })));
+    } else {
+      setAdjustmentRows([]);
     }
 
     const parsedRoll = safeParseArray(rawRoll);
@@ -304,17 +317,23 @@ export const LandFormScreen = ({ route, navigation }) => {
         assessmentLevelPercent: r.AssessmentLevelPercent || r.assessmentLevelPercent || 20,
         assessedValue: r.AssessmentValue || r.assessmentValue || r.AssessedValue || r.assessedValue || 15600
       })));
-    } else {
-      const mv = parseFloat(partData?.marketValue) || 78000;
+    } else if (partData?.areaSqMeters || partData?.marketValue) {
+      const mv = parseFloat(partData?.marketValue) || 0;
       const lvl = parseFloat(partData?.assessmentLevelPercent) || 20;
-      setAssessmentRollRows([{
-        id: 'roll_default',
-        kinds: 'LAND',
-        actualUseName: partData?.actualUse || 'RESIDENTIAL',
-        marketValue: mv,
-        assessmentLevelPercent: lvl,
-        assessedValue: Math.round(mv * (lvl / 100) * 100) / 100
-      }]);
+      if (mv > 0) {
+        setAssessmentRollRows([{
+          id: 'roll_default',
+          kinds: 'LAND',
+          actualUseName: partData?.actualUse || 'RESIDENTIAL',
+          marketValue: mv,
+          assessmentLevelPercent: lvl,
+          assessedValue: Math.round(mv * (lvl / 100) * 100) / 100
+        }]);
+      } else {
+        setAssessmentRollRows([]);
+      }
+    } else {
+      setAssessmentRollRows([]);
     }
   };
 
@@ -365,6 +384,8 @@ export const LandFormScreen = ({ route, navigation }) => {
       if (downloaded.tdnId) setTdnId(downloaded.tdnId);
       if (downloaded.sketchUrl) setSketchUrl(downloaded.sketchUrl);
       if (downloaded.attachments && Array.isArray(downloaded.attachments)) setAttachments(downloaded.attachments);
+      if (downloaded.trackingNo && !trackingNo) setTrackingNo(downloaded.trackingNo);
+      if (downloaded.transItem?.TrackingNo && !trackingNo) setTrackingNo(downloaded.transItem.TrackingNo);
 
       // Populate partition base properties first
       if (downloaded.currentPartition) {
@@ -374,11 +395,11 @@ export const LandFormScreen = ({ route, navigation }) => {
         if (cp.pin) setPin(cp.pin);
         if (cp.lotNo || cp.lotNumber) setLotNo(cp.lotNo || cp.lotNumber);
         if (cp.blockNo || cp.blockNumber) setBlockNo(cp.blockNo || cp.blockNumber);
-        if (cp.sectionNo) setSectionNo(cp.sectionNo);
-        if (cp.parcelNo) setParcelNo(cp.parcelNo);
-        if (cp.surveyNo || cp.surveyNumber) setSurveyNo(cp.surveyNo || cp.surveyNumber);
-        if (cp.cadastralSurveyNo) setCadastralSurveyNo(cp.cadastralSurveyNo);
-        if (cp.titleNo) setTctNo(cp.titleNo);
+        setSectionNo(cp.sectionNo || '');
+        setParcelNo(cp.parcelNo || '');
+        setSurveyNo(cp.surveyNo || cp.surveyNumber || '');
+        setCadastralSurveyNo(cp.cadastralSurveyNo || '');
+        setTctNo(cp.titleNo || '');
         if (cp.dateRegistered) setTctDate(cp.dateRegistered.substring(0, 10));
         if (cp.registrationStatus) setRegistrationStatus(cleanRegStatus(cp.registrationStatus));
         if (cp.titleType) setTitleType(cleanTitleType(cp.titleType));
@@ -395,14 +416,14 @@ export const LandFormScreen = ({ route, navigation }) => {
         if (cp.ownerContactNo) setOwnerContact(cp.ownerContactNo);
         if (cp.ownerEmail) setOwnerEmail(cp.ownerEmail);
         if (cp.ownerGender) setOwnerGender(cp.ownerGender);
-        if (cp.boundaryNorth) setNorthBoundary(cp.boundaryNorth);
-        if (cp.nremarks) setNRemarks(cp.nremarks);
-        if (cp.boundarySouth) setSouthBoundary(cp.boundarySouth);
-        if (cp.sremarks) setSRemarks(cp.sremarks);
-        if (cp.boundaryEast) setEastBoundary(cp.boundaryEast);
-        if (cp.eremarks) setERemarks(cp.eremarks);
-        if (cp.boundaryWest) setWestBoundary(cp.boundaryWest);
-        if (cp.wremarks) setWRemarks(cp.wremarks);
+        setNorthBoundary(cp.boundaryNorth || '');
+        setNRemarks(cp.nremarks || '');
+        setSouthBoundary(cp.boundarySouth || '');
+        setSRemarks(cp.sremarks || '');
+        setEastBoundary(cp.boundaryEast || '');
+        setERemarks(cp.eremarks || '');
+        setWestBoundary(cp.boundaryWest || '');
+        setWRemarks(cp.wremarks || '');
         hydrateSchedules(cp, downloaded.formData?.TDNLand);
         hydrateTab5(downloaded.formData?.TDN || cp);
       }
@@ -425,7 +446,7 @@ export const LandFormScreen = ({ route, navigation }) => {
     if (!hasUnsynced && (trackingNoParam || formWorkflowIdParam)) {
       try {
         if (!downloaded) setLoading(true);
-        const liveRes = await MobileApi.downloadTransactionDetails(formWorkflowIdParam, trackingNoParam);
+        const liveRes = await MobileApi.downloadTransactionDetails(formWorkflowIdParam, trackingNoParam, partitionIndexParam);
         if (liveRes && liveRes.success) {
           const targetIdx = parseInt(partitionIndexParam, 10) || 0;
           const livePart = (liveRes.partitions && liveRes.partitions[targetIdx]) || null;
@@ -434,8 +455,12 @@ export const LandFormScreen = ({ route, navigation }) => {
 
           if (liveSketch) setSketchUrl(liveSketch);
           if (Array.isArray(liveAtts)) setAttachments(liveAtts);
+          if (liveRes.tdnId) setTdnId(liveRes.tdnId);
 
           if (livePart) {
+            if (livePart.tdnId) setTdnId(livePart.tdnId);
+            if (livePart.tdnLandId) setTdnLandId(livePart.tdnLandId);
+            else if (livePart.formData?.TDNLand?.TDNLandId) setTdnLandId(livePart.formData.TDNLand.TDNLandId);
             if (livePart.systemGeneratedTDN) setDeclarationNo(livePart.systemGeneratedTDN);
             if (livePart.arpNo) setArpNo(livePart.arpNo);
             if (livePart.pin) setPin(livePart.pin);
@@ -443,12 +468,12 @@ export const LandFormScreen = ({ route, navigation }) => {
             if (livePart.dateRegistered) setTctDate(livePart.dateRegistered.substring(0, 10));
             if (livePart.registrationStatus) setRegistrationStatus(cleanRegStatus(livePart.registrationStatus));
             if (livePart.titleType) setTitleType(cleanTitleType(livePart.titleType));
-            if (livePart.sectionNo) setSectionNo(livePart.sectionNo);
+            setSectionNo(livePart.sectionNo || '');
             if (livePart.lotNo || livePart.lotNumber) setLotNo(livePart.lotNo || livePart.lotNumber);
-            if (livePart.parcelNo) setParcelNo(livePart.parcelNo);
-            if (livePart.surveyNo || livePart.surveyNumber) setSurveyNo(livePart.surveyNo || livePart.surveyNumber);
-            if (livePart.titleNo) setTctNo(livePart.titleNo);
-            if (livePart.cadastralSurveyNo) setCadastralSurveyNo(livePart.cadastralSurveyNo);
+            setParcelNo(livePart.parcelNo || '');
+            setSurveyNo(livePart.surveyNo || livePart.surveyNumber || '');
+            setTctNo(livePart.titleNo || '');
+            setCadastralSurveyNo(livePart.cadastralSurveyNo || '');
             if (livePart.streetLocation || livePart.streetNo || livePart.buildingNo) {
               setStreetLocation(livePart.streetLocation || livePart.streetNo || livePart.buildingNo);
             }
@@ -462,15 +487,16 @@ export const LandFormScreen = ({ route, navigation }) => {
             if (livePart.ownerContactNo) setOwnerContact(livePart.ownerContactNo);
             if (livePart.ownerEmail) setOwnerEmail(livePart.ownerEmail);
             if (livePart.ownerGender) setOwnerGender(livePart.ownerGender);
-            if (livePart.boundaryNorth) setNorthBoundary(livePart.boundaryNorth);
-            if (livePart.nremarks) setNRemarks(livePart.nremarks);
-            if (livePart.boundarySouth) setSouthBoundary(livePart.boundarySouth);
-            if (livePart.sremarks) setSRemarks(livePart.sremarks);
-            if (livePart.boundaryEast) setEastBoundary(livePart.boundaryEast);
-            if (livePart.eremarks) setERemarks(livePart.eremarks);
-            if (livePart.boundaryWest) setWestBoundary(livePart.boundaryWest);
-            if (livePart.wremarks) setWRemarks(livePart.wremarks);
-            hydrateSchedules(livePart, liveRes?.formData?.TDNLand);
+            setNorthBoundary(livePart.boundaryNorth || '');
+            setNRemarks(livePart.nremarks || '');
+            setSouthBoundary(livePart.boundarySouth || '');
+            setSRemarks(livePart.sremarks || '');
+            setEastBoundary(livePart.boundaryEast || '');
+            setERemarks(livePart.eremarks || '');
+            setWestBoundary(livePart.boundaryWest || '');
+            setWRemarks(livePart.wremarks || '');
+            // Strictly hydrate schedules from this partition's own formData DTO, NEVER from top-level/Partition 1
+            hydrateSchedules(livePart, livePart.formData?.TDNLand);
             hydrateTab5(livePart);
           }
 
@@ -504,9 +530,22 @@ export const LandFormScreen = ({ route, navigation }) => {
       if (t.PIN) setPin(t.PIN);
       if (t.DisplayName) setOwnerName(t.DisplayName);
       if (t.OwnerAddress) setOwnerAddress(t.OwnerAddress);
-      if (t.PropAdminName) setAdminName(t.PropAdminName);
-      if (t.PropAdminAddress) setAdminAddress(t.PropAdminAddress);
-      if (t.PropAdminContactNo) setAdminContact(t.PropAdminContactNo);
+      const hasAdmin = !!t.IsAdministrator || !!t.AdministratorName || !!t.PropAdminName;
+      const hasBenef = !hasAdmin && !!t.IsBeneficialUser;
+      const hasPoss = !hasAdmin && !hasBenef && !!t.IsPossessor;
+      setIsAdministrator(hasAdmin);
+      setIsBeneficialUser(hasBenef);
+      setIsPossessor(hasPoss);
+      if (t.AdministratorName) {
+        setAdminName(t.AdministratorName);
+      } else if (t.PropAdminName) {
+        setAdminName(t.PropAdminName);
+      }
+      if (t.AdministratorGender) setAdminGender(t.AdministratorGender);
+      if (t.AdministratorTin) setAdminTin(t.AdministratorTin);
+      if (t.AdministratorContactNo || t.PropAdminContactNo) setAdminContact(t.AdministratorContactNo || t.PropAdminContactNo);
+      if (t.AdministratorAddress || t.PropAdminAddress) setAdminAddress(t.AdministratorAddress || t.PropAdminAddress);
+      if (t.AdministratorEmail) setAdminEmail(t.AdministratorEmail);
       if (t.PropLocationStreet) setStreetLocation(t.PropLocationStreet);
       else if (t.Location && !t.Location.includes(',')) setStreetLocation(t.Location);
       if (t.CadastralSurveyNo) setCadastralSurveyNo(t.CadastralSurveyNo);
@@ -555,14 +594,28 @@ export const LandFormScreen = ({ route, navigation }) => {
       else if (p.tctDate) setTctDate(p.tctDate.toString().substring(0, 10));
       if (p.registrationStatus) setRegistrationStatus(cleanRegStatus(p.registrationStatus));
       if (p.titleType) setTitleType(cleanTitleType(p.titleType));
-      if (p.sectionNo) setSectionNo(p.sectionNo);
-      if (p.parcelNo) setParcelNo(p.parcelNo);
-      if (p.surveyNo || p.surveyNumber) setSurveyNo(p.surveyNo || p.surveyNumber);
-      if (p.titleNo) setTctNo(p.titleNo);
+      setSectionNo(p.sectionNo || '');
+      setParcelNo(p.parcelNo || '');
+      setSurveyNo(p.surveyNo || p.surveyNumber || '');
+      setTctNo(p.titleNo || '');
       if (p.streetLocation || p.streetNo || p.buildingNo) setStreetLocation(p.streetLocation || p.streetNo || p.buildingNo);
       if (p.purok) setPurok(p.purok);
       if (p.districtOrBarangay) setDistrictOrBarangay(normalizeBarangay(p.districtOrBarangay));
       if (p.newOwnerName || p.ownerName) setOwnerName(p.newOwnerName || p.ownerName);
+      const pAdmin = !!p.isAdministrator || !!p.administratorName;
+      const pBenef = !pAdmin && !!p.isBeneficialUser;
+      const pPoss = !pAdmin && !pBenef && !!p.isPossessor;
+      setIsAdministrator(pAdmin);
+      setIsBeneficialUser(pBenef);
+      setIsPossessor(pPoss);
+      if (p.administratorName) {
+        setAdminName(p.administratorName);
+      }
+      if (p.administratorGender) setAdminGender(p.administratorGender);
+      if (p.administratorTin) setAdminTin(p.administratorTin);
+      if (p.administratorContactNo) setAdminContact(p.administratorContactNo);
+      if (p.administratorAddress) setAdminAddress(p.administratorAddress);
+      if (p.administratorEmail) setAdminEmail(p.administratorEmail);
       if (p.ownerAddress) setOwnerAddress(p.ownerAddress);
       if (p.ownerTIN || p.ownerTin) setOwnerTin(p.ownerTIN || p.ownerTin);
       if (p.ownerContactNo) setOwnerContact(p.ownerContactNo);
@@ -593,14 +646,14 @@ export const LandFormScreen = ({ route, navigation }) => {
     if (d.TDNLand) {
       const l = d.TDNLand;
       if (l.TDNLandId) setTdnLandId(l.TDNLandId);
-      if (l.NorthBoundary) setNorthBoundary(l.NorthBoundary);
-      if (l.Nremarks) setNRemarks(l.Nremarks);
-      if (l.SouthBoundary) setSouthBoundary(l.SouthBoundary);
-      if (l.Sremarks) setSRemarks(l.Sremarks);
-      if (l.EastBoundary) setEastBoundary(l.EastBoundary);
-      if (l.Eremarks) setERemarks(l.Eremarks);
-      if (l.WestBoundary) setWestBoundary(l.WestBoundary);
-      if (l.Wremarks) setWRemarks(l.Wremarks);
+      setNorthBoundary(l.NorthBoundary || '');
+      setNRemarks(l.Nremarks || '');
+      setSouthBoundary(l.SouthBoundary || '');
+      setSRemarks(l.Sremarks || '');
+      setEastBoundary(l.EastBoundary || '');
+      setERemarks(l.Eremarks || '');
+      setWestBoundary(l.WestBoundary || '');
+      setWRemarks(l.Wremarks || '');
     }
 
     if (d.TDNLandDetails && d.TDNLandDetails.length > 0) {
@@ -999,15 +1052,22 @@ export const LandFormScreen = ({ route, navigation }) => {
     }
   };
 
-  const showCompleteAlertAndGoBack = (title, message) => {
-    if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && typeof window.alert === 'function') {
-        window.alert(`${title}\n\n${message}`);
-      }
-      navigateBack();
-    } else {
-      Alert.alert(title, message, [{ text: 'OK', onPress: navigateBack }]);
-    }
+  const [completeModalConfig, setCompleteModalConfig] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    icon: 'cloud-done-outline',
+    iconType: 'success'
+  });
+
+  const showCompleteModalAndGoBack = (title, message, iconType = 'success', icon = 'cloud-done-outline') => {
+    setCompleteModalConfig({
+      visible: true,
+      title,
+      message,
+      icon,
+      iconType
+    });
   };
 
   const handleCancel = () => {
@@ -1128,7 +1188,12 @@ export const LandFormScreen = ({ route, navigation }) => {
         workflowForwardPayload
       );
       setSaving(false);
-      navigateBack();
+      showCompleteModalAndGoBack(
+        'Saved to Offline Queue',
+        `Edits for Partition ${partitionLetterParam} have been saved locally in the offline queue and will sync to the Web Portal once you are online.`,
+        'warning',
+        'cloud-offline-outline'
+      );
       return;
     }
 
@@ -1150,14 +1215,50 @@ export const LandFormScreen = ({ route, navigation }) => {
           await markTransactionSynced(trackingNo || trackingNoParam, formWorkflowIdParam, transferStage, payload);
         }
         setSaving(false);
-        navigateBack();
+        showCompleteModalAndGoBack(
+          'Land Appraisal Saved & Synced',
+          `Partition ${partitionLetterParam} updates were successfully saved and synchronized directly with the City Assessor Web Portal.`,
+          'success',
+          'cloud-done-outline'
+        );
+        return;
+      } else {
+        // Server rejected live sync: preserve all data safely in the offline queue
+        await queueOfflineUpdate(
+          'UPDATE_LAND',
+          payload,
+          `Land Appraisal [Part ${partitionLetterParam}]: ${trackingNo || arpNo} (${ownerName || 'Owner'})`,
+          workflowForwardPayload
+        );
+        setSaving(false);
+        showCompleteModalAndGoBack(
+          'Saved to Offline Queue (Sync Rejected)',
+          `Live sync could not complete (${res?.message || 'Server rejected the land form update'}). Your edits have been safely preserved in the offline queue and can be re-synced anytime.`,
+          'warning',
+          'cloud-offline-outline'
+        );
         return;
       }
     } catch (err) {
-      // Fallback to offline queue
+      const serverMsg = err.response?.data?.message || err.response?.data || err.message || 'Server returned an error.';
+      // Live sync failed with error: preserve all data safely in the offline queue
+      await queueOfflineUpdate(
+        'UPDATE_LAND',
+        payload,
+        `Land Appraisal [Part ${partitionLetterParam}]: ${trackingNo || arpNo} (${ownerName || 'Owner'})`,
+        workflowForwardPayload
+      );
+      setSaving(false);
+      showCompleteModalAndGoBack(
+        'Saved to Offline Queue (Sync Failed)',
+        `Live sync failed (${serverMsg}). Your edits have been safely preserved in the offline queue and can be re-synced anytime.`,
+        'warning',
+        'cloud-offline-outline'
+      );
+      return;
     }
 
-    // Fallback: Queue offline safely without blocking the user
+    // Fallback: Only queue offline if completely unreachable or network disconnected
     await queueOfflineUpdate(
       'UPDATE_LAND',
       payload,
@@ -1165,7 +1266,12 @@ export const LandFormScreen = ({ route, navigation }) => {
       workflowForwardPayload
     );
     setSaving(false);
-    navigateBack();
+    showCompleteModalAndGoBack(
+      'Saved to Offline Queue',
+      `Device is currently offline or the server was unreachable. Your Partition ${partitionLetterParam} edits have been stored safely in the offline queue and will automatically sync once connected.`,
+      'warning',
+      'cloud-offline-outline'
+    );
   };
 
   return (
@@ -1180,10 +1286,24 @@ export const LandFormScreen = ({ route, navigation }) => {
 
       {/* Offline Status Ribbon */}
       <View style={[styles.ribbon, isDownloaded ? styles.ribbonDownloaded : styles.ribbonStandard]}>
-        <Ionicons name={isDownloaded ? "shield-checkmark" : "cloud-outline"} size={16} color={isDownloaded ? (isDarkMode ? "#34d399" : "#15803d") : colors.primary} />
-        <Text style={[styles.ribbonText, isDownloaded && { color: isDarkMode ? '#34d399' : '#15803d' }]}>
-          {isDownloaded ? "Downloaded Form • 100% Offline Field Ready" : "Live Online Form"}
-        </Text>
+        <View style={styles.ribbonLeft}>
+          <Ionicons name={isDownloaded ? "shield-checkmark" : "cloud-outline"} size={16} color={isDownloaded ? (isDarkMode ? "#34d399" : "#15803d") : colors.primary} />
+          <Text style={[styles.ribbonText, isDownloaded && { color: isDarkMode ? '#34d399' : '#15803d' }]}>
+            {isDownloaded ? "Downloaded Form • 100% Offline Field Ready" : "Live Online Form"}
+          </Text>
+        </View>
+
+        {/* Live Network Status Tag */}
+        <TouchableOpacity
+          style={[styles.ribbonNetTag, isOnline ? styles.ribbonNetOnline : styles.ribbonNetOffline]}
+          onPress={() => checkConnectivity && checkConnectivity()}
+          accessibilityLabel={`Network Status: ${isOnline ? 'Online' : 'Offline'}. Tap to test.`}
+        >
+          <View style={[styles.ribbonNetDot, isOnline ? styles.ribbonNetDotOnline : styles.ribbonNetDotOffline]} />
+          <Text style={[styles.ribbonNetText, isOnline ? styles.ribbonNetTextOnline : styles.ribbonNetTextOffline]}>
+            {isOnline ? 'ONLINE' : 'OFFLINE'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Sticky, Well-Positioned Tab Bar Header */}
@@ -1227,7 +1347,7 @@ export const LandFormScreen = ({ route, navigation }) => {
                   color={isActive ? '#ffffff' : (isDarkMode ? colors.textDark : '#475569')}
                 />
                 <Text style={[styles.sectionTabText, isActive && styles.sectionTabTextActive]}>
-                  {tab.label} {idx === 5 && attachments && attachments.length > 0 ? `(${attachments.length})` : ''}
+                  {tab.label} {idx === 4 && attachments && attachments.length > 0 ? `(${attachments.length})` : ''}
                 </Text>
               </TouchableOpacity>
             );
@@ -1463,7 +1583,7 @@ export const LandFormScreen = ({ route, navigation }) => {
             {activeTab === 1 && (
               <View style={styles.tabContentBlock}>
                 <View style={[styles.card, shadows.card]}>
-                  <Text style={styles.cardHeaderTitle}>Property Location Details (General Santos City Standard)</Text>
+                  <Text style={styles.cardHeaderTitle}>Property Location Details (City of Koronadal Standard)</Text>
 
                   <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>BUILDING NO. / STREET / ROAD</Text>
@@ -1507,7 +1627,7 @@ export const LandFormScreen = ({ route, navigation }) => {
                       <Text style={styles.inputLabel}>CITY / MUNICIPALITY</Text>
                       <TextInput
                         style={[styles.input, styles.inputDisabled]}
-                        value={cityMunicipality}
+                        value={cityMunicipality || 'Koronadal City'}
                         editable={false}
                       />
                     </View>
@@ -1515,7 +1635,7 @@ export const LandFormScreen = ({ route, navigation }) => {
                       <Text style={styles.inputLabel}>PROVINCE</Text>
                       <TextInput
                         style={[styles.input, styles.inputDisabled]}
-                        value={province}
+                        value={province || 'South Cotabato'}
                         editable={false}
                       />
                     </View>
@@ -1606,6 +1726,17 @@ export const LandFormScreen = ({ route, navigation }) => {
                     />
                   </View>
                 </View>
+
+                {/* 2nd Tab: Site Sketch Attachment */}
+                <AttachmentsSection
+                  trackingNo={trackingNo || trackingNoParam}
+                  sketchUrl={sketchUrl}
+                  attachments={attachments}
+                  onAttachmentsChange={setAttachments}
+                  propertyKind="Land"
+                  showSketch={true}
+                  showAttachments={false}
+                />
               </View>
             )}
 
@@ -1615,47 +1746,82 @@ export const LandFormScreen = ({ route, navigation }) => {
             {activeTab === 2 && (
               <View style={styles.tabContentBlock}>
                 <View style={[styles.card, shadows.card]}>
-                  <View style={styles.cardHeaderRow}>
-                    <Text style={styles.cardHeaderTitle}>Owner & Declarant Demographics</Text>
-                  </View>
+                  <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 10, marginBottom: 12 }}>
+                    <Text style={[styles.cardHeaderTitle, { borderBottomWidth: 0, paddingBottom: 0, marginBottom: 8 }]}>
+                      Owner & Declarant Demographics
+                    </Text>
 
-                  {/* Administrator, Beneficial User, Possessor Checkbox Pills */}
-                  <View style={styles.rolePillsRow}>
-                    <TouchableOpacity
-                      style={[styles.rolePill, isAdministrator && styles.rolePillActive]}
-                      onPress={() => setIsAdministrator(!isAdministrator)}
-                    >
-                      <Ionicons
-                        name={isAdministrator ? "checkbox" : "square-outline"}
-                        size={16}
-                        color={isAdministrator ? colors.primary : colors.textMuted}
-                      />
-                      <Text style={[styles.rolePillText, isAdministrator && styles.rolePillTextActive]}>ADMINISTRATOR</Text>
-                    </TouchableOpacity>
+                    {/* 3 Options: Administrator, Beneficial User, Possessor (Check only one) */}
+                    <View style={styles.rolePillsRow}>
+                      <TouchableOpacity
+                        style={[styles.rolePill, isAdministrator && styles.rolePillActive]}
+                        onPress={() => {
+                          if (isAdministrator) {
+                            setIsAdministrator(false);
+                          } else {
+                            setIsAdministrator(true);
+                            setIsBeneficialUser(false);
+                            setIsPossessor(false);
+                          }
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons
+                          name={isAdministrator ? "checkbox" : "square-outline"}
+                          size={16}
+                          color={isAdministrator ? colors.primary : colors.textMuted}
+                        />
+                        <Text style={[styles.rolePillText, isAdministrator && styles.rolePillTextActive]}>
+                          ADMINISTRATOR
+                        </Text>
+                      </TouchableOpacity>
 
-                    <TouchableOpacity
-                      style={[styles.rolePill, isBeneficialUser && styles.rolePillActive]}
-                      onPress={() => setIsBeneficialUser(!isBeneficialUser)}
-                    >
-                      <Ionicons
-                        name={isBeneficialUser ? "checkbox" : "square-outline"}
-                        size={16}
-                        color={isBeneficialUser ? colors.primary : colors.textMuted}
-                      />
-                      <Text style={[styles.rolePillText, isBeneficialUser && styles.rolePillTextActive]}>BENEFICIAL USER</Text>
-                    </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.rolePill, isBeneficialUser && styles.rolePillActive]}
+                        onPress={() => {
+                          if (isBeneficialUser) {
+                            setIsBeneficialUser(false);
+                          } else {
+                            setIsBeneficialUser(true);
+                            setIsAdministrator(false);
+                            setIsPossessor(false);
+                          }
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons
+                          name={isBeneficialUser ? "checkbox" : "square-outline"}
+                          size={16}
+                          color={isBeneficialUser ? colors.primary : colors.textMuted}
+                        />
+                        <Text style={[styles.rolePillText, isBeneficialUser && styles.rolePillTextActive]}>
+                          BENEFICIAL USER
+                        </Text>
+                      </TouchableOpacity>
 
-                    <TouchableOpacity
-                      style={[styles.rolePill, isPossessor && styles.rolePillActive]}
-                      onPress={() => setIsPossessor(!isPossessor)}
-                    >
-                      <Ionicons
-                        name={isPossessor ? "checkbox" : "square-outline"}
-                        size={16}
-                        color={isPossessor ? colors.primary : colors.textMuted}
-                      />
-                      <Text style={[styles.rolePillText, isPossessor && styles.rolePillTextActive]}>POSSESSOR</Text>
-                    </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.rolePill, isPossessor && styles.rolePillActive]}
+                        onPress={() => {
+                          if (isPossessor) {
+                            setIsPossessor(false);
+                          } else {
+                            setIsPossessor(true);
+                            setIsAdministrator(false);
+                            setIsBeneficialUser(false);
+                          }
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons
+                          name={isPossessor ? "checkbox" : "square-outline"}
+                          size={16}
+                          color={isPossessor ? colors.primary : colors.textMuted}
+                        />
+                        <Text style={[styles.rolePillText, isPossessor && styles.rolePillTextActive]}>
+                          POSSESSOR
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
 
                   <View style={styles.inputGroup}>
@@ -1717,86 +1883,104 @@ export const LandFormScreen = ({ route, navigation }) => {
                     </View>
                     <View style={[styles.inputGroup, { flex: 1 }]}>
                       <Text style={styles.inputLabel}>SEX / GENDER</Text>
-                      <View style={styles.optionPillRow}>
-                        {['Male', 'Female'].map((gender) => (
+                      <TouchableOpacity
+                        style={styles.selectBtn}
+                        onPress={() => openGenderPicker('owner')}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.selectBtnText, !ownerGender && { color: colors.placeholder }]} numberOfLines={1}>
+                          {ownerGender || 'Select Gender...'}
+                        </Text>
+                        <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {(isAdministrator || isBeneficialUser || isPossessor) && (
+                    <View style={{ marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.border }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+                        <Ionicons name="shield-checkmark-outline" size={16} color={colors.primary} />
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary, textTransform: 'uppercase' }}>
+                          {isAdministrator ? 'Administrator Details' : isBeneficialUser ? 'Beneficial User Details' : 'Possessor Details'}
+                        </Text>
+                      </View>
+
+                      <View style={styles.inputGroup}>
+                        <Text style={styles.inputLabel}>
+                          NAME ({isAdministrator ? 'ADMINISTRATOR' : isBeneficialUser ? 'BENEFICIAL USER' : 'POSSESSOR'})
+                        </Text>
+                        <TextInput
+                          placeholderTextColor={colors.placeholder}
+                          style={styles.input}
+                          value={adminName}
+                          onChangeText={setAdminName}
+                          placeholder="Full name of administrator / representative"
+                        />
+                      </View>
+
+                      <View style={styles.rowInputs}>
+                        <View style={[styles.inputGroup, { flex: 1 }]}>
+                          <Text style={styles.inputLabel}>TAX IDENTIFICATION NO. (TIN)</Text>
+                          <TextInput
+                            placeholderTextColor={colors.placeholder}
+                            style={styles.input}
+                            value={adminTin}
+                            onChangeText={setAdminTin}
+                            placeholder="000-000-000-000"
+                          />
+                        </View>
+                        <View style={[styles.inputGroup, { flex: 1 }]}>
+                          <Text style={styles.inputLabel}>CONTACT NUMBER</Text>
+                          <TextInput
+                            placeholderTextColor={colors.placeholder}
+                            style={styles.input}
+                            value={adminContact}
+                            onChangeText={setAdminContact}
+                            placeholder="09XX-XXX-XXXX"
+                          />
+                        </View>
+                      </View>
+
+                      <View style={styles.inputGroup}>
+                        <Text style={styles.inputLabel}>ADMINISTRATOR ADDRESS</Text>
+                        <TextInput
+                          placeholderTextColor={colors.placeholder}
+                          style={styles.input}
+                          value={adminAddress}
+                          onChangeText={setAdminAddress}
+                          placeholder="House No., Street, Barangay, City, Province"
+                        />
+                      </View>
+
+                      <View style={styles.rowInputs}>
+                        <View style={[styles.inputGroup, { flex: 2 }]}>
+                          <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
+                          <TextInput
+                            placeholderTextColor={colors.placeholder}
+                            style={styles.input}
+                            value={adminEmail}
+                            onChangeText={setAdminEmail}
+                            placeholder="admin@example.com"
+                            keyboardType="email-address"
+                          />
+                        </View>
+                        <View style={[styles.inputGroup, { flex: 1 }]}>
+                          <Text style={styles.inputLabel}>SEX / GENDER</Text>
                           <TouchableOpacity
-                            key={gender}
-                            style={[styles.optionPill, ownerGender === gender && styles.optionPillActive]}
-                            onPress={() => setOwnerGender(gender)}
+                            style={styles.selectBtn}
+                            onPress={() => openGenderPicker('admin')}
+                            activeOpacity={0.7}
                           >
-                            <Text style={[styles.optionPillText, ownerGender === gender && styles.optionPillTextActive]}>
-                              {gender}
+                            <Text style={[styles.selectBtnText, !adminGender && { color: colors.placeholder }]} numberOfLines={1}>
+                              {adminGender || 'Select Gender...'}
                             </Text>
+                            <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
                           </TouchableOpacity>
-                        ))}
+                        </View>
                       </View>
                     </View>
-                  </View>
+                  )}
                 </View>
-
-                {/* Administrator / Beneficial User / Possessor Details */}
-                {Boolean(isAdministrator || isBeneficialUser || isPossessor || adminName) ? (
-                  <View style={[styles.card, shadows.card]}>
-                    <Text style={styles.cardHeaderTitle}>Administrator / Beneficial User / Possessor Details</Text>
-
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.inputLabel}>NAMES (ADMINISTRATOR / BENEFICIAL USER / POSSESSOR)</Text>
-                      <TextInput
-                        placeholderTextColor={colors.placeholder}
-                        style={styles.input}
-                        value={adminName}
-                        onChangeText={setAdminName}
-                        placeholder="Full name of administrator / representative"
-                      />
-                    </View>
-
-                    <View style={styles.rowInputs}>
-                      <View style={[styles.inputGroup, { flex: 1 }]}>
-                        <Text style={styles.inputLabel}>TIN</Text>
-                        <TextInput
-                          placeholderTextColor={colors.placeholder}
-                          style={styles.input}
-                          value={adminTin}
-                          onChangeText={setAdminTin}
-                          placeholder="000-000-000-000"
-                        />
-                      </View>
-                      <View style={[styles.inputGroup, { flex: 1 }]}>
-                        <Text style={styles.inputLabel}>PHONE NO.</Text>
-                        <TextInput
-                          placeholderTextColor={colors.placeholder}
-                          style={styles.input}
-                          value={adminContact}
-                          onChangeText={setAdminContact}
-                          placeholder="09XX-XXX-XXXX"
-                        />
-                      </View>
-                    </View>
-
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.inputLabel}>MAILING ADDRESS</Text>
-                      <TextInput
-                        placeholderTextColor={colors.placeholder}
-                        style={styles.input}
-                        value={adminAddress}
-                        onChangeText={setAdminAddress}
-                        placeholder="Complete mailing address"
-                      />
-                    </View>
-
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.inputLabel}>EMAIL</Text>
-                      <TextInput
-                        placeholderTextColor={colors.placeholder}
-                        style={styles.input}
-                        value={adminEmail}
-                        onChangeText={setAdminEmail}
-                        placeholder="admin@example.com"
-                        keyboardType="email-address"
-                      />
-                    </View>
-                  </View>
-                ) : null}
               </View>
             )}
 
@@ -2417,20 +2601,16 @@ export const LandFormScreen = ({ route, navigation }) => {
                     </View>
                   )}
                 </View>
-              </View>
-            )}
 
-            {/* ========================================================= */}
-            {/* TAB 5: 6. FIELD PHOTOS & SITE SKETCH                      */}
-            {/* ========================================================= */}
-            {activeTab === 5 && (
-              <View style={styles.tabContentBlock}>
+                {/* 5th Tab: Field Photos & Attachments */}
                 <AttachmentsSection
                   trackingNo={trackingNo || trackingNoParam}
                   sketchUrl={sketchUrl}
                   attachments={attachments}
                   onAttachmentsChange={setAttachments}
                   propertyKind="Land"
+                  showSketch={false}
+                  showAttachments={true}
                 />
               </View>
             )}
@@ -2557,6 +2737,58 @@ export const LandFormScreen = ({ route, navigation }) => {
                 );
               })}
             </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Gender Picker Modal */}
+      <Modal
+        visible={genderPickerVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setGenderPickerVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setGenderPickerVisible(false)}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {genderPickerTarget === 'owner' ? 'Select Owner Gender' : 'Select Gender'}
+              </Text>
+              <TouchableOpacity onPress={() => setGenderPickerVisible(false)}>
+                <Ionicons name="close" size={24} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+            <View style={{ paddingVertical: 8 }}>
+              {GENDER_OPTIONS.map((option) => {
+                const currentVal = genderPickerTarget === 'owner' ? ownerGender : adminGender;
+                const isSelected = currentVal === option;
+                return (
+                  <TouchableOpacity
+                    key={option}
+                    style={[styles.typeOptionItem, isSelected && styles.typeOptionItemSelected]}
+                    onPress={() => {
+                      if (genderPickerTarget === 'owner') {
+                        setOwnerGender(option);
+                      } else {
+                        setAdminGender(option);
+                      }
+                      setGenderPickerVisible(false);
+                    }}
+                  >
+                    <Text style={[styles.typeOptionText, isSelected && styles.typeOptionTextSelected]}>
+                      {option}
+                    </Text>
+                    {isSelected && (
+                      <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
         </TouchableOpacity>
       </Modal>
@@ -3589,6 +3821,29 @@ export const LandFormScreen = ({ route, navigation }) => {
         onConfirmDiscard={navigateBack}
         partitionLetter={partitionLetterParam}
       />
+
+      {/* Save & Offline Queue Completion Modal */}
+      <ActionModal
+        visible={completeModalConfig.visible}
+        title={completeModalConfig.title}
+        message={completeModalConfig.message}
+        icon={completeModalConfig.icon}
+        iconType={completeModalConfig.iconType}
+        buttons={[
+          {
+            text: 'OK',
+            style: 'primary',
+            onPress: () => {
+              setCompleteModalConfig(prev => ({ ...prev, visible: false }));
+              navigateBack();
+            }
+          }
+        ]}
+        onClose={() => {
+          setCompleteModalConfig(prev => ({ ...prev, visible: false }));
+          navigateBack();
+        }}
+      />
     </View>
   );
 };
@@ -3601,10 +3856,56 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
   ribbon: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 8,
     gap: 8,
     borderBottomWidth: 1
+  },
+  ribbonLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1
+  },
+  ribbonNetTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 4
+  },
+  ribbonNetOnline: {
+    backgroundColor: isDarkMode ? 'rgba(5, 150, 105, 0.2)' : '#ecfdf5',
+    borderColor: isDarkMode ? '#059669' : '#a7f3d0'
+  },
+  ribbonNetOffline: {
+    backgroundColor: isDarkMode ? 'rgba(217, 119, 6, 0.2)' : '#fffbeb',
+    borderColor: isDarkMode ? '#d97706' : '#fde68a'
+  },
+  ribbonNetDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3
+  },
+  ribbonNetDotOnline: {
+    backgroundColor: '#059669'
+  },
+  ribbonNetDotOffline: {
+    backgroundColor: '#d97706'
+  },
+  ribbonNetText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5
+  },
+  ribbonNetTextOnline: {
+    color: isDarkMode ? '#34d399' : '#059669'
+  },
+  ribbonNetTextOffline: {
+    color: isDarkMode ? '#fbbf24' : '#d97706'
   },
   ribbonDownloaded: {
     backgroundColor: isDarkMode ? '#064e3b' : '#dcfce7',

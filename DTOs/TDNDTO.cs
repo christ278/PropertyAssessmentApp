@@ -107,6 +107,7 @@ public class TDNDTO
     public string? OwnerContactNo { get; set; }
     public string? OwnerEmail { get; set; }
     public string? OwnerGender { get; set; }
+    public string? OwnerCivilStatus { get; set; }
     public bool IsAdministrator { get; set; }
     public bool IsBeneficialUser { get; set; }
     public bool IsPossessor { get; set; }
@@ -124,6 +125,8 @@ public class TDNDTO
     public string? LandImprovementsJson { get; set; }
     public string? LandAdjustmentsJson { get; set; }
     public string? LandPropertyAssessmentsJson { get; set; }
+    public string? FloorBreakdownJson { get; set; }
+    public string? AdditionalItemsJson { get; set; }
     public string? Classification { get; set; }
     public string? SubClassification { get; set; }
     public string? ActualUse { get; set; }

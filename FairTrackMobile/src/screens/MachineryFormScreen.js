@@ -140,7 +140,7 @@ export const MachineryFormScreen = ({ route, navigation }) => {
     if (!hasUnsynced && (trackingNoParam || formWorkflowIdParam)) {
       try {
         if (!downloaded) setLoading(true);
-        const liveRes = await MobileApi.downloadTransactionDetails(formWorkflowIdParam, trackingNoParam);
+        const liveRes = await MobileApi.downloadTransactionDetails(formWorkflowIdParam, trackingNoParam, partitionIndexParam);
         if (liveRes && liveRes.success) {
           const targetIdx = parseInt(partitionIndexParam, 10) || 0;
           const livePart = (liveRes.partitions && liveRes.partitions[targetIdx]) || null;

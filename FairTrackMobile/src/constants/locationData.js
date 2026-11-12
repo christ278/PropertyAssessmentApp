@@ -1,59 +1,33 @@
-// Official LGU Barangays (General Santos City, Koronadal City & Regional Centers)
+// Official LGU Barangays (City of Koronadal, South Cotabato)
+// Exactly aligned with Web Portal (OfficialKoronadalBarangays)
 export const BARANGAY_OPTIONS = [
-  // General Santos City
-  'Brgy. Central',
-  'Brgy. Dadiangas East',
-  'Brgy. Dadiangas North',
-  'Brgy. Dadiangas South',
-  'Brgy. Dadiangas West',
-  'Brgy. Lagao',
-  'Brgy. San Isidro',
-  'Brgy. Calumpang',
-  'Brgy. City Heights',
-  'Brgy. Labangal',
-  'Brgy. Apopong',
-  'Brgy. Baluan',
-  'Brgy. Batomelong',
-  'Brgy. Buayan',
-  'Brgy. Bula',
-  'Brgy. Conel',
-  'Brgy. Fatima',
-  'Brgy. Katangawan',
-  'Brgy. Ligaya',
-  'Brgy. Mabuhay',
-  'Brgy. San Jose',
-  'Brgy. Sinawal',
-  'Brgy. Tambler',
-  'Brgy. Tinagacan',
-  'Brgy. Upper Labay',
-  'Brgy. Olympog',
-
-  // Koronadal City
-  'Brgy. Zone I (Poblacion)',
-  'Brgy. Zone II (Poblacion)',
-  'Brgy. Zone III (Poblacion)',
-  'Brgy. Zone IV (Poblacion)',
-  'Brgy. Assumption',
-  'Brgy. Avanceña',
-  'Brgy. Cacub',
-  'Brgy. Caloocan',
-  'Brgy. Carpenter Hill',
-  'Brgy. Concepcion',
-  'Brgy. Esperanza',
-  'Brgy. Gen. P. Santos',
-  'Brgy. Mabini',
-  'Brgy. Magsaysay',
-  'Brgy. Mambucal',
-  'Brgy. Morales',
-  'Brgy. Namnama',
-  'Brgy. New Pangasinan',
-  'Brgy. Paraiso',
-  'Brgy. Rotonda',
-  'Brgy. San Roque',
-  'Brgy. Saravia',
-  'Brgy. Sta. Cruz',
-  'Brgy. Sto. Niño',
-  'Brgy. Topland'
+  'BRGY. ASSUMPTION',
+  'BRGY. AVANCENA',
+  'BRGY. CACUB',
+  'BRGY. CALOOCAN',
+  'BRGY. CARPENTER HILL',
+  'BRGY. CONCEPCION',
+  'BRGY. ESPERANZA',
+  'BRGY. GEN. P. SANTOS',
+  'BRGY. MABINI',
+  'BRGY. MAGSAYSAY',
+  'BRGY. MAMBUCAL',
+  'BRGY. MORALES',
+  'BRGY. NAMNAMA',
+  'BRGY. NEW PANGASINAN',
+  'BRGY. PARAISO',
+  'BRGY. ROTONDA',
+  'BRGY. SAN ISIDRO',
+  'BRGY. SAN JOSE',
+  'BRGY. SAN ROQUE',
+  'BRGY. SARAVIA',
+  'BRGY. STA. CRUZ',
+  'BRGY. STO. NIÑO',
+  'BRGY. TOPLAND',
+  'BRGY. ZONE I',
+  'BRGY. ZONE II',
+  'BRGY. ZONE III',
+  'BRGY. ZONE IV'
 ];
 
 export const normalizeBarangay = (raw) => {
@@ -62,12 +36,31 @@ export const normalizeBarangay = (raw) => {
   const direct = BARANGAY_OPTIONS.find(b => b.toLowerCase() === clean.toLowerCase());
   if (direct) return direct;
 
-  // Partial match without "Brgy." or "Barangay"
-  const stripped = clean.replace(/^(brgy\.?|barangay)\s*/i, '').trim().toLowerCase();
-  const partial = BARANGAY_OPTIONS.find(b => {
-    const bStripped = b.replace(/^(brgy\.?|barangay)\s*/i, '').trim().toLowerCase();
-    return bStripped === stripped || bStripped.includes(stripped) || stripped.includes(bStripped);
-  });
-  return partial || clean;
-};
+  const strip = (s) =>
+    s
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/^(brgy\.?|barangay)\s*/i, '')
+      .replace(/\s*\(poblacion\)\s*/i, '')
+      .replace(/[^a-zA-Z0-9]/g, '')
+      .trim()
+      .toLowerCase();
 
+  const stripped = strip(clean);
+
+  // Map Roman numerals vs Arabic numerals for Zone 1-4 (e.g., Zone 1 -> Zone I)
+  const zoneMap = {
+    'zone1': 'zonei',
+    'zone2': 'zoneii',
+    'zone3': 'zoneiii',
+    'zone4': 'zoneiv'
+  };
+  const normalizedStripped = zoneMap[stripped] || stripped;
+
+  const match = BARANGAY_OPTIONS.find(b => {
+    const bStripped = strip(b);
+    return bStripped === normalizedStripped || bStripped.includes(normalizedStripped) || normalizedStripped.includes(bStripped);
+  });
+
+  return match || clean;
+};

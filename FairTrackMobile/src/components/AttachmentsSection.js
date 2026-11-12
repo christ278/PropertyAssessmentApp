@@ -23,7 +23,9 @@ export const AttachmentsSection = ({
   sketchUrl,
   attachments = [],
   onAttachmentsChange,
-  propertyKind = 'Building' // 'Building' | 'Land' | 'Machinery'
+  propertyKind = 'Building', // 'Building' | 'Land' | 'Machinery'
+  showSketch = true,
+  showAttachments = true
 }) => {
   const { isDarkMode, colors, shadows } = useTheme();
   const styles = React.useMemo(() => getStyles(colors, isDarkMode), [colors, isDarkMode]);
@@ -242,69 +244,72 @@ export const AttachmentsSection = ({
       {/* =========================================================================
           SECTION 1: WEB-UPLOADED SITE SKETCH / FLOOR PLAN BLUEPRINT
           ========================================================================= */}
-      <View style={[styles.card, shadows.card]}>
-        <View style={styles.headerRow}>
-          <View style={styles.headerIconBox}>
-            <Ionicons name="map-outline" size={20} color={colors.primary} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.cardTitle}>Site Sketch & Floor Plan Blueprint</Text>
-            <Text style={styles.cardSubtitle}>Uploaded from Assessor Office Web Portal</Text>
-          </View>
-          <View style={styles.badgeWeb}>
-            <Text style={styles.badgeWebText}>Office Web Sketch</Text>
-          </View>
-        </View>
-
-        {displaySketchUri ? (
-          <View style={styles.sketchContainer}>
-            <TouchableOpacity
-              activeOpacity={0.85}
-              style={styles.sketchImageWrap}
-              onPress={() => setFullscreenImage(displaySketchUri)}
-            >
-              <Image
-                source={{ uri: displaySketchUri }}
-                style={styles.sketchImage}
-                resizeMode="contain"
-              />
-              <View style={styles.zoomOverlay}>
-                <Ionicons name="scan-outline" size={16} color="#ffffff" />
-                <Text style={styles.zoomOverlayText}>Tap to Enlarge</Text>
-              </View>
-            </TouchableOpacity>
-
-            <View style={styles.sketchFooter}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.sketchFileName} numberOfLines={1}>
-                  {sketchUrl.split('/').pop()}
-                </Text>
-                <Text style={styles.sketchHint}>Official blueprint for {propertyKind} inspection</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.viewFullBtn}
-                onPress={() => setFullscreenImage(resolvedSketchUri)}
-              >
-                <Ionicons name="expand-outline" size={16} color={colors.primary} />
-                <Text style={styles.viewFullBtnText}>Full View</Text>
-              </TouchableOpacity>
+      {showSketch && (
+        <View style={[styles.card, shadows.card]}>
+          <View style={styles.headerRow}>
+            <View style={styles.headerIconBox}>
+              <Ionicons name="map-outline" size={20} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.cardTitle}>Site Sketch & Floor Plan Blueprint</Text>
+              <Text style={styles.cardSubtitle}>Uploaded from Assessor Office Web Portal</Text>
+            </View>
+            <View style={styles.badgeWeb}>
+              <Text style={styles.badgeWebText}>Office Web Sketch</Text>
             </View>
           </View>
-        ) : (
-          <View style={styles.emptySketchBox}>
-            <Ionicons name="document-text-outline" size={38} color={colors.textMuted} />
-            <Text style={styles.emptySketchTitle}>No Blueprint Sketch Uploaded</Text>
-            <Text style={styles.emptySketchText}>
-              No Site Sketch or Floor Plan blueprint has been attached from the Office Web Portal for this partition yet.
-            </Text>
-          </View>
-        )}
-      </View>
+
+          {displaySketchUri ? (
+            <View style={styles.sketchContainer}>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                style={styles.sketchImageWrap}
+                onPress={() => setFullscreenImage(displaySketchUri)}
+              >
+                <Image
+                  source={{ uri: displaySketchUri }}
+                  style={styles.sketchImage}
+                  resizeMode="contain"
+                />
+                <View style={styles.zoomOverlay}>
+                  <Ionicons name="scan-outline" size={16} color="#ffffff" />
+                  <Text style={styles.zoomOverlayText}>Tap to Enlarge</Text>
+                </View>
+              </TouchableOpacity>
+
+              <View style={styles.sketchFooter}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.sketchFileName} numberOfLines={1}>
+                    {sketchUrl.split('/').pop()}
+                  </Text>
+                  <Text style={styles.sketchHint}>Official blueprint for {propertyKind} inspection</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.viewFullBtn}
+                  onPress={() => setFullscreenImage(resolvedSketchUri)}
+                >
+                  <Ionicons name="expand-outline" size={16} color={colors.primary} />
+                  <Text style={styles.viewFullBtnText}>Full View</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.emptySketchBox}>
+              <Ionicons name="document-text-outline" size={38} color={colors.textMuted} />
+              <Text style={styles.emptySketchTitle}>No Blueprint Sketch Uploaded</Text>
+              <Text style={styles.emptySketchText}>
+                No Site Sketch or Floor Plan blueprint has been attached from the Office Web Portal for this partition yet.
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
 
       {/* =========================================================================
           SECTION 2: MULTIPLE FIELD INSPECTION PHOTOS (CAMERA & GALLERY ONLY)
           ========================================================================= */}
-      <View style={[styles.card, shadows.card, { marginTop: 14 }]}>
+      {showAttachments && (
+        <View style={[styles.card, shadows.card, { marginTop: showSketch ? 14 : 0 }]}>
         <View style={styles.headerRow}>
           <View style={[styles.headerIconBox, { backgroundColor: isDarkMode ? '#064e3b' : '#ecfdf5' }]}>
             <Ionicons name="camera-outline" size={20} color={isDarkMode ? '#34d399' : '#059669'} />
@@ -438,6 +443,7 @@ export const AttachmentsSection = ({
           </View>
         )}
       </View>
+      )}
 
       {/* =========================================================================
           FULL-SCREEN IMAGE PREVIEW MODAL

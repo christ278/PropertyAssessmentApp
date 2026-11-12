@@ -42,32 +42,39 @@ export const MobileApi = {
   },
 
   // Download Full Form Assessment Details for Field Inspection
-  downloadTransactionDetails: async (formWorkflowId, trackingNo = '') => {
+  downloadTransactionDetails: async (formWorkflowId, trackingNo = '', partitionIndex = null) => {
+    const params = { formWorkflowId, trackingNo };
+    if (partitionIndex !== null && partitionIndex !== undefined) {
+      params.partitionIndex = partitionIndex;
+    }
     const response = await apiClient.get('/api/mobile/transaction/download-details', {
-      params: { formWorkflowId, trackingNo }
+      params
     });
     return response.data;
   },
 
-  // Fetch Form Details (Land, Building, Machinery)
-  getBuildingForm: async (tdnId, castTdnBuildingId = null) => {
-    const response = await apiClient.get('/api/mobile/form/building', {
-      params: { tdnId, castTdnBuildingId }
-    });
+  // Fetch Form Details (Land, Building, Machinery) - Dedicated endpoints per kind
+  getBuildingForm: async (paramsOrTdnId, castTdnBuildingId = null) => {
+    const params = (typeof paramsOrTdnId === 'object' && paramsOrTdnId !== null)
+      ? paramsOrTdnId
+      : { tdnId: paramsOrTdnId, castTdnBuildingId };
+    const response = await apiClient.get('/api/mobile/form/building', { params });
     return response.data;
   },
 
-  getLandForm: async (tdnId, tdnLandId = null) => {
-    const response = await apiClient.get('/api/mobile/form/land', {
-      params: { tdnId, tdnLandId }
-    });
+  getLandForm: async (paramsOrTdnId, tdnLandId = null) => {
+    const params = (typeof paramsOrTdnId === 'object' && paramsOrTdnId !== null)
+      ? paramsOrTdnId
+      : { tdnId: paramsOrTdnId, tdnLandId };
+    const response = await apiClient.get('/api/mobile/form/land', { params });
     return response.data;
   },
 
-  getMachineryForm: async (tdnId, tdnMachineryId = null) => {
-    const response = await apiClient.get('/api/mobile/form/machinery', {
-      params: { tdnId, tdnMachineryId }
-    });
+  getMachineryForm: async (paramsOrTdnId, tdnMachineryId = null) => {
+    const params = (typeof paramsOrTdnId === 'object' && paramsOrTdnId !== null)
+      ? paramsOrTdnId
+      : { tdnId: paramsOrTdnId, tdnMachineryId };
+    const response = await apiClient.get('/api/mobile/form/machinery', { params });
     return response.data;
   },
 
