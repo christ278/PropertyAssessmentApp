@@ -28,8 +28,7 @@ const TABS = [
   { label: '1. Property Info & Taxpayer (CCT)', icon: 'information-circle-outline' },
   { label: '2. Structural Specs & 17 Materials', icon: 'business-outline' },
   { label: '3. Floor Levels, Additions & Valuation', icon: 'calculator-outline' },
-  { label: '4. Back Taxes, Effectivity & Notes', icon: 'document-text-outline' },
-  { label: '5. Field Photos & Attachments', icon: 'images-outline' },
+  { label: '4. Back Taxes, Effectivity & Attachments', icon: 'document-text-outline' },
 ];
 
 const FLOOR_LEVEL_OPTIONS = [
@@ -232,7 +231,14 @@ export const BuildingFormScreen = ({ route, navigation }) => {
   const [areaSqMeters, setAreaSqMeters] = useState('');
   const [ownerName, setOwnerName] = useState('');
   const [isAdministrator, setIsAdministrator] = useState(false);
+  const [isBeneficialUser, setIsBeneficialUser] = useState(false);
   const [adminName, setAdminName] = useState('');
+  const [adminGender, setAdminGender] = useState('Male');
+  const [adminCivilStatus, setAdminCivilStatus] = useState('Single');
+  const [adminTin, setAdminTin] = useState('');
+  const [adminContact, setAdminContact] = useState('');
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminAddress, setAdminAddress] = useState('');
   const [ownerGender, setOwnerGender] = useState('Male');
   const [ownerCivilStatus, setOwnerCivilStatus] = useState('Single');
   const [ownerTin, setOwnerTin] = useState('');
@@ -587,11 +593,17 @@ export const BuildingFormScreen = ({ route, navigation }) => {
         }
         if (cp.arpNo) setArpNo(cp.arpNo);
         if (cp.systemGeneratedTDN) setDeclarationNo(cp.systemGeneratedTDN);
-        if (cp.isAdministrator != null) setIsAdministrator(!!cp.isAdministrator);
-        if (cp.administratorName) {
-          setAdminName(cp.administratorName);
-          setIsAdministrator(true);
-        }
+        const hasAdmin = !!cp.isAdministrator || !!cp.administratorName;
+        const hasBenef = !hasAdmin && !!cp.isBeneficialUser;
+        setIsAdministrator(hasAdmin);
+        setIsBeneficialUser(hasBenef);
+        if (cp.administratorName) setAdminName(cp.administratorName);
+        if (cp.administratorAddress || cp.propAdminAddress) setAdminAddress(cp.administratorAddress || cp.propAdminAddress);
+        if (cp.administratorContactNo || cp.propAdminContactNo) setAdminContact(cp.administratorContactNo || cp.propAdminContactNo);
+        if (cp.administratorTin) setAdminTin(cp.administratorTin);
+        if (cp.administratorEmail) setAdminEmail(cp.administratorEmail);
+        if (cp.administratorGender) setAdminGender(cp.administratorGender);
+        if (cp.administratorCivilStatus) setAdminCivilStatus(cp.administratorCivilStatus);
         if (cp.ownerGender) setOwnerGender(cp.ownerGender);
         if (cp.ownerCivilStatus) setOwnerCivilStatus(cp.ownerCivilStatus);
         if (cp.ownerTin) setOwnerTin(cp.ownerTin);
@@ -648,6 +660,17 @@ export const BuildingFormScreen = ({ route, navigation }) => {
               if (livePart.titleNo) setTctNo(livePart.titleNo);
               if (livePart.sectionNo) setSectionNo(livePart.sectionNo);
             }
+            const pAdmin = !!livePart.isAdministrator || !!livePart.administratorName;
+            const pBenef = !pAdmin && !!livePart.isBeneficialUser;
+            setIsAdministrator(pAdmin);
+            setIsBeneficialUser(pBenef);
+            if (livePart.administratorName) setAdminName(livePart.administratorName);
+            if (livePart.administratorAddress || livePart.propAdminAddress) setAdminAddress(livePart.administratorAddress || livePart.propAdminAddress);
+            if (livePart.administratorContactNo || livePart.propAdminContactNo) setAdminContact(livePart.administratorContactNo || livePart.propAdminContactNo);
+            if (livePart.administratorTin) setAdminTin(livePart.administratorTin);
+            if (livePart.administratorEmail) setAdminEmail(livePart.administratorEmail);
+            if (livePart.administratorGender) setAdminGender(livePart.administratorGender);
+            if (livePart.administratorCivilStatus) setAdminCivilStatus(livePart.administratorCivilStatus);
             if (livePart.ownerGender) setOwnerGender(livePart.ownerGender);
             if (livePart.ownerCivilStatus) setOwnerCivilStatus(livePart.ownerCivilStatus);
             if (livePart.ownerEmail) setOwnerEmail(livePart.ownerEmail);
@@ -703,11 +726,17 @@ export const BuildingFormScreen = ({ route, navigation }) => {
       if (t.OwnerTIN) setOwnerTin(t.OwnerTIN);
       if (t.OwnerContactNo) setOwnerContact(t.OwnerContactNo);
       if (t.OwnerEmail) setOwnerEmail(t.OwnerEmail);
-      if (t.IsAdministrator != null) setIsAdministrator(!!t.IsAdministrator);
-      if (t.PropAdminName || t.AdministratorName) {
-        setAdminName(t.PropAdminName || t.AdministratorName);
-        setIsAdministrator(true);
-      }
+      const tAdmin = !!t.IsAdministrator || !!t.AdministratorName || !!t.PropAdminName;
+      const tBenef = !tAdmin && !!t.IsBeneficialUser;
+      setIsAdministrator(tAdmin);
+      setIsBeneficialUser(tBenef);
+      if (t.AdministratorName || t.PropAdminName) setAdminName(t.AdministratorName || t.PropAdminName);
+      if (t.AdministratorAddress || t.PropAdminAddress) setAdminAddress(t.AdministratorAddress || t.PropAdminAddress);
+      if (t.AdministratorContactNo || t.PropAdminContactNo) setAdminContact(t.AdministratorContactNo || t.PropAdminContactNo);
+      if (t.AdministratorTin) setAdminTin(t.AdministratorTin);
+      if (t.AdministratorEmail) setAdminEmail(t.AdministratorEmail);
+      if (t.AdministratorGender) setAdminGender(t.AdministratorGender);
+      if (t.AdministratorCivilStatus) setAdminCivilStatus(t.AdministratorCivilStatus);
       if (t.PropLocationStreet) setStreetLocation(t.PropLocationStreet);
       else if (t.Location && !t.Location.includes(',')) setStreetLocation(t.Location);
       if (t.DistrictOrBarangay || t.Barangay) setDistrictOrBarangay(normalizeBarangay(t.DistrictOrBarangay || t.Barangay));
@@ -811,11 +840,17 @@ export const BuildingFormScreen = ({ route, navigation }) => {
       if (cp.districtOrBarangay) setDistrictOrBarangay(normalizeBarangay(cp.districtOrBarangay));
       if (cp.cityMunicipality) setCityMunicipality(cp.cityMunicipality);
       if (cp.province) setProvince(cp.province);
-      if (cp.isAdministrator != null) setIsAdministrator(!!cp.isAdministrator);
-      if (cp.administratorName) {
-        setAdminName(cp.administratorName);
-        setIsAdministrator(true);
-      }
+      const cpAdmin = !!cp.isAdministrator || !!cp.administratorName;
+      const cpBenef = !cpAdmin && !!cp.isBeneficialUser;
+      setIsAdministrator(cpAdmin);
+      setIsBeneficialUser(cpBenef);
+      if (cp.administratorName) setAdminName(cp.administratorName);
+      if (cp.administratorAddress || cp.propAdminAddress) setAdminAddress(cp.administratorAddress || cp.propAdminAddress);
+      if (cp.administratorContactNo || cp.propAdminContactNo) setAdminContact(cp.administratorContactNo || cp.propAdminContactNo);
+      if (cp.administratorTin) setAdminTin(cp.administratorTin);
+      if (cp.administratorEmail) setAdminEmail(cp.administratorEmail);
+      if (cp.administratorGender) setAdminGender(cp.administratorGender);
+      if (cp.administratorCivilStatus) setAdminCivilStatus(cp.administratorCivilStatus);
       if (cp.ownerGender) setOwnerGender(cp.ownerGender);
       if (cp.ownerCivilStatus) setOwnerCivilStatus(cp.ownerCivilStatus);
       if (cp.ownerTin) setOwnerTin(cp.ownerTin);
@@ -933,8 +968,17 @@ export const BuildingFormScreen = ({ route, navigation }) => {
         OwnerEmail: ownerEmail,
         OwnerAddress: ownerAddress,
         IsAdministrator: isAdministrator,
-        AdministratorName: isAdministrator ? adminName : '',
-        PropAdminName: isAdministrator ? adminName : '',
+        IsBeneficialUser: isBeneficialUser,
+        AdministratorName: (isAdministrator || isBeneficialUser) ? adminName : '',
+        PropAdminName: (isAdministrator || isBeneficialUser) ? adminName : '',
+        AdministratorAddress: (isAdministrator || isBeneficialUser) ? adminAddress : '',
+        PropAdminAddress: (isAdministrator || isBeneficialUser) ? adminAddress : '',
+        AdministratorContactNo: (isAdministrator || isBeneficialUser) ? adminContact : '',
+        PropAdminContactNo: (isAdministrator || isBeneficialUser) ? adminContact : '',
+        AdministratorTin: (isAdministrator || isBeneficialUser) ? adminTin : '',
+        AdministratorEmail: (isAdministrator || isBeneficialUser) ? adminEmail : '',
+        AdministratorGender: (isAdministrator || isBeneficialUser) ? adminGender : '',
+        AdministratorCivilStatus: (isAdministrator || isBeneficialUser) ? adminCivilStatus : '',
         PropLocationStreet: streetLocation,
         Location: streetLocation,
         DistrictOrBarangay: districtOrBarangay,
@@ -1027,7 +1071,8 @@ export const BuildingFormScreen = ({ route, navigation }) => {
         Gender: ownerGender,
         CivilStatus: ownerCivilStatus,
         IsAdministrator: isAdministrator,
-        AdministratorName: isAdministrator ? adminName : '',
+        IsBeneficialUser: isBeneficialUser,
+        AdministratorName: (isAdministrator || isBeneficialUser) ? adminName : '',
         LandOwnerName: landOwnerName,
         LandTdNo: landTdNo,
         LandPin: landPin,
@@ -1367,45 +1412,69 @@ export const BuildingFormScreen = ({ route, navigation }) => {
                     </View>
                   </View>
 
-                  <View style={styles.rowInputs}>
-                    <View style={[styles.inputGroup, { flex: 1 }]}>
-                      <Text style={styles.inputLabel}>SECTION NO.</Text>
-                      <TextInput
-                        style={styles.input}
-                        value={sectionNo}
-                        onChangeText={setSectionNo}
-                        placeholder="e.g. 001"
-                        placeholderTextColor={colors.placeholder}
-                      />
-                    </View>
-                    <View style={[styles.inputGroup, { flex: 1 }]}>
-                      <Text style={styles.inputLabel}>PARCEL NO.</Text>
-                      <TextInput
-                        style={styles.input}
-                        value={parcelNo}
-                        onChangeText={setParcelNo}
-                        placeholder="Parcel"
-                        placeholderTextColor={colors.placeholder}
-                      />
-                    </View>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>SECTION NO.</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={sectionNo}
+                      onChangeText={setSectionNo}
+                      placeholder="e.g. 001"
+                      placeholderTextColor={colors.placeholder}
+                    />
                   </View>
                 </View>
 
                 <View style={[styles.card, shadows.card]}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 8, marginBottom: 12 }}>
-                    <Text style={[styles.cardHeaderTitle, { borderBottomWidth: 0, paddingBottom: 0, marginBottom: 0 }]}>
-                      Owner & Administrator Demographics
+                  <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 10, marginBottom: 12 }}>
+                    <Text style={[styles.cardHeaderTitle, { borderBottomWidth: 0, paddingBottom: 0, marginBottom: 8 }]}>
+                      Owner & Declarant Demographics
                     </Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={{ fontSize: 10, fontWeight: '700', color: colors.textSecondary }}>
-                        IS ADMINISTRATOR / BENEFICIAL USER
-                      </Text>
-                      <Switch
-                        value={isAdministrator}
-                        onValueChange={setIsAdministrator}
-                        trackColor={{ false: colors.borderDark || '#cbd5e1', true: colors.primary }}
-                        thumbColor={isAdministrator ? '#ffffff' : '#f8fafc'}
-                      />
+
+                    {/* 2 Options: Administrator, Beneficial User (Check only one) */}
+                    <View style={styles.rolePillsRow}>
+                      <TouchableOpacity
+                        style={[styles.rolePill, isAdministrator && styles.rolePillActive]}
+                        onPress={() => {
+                          if (isAdministrator) {
+                            setIsAdministrator(false);
+                          } else {
+                            setIsAdministrator(true);
+                            setIsBeneficialUser(false);
+                          }
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons
+                          name={isAdministrator ? "checkbox" : "square-outline"}
+                          size={16}
+                          color={isAdministrator ? colors.primary : colors.textMuted}
+                        />
+                        <Text style={[styles.rolePillText, isAdministrator && styles.rolePillTextActive]}>
+                          ADMINISTRATOR
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.rolePill, isBeneficialUser && styles.rolePillActive]}
+                        onPress={() => {
+                          if (isBeneficialUser) {
+                            setIsBeneficialUser(false);
+                          } else {
+                            setIsBeneficialUser(true);
+                            setIsAdministrator(false);
+                          }
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons
+                          name={isBeneficialUser ? "checkbox" : "square-outline"}
+                          size={16}
+                          color={isBeneficialUser ? colors.primary : colors.textMuted}
+                        />
+                        <Text style={[styles.rolePillText, isBeneficialUser && styles.rolePillTextActive]}>
+                          BENEFICIAL USER
+                        </Text>
+                      </TouchableOpacity>
                     </View>
                   </View>
 
@@ -1419,24 +1488,6 @@ export const BuildingFormScreen = ({ route, navigation }) => {
                       placeholderTextColor={colors.placeholder}
                     />
                   </View>
-
-                  {isAdministrator && (
-                    <View style={styles.inputGroup}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                        <Text style={styles.inputLabel}>ADMINISTRATOR NAME</Text>
-                        <Text style={{ fontSize: 10, fontFamily: 'monospace', fontWeight: 'bold', color: colors.primary, textTransform: 'uppercase' }}>
-                          Administrator / Beneficial User
-                        </Text>
-                      </View>
-                      <TextInput
-                        style={styles.input}
-                        value={adminName}
-                        onChangeText={setAdminName}
-                        placeholder="Administrator name (if flagged as administrator)"
-                        placeholderTextColor={colors.placeholder}
-                      />
-                    </View>
-                  )}
 
                   <View style={styles.rowInputs}>
                     <View style={{ flex: 1 }}>
@@ -1492,6 +1543,87 @@ export const BuildingFormScreen = ({ route, navigation }) => {
                       placeholderTextColor={colors.placeholder}
                     />
                   </View>
+
+                  {(isAdministrator || isBeneficialUser) && (
+                    <View style={{ marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.border }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+                        <Ionicons name="shield-checkmark-outline" size={16} color={colors.primary} />
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary, textTransform: 'uppercase' }}>
+                          {isAdministrator ? 'Administrator Details' : 'Beneficial User Details'}
+                        </Text>
+                      </View>
+
+                      <View style={styles.inputGroup}>
+                        <Text style={styles.inputLabel}>
+                          NAME ({isAdministrator ? 'ADMINISTRATOR' : 'BENEFICIAL USER'})
+                        </Text>
+                        <TextInput
+                          style={styles.input}
+                          value={adminName}
+                          onChangeText={setAdminName}
+                          placeholder={`Full name of ${isAdministrator ? 'administrator' : 'beneficial user'} / representative`}
+                          placeholderTextColor={colors.placeholder}
+                        />
+                      </View>
+
+                      <View style={styles.rowInputs}>
+                        <View style={{ flex: 1 }}>
+                          {renderSelectField('SEX / GENDER', adminGender, GENDER_OPTIONS, setAdminGender)}
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          {renderSelectField('CIVIL STATUS', adminCivilStatus, CIVIL_STATUS_OPTIONS, setAdminCivilStatus)}
+                        </View>
+                      </View>
+
+                      <View style={styles.rowInputs}>
+                        <View style={[styles.inputGroup, { flex: 1 }]}>
+                          <Text style={styles.inputLabel}>TAX IDENTIFICATION NO. (TIN)</Text>
+                          <TextInput
+                            style={styles.input}
+                            value={adminTin}
+                            onChangeText={setAdminTin}
+                            placeholder="000-000-000-000"
+                            placeholderTextColor={colors.placeholder}
+                          />
+                        </View>
+                        <View style={[styles.inputGroup, { flex: 1 }]}>
+                          <Text style={styles.inputLabel}>CONTACT NUMBER</Text>
+                          <TextInput
+                            style={styles.input}
+                            value={adminContact}
+                            onChangeText={setAdminContact}
+                            placeholder="09XX-XXX-XXXX"
+                            placeholderTextColor={colors.placeholder}
+                          />
+                        </View>
+                      </View>
+
+                      <View style={styles.inputGroup}>
+                        <Text style={styles.inputLabel}>
+                          {isAdministrator ? 'ADMINISTRATOR ADDRESS' : 'BENEFICIAL USER ADDRESS'}
+                        </Text>
+                        <TextInput
+                          style={styles.input}
+                          value={adminAddress}
+                          onChangeText={setAdminAddress}
+                          placeholder="House No., Street, Barangay, City, Province"
+                          placeholderTextColor={colors.placeholder}
+                        />
+                      </View>
+
+                      <View style={styles.inputGroup}>
+                        <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
+                        <TextInput
+                          style={styles.input}
+                          value={adminEmail}
+                          onChangeText={setAdminEmail}
+                          placeholder="admin@example.com"
+                          placeholderTextColor={colors.placeholder}
+                          keyboardType="email-address"
+                        />
+                      </View>
+                    </View>
+                  )}
                 </View>
 
                 <View style={[styles.card, shadows.card]}>
@@ -1631,6 +1763,17 @@ export const BuildingFormScreen = ({ route, navigation }) => {
                     </>
                   )}
                 </View>
+
+                {/* Floor Plan / Building Sketch */}
+                <AttachmentsSection
+                  trackingNo={trackingNo || trackingNoParam}
+                  sketchUrl={sketchUrl}
+                  attachments={attachments}
+                  onAttachmentsChange={setAttachments}
+                  propertyKind="Building"
+                  showSketch={true}
+                  showAttachments={false}
+                />
               </View>
             )}
 
@@ -2249,18 +2392,16 @@ export const BuildingFormScreen = ({ route, navigation }) => {
                     </View>
                   )}
                 </View>
-              </View>
-            )}
 
-            {/* TAB 4: 5. Field Photos & Attachments */}
-            {activeTab === 4 && (
-              <View style={styles.tabContentBlock}>
+                {/* Field Photos & Attachments */}
                 <AttachmentsSection
                   trackingNo={trackingNo || trackingNoParam}
                   sketchUrl={sketchUrl}
                   attachments={attachments}
                   onAttachmentsChange={setAttachments}
                   propertyKind="Building"
+                  showSketch={false}
+                  showAttachments={true}
                 />
               </View>
             )}
@@ -2930,6 +3071,36 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
     paddingBottom: 8
+  },
+  rolePillsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingBottom: 4
+  },
+  rolePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: isDarkMode ? (colors.surfaceSecondary || '#1e293b') : '#f8fafc',
+    borderWidth: 1,
+    borderColor: colors.border
+  },
+  rolePillActive: {
+    backgroundColor: isDarkMode ? '#064e3b33' : '#ecfdf5',
+    borderColor: colors.primary
+  },
+  rolePillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.textMuted
+  },
+  rolePillTextActive: {
+    color: isDarkMode ? '#34d399' : '#047857',
+    fontWeight: '800'
   },
   inputGroup: {
     gap: 4
