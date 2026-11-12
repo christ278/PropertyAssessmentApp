@@ -127,6 +127,8 @@ public class TDNDTO
     public string? LandPropertyAssessmentsJson { get; set; }
     public string? FloorBreakdownJson { get; set; }
     public string? AdditionalItemsJson { get; set; }
+    public string? MachineryAppraisalDetailsJson { get; set; }
+    public string? MachineryPropertyAssessmentsJson { get; set; }
     public string? Classification { get; set; }
     public string? SubClassification { get; set; }
     public string? ActualUse { get; set; }

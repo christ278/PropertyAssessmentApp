@@ -196,6 +196,24 @@ public class TDNMachineDataDTO
     public string? LandOwnerPIN { get; set; }
     public string? BuildingOwner { get; set; }
     public string? BuildingOwnerPIN { get; set; }
+    public string? LandTdNo { get; set; }
+    public string? BuildingTdNo { get; set; }
+    public bool IsLandOwnerAlsoBuildingOwner { get; set; }
+    public bool IsLocallyManufactured { get; set; }
+    public string? MachineryRegNo { get; set; }
+    public DateTime? MachineryDateRegistered { get; set; }
+    public string? ImportationPermitNo { get; set; }
+    public DateTime? ImportationDateIssued { get; set; }
+    public string? CountryOfOrigin { get; set; }
+    public string? SupplierSeller { get; set; }
+    public string? SupplierAddress { get; set; }
+    public decimal? AcquisitionCost { get; set; }
+    public string? OrNo { get; set; }
+    public DateTime? OrDate { get; set; }
+    public string? OrNoAndDate { get; set; }
+    public DateTime? LocalDateIssued { get; set; }
+    public string? MachineryAppraisalDetailsJson { get; set; }
+    public string? MachineryPropertyAssessmentsJson { get; set; }
 }
 
 public class TDNMachineDetailDTO

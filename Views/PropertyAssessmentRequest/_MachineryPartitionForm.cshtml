@@ -78,7 +78,15 @@
     };
 
     window.onLandOwnerAlsoBuildingOwnerToggle = function(isChecked) {
-        if (!isChecked) return;
+        if (!isChecked) {
+            var bldgOwner = document.getElementById('inputMachineryBldgOwner');
+            var bldgPin = document.getElementById('inputMachineryBldgPin');
+            var bldgTdNo = document.getElementById('inputMachineryBldgTdNo');
+            if (bldgOwner) bldgOwner.value = '';
+            if (bldgPin) bldgPin.value = '';
+            if (bldgTdNo) bldgTdNo.value = '';
+            return;
+        }
         var landOwner = document.getElementById('inputMachineryLandOwner');
         var bldgOwner = document.getElementById('inputMachineryBldgOwner');
         if (landOwner && bldgOwner) {

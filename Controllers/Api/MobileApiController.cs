@@ -839,7 +839,25 @@ public class MobileApiController : ControllerBase
                 LandOwnerPIN = !string.IsNullOrWhiteSpace(part.LandPin) ? part.LandPin : m?.LandPin,
                 BuildingOwnerPIN = !string.IsNullOrWhiteSpace(part.BuildingPin) ? part.BuildingPin : m?.BuildingPin,
                 LandOwner = !string.IsNullOrWhiteSpace(part.LandOwnerName) ? part.LandOwnerName : m?.LandOwnerName,
-                BuildingOwner = !string.IsNullOrWhiteSpace(part.BuildingReferenceName) ? part.BuildingReferenceName : m?.BuildingReferenceName
+                BuildingOwner = !string.IsNullOrWhiteSpace(part.BuildingReferenceName) ? part.BuildingReferenceName : m?.BuildingReferenceName,
+                LandTdNo = part.LandTdNo,
+                BuildingTdNo = part.BuildingTdNo,
+                IsLandOwnerAlsoBuildingOwner = part.IsLandOwnerAlsoBuildingOwner,
+                IsLocallyManufactured = part.IsLocallyManufactured,
+                MachineryRegNo = part.MachineryRegNo,
+                MachineryDateRegistered = part.MachineryDateRegistered,
+                ImportationPermitNo = part.ImportationPermitNo,
+                ImportationDateIssued = part.ImportationDateIssued,
+                CountryOfOrigin = part.CountryOfOrigin,
+                SupplierSeller = part.SupplierSeller,
+                SupplierAddress = part.SupplierAddress,
+                AcquisitionCost = part.AcquisitionCost > 0 ? part.AcquisitionCost : (m?.OriginalCost ?? 0),
+                OrNo = part.OrNo,
+                OrDate = part.OrDate,
+                OrNoAndDate = part.OrNoAndDate,
+                LocalDateIssued = part.LocalDateIssued,
+                MachineryAppraisalDetailsJson = part.MachineryAppraisalDetailsJson,
+                MachineryPropertyAssessmentsJson = part.MachineryPropertyAssessmentsJson
             },
             TDNMachineDetail = details
         };
@@ -1015,6 +1033,28 @@ public class MobileApiController : ControllerBase
                 landImprovementsJson = p.LandImprovementsJson,
                 landAdjustmentsJson = p.LandAdjustmentsJson,
                 landPropertyAssessmentsJson = p.LandPropertyAssessmentsJson,
+                isLandOwnerAlsoBuildingOwner = p.IsLandOwnerAlsoBuildingOwner,
+                buildingReferenceName = p.BuildingReferenceName,
+                buildingPin = p.BuildingPin,
+                buildingTdNo = p.BuildingTdNo,
+                landOwnerName = p.LandOwnerName,
+                landPin = p.LandPin,
+                landTdNo = p.LandTdNo,
+                isLocallyManufactured = p.IsLocallyManufactured,
+                machineryRegNo = p.MachineryRegNo,
+                machineryDateRegistered = p.MachineryDateRegistered?.ToString("yyyy-MM-dd"),
+                importationPermitNo = p.ImportationPermitNo,
+                importationDateIssued = p.ImportationDateIssued?.ToString("yyyy-MM-dd"),
+                countryOfOrigin = p.CountryOfOrigin,
+                supplierSeller = p.SupplierSeller,
+                supplierAddress = p.SupplierAddress,
+                acquisitionCost = p.AcquisitionCost,
+                orNo = p.OrNo,
+                orDate = p.OrDate?.ToString("yyyy-MM-dd"),
+                orNoAndDate = p.OrNoAndDate,
+                localDateIssued = p.LocalDateIssued?.ToString("yyyy-MM-dd"),
+                machineryAppraisalDetailsJson = p.MachineryAppraisalDetailsJson,
+                machineryPropertyAssessmentsJson = p.MachineryPropertyAssessmentsJson,
                 taxability = !string.IsNullOrWhiteSpace(p.Taxability) ? p.Taxability : td.Taxability,
                 effectivityYear = p.EffectivityYear ?? td.EffectivityYear,
                 effectivityQuarter = !string.IsNullOrWhiteSpace(p.EffectivityQuarter) ? p.EffectivityQuarter : td.EffectivityQuarter,
@@ -2172,7 +2212,28 @@ public class MobileApiController : ControllerBase
             if (!string.IsNullOrWhiteSpace(m.BuildingOwnerPIN)) part.BuildingPin = m.BuildingOwnerPIN;
             if (!string.IsNullOrWhiteSpace(m.LandOwner)) part.LandOwnerName = m.LandOwner;
             if (!string.IsNullOrWhiteSpace(m.BuildingOwner)) part.BuildingReferenceName = m.BuildingOwner;
+            if (!string.IsNullOrWhiteSpace(m.LandTdNo)) part.LandTdNo = m.LandTdNo;
+            if (!string.IsNullOrWhiteSpace(m.BuildingTdNo)) part.BuildingTdNo = m.BuildingTdNo;
+            part.IsLandOwnerAlsoBuildingOwner = m.IsLandOwnerAlsoBuildingOwner;
+            part.IsLocallyManufactured = m.IsLocallyManufactured;
+            if (!string.IsNullOrWhiteSpace(m.MachineryRegNo)) part.MachineryRegNo = m.MachineryRegNo;
+            if (m.MachineryDateRegistered.HasValue) part.MachineryDateRegistered = m.MachineryDateRegistered.Value;
+            if (!string.IsNullOrWhiteSpace(m.ImportationPermitNo)) part.ImportationPermitNo = m.ImportationPermitNo;
+            if (m.ImportationDateIssued.HasValue) part.ImportationDateIssued = m.ImportationDateIssued.Value;
+            if (!string.IsNullOrWhiteSpace(m.CountryOfOrigin)) part.CountryOfOrigin = m.CountryOfOrigin;
+            if (!string.IsNullOrWhiteSpace(m.SupplierSeller)) part.SupplierSeller = m.SupplierSeller;
+            if (!string.IsNullOrWhiteSpace(m.SupplierAddress)) part.SupplierAddress = m.SupplierAddress;
+            if (m.AcquisitionCost.HasValue && m.AcquisitionCost.Value > 0) part.AcquisitionCost = m.AcquisitionCost.Value;
+            if (!string.IsNullOrWhiteSpace(m.OrNo)) part.OrNo = m.OrNo;
+            if (m.OrDate.HasValue) part.OrDate = m.OrDate.Value;
+            if (!string.IsNullOrWhiteSpace(m.OrNoAndDate)) part.OrNoAndDate = m.OrNoAndDate;
+            if (m.LocalDateIssued.HasValue) part.LocalDateIssued = m.LocalDateIssued.Value;
+            if (!string.IsNullOrWhiteSpace(m.MachineryAppraisalDetailsJson)) part.MachineryAppraisalDetailsJson = m.MachineryAppraisalDetailsJson;
+            if (!string.IsNullOrWhiteSpace(m.MachineryPropertyAssessmentsJson)) part.MachineryPropertyAssessmentsJson = m.MachineryPropertyAssessmentsJson;
         }
+
+        if (!string.IsNullOrWhiteSpace(dtoTdn.MachineryAppraisalDetailsJson)) part.MachineryAppraisalDetailsJson = dtoTdn.MachineryAppraisalDetailsJson;
+        if (!string.IsNullOrWhiteSpace(dtoTdn.MachineryPropertyAssessmentsJson)) part.MachineryPropertyAssessmentsJson = dtoTdn.MachineryPropertyAssessmentsJson;
 
         if (dtoMach.TDNMachineDetail != null && dtoMach.TDNMachineDetail.Count > 0)
         {
