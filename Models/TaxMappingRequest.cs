@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Validation;
 
 namespace PropertyAssessmentApp.Models;
@@ -25,8 +25,8 @@ public class TaxMappingRequest
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 
-    [Required]
-    [Display(Name = "Request Reference No.")]
+    [Required(ErrorMessage = "Transaction No. is required.")]
+    [Display(Name = "Transaction No.")]
     public string RequestNumber { get; set; } = string.Empty;
 
     [Display(Name = "Tax Declaration Reference")]

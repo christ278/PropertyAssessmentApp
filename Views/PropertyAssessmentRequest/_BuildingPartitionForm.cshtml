@@ -114,11 +114,15 @@
             <h3 class="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2">
                 <i data-lucide="users" class="w-4 h-4 text-emerald-600"></i> Owner & Administrator Demographics
             </h3>
-            <!-- Flagging: Is Administrator / Beneficial User -->
-            <div class="flex items-center gap-2">
+            <!-- Flagging: Is Administrator / Possessor -->
+            <div class="flex flex-wrap items-center gap-2">
                 <label class="inline-flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 dark:text-stone-300 bg-white dark:bg-stone-900 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-stone-800 shadow-sm hover:border-emerald-500 transition-colors">
-                    <input type="checkbox" asp-for="IsAdministrator" id="isAdminSwitch" class="rounded border-slate-300 text-emerald-600 shadow-sm focus:ring-emerald-500 w-4 h-4" />
-                    <span>IS ADMINISTRATOR / BENEFICIAL USER</span>
+                    <input type="checkbox" asp-for="IsAdministrator" id="isBldgAdminSwitch" class="bldg-role-checkbox rounded border-slate-300 text-emerald-600 shadow-sm focus:ring-emerald-500 w-4 h-4" />
+                    <span>ADMINISTRATOR</span>
+                </label>
+                <label class="inline-flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 dark:text-stone-300 bg-white dark:bg-stone-900 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-stone-800 shadow-sm hover:border-emerald-500 transition-colors">
+                    <input type="checkbox" asp-for="IsPossessor" id="isBldgPossessorSwitch" class="bldg-role-checkbox rounded border-slate-300 text-emerald-600 shadow-sm focus:ring-emerald-500 w-4 h-4" />
+                    <span>POSSESSOR</span>
                 </label>
             </div>
         </div>
@@ -137,22 +141,15 @@
                 }
             </select>
             <p class="text-[11px] text-slate-600 dark:text-stone-300">
-                Selecting an active registered owner will automatically populate Owner / Administrator Name, Gender/Type, Civil Status, TIN No., Mobile/Contact No., Email Address, and Mailing Address below.
+                Selecting an active registered owner will automatically populate Owner / Declarant Name, Gender/Type, Civil Status, TIN No., Mobile/Contact No., Email Address, and Mailing Address below.
             </p>
         </div>
 
-        <!-- Single Normalized Demographics Form -->
+        <!-- Single Normalized Demographics Form (Owner remains visible, like Land form) -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div id="divOwnerName" class="md:col-span-2">
                 <label asp-for="NewOwnerName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">OWNER / DECLARANT NAME</label>
                 <input asp-for="NewOwnerName" id="inputOwnerName" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-bold font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="Full name of owner / declarant" />
-            </div>
-            <div id="divAdminName" class="md:col-span-2 hidden">
-                <label asp-for="AdministratorName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold flex items-center justify-between">
-                    <span>ADMINISTRATOR NAME</span>
-                    <span id="adminBadge" class="text-[10px] font-mono text-emerald-600 font-bold uppercase">Administrator / Beneficial User</span>
-                </label>
-                <input asp-for="AdministratorName" id="inputAdminName" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="Administrator name (if flagged as administrator)" />
             </div>
             <div>
                 <label asp-for="OwnerGender" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">GENDER / SEX</label>
@@ -190,6 +187,56 @@
                 <input asp-for="OwnerAddress" id="inputBldgOwnerAddress" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="House / Unit No., Street, Barangay, City, Province" />
             </div>
         </div>
+
+        <!-- Administrator / Possessor Section (Toggled) -->
+        <div id="divBldgAdminSection" class="hidden pt-4 border-t border-slate-200 dark:border-stone-800 space-y-3">
+            <h5 class="text-xs font-bold text-amber-700 dark:text-amber-400 flex items-center gap-1.5 uppercase">
+                <i data-lucide="shield-alert" class="w-4 h-4"></i> Administrator / Possessor Details
+            </h5>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="md:col-span-2">
+                    <label asp-for="AdministratorName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">NAMES (ADMINISTRATOR / POSSESSOR)</label>
+                    <input asp-for="AdministratorName" id="inputBldgAdminName" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-bold font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="Full name of administrator / possessor" />
+                    <!-- Hidden alias for legacy script compatibility -->
+                    <input type="hidden" id="inputAdminName" />
+                </div>
+                <div>
+                    <label asp-for="AdministratorGender" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">SEX</label>
+                    <select asp-for="AdministratorGender" id="selectBldgAdminGender" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-xs font-bold text-slate-900 dark:text-white">
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Corporate">Corporate / Entity</option>
+                    </select>
+                </div>
+                <div>
+                    <label asp-for="AdministratorCivilStatus" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">CIVIL STATUS</label>
+                    <select asp-for="AdministratorCivilStatus" id="selectBldgAdminCivilStatus" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-xs font-bold text-slate-900 dark:text-white">
+                        <option value="Single">Single</option>
+                        <option value="Married">Married</option>
+                        <option value="Widowed">Widowed</option>
+                        <option value="Divorced">Divorced</option>
+                        <option value="Legally Separated">Legally Separated</option>
+                        <option value="N/A (Corporate / Entity)">N/A (Corporate / Entity)</option>
+                    </select>
+                </div>
+                <div>
+                    <label asp-for="AdministratorTin" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">TIN</label>
+                    <input asp-for="AdministratorTin" id="inputBldgAdminTin" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="000-000-000-000" />
+                </div>
+                <div class="md:col-span-2">
+                    <label asp-for="AdministratorAddress" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">MAILING ADDRESS</label>
+                    <input asp-for="AdministratorAddress" id="inputBldgAdminAddress" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="Complete mailing address" />
+                </div>
+                <div>
+                    <label asp-for="AdministratorContactNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">PHONE NO.</label>
+                    <input asp-for="AdministratorContactNo" id="inputBldgAdminPhone" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="09XX-XXX-XXXX" />
+                </div>
+                <div>
+                    <label asp-for="AdministratorEmail" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">EMAIL</label>
+                    <input asp-for="AdministratorEmail" id="inputBldgAdminEmail" type="email" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs focus:outline-none focus:border-emerald-600 text-slate-900 dark:text-white" placeholder="admin@example.com" />
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Two-Column Row: Left (Location & Land Reference & CCT) | Right (Building Floor Plan Sketch) -->
@@ -209,7 +256,7 @@
                     </div>
                     <div>
                         <label asp-for="DistrictOrBarangay" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BARANGAY <span class="text-rose-500">*</span></label>
-                        <select asp-for="DistrictOrBarangay" id="selectBldgBarangay" class="select2-barangay w-full">
+                        <select asp-for="DistrictOrBarangay" id="selectBldgBarangay" class="select2-barangay w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-medium cursor-pointer">
                             @foreach (var b in PropertyAssessmentApp.Controllers.DashboardController.OfficialKoronadalBarangays.OrderBy(x => x.Name))
                             {
                                 var isSel = string.Equals(Model.DistrictOrBarangay, b.Name, StringComparison.OrdinalIgnoreCase)
@@ -284,7 +331,7 @@
         </div>
 
         <!-- Right Column: Building Floor Plan Sketch Attachment (CAST Standard) -->
-        <div class="p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4 flex flex-col justify-between">
+        <div class="p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4 flex flex-col justify-between overflow-hidden">
             <div>
                 <div class="border-b border-slate-200 dark:border-stone-800 pb-2 flex items-center justify-between">
                     <h3 class="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2">
@@ -319,10 +366,14 @@
             </div>
 
             <!-- Sketch Footer & Actions -->
-            <div class="pt-3 border-t border-slate-200 dark:border-stone-800 flex items-center justify-between">
-                <span class="text-[11px] font-mono text-slate-400" id="sketchFilenameDisplay">@(string.IsNullOrEmpty(Model.BuildingFloorPlanSketchPath) ? "No file chosen" : Model.BuildingFloorPlanSketchPath)</span>
-                <button type="button" id="btnClearSketch" onclick="clearSketchImage()" class="px-3 py-1.5 rounded-lg text-xs font-mono font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors flex items-center gap-1.5 @(string.IsNullOrEmpty(Model.BuildingFloorPlanSketchBase64) && string.IsNullOrEmpty(Model.BuildingFloorPlanSketchPath) ? "hidden" : "")">
-                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Clear Sketch
+            <div class="pt-3 border-t border-slate-200 dark:border-stone-800 flex items-center justify-between gap-3 min-w-0">
+                <div class="min-w-0 flex-1 overflow-hidden">
+                    <span class="text-[11px] font-mono text-slate-500 dark:text-stone-400 block break-all line-clamp-2" id="sketchFilenameDisplay" title="@(string.IsNullOrEmpty(Model.BuildingFloorPlanSketchPath) ? "No file chosen" : Model.BuildingFloorPlanSketchPath)">
+                        @(string.IsNullOrEmpty(Model.BuildingFloorPlanSketchPath) ? "No file chosen" : Model.BuildingFloorPlanSketchPath)
+                    </span>
+                </div>
+                <button type="button" id="btnClearSketch" onclick="clearSketchImage()" class="shrink-0 px-3 py-1.5 rounded-lg text-xs font-mono font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors inline-flex items-center gap-1.5 whitespace-nowrap @(string.IsNullOrEmpty(Model.BuildingFloorPlanSketchBase64) && string.IsNullOrEmpty(Model.BuildingFloorPlanSketchPath) ? "hidden" : "")">
+                    <i data-lucide="trash-2" class="w-3.5 h-3.5 shrink-0"></i> <span>Clear Sketch</span>
                 </button>
             </div>
 

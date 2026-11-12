@@ -7,13 +7,13 @@ namespace PropertyAssessmentApp.Models;
 public enum PropertyKind
 {
     [Display(Name = "Land Property")]
-    Land,
+    Land = 1,
 
     [Display(Name = "Building & Structure")]
-    Building,
+    Building = 2,
 
     [Display(Name = "Machinery & Equipment")]
-    Machinery
+    Machinery = 3
 }
 
 public enum PropertyClassification

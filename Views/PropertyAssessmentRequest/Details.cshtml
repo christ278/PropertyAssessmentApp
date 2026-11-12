@@ -2,7 +2,7 @@
 @using PropertyAssessmentApp.Models
 
 @{
-    ViewData["Title"] = $"Assessment Details - {Model.TrackingNumber}";
+    ViewData["Title"] = $"Assessment Details - {Model.TransactionNo ?? Model.TrackingNumber}";
 }
 
 <div class="space-y-6 font-mono text-xs">
@@ -15,7 +15,7 @@
                 <span>Property Assessment Dossier</span>
             </div>
             <div class="flex items-center gap-3">
-                <h1 class="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">@Model.TrackingNumber</h1>
+                <h1 class="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">@(Model.TransactionNo ?? Model.TrackingNumber)</h1>
                 <span class="px-3 py-1 rounded-full text-xs font-bold 
                     @(Model.Status == PropertyAssessmentStatus.Approved ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300" :
                       Model.Status == PropertyAssessmentStatus.Deferred ? "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300" :
@@ -447,7 +447,7 @@
                 </div>
                 <div>
                     <h3 class="text-base font-black text-slate-900 dark:text-white">Forward to GIS Mapping</h3>
-                    <p class="text-xs text-slate-500 dark:text-stone-400">Tracking No: <span class="font-bold text-slate-800 dark:text-stone-200 font-mono">@Model.TrackingNumber</span></p>
+                    <p class="text-xs text-slate-500 dark:text-stone-400">Transaction No: <span class="font-bold text-slate-800 dark:text-stone-200 font-mono">@(Model.TransactionNo ?? Model.TrackingNumber)</span></p>
                 </div>
             </div>
             <button type="button" onclick="closeForwardModal()" class="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-stone-200 rounded-xl hover:bg-slate-100 dark:hover:bg-stone-800 transition-colors">

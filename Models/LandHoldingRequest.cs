@@ -22,8 +22,8 @@ public class LandHoldingRequest
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 
-    [Required]
-    [Display(Name = "Tracking No.")]
+    [Required(ErrorMessage = "Transaction No. is required.")]
+    [Display(Name = "Transaction No.")]
     public string TrackingNumber { get; set; } = string.Empty;
 
     [Display(Name = "Tax Declaration Reference")]

@@ -47,7 +47,7 @@ public class RequestForInspection
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 
-    [Required]
+    [Required(ErrorMessage = "Tracking No. is required.")]
     [Display(Name = "Tracking No.")]
     public string TrackingNumber { get; set; } = string.Empty;
 

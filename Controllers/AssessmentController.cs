@@ -347,9 +347,9 @@ public class AssessmentController : Controller
                         k.StartsWith("BuildingDetails.", StringComparison.OrdinalIgnoreCase) ||
                         k.StartsWith("LandDetails.", StringComparison.OrdinalIgnoreCase) ||
                         k.StartsWith("MachineryDetails.", StringComparison.OrdinalIgnoreCase) ||
-                        k.StartsWith("MachineryDetails.", StringComparison.OrdinalIgnoreCase) ||
                         k.StartsWith("PropertyImages", StringComparison.OrdinalIgnoreCase) ||
-                        k.StartsWith("Owner.", StringComparison.OrdinalIgnoreCase))
+                        k.StartsWith("Owner.", StringComparison.OrdinalIgnoreCase) ||
+                        k.Equals("Owner", StringComparison.OrdinalIgnoreCase))
             .ToList();
 
         foreach (var key in keysToRemove)
@@ -507,20 +507,20 @@ public class AssessmentController : Controller
             td.Kind = parsedKind;
         }
 
-        if (!string.IsNullOrWhiteSpace(p.SystemGeneratedTDN))
+        if (!string.IsNullOrWhiteSpace(p.SystemGeneratedTDN) && !p.SystemGeneratedTDN.Contains("Pending", StringComparison.OrdinalIgnoreCase))
         {
             td.TaxDeclarationNumber = p.SystemGeneratedTDN.Trim();
         }
-        if (!string.IsNullOrWhiteSpace(p.PIN))
+        if (!string.IsNullOrWhiteSpace(p.PIN) && !p.PIN.Contains("Pending", StringComparison.OrdinalIgnoreCase))
         {
             td.PropertyIndexNumber = p.PIN.Trim();
         }
-        else if (string.IsNullOrWhiteSpace(td.PropertyIndexNumber))
+        else if (string.IsNullOrWhiteSpace(td.PropertyIndexNumber) || td.PropertyIndexNumber.Contains("Pending", StringComparison.OrdinalIgnoreCase))
         {
-            td.PropertyIndexNumber = !string.IsNullOrWhiteSpace(p.ARPNo) ? p.ARPNo : $"187-00-0001-001-{new Random().Next(1, 999):D3}";
+            td.PropertyIndexNumber = !string.IsNullOrWhiteSpace(p.ARPNo) && !p.ARPNo.Contains("Pending", StringComparison.OrdinalIgnoreCase) ? p.ARPNo : $"187-00-0001-001-{new Random().Next(1, 999):D3}";
         }
 
-        if (!string.IsNullOrWhiteSpace(p.ARPNo))
+        if (!string.IsNullOrWhiteSpace(p.ARPNo) && !p.ARPNo.Contains("Pending", StringComparison.OrdinalIgnoreCase))
         {
             td.ARPNo = p.ARPNo.Trim();
         }
@@ -528,6 +528,10 @@ public class AssessmentController : Controller
         if (p.OwnerId.HasValue && p.OwnerId.Value != Guid.Empty)
         {
             td.OwnerId = p.OwnerId.Value;
+        }
+        else if (td.OwnerId == Guid.Empty)
+        {
+            td.OwnerId = null;
         }
         td.OwnerName = !string.IsNullOrWhiteSpace(p.NewOwnerName)
             ? p.NewOwnerName.Trim()
@@ -588,6 +592,8 @@ public class AssessmentController : Controller
         td.MarketValue = p.MarketValue;
         td.AdjustedMarketValue = p.MarketValue;
         td.AssessmentLevelPercent = p.AssessmentLevelPercent > 0 ? p.AssessmentLevelPercent : _assessmentService.GetDefaultAssessmentLevel(td.Classification);
+        td.AssessedValue = p.AssessedValue > 0 ? p.AssessedValue : Math.Round(td.MarketValue * (td.AssessmentLevelPercent / 100m), 2);
+        td.AnnualTaxDue = Math.Round(td.AssessedValue * 0.03m, 2);
 
         td.Taxability = !string.IsNullOrWhiteSpace(p.Taxability) ? p.Taxability : "Taxable";
         td.EffectivityQuarter = !string.IsNullOrWhiteSpace(p.EffectivityQuarter) ? p.EffectivityQuarter : "1st Quarter";

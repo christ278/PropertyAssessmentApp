@@ -242,6 +242,15 @@ public class RequestForInspectionController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(RequestForInspection request, IFormFile? fileUpload)
     {
+        if (string.IsNullOrWhiteSpace(request.TrackingNumber))
+        {
+            var now = DateTime.Now;
+            request.TrackingNumber = !string.IsNullOrWhiteSpace(request.TransactionNo) 
+                ? request.TransactionNo 
+                : $"RFI-{now:yyyyMMdd}-{new Random().Next(1000, 9999)}";
+        }
+        ModelState.Remove(nameof(request.TrackingNumber));
+
         ValidateInspectionRequest(request);
 
         if (ModelState.IsValid)
@@ -336,6 +345,14 @@ public class RequestForInspectionController : Controller
     public IActionResult Edit(Guid id, RequestForInspection request, IFormFile? fileUpload)
     {
         if (id != request.Id) return BadRequest();
+
+        if (string.IsNullOrWhiteSpace(request.TrackingNumber))
+        {
+            request.TrackingNumber = !string.IsNullOrWhiteSpace(request.TransactionNo) 
+                ? request.TransactionNo 
+                : $"RFI-{DateTime.Now:yyyyMMdd}-{new Random().Next(1000, 9999)}";
+        }
+        ModelState.Remove(nameof(request.TrackingNumber));
 
         ValidateInspectionRequest(request);
 

@@ -65,6 +65,13 @@ public class LandHoldingRequestController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(LandHoldingRequest request, IFormFile? fileUpload)
     {
+        if (string.IsNullOrWhiteSpace(request.TrackingNumber))
+        {
+            var now = DateTime.Now;
+            request.TrackingNumber = $"LH-{now:yyyyMMddHHmmss}-{now.Second:D2}";
+        }
+        ModelState.Remove(nameof(request.TrackingNumber));
+
         if (ModelState.IsValid)
         {
             try
@@ -120,6 +127,8 @@ public class LandHoldingRequestController : Controller
         {
             return BadRequest();
         }
+
+        ModelState.Remove(nameof(request.TrackingNumber));
 
         if (ModelState.IsValid)
         {

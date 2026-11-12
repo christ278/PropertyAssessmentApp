@@ -1,4 +1,4 @@
-﻿@model PropertyAssessmentApp.Models.RequestForInspection
+@model PropertyAssessmentApp.Models.RequestForInspection
 @using PropertyAssessmentApp.Models
 
 @{
@@ -29,6 +29,7 @@
     <div class="p-4 sm:p-6 lg:p-8 rounded-2xl sm:rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm">
         <form asp-action="Create" method="post" enctype="multipart/form-data" id="inspectionForm" class="space-y-8" novalidate>
             <input type="hidden" asp-for="Id" />
+            <input type="hidden" asp-for="TrackingNumber" />
             <input type="hidden" asp-for="Partitions" id="Partitions" value="1" />
             <input type="hidden" asp-for="RequestedDocumentsJson" id="RequestedDocumentsJson" />
             <input type="hidden" asp-for="TotalFeesAmount" id="TotalFeesAmount" />
@@ -42,7 +43,7 @@
             <div class="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 flex flex-wrap items-center justify-between gap-4">
                 <div class="flex items-center gap-3">
                     <span class="px-3 py-1.5 rounded-xl bg-emerald-600 text-white font-extrabold text-xs font-mono">
-                        TRACKING NO: @Model.TrackingNumber
+                        TRANSACTION NO: @(Model.TransactionNo ?? Model.TrackingNumber)
                     </span>
                     <span class="text-slate-500 dark:text-stone-400 text-[11px]">Auto-generated system reference</span>
                 </div>

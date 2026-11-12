@@ -114,6 +114,11 @@ public class AssessmentService : IAssessmentService
         {
             var exists = _context.TaxpayerOwners.AsNoTracking().Any(o => o.Id == declaration.OwnerId.Value);
             if (exists) return;
+            declaration.OwnerId = null;
+        }
+        else
+        {
+            declaration.OwnerId = null;
         }
 
         if (!string.IsNullOrWhiteSpace(declaration.OwnerTin))
@@ -144,6 +149,65 @@ public class AssessmentService : IAssessmentService
             if (matchByName != null)
             {
                 declaration.OwnerId = matchByName.Id;
+                return;
+            }
+
+            // Automatically register new taxpayer owner in TaxpayerOwners table so it binds cleanly
+            try
+            {
+                var newOwner = new Owner
+                {
+                    Id = Guid.NewGuid(),
+                    Address = !string.IsNullOrWhiteSpace(declaration.OwnerAddress) ? declaration.OwnerAddress : "Koronadal City",
+                    BarangayName = !string.IsNullOrWhiteSpace(declaration.DistrictOrBarangay) ? declaration.DistrictOrBarangay : "Brgy. Central",
+                    CityMunicipalityName = !string.IsNullOrWhiteSpace(declaration.Municipality) ? declaration.Municipality : "Koronadal City",
+                    ProvinceName = !string.IsNullOrWhiteSpace(declaration.ProvinceCity) ? declaration.ProvinceCity : "South Cotabato",
+                    ContactNo = declaration.OwnerPhone ?? string.Empty,
+                    Email = declaration.OwnerEmail ?? string.Empty,
+                    TaxIdentNo = !string.IsNullOrWhiteSpace(declaration.OwnerTin) ? declaration.OwnerTin : "000-000-000-000",
+                    IsActive = true,
+                    CreatedDate = DateTime.Now,
+                    UpdatedDate = DateTime.Now
+                };
+
+                if (string.Equals(declaration.OwnerSex, "Corporate", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(declaration.OwnerCivilStatus, "N/A (Corporate / Entity)", StringComparison.OrdinalIgnoreCase))
+                {
+                    newOwner.OwnerType = OwnerType.Corporate;
+                    newOwner.CorporateName = cleanName;
+                }
+                else
+                {
+                    newOwner.OwnerType = OwnerType.Individual;
+                    var nameParts = cleanName.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                    if (nameParts.Length >= 2)
+                    {
+                        newOwner.LastName = nameParts[0];
+                        newOwner.FirstName = nameParts[1];
+                    }
+                    else
+                    {
+                        var spaceParts = cleanName.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                        if (spaceParts.Length > 1)
+                        {
+                            newOwner.LastName = spaceParts[^1];
+                            newOwner.FirstName = string.Join(' ', spaceParts.Take(spaceParts.Length - 1));
+                        }
+                        else
+                        {
+                            newOwner.LastName = cleanName;
+                            newOwner.FirstName = cleanName;
+                        }
+                    }
+                }
+
+                _context.TaxpayerOwners.Add(newOwner);
+                _context.SaveChanges();
+                declaration.OwnerId = newOwner.Id;
+            }
+            catch
+            {
+                declaration.OwnerId = null;
             }
         }
     }
@@ -193,7 +257,8 @@ public class AssessmentService : IAssessmentService
         var currentTd = declaration.TaxDeclarationNumber?.Trim() ?? string.Empty;
         bool isLegacyPlaceholder = string.IsNullOrWhiteSpace(currentTd)
             || currentTd.StartsWith("TD-", StringComparison.OrdinalIgnoreCase)
-            || currentTd.StartsWith("TDN-", StringComparison.OrdinalIgnoreCase);
+            || currentTd.StartsWith("TDN-", StringComparison.OrdinalIgnoreCase)
+            || currentTd.Contains("Pending", StringComparison.OrdinalIgnoreCase);
 
         if (isLegacyPlaceholder || (declaration.Status == AssessmentStatus.Active && CastTdGenerator.IsCastArpFormat(currentTd)))
         {
@@ -241,6 +306,16 @@ public class AssessmentService : IAssessmentService
             declaration.AssessmentLevelPercent = GetDefaultAssessmentLevel(declaration.Classification);
         }
 
+        if (declaration.AssessedValue <= 0 && declaration.MarketValue > 0 && declaration.AssessmentLevelPercent > 0)
+        {
+            declaration.AssessedValue = Math.Round(declaration.MarketValue * (declaration.AssessmentLevelPercent / 100m), 2);
+        }
+
+        if (declaration.AssessedValue > 0)
+        {
+            declaration.AnnualTaxDue = Math.Round(declaration.AssessedValue * 0.03m, 2);
+        }
+
         var existing = _context.TaxDeclarations.Find(declaration.Id);
         if (existing == null)
         {
@@ -274,6 +349,21 @@ public class AssessmentService : IAssessmentService
             if (declaration.AdjustedMarketValue <= 0 && declaration.MarketValue > 0)
             {
                 declaration.AdjustedMarketValue = declaration.MarketValue;
+            }
+
+            if (declaration.AssessmentLevelPercent <= 0)
+            {
+                declaration.AssessmentLevelPercent = GetDefaultAssessmentLevel(declaration.Classification);
+            }
+
+            if (declaration.AssessedValue <= 0 && declaration.MarketValue > 0 && declaration.AssessmentLevelPercent > 0)
+            {
+                declaration.AssessedValue = Math.Round(declaration.MarketValue * (declaration.AssessmentLevelPercent / 100m), 2);
+            }
+
+            if (declaration.AssessedValue > 0)
+            {
+                declaration.AnnualTaxDue = Math.Round(declaration.AssessedValue * 0.03m, 2);
             }
 
             _context.Entry(existing).CurrentValues.SetValues(declaration);
@@ -453,7 +543,10 @@ public class AssessmentService : IAssessmentService
             }
             else
             {
-                if (!ReferenceEquals(existingBldg, bldg)) { _context.Entry(existingBldg).CurrentValues.SetValues(bldg); if (bldg.FloorLevels.Any()) { existingBldg.FloorLevels.Clear(); foreach (var fl in bldg.FloorLevels) existingBldg.FloorLevels.Add(fl); } if (bldg.AdditionalItems.Any()) { existingBldg.AdditionalItems.Clear(); foreach (var ai in bldg.AdditionalItems) existingBldg.AdditionalItems.Add(ai); } if (bldg.StructuralMaterials.Any()) { existingBldg.StructuralMaterials.Clear(); foreach (var sm in bldg.StructuralMaterials) existingBldg.StructuralMaterials.Add(sm); } } SyncPropertyImages(declaration); return;
+                if (!ReferenceEquals(existingBldg, bldg))
+                {
+                    _context.Entry(existingBldg).CurrentValues.SetValues(bldg);
+                }
                 if (bldg.FloorLevels.Any())
                 {
                     existingBldg.FloorLevels.Clear();
@@ -636,7 +729,10 @@ public class AssessmentService : IAssessmentService
             }
             else
             {
-                if (!ReferenceEquals(existingLand, land)) { _context.Entry(existingLand).CurrentValues.SetValues(land); if (land.TDNLandDetails.Any()) { existingLand.TDNLandDetails.Clear(); foreach (var d in land.TDNLandDetails) existingLand.TDNLandDetails.Add(d); } if (land.TDNLandImprovements.Any()) { existingLand.TDNLandImprovements.Clear(); foreach (var imp in land.TDNLandImprovements) existingLand.TDNLandImprovements.Add(imp); } if (land.TDNLandBaseMarkets.Any()) { existingLand.TDNLandBaseMarkets.Clear(); foreach (var b in land.TDNLandBaseMarkets) existingLand.TDNLandBaseMarkets.Add(b); } if (land.TDNLandPropertyAssessments.Any()) { existingLand.TDNLandPropertyAssessments.Clear(); foreach (var p in land.TDNLandPropertyAssessments) existingLand.TDNLandPropertyAssessments.Add(p); } } SyncPropertyImages(declaration); return;
+                if (!ReferenceEquals(existingLand, land))
+                {
+                    _context.Entry(existingLand).CurrentValues.SetValues(land);
+                }
 
                 // Update details
                 if (land.TDNLandDetails.Any())
@@ -822,7 +918,10 @@ public class AssessmentService : IAssessmentService
             }
             else
             {
-                if (!ReferenceEquals(existingMach, mach)) { _context.Entry(existingMach).CurrentValues.SetValues(mach); if (mach.TDNMachineryDetails.Any()) { existingMach.TDNMachineryDetails.Clear(); foreach (var d in mach.TDNMachineryDetails) existingMach.TDNMachineryDetails.Add(d); } if (mach.TDNMachineryPropertyAssessments.Any()) { existingMach.TDNMachineryPropertyAssessments.Clear(); foreach (var p in mach.TDNMachineryPropertyAssessments) existingMach.TDNMachineryPropertyAssessments.Add(p); } } SyncPropertyImages(declaration); return;
+                if (!ReferenceEquals(existingMach, mach))
+                {
+                    _context.Entry(existingMach).CurrentValues.SetValues(mach);
+                }
 
                 if (mach.TDNMachineryDetails.Any())
                 {

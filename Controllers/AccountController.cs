@@ -125,7 +125,7 @@ public class AccountController : Controller
     {
         if (string.IsNullOrWhiteSpace(referenceNumber))
         {
-            return Json(new { success = false, message = "Please provide a valid Transaction Number or Tracking Number." });
+            return Json(new { success = false, message = "Please provide a valid Transaction Number." });
         }
 
         var cleanRef = referenceNumber.Trim();
@@ -134,7 +134,7 @@ public class AccountController : Controller
         {
             return Json(new { 
                 success = false, 
-                message = $"No transaction found for \"{cleanRef}\". Please check the Transaction or Tracking Number and try again." 
+                message = $"No transaction found for \"{cleanRef}\". Please check the Transaction Number and try again." 
             });
         }
 
