@@ -1,4 +1,4 @@
-﻿@model List<PropertyAssessmentApp.Models.WorkflowSequence>
+@model List<PropertyAssessmentApp.Models.WorkflowSequence>
 @using PropertyAssessmentApp.Models
 @{
     ViewData["Title"] = "Transaction Workflow Manager";
@@ -593,11 +593,14 @@
             }
         });
 
+        const referencedTargets = new Set();
         for (const sourceId in groups) {
-            const statusDetail = allStatuses.find(s => s.TransactionStatusId === parseInt(sourceId, 10));
+            const parsedSourceId = parseInt(sourceId, 10);
+            const statusDetail = allStatuses.find(s => s.TransactionStatusId === parsedSourceId);
             if (statusDetail) {
+                groups[sourceId].forEach(t => referencedTargets.add(t));
                 activeWorkflowModel.push({
-                    SourceStatusId: parseInt(sourceId, 10),
+                    SourceStatusId: parsedSourceId,
                     SourceName: formatStatusName(statusDetail.Name),
                     SourceDivisionId: statusDetail.DivisionId,
                     NextStatusIds: groups[sourceId],
@@ -606,10 +609,42 @@
             }
         }
 
-        activeWorkflowModel.sort((a, b) => a.SourceStatusId - b.SourceStatusId);
+        // Materialize target-only terminal steps (e.g. Releasing [10], Releasing (GIS) [19])
+        // so the Visual Graph and Step Configuration Matrix display every configured branch target.
+        referencedTargets.forEach(targetId => {
+            if (!activeWorkflowModel.some(s => s.SourceStatusId === targetId)) {
+                const statusDetail = allStatuses.find(s => s.TransactionStatusId === targetId);
+                if (statusDetail) {
+                    activeWorkflowModel.push({
+                        SourceStatusId: targetId,
+                        SourceName: formatStatusName(statusDetail.Name),
+                        SourceDivisionId: statusDetail.DivisionId,
+                        NextStatusIds: [],
+                        IsApproval: false
+                    });
+                }
+            }
+        });
+
+        sortWorkflowModelByFlowOrder();
 
         renderWorkflowCards();
         renderOrgChart();
+    }
+
+    function sortWorkflowModelByFlowOrder() {
+        const tiers = computeTopologicalTiers(activeWorkflowModel);
+        const ordered = [];
+        tiers.forEach(tier => {
+            tier.sort((a, b) => {
+                const aRecv = a.SourceName.toLowerCase().includes('receiving') ? 0 : 1;
+                const bRecv = b.SourceName.toLowerCase().includes('receiving') ? 0 : 1;
+                if (aRecv !== bRecv) return aRecv - bRecv;
+                return a.SourceStatusId - b.SourceStatusId;
+            });
+            tier.forEach(node => ordered.push(node));
+        });
+        activeWorkflowModel = ordered;
     }
 
     // =========================================================
@@ -811,6 +846,8 @@
         const containerRect = zoomContainer.getBoundingClientRect();
         if (!containerRect) return;
 
+        let skipArrowIndex = 0;
+
         activeWorkflowModel.forEach(step => {
             const sourceCard = document.getElementById(`nodeCard_${step.SourceStatusId}`);
             if (!sourceCard) return;
@@ -818,6 +855,8 @@
             const sourceRect = sourceCard.getBoundingClientRect();
             const sourceWidth = sourceCard.offsetWidth || 230;
             const sourceHeight = sourceCard.offsetHeight || 100;
+            const sourceRow = sourceCard.closest('.graph-tier-row');
+            const sourceTier = sourceRow ? parseInt(sourceRow.id.replace('tierRow_', ''), 10) : 0;
 
             // Start point: Center-Bottom anchor dot of source card
             const x1 = (sourceRect.left - containerRect.left) / currentZoom + sourceWidth / 2;
@@ -829,6 +868,8 @@
 
                 const targetRect = targetCard.getBoundingClientRect();
                 const targetWidth = targetCard.offsetWidth || 230;
+                const targetRow = targetCard.closest('.graph-tier-row');
+                const targetTier = targetRow ? parseInt(targetRow.id.replace('tierRow_', ''), 10) : 0;
 
                 // End point: Center-Top anchor dot of target card
                 const x2 = (targetRect.left - containerRect.left) / currentZoom + targetWidth / 2;
@@ -836,9 +877,19 @@
 
                 if (isNaN(x1) || isNaN(y1) || isNaN(x2) || isNaN(y2)) return;
 
-                // Cubic Bezier Spline
-                const controlDelta = Math.max(Math.abs(y2 - y1) * 0.5, 30);
-                const pathD = `M ${x1} ${y1} C ${x1} ${y1 + controlDelta}, ${x2} ${y2 - controlDelta}, ${x2} ${y2 - 6}`;
+                let pathD;
+                const tierDiff = targetTier - sourceTier;
+                if (tierDiff > 1 && Math.abs(x2 - x1) < 160) {
+                    // Route skip-tier branches cleanly around intermediate cards so they aren't hidden behind them
+                    const direction = (skipArrowIndex % 2 === 0) ? 1 : -1;
+                    const lane = Math.floor(skipArrowIndex / 2);
+                    const sideOffset = direction * (210 + lane * 60);
+                    skipArrowIndex++;
+                    pathD = `M ${x1} ${y1} C ${x1 + sideOffset} ${y1 + 45}, ${x2 + sideOffset} ${y2 - 45}, ${x2} ${y2 - 6}`;
+                } else {
+                    const controlDelta = Math.max(Math.abs(y2 - y1) * 0.5, 30);
+                    pathD = `M ${x1} ${y1} C ${x1} ${y1 + controlDelta}, ${x2} ${y2 - controlDelta}, ${x2} ${y2 - 6}`;
+                }
 
                 const pathEl = document.createElementNS("http://www.w3.org/2000/svg", "path");
                 pathEl.setAttribute("d", pathD);
@@ -1022,6 +1073,19 @@
         const step = activeWorkflowModel.find(s => s.SourceStatusId === sourceId);
         if (step && !step.NextStatusIds.includes(nextId)) {
             step.NextStatusIds.push(nextId);
+            if (!activeWorkflowModel.some(s => s.SourceStatusId === nextId)) {
+                const targetDetail = allStatuses.find(s => s.TransactionStatusId === nextId);
+                if (targetDetail) {
+                    activeWorkflowModel.push({
+                        SourceStatusId: nextId,
+                        SourceName: formatStatusName(targetDetail.Name),
+                        SourceDivisionId: targetDetail.DivisionId,
+                        NextStatusIds: [],
+                        IsApproval: false
+                    });
+                }
+            }
+            sortWorkflowModelByFlowOrder();
             renderWorkflowCards();
             renderOrgChart();
         }
@@ -1031,6 +1095,7 @@
         const step = activeWorkflowModel.find(s => s.SourceStatusId === sourceId);
         if (step) {
             step.NextStatusIds = step.NextStatusIds.filter(id => id !== nextId);
+            sortWorkflowModelByFlowOrder();
             renderWorkflowCards();
             renderOrgChart();
         }
@@ -1059,7 +1124,7 @@
                 NextStatusIds: [],
                 IsApproval: false
             });
-            activeWorkflowModel.sort((a, b) => a.SourceStatusId - b.SourceStatusId);
+            sortWorkflowModelByFlowOrder();
             select.value = "";
             renderWorkflowCards();
             renderOrgChart();
@@ -1068,7 +1133,12 @@
 
     function removeSourceStep(sourceId) {
         if (!confirm("Are you sure you want to remove this workflow step?")) return;
-        activeWorkflowModel = activeWorkflowModel.filter(s => s.SourceStatusId !== sourceId);
+        activeWorkflowModel = activeWorkflowModel
+            .filter(s => s.SourceStatusId !== sourceId)
+            .map(s => ({
+                ...s,
+                NextStatusIds: s.NextStatusIds.filter(id => id !== sourceId)
+            }));
         renderWorkflowCards();
         renderOrgChart();
     }

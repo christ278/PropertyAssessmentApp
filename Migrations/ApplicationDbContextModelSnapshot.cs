@@ -6970,6 +6970,54 @@ namespace PropertyAssessmentApp.Migrations
                     b.ToTable("RoleModulePermission");
                 });
 
+            modelBuilder.Entity("PropertyAssessmentApp.Models.SmsNotificationLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("GatewayResponse")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<Guid?>("OwnerId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("RecipientName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("RecipientNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("SenderId")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("SentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SentBy")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId");
+
+                    b.ToTable("SmsNotificationLogs");
+                });
+
             modelBuilder.Entity("PropertyAssessmentApp.Models.SystemModule", b =>
                 {
                     b.Property<int>("ModuleId")
@@ -8969,6 +9017,16 @@ namespace PropertyAssessmentApp.Migrations
                     b.Navigation("SystemModule");
                 });
 
+            modelBuilder.Entity("PropertyAssessmentApp.Models.SmsNotificationLog", b =>
+                {
+                    b.HasOne("PropertyAssessmentApp.Models.Owner", "Owner")
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Owner");
+                });
+
             modelBuilder.Entity("PropertyAssessmentApp.Models.TDNBuilding", b =>
                 {
                     b.HasOne("PropertyAssessmentApp.Models.BuildingDepreciationScheduleItem", "DepreciationSchedule")
@@ -9122,7 +9180,7 @@ namespace PropertyAssessmentApp.Migrations
             modelBuilder.Entity("PropertyAssessmentApp.Models.TaxDeclaration", b =>
                 {
                     b.HasOne("PropertyAssessmentApp.Models.Owner", "Owner")
-                        .WithMany()
+                        .WithMany("TaxDeclarations")
                         .HasForeignKey("OwnerId")
                         .OnDelete(DeleteBehavior.SetNull);
 
@@ -9153,6 +9211,11 @@ namespace PropertyAssessmentApp.Migrations
             modelBuilder.Entity("PropertyAssessmentApp.Models.BuildingDepreciationScheduleItem", b =>
                 {
                     b.Navigation("TDNBuildings");
+                });
+
+            modelBuilder.Entity("PropertyAssessmentApp.Models.Owner", b =>
+                {
+                    b.Navigation("TaxDeclarations");
                 });
 
             modelBuilder.Entity("PropertyAssessmentApp.Models.TDNBuilding", b =>

@@ -9,12 +9,14 @@ public class OwnerController : Controller
     private readonly IOwnerService _ownerService;
     private readonly IGeographicService _geoService;
     private readonly IPhilSmsService _philSmsService;
+    private readonly IPermissionService _permissionService;
 
-    public OwnerController(IOwnerService ownerService, IGeographicService geoService, IPhilSmsService philSmsService)
+    public OwnerController(IOwnerService ownerService, IGeographicService geoService, IPhilSmsService philSmsService, IPermissionService permissionService)
     {
         _ownerService = ownerService;
         _geoService = geoService;
         _philSmsService = philSmsService;
+        _permissionService = permissionService;
     }
 
     private void PopulateGeographicEntities(Owner owner)
@@ -216,12 +218,28 @@ public class OwnerController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SendSms(Guid ownerId, string recipient, string message)
     {
+        if (!_permissionService.CanAccess(User, "Sms"))
+        {
+            return Json(new
+            {
+                success = false,
+                message = "Access Denied: You do not have permission to send SMS messages."
+            });
+        }
+
         var owner = ownerId != Guid.Empty ? _ownerService.GetById(ownerId) : null;
         var targetNumber = !string.IsNullOrWhiteSpace(recipient)
             ? recipient.Trim()
             : (owner?.ContactNo ?? string.Empty);
 
-        var result = await _philSmsService.SendSmsAsync(targetNumber, message);
+        var senderUser = User.Identity?.Name ?? "Assessor Staff";
+        var result = await _philSmsService.SendSmsAsync(
+            recipient: targetNumber,
+            message: message,
+            senderId: null,
+            ownerId: owner?.Id,
+            recipientName: owner?.DisplayName,
+            sentBy: senderUser);
         if (result.Success)
         {
             var ownerLabel = owner != null ? owner.DisplayName : result.NormalizedRecipient;

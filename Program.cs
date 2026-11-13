@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 using PropertyAssessmentApp.Data;
 using PropertyAssessmentApp.Hubs;
@@ -75,7 +76,17 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-app.UseStaticFiles();
+
+// Configure Static Files with explicit font MIME types for offline intranet deployment
+var contentTypeProvider = new FileExtensionContentTypeProvider();
+contentTypeProvider.Mappings[".woff2"] = "font/woff2";
+contentTypeProvider.Mappings[".woff"] = "font/woff";
+contentTypeProvider.Mappings[".ttf"] = "font/ttf";
+app.UseStaticFiles(new StaticFileOptions
+{
+    ContentTypeProvider = contentTypeProvider
+});
+
 app.UseRouting();
 
 app.UseCors("AllowMobileClients");

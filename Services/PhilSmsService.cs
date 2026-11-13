@@ -1,6 +1,9 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
+using PropertyAssessmentApp.Data;
+using PropertyAssessmentApp.Models;
 
 namespace PropertyAssessmentApp.Services;
 
@@ -9,11 +12,19 @@ public class PhilSmsResult
     public bool Success { get; set; }
     public string Message { get; set; } = string.Empty;
     public string? NormalizedRecipient { get; set; }
+    public Guid? LogId { get; set; }
 }
 
 public interface IPhilSmsService
 {
-    Task<PhilSmsResult> SendSmsAsync(string recipient, string message, string? senderId = null, CancellationToken cancellationToken = default);
+    Task<PhilSmsResult> SendSmsAsync(
+        string recipient,
+        string message,
+        string? senderId = null,
+        Guid? ownerId = null,
+        string? recipientName = null,
+        string? sentBy = null,
+        CancellationToken cancellationToken = default);
 }
 
 public class PhilSmsService : IPhilSmsService
@@ -21,48 +32,63 @@ public class PhilSmsService : IPhilSmsService
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IConfiguration _configuration;
     private readonly ILogger<PhilSmsService> _logger;
+    private readonly IServiceScopeFactory _scopeFactory;
 
     public PhilSmsService(
         IHttpClientFactory httpClientFactory,
         IConfiguration configuration,
-        ILogger<PhilSmsService> logger)
+        ILogger<PhilSmsService> logger,
+        IServiceScopeFactory scopeFactory)
     {
         _httpClientFactory = httpClientFactory;
         _configuration = configuration;
         _logger = logger;
+        _scopeFactory = scopeFactory;
     }
 
     public async Task<PhilSmsResult> SendSmsAsync(
         string recipient,
         string message,
         string? senderId = null,
+        Guid? ownerId = null,
+        string? recipientName = null,
+        string? sentBy = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(recipient))
         {
+            var failMsg = "Recipient mobile number is required.";
+            var logId = await SaveLogAsync(recipient ?? string.Empty, recipientName, ownerId, message ?? string.Empty, senderId, false, failMsg, sentBy);
             return new PhilSmsResult
             {
                 Success = false,
-                Message = "Recipient mobile number is required."
+                Message = failMsg,
+                LogId = logId
             };
         }
 
         if (string.IsNullOrWhiteSpace(message))
         {
+            var failMsg = "SMS message content cannot be empty.";
+            var logId = await SaveLogAsync(recipient, recipientName, ownerId, string.Empty, senderId, false, failMsg, sentBy);
             return new PhilSmsResult
             {
                 Success = false,
-                Message = "SMS message content cannot be empty."
+                Message = failMsg,
+                LogId = logId
             };
         }
 
         var normalizedRecipient = NormalizePhilippineMobileNumber(recipient);
         if (string.IsNullOrWhiteSpace(normalizedRecipient))
         {
+            var failMsg = "Invalid mobile number format. Please enter a valid Philippine mobile number (e.g., 09171234567 or +639171234567).";
+            var logId = await SaveLogAsync(recipient, recipientName, ownerId, message, senderId, false, failMsg, sentBy);
             return new PhilSmsResult
             {
                 Success = false,
-                Message = "Invalid mobile number format. Please enter a valid Philippine mobile number (e.g., 09171234567 or +639171234567)."
+                Message = failMsg,
+                LogId = logId
             };
         }
 
@@ -75,10 +101,14 @@ public class PhilSmsService : IPhilSmsService
         var apiToken = _configuration["PhilSmsSettings:ApiToken"]?.Trim();
         if (string.IsNullOrWhiteSpace(apiToken))
         {
+            var failMsg = "PhilSMS API Token is not configured.";
+            var logId = await SaveLogAsync(normalizedRecipient, recipientName, ownerId, message, senderId, false, failMsg, sentBy);
             return new PhilSmsResult
             {
                 Success = false,
-                Message = "PhilSMS API Token is not configured."
+                Message = failMsg,
+                NormalizedRecipient = normalizedRecipient,
+                LogId = logId
             };
         }
 
@@ -124,23 +154,27 @@ public class PhilSmsService : IPhilSmsService
 
                     if (string.Equals(status, "success", StringComparison.OrdinalIgnoreCase) || response.IsSuccessStatusCode && !string.Equals(status, "error", StringComparison.OrdinalIgnoreCase))
                     {
+                        var successMsg = !string.IsNullOrWhiteSpace(apiMsg) ? apiMsg : $"SMS sent successfully to {normalizedRecipient}.";
+                        var logId = await SaveLogAsync(normalizedRecipient, recipientName, ownerId, message, effectiveSenderId, true, successMsg, sentBy);
                         return new PhilSmsResult
                         {
                             Success = true,
                             NormalizedRecipient = normalizedRecipient,
-                            Message = !string.IsNullOrWhiteSpace(apiMsg)
-                                ? apiMsg
-                                : $"SMS sent successfully to {normalizedRecipient}."
+                            Message = successMsg,
+                            LogId = logId
                         };
                     }
 
+                    var errorMsg = !string.IsNullOrWhiteSpace(apiMsg)
+                        ? apiMsg
+                        : $"PhilSMS returned status '{status ?? response.StatusCode.ToString()}'.";
+                    var failLogId = await SaveLogAsync(normalizedRecipient, recipientName, ownerId, message, effectiveSenderId, false, errorMsg, sentBy);
                     return new PhilSmsResult
                     {
                         Success = false,
                         NormalizedRecipient = normalizedRecipient,
-                        Message = !string.IsNullOrWhiteSpace(apiMsg)
-                            ? apiMsg
-                            : $"PhilSMS returned status '{status ?? response.StatusCode.ToString()}'."
+                        Message = errorMsg,
+                        LogId = failLogId
                     };
                 }
                 catch (JsonException)
@@ -151,30 +185,77 @@ public class PhilSmsService : IPhilSmsService
 
             if (response.IsSuccessStatusCode)
             {
+                var successMsg = $"SMS sent successfully to {normalizedRecipient}.";
+                var logId = await SaveLogAsync(normalizedRecipient, recipientName, ownerId, message, effectiveSenderId, true, successMsg, sentBy);
                 return new PhilSmsResult
                 {
                     Success = true,
                     NormalizedRecipient = normalizedRecipient,
-                    Message = $"SMS sent successfully to {normalizedRecipient}."
+                    Message = successMsg,
+                    LogId = logId
                 };
             }
 
+            var httpErrorMsg = $"PhilSMS request failed with HTTP {(int)response.StatusCode} ({response.ReasonPhrase}).";
+            var httpFailLogId = await SaveLogAsync(normalizedRecipient, recipientName, ownerId, message, effectiveSenderId, false, httpErrorMsg, sentBy);
             return new PhilSmsResult
             {
                 Success = false,
                 NormalizedRecipient = normalizedRecipient,
-                Message = $"PhilSMS request failed with HTTP {(int)response.StatusCode} ({response.ReasonPhrase})."
+                Message = httpErrorMsg,
+                LogId = httpFailLogId
             };
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error sending SMS via PhilSMS to {Recipient}", normalizedRecipient);
+            var exMsg = $"Unable to connect to PhilSMS gateway: {ex.Message}";
+            var exLogId = await SaveLogAsync(normalizedRecipient, recipientName, ownerId, message, effectiveSenderId, false, exMsg, sentBy);
             return new PhilSmsResult
             {
                 Success = false,
                 NormalizedRecipient = normalizedRecipient,
-                Message = $"Unable to connect to PhilSMS gateway: {ex.Message}"
+                Message = exMsg,
+                LogId = exLogId
             };
+        }
+    }
+
+    private async Task<Guid?> SaveLogAsync(
+        string recipientNumber,
+        string? recipientName,
+        Guid? ownerId,
+        string message,
+        string? senderId,
+        bool isSuccess,
+        string? gatewayResponse,
+        string? sentBy)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var log = new SmsNotificationLog
+            {
+                Id = Guid.NewGuid(),
+                RecipientNumber = recipientNumber,
+                RecipientName = recipientName,
+                OwnerId = ownerId,
+                Message = message,
+                SenderId = senderId,
+                Status = isSuccess ? SmsDeliveryStatus.Success : SmsDeliveryStatus.Failed,
+                GatewayResponse = gatewayResponse,
+                SentAt = DateTime.Now,
+                SentBy = !string.IsNullOrWhiteSpace(sentBy) ? sentBy : "System"
+            };
+            db.SmsNotificationLogs.Add(log);
+            await db.SaveChangesAsync();
+            return log.Id;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to save SMS log to database for recipient {Recipient}", recipientNumber);
+            return null;
         }
     }
 
@@ -183,7 +264,6 @@ public class PhilSmsService : IPhilSmsService
         if (string.IsNullOrWhiteSpace(rawInput))
             return null;
 
-        // Support comma/semicolon/slash separated numbers by taking the first valid mobile number or joining multiple valid numbers
         var parts = rawInput.Split(new[] { ',', ';', '/' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var validNumbers = new List<string>();
 
@@ -214,4 +294,3 @@ public class PhilSmsService : IPhilSmsService
         return validNumbers.Count > 0 ? string.Join(",", validNumbers.Distinct()) : null;
     }
 }
-

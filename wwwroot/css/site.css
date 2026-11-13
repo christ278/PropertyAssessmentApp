@@ -1,4 +1,4 @@
-@import url('../lib/fonts/poppins/poppins.css');
+@import url('typography.css');
 
 :root {
     --emerald-50: #ecfdf5;
