@@ -25,7 +25,7 @@ export const DEFAULT_BASE_URL = Platform.OS === 'web'
 
 export const resolveServerUrl = async (path) => {
   if (!path) return '';
-  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:') || path.startsWith('file://')) {
+  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:') || path.startsWith('file:') || path.startsWith('blob:') || path.startsWith('content:')) {
     return path;
   }
   let base = DEFAULT_BASE_URL.replace(/\/+$/, '');

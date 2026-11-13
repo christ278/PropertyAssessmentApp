@@ -479,7 +479,7 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                 if (partitions.Count > 0)
                 {
                     tdnList = partitions
-                        .Where(p => !string.IsNullOrWhiteSpace(p.SystemGeneratedTDN))
+                        .Where(p => !string.IsNullOrWhiteSpace(p.SystemGeneratedTDN) && !CastTdGenerator.IsUnapprovedCastTd(p.SystemGeneratedTDN))
                         .Select(p => p.SystemGeneratedTDN)
                         .Where(s => !string.IsNullOrWhiteSpace(s))
                         .Distinct()
@@ -514,13 +514,21 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
             }
 
             // Sync OwnerId & Owner Demographics from matching partition item (or parent request)
+            // Match by PartitionIndex or PIN first so unapproved "-00000" TDNs don't collide across partitions A and B
             var matchingPartition = partitions.FirstOrDefault(p =>
                 (string.IsNullOrWhiteSpace(p.Kind) ||
                  string.Equals(p.Kind.Trim(), td.Kind.ToString(), StringComparison.OrdinalIgnoreCase)) &&
-                ((!string.IsNullOrWhiteSpace(p.SystemGeneratedTDN) &&
-                 string.Equals(p.SystemGeneratedTDN, td.TaxDeclarationNumber, StringComparison.OrdinalIgnoreCase)) ||
-                (!string.IsNullOrWhiteSpace(p.ARPNo) &&
-                 string.Equals(p.ARPNo, td.TaxDeclarationNumber, StringComparison.OrdinalIgnoreCase))));
+                ((!string.IsNullOrWhiteSpace(p.PartitionIndex) &&
+                  td.Memoranda != null && td.Memoranda.Contains($"Partition {p.PartitionIndex}")) ||
+                 (!string.IsNullOrWhiteSpace(p.PIN) &&
+                  string.Equals(p.PIN, td.PropertyIndexNumber, StringComparison.OrdinalIgnoreCase)) ||
+                 (!string.IsNullOrWhiteSpace(p.SystemGeneratedTDN) &&
+                  !CastTdGenerator.IsUnapprovedCastTd(p.SystemGeneratedTDN) &&
+                  string.Equals(p.SystemGeneratedTDN, td.TaxDeclarationNumber, StringComparison.OrdinalIgnoreCase)) ||
+                 (!string.IsNullOrWhiteSpace(p.ARPNo) &&
+                  p.ARPNo != CastTdGenerator.DefaultArpNumber &&
+                  string.Equals(p.ARPNo, td.ARPNo, StringComparison.OrdinalIgnoreCase))))
+                ?? (partitions.Count == 1 ? partitions[0] : null);
 
             if (matchingPartition != null)
             {
@@ -552,6 +560,50 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                 if (!string.IsNullOrWhiteSpace(matchingPartition.SectionNo)) td.SectionNo = matchingPartition.SectionNo;
                 if (!string.IsNullOrWhiteSpace(matchingPartition.LotNumber)) td.LotNo = matchingPartition.LotNumber;
                 if (!string.IsNullOrWhiteSpace(matchingPartition.ParcelNo)) td.ParcelNo = matchingPartition.ParcelNo;
+                if (!string.IsNullOrWhiteSpace(matchingPartition.StreetLocation)) td.StreetNo = matchingPartition.StreetLocation;
+                if (!string.IsNullOrWhiteSpace(matchingPartition.CityMunicipality)) td.Municipality = matchingPartition.CityMunicipality;
+                if (!string.IsNullOrWhiteSpace(matchingPartition.Province)) td.ProvinceCity = matchingPartition.Province;
+                if (!string.IsNullOrWhiteSpace(matchingPartition.TitleNo)) td.TitleNo = matchingPartition.TitleNo;
+                if (!string.IsNullOrWhiteSpace(matchingPartition.SurveyNumber)) td.SurveyNo = matchingPartition.SurveyNumber;
+                else if (!string.IsNullOrWhiteSpace(matchingPartition.CadastralSurveyNo)) td.SurveyNo = matchingPartition.CadastralSurveyNo;
+
+                // Boundaries & Remarks
+                if (!string.IsNullOrWhiteSpace(matchingPartition.BoundaryNorth)) td.BoundaryNorth = matchingPartition.BoundaryNorth;
+                if (!string.IsNullOrWhiteSpace(matchingPartition.BoundarySouth)) td.BoundarySouth = matchingPartition.BoundarySouth;
+                if (!string.IsNullOrWhiteSpace(matchingPartition.BoundaryEast)) td.BoundaryEast = matchingPartition.BoundaryEast;
+                if (!string.IsNullOrWhiteSpace(matchingPartition.BoundaryWest)) td.BoundaryWest = matchingPartition.BoundaryWest;
+                if (!string.IsNullOrWhiteSpace(matchingPartition.Nremarks)) td.Nremarks = matchingPartition.Nremarks;
+                if (!string.IsNullOrWhiteSpace(matchingPartition.Sremarks)) td.Sremarks = matchingPartition.Sremarks;
+                if (!string.IsNullOrWhiteSpace(matchingPartition.Eremarks)) td.Eremarks = matchingPartition.Eremarks;
+                if (!string.IsNullOrWhiteSpace(matchingPartition.Wremarks)) td.Wremarks = matchingPartition.Wremarks;
+
+                // Land Schedules JSON
+                if (!string.IsNullOrWhiteSpace(matchingPartition.LandAppraisalDetailsJson)) td.LandAppraisalDetailsJson = matchingPartition.LandAppraisalDetailsJson;
+                if (!string.IsNullOrWhiteSpace(matchingPartition.LandImprovementsJson)) td.LandImprovementsJson = matchingPartition.LandImprovementsJson;
+                if (!string.IsNullOrWhiteSpace(matchingPartition.LandAdjustmentsJson)) td.LandAdjustmentsJson = matchingPartition.LandAdjustmentsJson;
+                if (!string.IsNullOrWhiteSpace(matchingPartition.LandPropertyAssessmentsJson)) td.LandPropertyAssessmentsJson = matchingPartition.LandPropertyAssessmentsJson;
+
+                // Kind, Classification & Actual Use
+                if (Enum.TryParse<PropertyKind>(matchingPartition.Kind, true, out var parsedPk)) td.Kind = parsedPk;
+                if (Enum.TryParse<PropertyClassification>(matchingPartition.Classification, true, out var parsedPc)) td.Classification = parsedPc;
+                if (!string.IsNullOrWhiteSpace(matchingPartition.ActualUse)) td.ActualUse = matchingPartition.ActualUse;
+
+                // Valuation & Area
+                if (matchingPartition.AreaSqMeters > 0) td.AreaSqMeters = matchingPartition.AreaSqMeters;
+                if (matchingPartition.UnitValue > 0) td.UnitValue = matchingPartition.UnitValue;
+                if (matchingPartition.MarketValue > 0)
+                {
+                    td.MarketValue = matchingPartition.MarketValue;
+                    td.AdjustedMarketValue = matchingPartition.MarketValue;
+                }
+                if (matchingPartition.AssessmentLevelPercent > 0) td.AssessmentLevelPercent = matchingPartition.AssessmentLevelPercent;
+                if (matchingPartition.AssessedValue > 0) td.AssessedValue = matchingPartition.AssessedValue;
+                else if (td.MarketValue > 0 && td.AssessmentLevelPercent > 0)
+                {
+                    td.AssessedValue = Math.Round(td.MarketValue * (td.AssessmentLevelPercent / 100m), 2);
+                }
+                if (td.AssessedValue > 0) td.AnnualTaxDue = Math.Round(td.AssessedValue * 0.03m, 2);
+
                 if (matchingPartition.EffectivityYear.HasValue && matchingPartition.EffectivityYear.Value > 1900)
                 {
                     td.EffectivityYear = matchingPartition.EffectivityYear.Value;
@@ -614,10 +666,38 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                 if (matchingPartition.PropertyImagesJson != null)
                 {
                     td.PropertyImagesJson = matchingPartition.PropertyImagesJson;
-                    if ( td.Kind != PropertyKind.Machinery ) _assessmentService.Update(td);
                 }
 
-                // Sync Machinery & Land Appraisal JSONs if updated via EditPartition
+                // Sync Building specs
+                if (td.Kind == PropertyKind.Building)
+                {
+                    if (!string.IsNullOrWhiteSpace(matchingPartition.BuildingClassification)) td.BuildingClassification = matchingPartition.BuildingClassification;
+                    if (!string.IsNullOrWhiteSpace(matchingPartition.StructuralType)) td.StructuralType = matchingPartition.StructuralType;
+                    if (matchingPartition.NoOfStoreys > 0) td.NoOfStoreys = matchingPartition.NoOfStoreys;
+                    if (!string.IsNullOrWhiteSpace(matchingPartition.BuildingPermitNo)) td.BuildingPermitNo = matchingPartition.BuildingPermitNo;
+                    if (!string.IsNullOrWhiteSpace(matchingPartition.OccupancyPermitNo)) td.OccupancyPermitNo = matchingPartition.OccupancyPermitNo;
+                    if (matchingPartition.BuildingAgeYears > 0) td.BuildingAgeYears = matchingPartition.BuildingAgeYears;
+                    if (matchingPartition.DateConstructed.HasValue) td.DateConstructed = matchingPartition.DateConstructed;
+                    if (matchingPartition.DateCompleted.HasValue) td.DateCompleted = matchingPartition.DateCompleted;
+                    if (matchingPartition.DateOccupied.HasValue) td.DateOccupied = matchingPartition.DateOccupied;
+                    if (matchingPartition.TotalBuildingAreaSqm > 0) td.TotalBuildingAreaSqm = matchingPartition.TotalBuildingAreaSqm;
+
+                    if (!string.IsNullOrWhiteSpace(matchingPartition.StructuralFoundation)) td.StructuralFoundation = matchingPartition.StructuralFoundation;
+                    if (!string.IsNullOrWhiteSpace(matchingPartition.StructuralColumns)) td.StructuralColumns = matchingPartition.StructuralColumns;
+                    if (!string.IsNullOrWhiteSpace(matchingPartition.StructuralBeams)) td.StructuralBeams = matchingPartition.StructuralBeams;
+                    if (!string.IsNullOrWhiteSpace(matchingPartition.StructuralTrussRoof)) td.StructuralTrussRoof = matchingPartition.StructuralTrussRoof;
+                    if (!string.IsNullOrWhiteSpace(matchingPartition.StructuralRoof)) td.StructuralRoof = matchingPartition.StructuralRoof;
+                    if (!string.IsNullOrWhiteSpace(matchingPartition.StructuralExteriorWalls)) td.StructuralExteriorWalls = matchingPartition.StructuralExteriorWalls;
+                    if (!string.IsNullOrWhiteSpace(matchingPartition.StructuralFlooring)) td.StructuralFlooring = matchingPartition.StructuralFlooring;
+                    if (!string.IsNullOrWhiteSpace(matchingPartition.DoorMain)) td.DoorMain = matchingPartition.DoorMain;
+                    if (!string.IsNullOrWhiteSpace(matchingPartition.Ceiling)) td.Ceiling = matchingPartition.Ceiling;
+                    if (!string.IsNullOrWhiteSpace(matchingPartition.StructuralWindows)) td.StructuralWindows = matchingPartition.StructuralWindows;
+                    if (!string.IsNullOrWhiteSpace(matchingPartition.StructuralStairs)) td.StructuralStairs = matchingPartition.StructuralStairs;
+                    if (!string.IsNullOrWhiteSpace(matchingPartition.StructuralPartitionWalls)) td.StructuralPartitionWalls = matchingPartition.StructuralPartitionWalls;
+                    if (!string.IsNullOrWhiteSpace(matchingPartition.StructuralFloorFinish)) td.StructuralFloorFinish = matchingPartition.StructuralFloorFinish;
+                }
+
+                // Sync Machinery specs
                 if (td.Kind == PropertyKind.Machinery)
                 {
                     td.IsLandOwnerAlsoBuildingOwner = matchingPartition.IsLandOwnerAlsoBuildingOwner;
@@ -642,10 +722,9 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                     if (matchingPartition.LocalDateIssued.HasValue) td.LocalDateIssued = matchingPartition.LocalDateIssued;
                     if (!string.IsNullOrWhiteSpace(matchingPartition.MachineryAppraisalDetailsJson)) td.MachineryAppraisalDetailsJson = matchingPartition.MachineryAppraisalDetailsJson;
                     if (!string.IsNullOrWhiteSpace(matchingPartition.MachineryPropertyAssessmentsJson)) td.MachineryPropertyAssessmentsJson = matchingPartition.MachineryPropertyAssessmentsJson;
-                    if (matchingPartition.MarketValue > 0) td.MarketValue = matchingPartition.MarketValue;
-                    if (matchingPartition.AssessmentLevelPercent > 0) td.AssessmentLevelPercent = matchingPartition.AssessmentLevelPercent; _assessmentService.Update(td);
-                    if ( td.Kind != PropertyKind.Machinery ) _assessmentService.Update(td);
                 }
+
+                _assessmentService.Update(td);
                 partitionsModified = true;
             }
             else

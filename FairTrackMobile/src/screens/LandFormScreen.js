@@ -22,6 +22,7 @@ import { ActionModal } from '../components/ActionModal';
 import { DiscardChangesModal } from '../components/DiscardChangesModal';
 import { DatePickerModal } from '../components/DatePickerModal';
 import { AttachmentsSection } from '../components/AttachmentsSection';
+import { savePartitionAttachmentsOffline, loadPartitionAttachmentsOffline } from '../utils/fileStorage';
 import { COLORS, SHADOWS } from '../constants/theme';
 import { BARANGAY_OPTIONS, normalizeBarangay } from '../constants/locationData';
 import {
@@ -69,10 +70,12 @@ export const LandFormScreen = ({ route, navigation }) => {
   const formWorkflowIdParam = route?.params?.formWorkflowId || null;
   const partitionIndexParam = route?.params?.partitionIndex ?? 0;
   const partitionLetterParam = route?.params?.partitionLetter || String.fromCharCode(65 + (parseInt(partitionIndexParam, 10) || 0));
+  const fromHistory = route?.params?.fromHistory === true;
   const {
     queueOfflineUpdate,
     markTransactionSynced,
     getDownloadedFormData,
+    updatePartitionAttachmentsLocally,
     isTransactionDownloaded,
     hasPendingEdits,
     downloadSingleTransaction,
@@ -225,6 +228,8 @@ export const LandFormScreen = ({ route, navigation }) => {
 
   // 6. Site Sketch & Field Attachments
   const [sketchUrl, setSketchUrl] = useState('');
+  const [sketchBase64, setSketchBase64] = useState(null);
+  const [sketchFileName, setSketchFileName] = useState('');
   const [attachments, setAttachments] = useState([]);
 
   // Workflow Forwarding
@@ -376,6 +381,15 @@ export const LandFormScreen = ({ route, navigation }) => {
   const loadLandData = async () => {
     setNotDownloadedError(false);
 
+    // 0. Load any locally saved partition offline attachments and sketch
+    const offlineAttData = await loadPartitionAttachmentsOffline(trackingNoParam, partitionIndexParam);
+    if (offlineAttData.attachments && offlineAttData.attachments.length > 0) {
+      setAttachments(offlineAttData.attachments);
+    }
+    if (offlineAttData.sketchUrl) {
+      setSketchUrl(offlineAttData.sketchUrl);
+    }
+
     // 1. Check if downloaded offline copy exists and populate immediately
     const downloaded = getDownloadedFormData(trackingNoParam, formWorkflowIdParam, partitionIndexParam);
     if (downloaded) {
@@ -453,8 +467,35 @@ export const LandFormScreen = ({ route, navigation }) => {
           const liveAtts = livePart?.attachments || liveRes.attachments || [];
           const liveSketch = livePart?.sketchUrl || liveRes.sketchUrl;
 
-          if (liveSketch) setSketchUrl(liveSketch);
-          if (Array.isArray(liveAtts)) setAttachments(liveAtts);
+          const localAtts = (offlineAttData.attachments && offlineAttData.attachments.length > 0)
+            ? offlineAttData.attachments
+            : (downloaded?.currentPartition?.attachments || downloaded?.attachments || []);
+
+          if (localAtts.length > 0) {
+            const merged = [...localAtts];
+            if (Array.isArray(liveAtts)) {
+              for (const la of liveAtts) {
+                const laId = la?.id || la?.Id || la?.fileUrl || la?.FileUrl;
+                if (!merged.some(m => (m?.id || m?.Id || m?.fileUrl || m?.FileUrl) === laId)) {
+                  merged.push(la);
+                }
+              }
+            }
+            setAttachments(merged);
+          } else if (Array.isArray(liveAtts) && liveAtts.length > 0) {
+            setAttachments(liveAtts);
+          }
+
+          if (offlineAttData.sketchUrl) {
+            setSketchUrl(offlineAttData.sketchUrl);
+          } else if (liveSketch) {
+            setSketchUrl(liveSketch);
+          } else if (downloaded?.currentPartition?.sketchUrl) {
+            setSketchUrl(downloaded.currentPartition.sketchUrl);
+          } else if (downloaded?.sketchUrl) {
+            setSketchUrl(downloaded.sketchUrl);
+          }
+
           if (liveRes.tdnId) setTdnId(liveRes.tdnId);
 
           if (livePart) {
@@ -1045,10 +1086,18 @@ export const LandFormScreen = ({ route, navigation }) => {
 
   const navigateBack = () => {
     setDiscardModalVisible(false);
-    if (navigation && typeof navigation.navigate === 'function') {
-      navigation.navigate('Main', { screen: 'Feed' });
-    } else if (navigation && typeof navigation.goBack === 'function') {
-      navigation.goBack();
+    if (fromHistory) {
+      if (navigation && typeof navigation.canGoBack === 'function' && navigation.canGoBack()) {
+        navigation.goBack();
+      } else if (navigation && typeof navigation.navigate === 'function') {
+        navigation.navigate('Main', { screen: 'HistoryTab' });
+      }
+    } else {
+      if (navigation && typeof navigation.canGoBack === 'function' && navigation.canGoBack()) {
+        navigation.goBack();
+      } else if (navigation && typeof navigation.navigate === 'function') {
+        navigation.navigate('Main', { screen: 'Feed' });
+      }
     }
   };
 
@@ -1071,7 +1120,11 @@ export const LandFormScreen = ({ route, navigation }) => {
   };
 
   const handleCancel = () => {
-    setDiscardModalVisible(true);
+    if (fromHistory) {
+      navigateBack();
+    } else {
+      setDiscardModalVisible(true);
+    }
   };
 
   const handleSave = async (forceOffline = false, transferStage = false) => {
@@ -1138,6 +1191,8 @@ export const LandFormScreen = ({ route, navigation }) => {
         AdministratorEmail: adminEmail,
         AdministratorGender: adminGender,
         FloorPlanSketchPath: sketchUrl,
+        FloorPlanSketchBase64: sketchBase64,
+        FloorPlanSketchFileName: sketchFileName,
         Attachments: attachments,
         YearEffectivity: parseInt(yearEffectivity) || null,
         QuarterEffectivity: qNum,
@@ -1185,13 +1240,13 @@ export const LandFormScreen = ({ route, navigation }) => {
         'UPDATE_LAND',
         payload,
         `Land Appraisal [Part ${partitionLetterParam}]: ${trackingNo || arpNo} (${ownerName || 'Owner'})`,
-        workflowForwardPayload
+        null
       );
       setSaving(false);
       showCompleteModalAndGoBack(
-        'Saved to Offline Queue',
-        `Edits for Partition ${partitionLetterParam} have been saved locally in the offline queue and will sync to the Web Portal once you are online.`,
-        'warning',
+        'Partition Saved Offline',
+        `Edits for Partition ${partitionLetterParam} have been saved locally. To synchronize to the office database or transfer to supervisor, use the 3-dots (⋮) menu on the transaction card in My Transactions.`,
+        'success',
         'cloud-offline-outline'
       );
       return;
@@ -1277,12 +1332,22 @@ export const LandFormScreen = ({ route, navigation }) => {
   return (
     <View style={styles.container}>
       <HeaderBar
-        title="LAND APPRAISAL"
+        title={fromHistory ? "VIEW LAND RECORD" : "LAND APPRAISAL"}
         subtitle={`Tracking No: ${trackingNo || 'N/A'} • Partition ${partitionLetterParam}${declarationNo ? ` • TDN: ${declarationNo}` : ''}`}
         navigation={navigation}
         showBack={true}
         onBackPress={handleCancel}
       />
+
+      {/* Historical Record Ribbon */}
+      {fromHistory && (
+        <View style={styles.historyNoticeRibbon}>
+          <Ionicons name="time-outline" size={16} color="#0369a1" />
+          <Text style={styles.historyNoticeText}>
+            Historical Record View • Completed transaction cannot be edited.
+          </Text>
+        </View>
+      )}
 
       {/* Offline Status Ribbon */}
       <View style={[styles.ribbon, isDownloaded ? styles.ribbonDownloaded : styles.ribbonStandard]}>
@@ -1730,9 +1795,28 @@ export const LandFormScreen = ({ route, navigation }) => {
                 {/* 2nd Tab: Site Sketch Attachment */}
                 <AttachmentsSection
                   trackingNo={trackingNo || trackingNoParam}
+                  formWorkflowId={formWorkflowIdParam}
+                  partitionIndex={parseInt(partitionIndexParam, 10) || 0}
                   sketchUrl={sketchUrl}
+                  sketchBase64={sketchBase64}
                   attachments={attachments}
-                  onAttachmentsChange={setAttachments}
+                  onAttachmentsChange={(newAtts) => {
+                    setAttachments(newAtts);
+                    savePartitionAttachmentsOffline(trackingNo || trackingNoParam, partitionIndexParam, newAtts, sketchUrl);
+                    if (typeof updatePartitionAttachmentsLocally === 'function') {
+                      updatePartitionAttachmentsLocally(trackingNo || trackingNoParam, formWorkflowIdParam, partitionIndexParam, newAtts, sketchUrl);
+                    }
+                  }}
+                  onSketchChange={({ uri, base64, fileName }) => {
+                    const newSketch = uri || '';
+                    setSketchUrl(newSketch);
+                    setSketchBase64(base64 || null);
+                    setSketchFileName(fileName || '');
+                    savePartitionAttachmentsOffline(trackingNo || trackingNoParam, partitionIndexParam, attachments, newSketch);
+                    if (typeof updatePartitionAttachmentsLocally === 'function') {
+                      updatePartitionAttachmentsLocally(trackingNo || trackingNoParam, formWorkflowIdParam, partitionIndexParam, attachments, newSketch);
+                    }
+                  }}
                   propertyKind="Land"
                   showSketch={true}
                   showAttachments={false}
@@ -2576,38 +2660,21 @@ export const LandFormScreen = ({ route, navigation }) => {
                   </View>
                 </View>
 
-                <View style={[styles.card, shadows.card]}>
-                  <Text style={styles.cardHeaderTitle}>Office Workflow Transfer</Text>
-
-                  <View style={styles.switchRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.switchTitle}>Transfer to Next Step on Sync</Text>
-                      <Text style={styles.switchSubtitle}>Automatically forwards workflow after office sync</Text>
-                    </View>
-                    <Switch
-                      value={autoForward}
-                      onValueChange={setAutoForward}
-                      trackColor={{ false: colors.borderDark, true: colors.primary }}
-                    />
-                  </View>
-
-                  {autoForward && (
-                    <View style={styles.nextStepBox}>
-                      <Text style={styles.nextStepLabel}>Target Next Stage:</Text>
-                      <View style={styles.nextStepBadge}>
-                        <Ionicons name="checkmark-circle-outline" size={16} color={colors.primary} />
-                        <Text style={styles.nextStepBadgeText}>Inspection Checked / Recommend Approval</Text>
-                      </View>
-                    </View>
-                  )}
-                </View>
-
                 {/* 5th Tab: Field Photos & Attachments */}
                 <AttachmentsSection
                   trackingNo={trackingNo || trackingNoParam}
+                  formWorkflowId={formWorkflowIdParam}
+                  partitionIndex={parseInt(partitionIndexParam, 10) || 0}
                   sketchUrl={sketchUrl}
+                  sketchBase64={sketchBase64}
                   attachments={attachments}
-                  onAttachmentsChange={setAttachments}
+                  onAttachmentsChange={(newAtts) => {
+                    setAttachments(newAtts);
+                    savePartitionAttachmentsOffline(trackingNo || trackingNoParam, partitionIndexParam, newAtts, sketchUrl);
+                    if (typeof updatePartitionAttachmentsLocally === 'function') {
+                      updatePartitionAttachmentsLocally(trackingNo || trackingNoParam, formWorkflowIdParam, partitionIndexParam, newAtts, sketchUrl);
+                    }
+                  }}
                   propertyKind="Land"
                   showSketch={false}
                   showAttachments={true}
@@ -2616,72 +2683,49 @@ export const LandFormScreen = ({ route, navigation }) => {
             )}
 
             {/* Action Buttons */}
-            {!isOnline && (
-              <View style={styles.offlineNoticeRow}>
-                <Ionicons name="cloud-offline-outline" size={15} color="#b45309" />
-                <Text style={styles.offlineNoticeText}>
-                  Offline Mode: Changes will be saved locally to this device.
-                </Text>
-              </View>
-            )}
             <View style={styles.buttonContainer}>
-              {/* Button 1: Save & Sync to Web (Draft - No Transfer) */}
-              <TouchableOpacity
-                style={[
-                  styles.saveBtn,
-                  styles.saveBtnPrimary,
-                  !isOnline && styles.saveBtnOffline
-                ]}
-                onPress={() => handleSave(false, false)}
-                disabled={saving}
-              >
-                {saving ? (
-                  <ActivityIndicator color="#ffffff" />
-                ) : (
-                  <>
-                    <Ionicons
-                      name={isOnline ? "cloud-upload" : "file-tray-full-outline"}
-                      size={18}
-                      color="#ffffff"
-                    />
-                    <Text style={styles.saveBtnText}>
-                      {isOnline
-                        ? "Save & Sync to Web (Draft)"
-                        : "Save to Offline Queue (No Transfer)"}
+              {fromHistory ? (
+                <TouchableOpacity
+                  style={[styles.saveBtn, { backgroundColor: colors.primary }]}
+                  onPress={handleCancel}
+                >
+                  <Ionicons name="arrow-back" size={18} color="#ffffff" />
+                  <Text style={styles.saveBtnText}>Back to History</Text>
+                </TouchableOpacity>
+              ) : (
+                <>
+                  <View style={styles.partitionNoticeRow}>
+                    <Ionicons name="information-circle-outline" size={16} color={colors.primary} />
+                    <Text style={styles.partitionNoticeText}>
+                      Partition edits are saved locally to this device. Synchronizing to web and transferring to supervisor are handled per transaction via the 3-dots (⋮) menu on the transaction card in My Transactions.
                     </Text>
-                  </>
-                )}
-              </TouchableOpacity>
+                  </View>
 
-              {/* Button 2: Save & Transfer to Supervisor (Advances Workflow) */}
-              <TouchableOpacity
-                style={[styles.saveBtn, styles.saveBtnTransfer]}
-                onPress={() => handleSave(false, true)}
-                disabled={saving}
-              >
-                <Ionicons name="send" size={16} color="#ffffff" />
-                <Text style={styles.saveBtnText}>
-                  {isOnline
-                    ? "Save & Transfer to Supervisor"
-                    : "Queue & Transfer to Supervisor"}
-                </Text>
-              </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.saveBtn, styles.saveBtnOffline]}
+                    onPress={() => handleSave(true, false)}
+                    disabled={saving}
+                  >
+                    {saving ? (
+                      <ActivityIndicator color="#ffffff" />
+                    ) : (
+                      <>
+                        <Ionicons name="cloud-offline-outline" size={18} color="#ffffff" />
+                        <Text style={styles.saveBtnText}>Save Partition (Offline)</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[styles.saveBtn, styles.saveBtnSecondary]}
-                onPress={() => handleSave(true)}
-              >
-                <Ionicons name="save-outline" size={18} color={colors.primary} />
-                <Text style={styles.saveBtnSecondaryText}>Save to Offline Queue Only</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.saveBtn, styles.cancelBtn]}
-                onPress={handleCancel}
-                disabled={saving}
-              >
-                <Ionicons name="close-circle-outline" size={18} color="#e11d48" />
-                <Text style={styles.cancelBtnText}>Cancel & Discard Changes</Text>
-              </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.saveBtn, styles.cancelBtn]}
+                    onPress={handleCancel}
+                    disabled={saving}
+                  >
+                    <Ionicons name="close-circle-outline" size={18} color="#e11d48" />
+                    <Text style={styles.cancelBtnText}>Cancel & Discard Changes</Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
           </>
         )}
@@ -3853,6 +3897,21 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
     flex: 1,
     backgroundColor: colors.bgLight
   },
+  historyNoticeRibbon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: isDarkMode ? '#0c4a6e33' : '#e0f2fe',
+    borderBottomWidth: 1,
+    borderBottomColor: isDarkMode ? '#0369a1' : '#bae6fd',
+    paddingHorizontal: 16,
+    paddingVertical: 10
+  },
+  historyNoticeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: isDarkMode ? '#7dd3fc' : '#0369a1'
+  },
   ribbon: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -4221,6 +4280,24 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
   buttonContainer: {
     gap: 10,
     marginTop: 8
+  },
+  partitionNoticeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: isDarkMode ? '#1e293b' : '#f0fdf4',
+    borderWidth: 1,
+    borderColor: isDarkMode ? '#334155' : '#bbf7d0',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 4
+  },
+  partitionNoticeText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 16,
+    color: isDarkMode ? '#94a3b8' : '#166534',
+    fontWeight: '500'
   },
   saveBtn: {
     flexDirection: 'row',

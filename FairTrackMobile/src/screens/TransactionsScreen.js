@@ -10,7 +10,9 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
-  ScrollView
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { MobileApi } from '../api/mobileApi';
@@ -42,7 +44,9 @@ export const TransactionsScreen = ({ navigation }) => {
     getOfflineTransactions,
     downloadedForms,
     downloadedCount,
-    isDownloading
+    isDownloading,
+    syncTransactionToServer,
+    isSyncing
   } = useContext(SyncContext);
 
   const [transactions, setTransactions] = useState([]);
@@ -54,6 +58,11 @@ export const TransactionsScreen = ({ navigation }) => {
   const [isOffline, setIsOffline] = useState(false);
   const [selectedTransactionForPartition, setSelectedTransactionForPartition] = useState(null);
   const [showPartitionModal, setShowPartitionModal] = useState(false);
+  const [selectedTransactionForMenu, setSelectedTransactionForMenu] = useState(null);
+  const [threeDotsModalVisible, setThreeDotsModalVisible] = useState(false);
+  const [forwardConfirmModalVisible, setForwardConfirmModalVisible] = useState(false);
+  const [transferRemarks, setTransferRemarks] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
   const [actionModal, setActionModal] = useState({ visible: false, title: '', message: '', icon: 'information-circle-outline', iconType: 'primary', buttons: [] });
 
   const showModal = (config) => setActionModal({ visible: true, icon: 'information-circle-outline', iconType: 'primary', buttons: [], ...config });
@@ -277,9 +286,10 @@ export const TransactionsScreen = ({ navigation }) => {
     setShowPartitionModal(false);
     const pIdx = partition?.index ?? partition?.Index ?? 0;
     const pLetter = partition?.partitionIndex ?? partition?.PartitionIndex ?? String.fromCharCode(65 + pIdx);
-    const pKind = partition?.kind ?? partition?.Kind ?? 'Building';
+    const itemKind = transItem?.TransactionTypeId === 1 ? 'Land' : transItem?.TransactionTypeId === 3 ? 'Machinery' : 'Building';
+    const pKind = partition?.kind ?? partition?.Kind ?? itemKind;
     const pTypeId = partition?.transactionTypeId ?? partition?.TransactionTypeId ?? (
-      pKind === 'Land' ? 1 : pKind === 'Machinery' ? 3 : 2
+      pKind === 'Land' ? 1 : pKind === 'Machinery' ? 3 : (transItem?.TransactionTypeId || 1)
     );
 
     const navParams = {
@@ -350,6 +360,72 @@ export const TransactionsScreen = ({ navigation }) => {
     });
   };
 
+  const handleOpenThreeDots = (item) => {
+    setSelectedTransactionForMenu(item);
+    setThreeDotsModalVisible(true);
+  };
+
+  const handleSyncDraftFromMenu = async () => {
+    if (!selectedTransactionForMenu) return;
+    const trans = selectedTransactionForMenu;
+    setThreeDotsModalVisible(false);
+    setActionLoading(true);
+    const res = await syncTransactionToServer(trans.TrackingNo, trans.FormworkflowId, false);
+    setActionLoading(false);
+    if (res.success) {
+      showModal({
+        title: 'Office Sync Complete',
+        message: res.message,
+        icon: 'cloud-done-outline',
+        iconType: 'success'
+      });
+      fetchTransactions();
+    } else {
+      showModal({
+        title: 'Sync Failed',
+        message: res.message,
+        icon: 'alert-circle-outline',
+        iconType: 'danger'
+      });
+    }
+  };
+
+  const handlePromptForwardSupervisor = () => {
+    setThreeDotsModalVisible(false);
+    setTransferRemarks('Field inspection completed and transferred to supervisor.');
+    setForwardConfirmModalVisible(true);
+  };
+
+  const handleExecuteForwardToSupervisor = async () => {
+    if (!selectedTransactionForMenu) return;
+    const trans = selectedTransactionForMenu;
+    setForwardConfirmModalVisible(false);
+    setActionLoading(true);
+    const res = await syncTransactionToServer(
+      trans.TrackingNo,
+      trans.FormworkflowId,
+      true,
+      transferRemarks
+    );
+    setActionLoading(false);
+    if (res.success) {
+      showModal({
+        title: 'Forwarded to Supervisor',
+        message: res.message,
+        icon: 'checkmark-circle-outline',
+        iconType: 'success'
+      });
+      fetchTransactions();
+    } else {
+      showModal({
+        title: 'Transfer Failed',
+        message: res.message,
+        icon: 'alert-circle-outline',
+        iconType: 'danger'
+      });
+    }
+  };
+
   const renderItem = ({ item: rawItem }) => {
     const item = normalizeTransactionItem(rawItem);
     const isDownloaded = isTransactionDownloaded(item.TrackingNo, item.FormworkflowId);
@@ -381,7 +457,7 @@ export const TransactionsScreen = ({ navigation }) => {
         onPress={() => handleTransactionPress(item)}
       >
         <View style={styles.cardHeader}>
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, paddingRight: 6 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               <Text style={[styles.trackingNoText, { color: colors.textDark }]}>{item.TrackingNo || 'Unassigned Tracking No.'}</Text>
               {!item.HasPartition ? (
@@ -405,12 +481,30 @@ export const TransactionsScreen = ({ navigation }) => {
             </View>
             <Text style={styles.typeBadgeText}>{typeLabel}</Text>
           </View>
-          <StatusBadge
-            statusId={item.CurrentStatusId}
-            statusText={item.CurrentStatus}
-            isComplete={item.IsComplete}
-            isDeferred={item.IsDeffered}
-          />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <StatusBadge
+              statusId={item.CurrentStatusId}
+              statusText={item.CurrentStatus}
+              isComplete={item.IsComplete}
+              isDeferred={item.IsDeffered}
+            />
+            <TouchableOpacity
+              style={[
+                styles.threeDotsBtn,
+                {
+                  backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc',
+                  borderColor: colors.border
+                }
+              ]}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleOpenThreeDots(item);
+              }}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
+              <Ionicons name="ellipsis-vertical" size={18} color={colors.textDark} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.cardBody}>
@@ -466,7 +560,7 @@ export const TransactionsScreen = ({ navigation }) => {
                 <TouchableOpacity
                   style={styles.pendingFooterBadge}
                   activeOpacity={0.8}
-                  onPress={() => navigation.navigate('Main', { screen: 'SyncCenter' })}
+                  onPress={() => handleOpenThreeDots(item)}
                 >
                   <Ionicons name="cloud-upload" size={14} color="#d97706" />
                   <Text style={styles.pendingFooterBadgeText}>Unsynced (Sync)</Text>
@@ -884,6 +978,276 @@ export const TransactionsScreen = ({ navigation }) => {
         buttons={actionModal.buttons}
         onClose={closeModal}
       />
+
+      {/* 3-Dots Action Menu Modal */}
+      <Modal
+        visible={threeDotsModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setThreeDotsModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={[styles.modalOverlay, { backgroundColor: colors.modalOverlay }]}
+          activeOpacity={1}
+          onPress={() => setThreeDotsModalVisible(false)}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={[
+              styles.actionMenuCard,
+              {
+                backgroundColor: colors.cardBg,
+                borderColor: colors.border
+              },
+              shadows.hover
+            ]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.actionMenuHeader}>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={[styles.actionMenuTracking, { color: colors.textDark }]}>
+                    {selectedTransactionForMenu?.TrackingNo || 'Transaction'}
+                  </Text>
+                  {selectedTransactionForMenu && hasPendingEdits(selectedTransactionForMenu.TrackingNo, selectedTransactionForMenu.FormworkflowId) ? (
+                    <View style={styles.menuPendingBadge}>
+                      <Text style={styles.menuPendingBadgeText}>UNSYNCED EDITS</Text>
+                    </View>
+                  ) : null}
+                </View>
+                <Text style={[styles.actionMenuOwner, { color: colors.textMuted }]} numberOfLines={1}>
+                  {selectedTransactionForMenu?.Owner || selectedTransactionForMenu?.Requestor || 'Owner'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setThreeDotsModalVisible(false)}
+                style={styles.actionMenuCloseBtn}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="close" size={20} color={colors.textDark} />
+              </TouchableOpacity>
+            </View>
+
+            {actionLoading ? (
+              <View style={styles.menuLoadingContainer}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={[styles.menuLoadingText, { color: colors.textDark }]}>
+                  Processing Transaction...
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.actionMenuList}>
+                {/* Option 1: Sync to Web (Draft) */}
+                <TouchableOpacity
+                  style={[
+                    styles.menuActionItem,
+                    {
+                      backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+                      borderColor: colors.border
+                    }
+                  ]}
+                  onPress={handleSyncDraftFromMenu}
+                >
+                  <View style={[styles.menuActionIconBox, { backgroundColor: isDarkMode ? '#0369a133' : '#e0f2fe' }]}>
+                    <Ionicons name="cloud-upload-outline" size={20} color="#0284c7" />
+                  </View>
+                  <View style={styles.menuActionTextCol}>
+                    <Text style={[styles.menuActionTitle, { color: colors.textDark }]}>
+                      Sync to Web (Draft)
+                    </Text>
+                    <Text style={[styles.menuActionSubtitle, { color: colors.textMuted }]}>
+                      Upload offline partition edits without advancing workflow
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                </TouchableOpacity>
+
+                {/* Option 2: Sync & Forward to Supervisor */}
+                <TouchableOpacity
+                  style={[
+                    styles.menuActionItem,
+                    {
+                      backgroundColor: isDarkMode ? '#064e3b22' : '#f0fdf4',
+                      borderColor: isDarkMode ? '#065f46' : '#bbf7d0'
+                    }
+                  ]}
+                  onPress={handlePromptForwardSupervisor}
+                >
+                  <View style={[styles.menuActionIconBox, { backgroundColor: isDarkMode ? '#065f46' : '#dcfce7' }]}>
+                    <Ionicons name="send" size={18} color="#059669" />
+                  </View>
+                  <View style={styles.menuActionTextCol}>
+                    <Text style={[styles.menuActionTitle, { color: isDarkMode ? '#34d399' : '#047857' }]}>
+                      Sync & Forward to Supervisor
+                    </Text>
+                    <Text style={[styles.menuActionSubtitle, { color: isDarkMode ? '#a7f3d0' : '#15803d' }]}>
+                      Sync all partition changes and transfer to Supervisor
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color="#059669" />
+                </TouchableOpacity>
+
+                {/* Option 3: Open / Inspect Partitions */}
+                <TouchableOpacity
+                  style={[
+                    styles.menuActionItem,
+                    {
+                      backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+                      borderColor: colors.border
+                    }
+                  ]}
+                  onPress={() => {
+                    setThreeDotsModalVisible(false);
+                    if (selectedTransactionForMenu) {
+                      handleTransactionPress(selectedTransactionForMenu);
+                    }
+                  }}
+                >
+                  <View style={[styles.menuActionIconBox, { backgroundColor: isDarkMode ? '#334155' : '#f1f5f9' }]}>
+                    <Ionicons name="folder-open-outline" size={20} color={colors.primary} />
+                  </View>
+                  <View style={styles.menuActionTextCol}>
+                    <Text style={[styles.menuActionTitle, { color: colors.textDark }]}>
+                      Open & Edit Partitions
+                    </Text>
+                    <Text style={[styles.menuActionSubtitle, { color: colors.textMuted }]}>
+                      Field appraisal & partition inspection forms
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                </TouchableOpacity>
+
+                {/* Option 4: Download / Re-download */}
+                <TouchableOpacity
+                  style={[
+                    styles.menuActionItem,
+                    {
+                      backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+                      borderColor: colors.border
+                    }
+                  ]}
+                  onPress={() => {
+                    setThreeDotsModalVisible(false);
+                    if (selectedTransactionForMenu) {
+                      handleDownloadSingle(selectedTransactionForMenu);
+                    }
+                  }}
+                >
+                  <View style={[styles.menuActionIconBox, { backgroundColor: isDarkMode ? '#334155' : '#f1f5f9' }]}>
+                    <Ionicons name="cloud-download-outline" size={20} color={colors.textDark} />
+                  </View>
+                  <View style={styles.menuActionTextCol}>
+                    <Text style={[styles.menuActionTitle, { color: colors.textDark }]}>
+                      {selectedTransactionForMenu && isTransactionDownloaded(selectedTransactionForMenu.TrackingNo, selectedTransactionForMenu.FormworkflowId)
+                        ? 'Re-download Transaction'
+                        : 'Download for Offline Inspection'}
+                    </Text>
+                    <Text style={[styles.menuActionSubtitle, { color: colors.textMuted }]}>
+                      Save latest data and photos to local storage
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={[styles.modalCancelBtn, { borderColor: colors.border, marginTop: 6 }]}
+              onPress={() => setThreeDotsModalVisible(false)}
+            >
+              <Text style={[styles.modalCancelBtnText, { color: colors.textMuted }]}>Close</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Forward to Supervisor Confirmation Modal */}
+      <Modal
+        visible={forwardConfirmModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setForwardConfirmModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ flex: 1 }}
+        >
+          <TouchableOpacity
+            style={[styles.modalOverlay, { backgroundColor: colors.modalOverlay }]}
+            activeOpacity={1}
+            onPress={() => setForwardConfirmModalVisible(false)}
+          >
+            <TouchableOpacity
+              activeOpacity={1}
+              style={[
+                styles.actionMenuCard,
+                {
+                  backgroundColor: colors.cardBg,
+                  borderColor: colors.border
+                },
+                shadows.hover
+              ]}
+              onPress={(e) => e.stopPropagation()}
+            >
+              <View style={[styles.iconBubble, { backgroundColor: isDarkMode ? '#065f46' : '#dcfce7', alignSelf: 'center', marginBottom: 12 }]}>
+                <Ionicons name="send" size={26} color="#059669" />
+              </View>
+
+              <Text style={[styles.forwardModalTitle, { color: colors.textDark }]}>
+                Forward to Supervisor?
+              </Text>
+
+              <Text style={[styles.forwardModalDescription, { color: colors.textMuted }]}>
+                This will synchronize all offline partition changes for {selectedTransactionForMenu?.TrackingNo} to the Web Portal and advance the workflow to Recommend Approval (Supervisor Review).
+              </Text>
+
+              <Text style={[styles.inputLabel, { color: colors.textDark, alignSelf: 'flex-start', marginBottom: 4 }]}>
+                Appraiser Notes / Remarks (Optional)
+              </Text>
+              <TextInput
+                style={[
+                  styles.remarksInput,
+                  {
+                    backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+                    borderColor: colors.border,
+                    color: colors.textDark
+                  }
+                ]}
+                placeholder="Enter remarks for supervisor..."
+                placeholderTextColor={colors.placeholder || '#94a3b8'}
+                value={transferRemarks}
+                onChangeText={setTransferRemarks}
+                multiline={true}
+              />
+
+              <View style={styles.forwardActionBtnRow}>
+                <TouchableOpacity
+                  style={[styles.modalCancelBtn, { flex: 1, borderColor: colors.border }]}
+                  onPress={() => setForwardConfirmModalVisible(false)}
+                  disabled={actionLoading}
+                >
+                  <Text style={[styles.modalCancelBtnText, { color: colors.textMuted }]}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.confirmForwardBtn, { flex: 2 }]}
+                  onPress={handleExecuteForwardToSupervisor}
+                  disabled={actionLoading}
+                >
+                  {actionLoading ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <>
+                      <Ionicons name="send" size={16} color="#ffffff" />
+                      <Text style={styles.confirmForwardBtnText}>Sync & Forward</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 };
@@ -1338,5 +1702,135 @@ const styles = StyleSheet.create({
   modalCancelBtnText: {
     fontSize: 14,
     fontWeight: '700'
+  },
+  threeDotsBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1
+  },
+  actionMenuCard: {
+    width: '100%',
+    maxWidth: 420,
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1
+  },
+  actionMenuHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    paddingBottom: 14,
+    marginBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9'
+  },
+  actionMenuTracking: {
+    fontSize: 17,
+    fontWeight: '800'
+  },
+  actionMenuOwner: {
+    fontSize: 12,
+    marginTop: 2,
+    fontWeight: '500'
+  },
+  actionMenuCloseBtn: {
+    padding: 4
+  },
+  menuPendingBadge: {
+    backgroundColor: '#fef3c7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6
+  },
+  menuPendingBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#b45309'
+  },
+  menuLoadingContainer: {
+    paddingVertical: 30,
+    alignItems: 'center',
+    gap: 12
+  },
+  menuLoadingText: {
+    fontSize: 14,
+    fontWeight: '600'
+  },
+  actionMenuList: {
+    gap: 8,
+    marginBottom: 10
+  },
+  menuActionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 12
+  },
+  menuActionIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  menuActionTextCol: {
+    flex: 1
+  },
+  menuActionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 2
+  },
+  menuActionSubtitle: {
+    fontSize: 11,
+    lineHeight: 15
+  },
+  forwardModalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 8
+  },
+  forwardModalDescription: {
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 19,
+    marginBottom: 16
+  },
+  remarksInput: {
+    width: '100%',
+    minHeight: 70,
+    borderRadius: 10,
+    borderWidth: 1,
+    padding: 10,
+    textAlignVertical: 'top',
+    fontSize: 13,
+    marginBottom: 16
+  },
+  forwardActionBtnRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    width: '100%'
+  },
+  confirmForwardBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: '#059669'
+  },
+  confirmForwardBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '800'
   },
 });

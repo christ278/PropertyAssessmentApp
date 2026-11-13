@@ -28,6 +28,9 @@ public class MobileApiController : ControllerBase
     private readonly IHubContext<WorkflowHub> _hubContext;
     private readonly IWorkflowNotifier _workflowNotifier;
     private readonly IWebHostEnvironment _env;
+    private readonly IPropertyAssessmentRequestService _rpaService;
+    private readonly IRequestForInspectionService _rfiService;
+    private readonly IAssessmentService _assessmentService;
 
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
@@ -56,13 +59,19 @@ public class MobileApiController : ControllerBase
         IDocumentWorkflowService workflowService,
         IHubContext<WorkflowHub> hubContext,
         IWorkflowNotifier workflowNotifier,
-        IWebHostEnvironment env)
+        IWebHostEnvironment env,
+        IPropertyAssessmentRequestService rpaService,
+        IRequestForInspectionService rfiService,
+        IAssessmentService assessmentService)
     {
         _context = context;
         _workflowService = workflowService;
         _hubContext = hubContext;
         _workflowNotifier = workflowNotifier;
         _env = env;
+        _rpaService = rpaService;
+        _rfiService = rfiService;
+        _assessmentService = assessmentService;
     }
 
     // Helper: Generate a deterministic positive 64-bit integer from a Guid
@@ -128,13 +137,18 @@ public class MobileApiController : ControllerBase
         });
     }
 
-        private List<MobilePartitionSummaryDTO> BuildPartitionSummaries(List<AssessmentPartitionItem> partitions, string defaultOwner, int fallbackPhotoCount = 0)
+        private List<MobilePartitionSummaryDTO> BuildPartitionSummaries(List<AssessmentPartitionItem> partitions, string defaultOwner, int fallbackPhotoCount = 0, string? parentKind = null)
     {
         var result = new List<MobilePartitionSummaryDTO>();
         for (int i = 0; i < partitions.Count; i++)
         {
             var p = partitions[i];
-            int pKindId = ParsePropertyKindId(p.Kind, 1);
+            if (!string.IsNullOrWhiteSpace(parentKind) && (string.IsNullOrWhiteSpace(p.Kind) || (string.Equals(parentKind, "Land", StringComparison.OrdinalIgnoreCase) && string.Equals(p.Kind, "Building", StringComparison.OrdinalIgnoreCase))))
+            {
+                p.Kind = parentKind;
+            }
+            int fallbackKindId = ParsePropertyKindId(parentKind, 1);
+            int pKindId = ParsePropertyKindId(p.Kind, fallbackKindId);
             string fType = pKindId switch { 1 => "LAND", 3 => "MACHINERY", _ => "BUILDING" };
             int pPhotoCount = 0;
             if (!string.IsNullOrWhiteSpace(p.AttachmentsJson))
@@ -156,7 +170,7 @@ public class MobileApiController : ControllerBase
             {
                 Index = i,
                 PartitionIndex = !string.IsNullOrWhiteSpace(p.PartitionIndex) ? p.PartitionIndex : ((char)('A' + i)).ToString(),
-                Kind = !string.IsNullOrWhiteSpace(p.Kind) ? p.Kind : "Land",
+                Kind = !string.IsNullOrWhiteSpace(p.Kind) ? p.Kind : (!string.IsNullOrWhiteSpace(parentKind) ? parentKind : "Land"),
                 TransactionTypeId = pKindId,
                 FormType = fType,
                 SystemGeneratedTDN = p.SystemGeneratedTDN,
@@ -192,14 +206,53 @@ public class MobileApiController : ControllerBase
         }
     }
 
+    // Kind-aware resolver: never lets a Land edit land on a Building/Machinery partition (and vice versa).
+    private static int ResolvePartitionTargetIndex(List<AssessmentPartitionItem> partitions, TDNDTO? dtoTdn, string expectedKind)
+    {
+        int idx = ResolvePartitionTargetIndex(partitions, dtoTdn);
+        if (partitions.Count == 0) return idx;
+
+        bool KindOk(AssessmentPartitionItem p) =>
+            string.IsNullOrWhiteSpace(p.Kind) || string.Equals(p.Kind, expectedKind, StringComparison.OrdinalIgnoreCase);
+
+        if (KindOk(partitions[idx])) return idx;
+
+        string? tdn = dtoTdn?.ARPNo ?? dtoTdn?.DeclarationNo ?? dtoTdn?.TDN;
+        string? pin = dtoTdn?.PIN;
+        var sameKind = Enumerable.Range(0, partitions.Count).Where(i => KindOk(partitions[i])).ToList();
+
+        int byTdn = sameKind.FirstOrDefault(i => !string.IsNullOrWhiteSpace(tdn) &&
+            string.Equals(partitions[i].SystemGeneratedTDN, tdn!.Trim(), StringComparison.OrdinalIgnoreCase), -1);
+        if (byTdn >= 0) return byTdn;
+        int byPin = sameKind.FirstOrDefault(i => !string.IsNullOrWhiteSpace(pin) &&
+            string.Equals(partitions[i].PIN, pin!.Trim(), StringComparison.OrdinalIgnoreCase), -1);
+        if (byPin >= 0) return byPin;
+        if (sameKind.Count == 1) return sameKind[0];
+
+        // If partitions in this transaction previously inherited a default or mismatched Kind (e.g. "Building" default on a Land transaction),
+        // but this edit explicitly targets this partition from the matching form, allow it and reclassify the partition to expectedKind.
+        if (idx >= 0 && idx < partitions.Count)
+        {
+            partitions[idx].Kind = expectedKind;
+            return idx;
+        }
+
+        throw new InvalidOperationException(
+            $"Could not match this {expectedKind} edit to a {expectedKind} partition. The resolved partition is '{partitions[idx].Kind}'.");
+    }
+
     private static int ResolvePartitionTargetIndex(List<AssessmentPartitionItem> partitions, TDNDTO? dtoTdn)
     {
         if (dtoTdn == null || partitions.Count == 0) return 0;
 
         if (!string.IsNullOrWhiteSpace(dtoTdn.PartitionIndex))
         {
-            int idx = partitions.FindIndex(p => string.Equals(p.PartitionIndex, dtoTdn.PartitionIndex.Trim(), StringComparison.OrdinalIgnoreCase));
-            if (idx >= 0) return idx;
+            var key = dtoTdn.PartitionIndex.Trim();
+            // Only trust the letter when it is unique; duplicate labels (e.g. two "A") would always hit the first item.
+            var matches = Enumerable.Range(0, partitions.Count)
+                .Where(i => string.Equals(partitions[i].PartitionIndex, key, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            if (matches.Count == 1) return matches[0];
         }
 
         if (dtoTdn.PartitionItemIndex.HasValue && dtoTdn.PartitionItemIndex.Value >= 0 && dtoTdn.PartitionItemIndex.Value < partitions.Count)
@@ -305,7 +358,7 @@ public class MobileApiController : ControllerBase
                     partitionCount = partitions.Count;
 
                     int dossierPhotos = !string.IsNullOrWhiteSpace(item.RequestType == "PropertyAssessmentRequest" ? allRpas.FirstOrDefault(r => r.Id == item.RequestId)?.WebRelativePath : allRfis.FirstOrDefault(r => r.Id == item.RequestId)?.WebRelativePath) ? 1 : 0;
-                    partitionSummaries = BuildPartitionSummaries(partitions, ownerName, dossierPhotos);
+                    partitionSummaries = BuildPartitionSummaries(partitions, ownerName, dossierPhotos, rpa.Kind);
 
                     ownerName = !string.IsNullOrWhiteSpace(rpa.NewOwnerName) ? rpa.NewOwnerName
                               : !string.IsNullOrWhiteSpace(rpa.PrevOwner) ? rpa.PrevOwner
@@ -322,8 +375,16 @@ public class MobileApiController : ControllerBase
                                 : !string.IsNullOrWhiteSpace(rpa.PrevPIN) ? rpa.PrevPIN
                                 : string.Empty;
 
-                    transType = ParsePropertyKindId(rpa.Kind, 2);
-                    if (firstPart != null && !string.IsNullOrWhiteSpace(firstPart.Kind))
+                    transType = ParsePropertyKindId(rpa.Kind, 1);
+                    if (string.Equals(rpa.Kind, "Land", StringComparison.OrdinalIgnoreCase))
+                    {
+                        transType = 1;
+                    }
+                    else if (string.Equals(rpa.Kind, "Machinery", StringComparison.OrdinalIgnoreCase))
+                    {
+                        transType = 3;
+                    }
+                    else if (firstPart != null && !string.IsNullOrWhiteSpace(firstPart.Kind))
                     {
                         transType = ParsePropertyKindId(firstPart.Kind, transType);
                     }
@@ -352,7 +413,7 @@ public class MobileApiController : ControllerBase
                     partitionCount = partitions.Count;
 
                     int dossierPhotos = !string.IsNullOrWhiteSpace(item.RequestType == "PropertyAssessmentRequest" ? allRpas.FirstOrDefault(r => r.Id == item.RequestId)?.WebRelativePath : allRfis.FirstOrDefault(r => r.Id == item.RequestId)?.WebRelativePath) ? 1 : 0;
-                    partitionSummaries = BuildPartitionSummaries(partitions, ownerName, dossierPhotos);
+                    partitionSummaries = BuildPartitionSummaries(partitions, ownerName, dossierPhotos, rfi.Kind);
 
                     ownerName = !string.IsNullOrWhiteSpace(rfi.OwnerName) ? rfi.OwnerName
                               : !string.IsNullOrWhiteSpace(firstPart?.NewOwnerName) ? firstPart!.NewOwnerName
@@ -368,8 +429,16 @@ public class MobileApiController : ControllerBase
                                 : !string.IsNullOrWhiteSpace(rfi.PropertyIndexNumber) ? rfi.PropertyIndexNumber
                                 : string.Empty;
 
-                    transType = ParsePropertyKindId(rfi.Kind, 2);
-                    if (firstPart != null && !string.IsNullOrWhiteSpace(firstPart.Kind))
+                    transType = ParsePropertyKindId(rfi.Kind, 1);
+                    if (string.Equals(rfi.Kind, "Land", StringComparison.OrdinalIgnoreCase))
+                    {
+                        transType = 1;
+                    }
+                    else if (string.Equals(rfi.Kind, "Machinery", StringComparison.OrdinalIgnoreCase))
+                    {
+                        transType = 3;
+                    }
+                    else if (firstPart != null && !string.IsNullOrWhiteSpace(firstPart.Kind))
                     {
                         transType = ParsePropertyKindId(firstPart.Kind, transType);
                     }
@@ -515,6 +584,9 @@ public class MobileApiController : ControllerBase
             }
             catch { }
         }
+
+        // Filter out any dead/legacy blob URLs that cannot survive across browser/app sessions
+        list.RemoveAll(a => !string.IsNullOrEmpty(a.FileUrl) && a.FileUrl.StartsWith("blob:", StringComparison.OrdinalIgnoreCase));
 
         // Ensure all fileUrls have proper fully-qualified URL based on incoming request host
         string baseUrl = $"{Request.Scheme}://{Request.Host}";
@@ -938,8 +1010,13 @@ public class MobileApiController : ControllerBase
         for (int i = 0; i < parts.Count; i++)
         {
             var p = parts[i];
+            string parentKindStr = matchedRpa != null ? matchedRpa.Kind : (matchedRfi != null ? matchedRfi.Kind : "Land");
+            if (string.Equals(parentKindStr, "Land", StringComparison.OrdinalIgnoreCase) && (string.IsNullOrWhiteSpace(p.Kind) || string.Equals(p.Kind, "Building", StringComparison.OrdinalIgnoreCase)))
+            {
+                p.Kind = "Land";
+            }
             var pAttachments = ResolveAllAttachmentsForPartition(p, i, matchedRpa, matchedRfi, td);
-            int pKindId = ParsePropertyKindId(p.Kind, 1);
+            int pKindId = ParsePropertyKindId(p.Kind, ParsePropertyKindId(parentKindStr, 1));
             string? rawSketch = p.BuildingFloorPlanSketchPath ?? td.FloorPlanSketchPath;
             string? pSketch = !string.IsNullOrWhiteSpace(rawSketch) ? ResolveFullUrl(rawSketch) : null;
             object pForm = pKindId switch
@@ -1123,168 +1200,6 @@ public class MobileApiController : ControllerBase
     }
 
     // =========================================================================
-    // 2. FETCH FORM DETAILS (BUILDING, LAND, MACHINERY) - DEDICATED PER KIND
-    // =========================================================================
-
-    // GET: /api/mobile/form/building
-    [HttpGet("form/building")]
-    public async Task<IActionResult> GetBuildingForm(
-        [FromQuery] long? formWorkflowId,
-        [FromQuery] string trackingNo = "",
-        [FromQuery] int partitionIndex = 0,
-        [FromQuery] long? tdnId = null,
-        [FromQuery] long? castTdnBuildingId = null)
-    {
-        // 1. Prioritize transaction partitions if formWorkflowId or trackingNo is provided
-        if ((formWorkflowId.HasValue && formWorkflowId.Value > 0) || !string.IsNullOrWhiteSpace(trackingNo))
-        {
-            var (matchedRpa, matchedRfi, _) = await FindParentMobileTransactionAsync(formWorkflowId, trackingNo, null, null);
-            if (matchedRpa != null || matchedRfi != null)
-            {
-                var parts = matchedRpa != null
-                    ? PartitionJsonHelper.ParseList(matchedRpa.GeneratedPartitionsJson)
-                    : PartitionJsonHelper.ParseList(matchedRfi!.GeneratedPartitionsJson);
-
-                if (parts.Count > 0 && partitionIndex >= 0 && partitionIndex < parts.Count)
-                {
-                    var part = parts[partitionIndex];
-                    var baseTd = matchedRpa != null
-                        ? await BuildOrFindTaxDeclarationForRpaAsync(matchedRpa, part)
-                        : await BuildOrFindTaxDeclarationForRfiAsync(matchedRfi!, part);
-                    long wfId = matchedRpa != null ? GuidToNumericId(matchedRpa.Id) : GuidToNumericId(matchedRfi!.Id);
-                    string trk = matchedRpa?.TrackingNumber ?? matchedRfi?.TrackingNumber ?? trackingNo;
-                    var atts = ResolveAllAttachmentsForPartition(part, partitionIndex, matchedRpa, matchedRfi, baseTd);
-                    var dto = MapPartitionToBuildingDTO(part, partitionIndex, trk, wfId, baseTd, part.BuildingFloorPlanSketchPath, atts);
-                    return Ok(new { success = true, data = dto });
-                }
-            }
-        }
-
-        // 2. Fallback to existing TaxDeclaration by tdnId
-        var td = await FindTaxDeclaration(tdnId, PropertyKind.Building);
-        if (td == null)
-        {
-            return NotFound(new { success = false, message = "Building assessment record not found." });
-        }
-
-        var fallbackDto = MapTaxDeclarationToBuildingDTO(td);
-        return Ok(new { success = true, data = fallbackDto });
-    }
-
-    // GET: /api/mobile/form/land
-    [HttpGet("form/land")]
-    public async Task<IActionResult> GetLandForm(
-        [FromQuery] long? formWorkflowId,
-        [FromQuery] string trackingNo = "",
-        [FromQuery] int partitionIndex = 0,
-        [FromQuery] long? tdnId = null,
-        [FromQuery] long? tdnLandId = null)
-    {
-        // 1. Prioritize transaction partitions if formWorkflowId or trackingNo is provided
-        if ((formWorkflowId.HasValue && formWorkflowId.Value > 0) || !string.IsNullOrWhiteSpace(trackingNo))
-        {
-            var (matchedRpa, matchedRfi, _) = await FindParentMobileTransactionAsync(formWorkflowId, trackingNo, null, null);
-            if (matchedRpa != null || matchedRfi != null)
-            {
-                var parts = matchedRpa != null
-                    ? PartitionJsonHelper.ParseList(matchedRpa.GeneratedPartitionsJson)
-                    : PartitionJsonHelper.ParseList(matchedRfi!.GeneratedPartitionsJson);
-
-                if (parts.Count > 0 && partitionIndex >= 0 && partitionIndex < parts.Count)
-                {
-                    var part = parts[partitionIndex];
-                    var baseTd = matchedRpa != null
-                        ? await BuildOrFindTaxDeclarationForRpaAsync(matchedRpa, part)
-                        : await BuildOrFindTaxDeclarationForRfiAsync(matchedRfi!, part);
-                    long wfId = matchedRpa != null ? GuidToNumericId(matchedRpa.Id) : GuidToNumericId(matchedRfi!.Id);
-                    string trk = matchedRpa?.TrackingNumber ?? matchedRfi?.TrackingNumber ?? trackingNo;
-                    var atts = ResolveAllAttachmentsForPartition(part, partitionIndex, matchedRpa, matchedRfi, baseTd);
-                    var dto = MapPartitionToLandDTO(part, partitionIndex, trk, wfId, baseTd, part.BuildingFloorPlanSketchPath, atts);
-                    return Ok(new { success = true, data = dto });
-                }
-            }
-        }
-
-        // 2. Fallback to existing TaxDeclaration by tdnId
-        var td = await FindTaxDeclaration(tdnId, PropertyKind.Land);
-        if (td == null)
-        {
-            return NotFound(new { success = false, message = "Land appraisal record not found." });
-        }
-
-        var fallbackDto = MapTaxDeclarationToLandDTO(td);
-        return Ok(new { success = true, data = fallbackDto });
-    }
-
-    // GET: /api/mobile/form/machinery
-    [HttpGet("form/machinery")]
-    public async Task<IActionResult> GetMachineryForm(
-        [FromQuery] long? formWorkflowId,
-        [FromQuery] string trackingNo = "",
-        [FromQuery] int partitionIndex = 0,
-        [FromQuery] long? tdnId = null,
-        [FromQuery] long? tdnMachineryId = null)
-    {
-        // 1. Prioritize transaction partitions if formWorkflowId or trackingNo is provided
-        if ((formWorkflowId.HasValue && formWorkflowId.Value > 0) || !string.IsNullOrWhiteSpace(trackingNo))
-        {
-            var (matchedRpa, matchedRfi, _) = await FindParentMobileTransactionAsync(formWorkflowId, trackingNo, null, null);
-            if (matchedRpa != null || matchedRfi != null)
-            {
-                var parts = matchedRpa != null
-                    ? PartitionJsonHelper.ParseList(matchedRpa.GeneratedPartitionsJson)
-                    : PartitionJsonHelper.ParseList(matchedRfi!.GeneratedPartitionsJson);
-
-                if (parts.Count > 0 && partitionIndex >= 0 && partitionIndex < parts.Count)
-                {
-                    var part = parts[partitionIndex];
-                    var baseTd = matchedRpa != null
-                        ? await BuildOrFindTaxDeclarationForRpaAsync(matchedRpa, part)
-                        : await BuildOrFindTaxDeclarationForRfiAsync(matchedRfi!, part);
-                    long wfId = matchedRpa != null ? GuidToNumericId(matchedRpa.Id) : GuidToNumericId(matchedRfi!.Id);
-                    string trk = matchedRpa?.TrackingNumber ?? matchedRfi?.TrackingNumber ?? trackingNo;
-                    var atts = ResolveAllAttachmentsForPartition(part, partitionIndex, matchedRpa, matchedRfi, baseTd);
-                    var dto = MapPartitionToMachineryDTO(part, partitionIndex, trk, wfId, baseTd, part.BuildingFloorPlanSketchPath, atts);
-                    return Ok(new { success = true, data = dto });
-                }
-            }
-        }
-
-        // 2. Fallback to existing TaxDeclaration by tdnId
-        var td = await FindTaxDeclaration(tdnId, PropertyKind.Machinery);
-        if (td == null)
-        {
-            return NotFound(new { success = false, message = "Machinery assessment record not found." });
-        }
-
-        var fallbackDto = MapTaxDeclarationToMachineryDTO(td);
-        return Ok(new { success = true, data = fallbackDto });
-    }
-
-    // GET: /api/mobile/schedules/land
-    [HttpGet("schedules/land")]
-    public async Task<IActionResult> GetLandSchedules()
-    {
-        var classifications = await _context.LandClassifications.AsNoTracking().Where(c => c.IsActive).OrderBy(c => c.SortOrder).ToListAsync();
-        var subClassifications = await _context.LandSubClassifications.AsNoTracking().Where(s => s.IsActive).OrderBy(s => s.SubClass).ToListAsync();
-        var actualUses = await _context.LandActualUses.AsNoTracking().Where(a => a.IsActive).OrderBy(a => a.ActualUseName).ToListAsync();
-        var assessmentLevels = await _context.LandAssessmentLevels.AsNoTracking().Where(l => l.IsActive).OrderBy(l => l.ActualUseName).ToListAsync();
-        var adjustments = await _context.LandAdjustmentFactors.AsNoTracking().Where(f => f.IsActive).OrderBy(f => f.Description).ToListAsync();
-        var improvementTypes = await _context.LandImprovementTypes.AsNoTracking().Where(i => i.IsActive).OrderBy(i => i.TypeDescription).ToListAsync();
-
-        return Ok(new
-        {
-            success = true,
-            classifications,
-            subClassifications,
-            actualUses,
-            assessmentLevels,
-            adjustments,
-            improvementTypes
-        });
-    }
-
-    // =========================================================================
     // 3. UPDATE PROPERTY FORM DETAILS (STRICTLY PROPERTY ASSESSMENT & FIELD INSPECTION)
     // =========================================================================
 
@@ -1333,11 +1248,12 @@ public class MobileApiController : ControllerBase
 
         try
         {
-            int targetIdx = ResolvePartitionTargetIndex(partitions, dto.TDN);
+            int targetIdx = ResolvePartitionTargetIndex(partitions, dto.TDN, "Building");
             var part = partitions[targetIdx];
 
             string trackingNo = matchedRpa?.TrackingNumber ?? matchedRfi?.TrackingNumber ?? dto.TDN.TrackingNo ?? "general";
             var processedAttachments = ProcessAndSaveAttachments(dto.TDN.Attachments, trackingNo);
+            ProcessAndSaveSketch(dto.TDN, trackingNo);
 
             ApplyBuildingDTOToPartition(part, dto.TDN, dto.CAST_TDNBuildingDTO, processedAttachments);
 
@@ -1345,21 +1261,29 @@ public class MobileApiController : ControllerBase
             {
                 matchedRpa.GeneratedPartitionsJson = JsonSerializer.Serialize(partitions, _jsonOptions);
                 matchedRpa.UpdatedDate = DateTime.Now;
-                if (!string.IsNullOrWhiteSpace(part.NewOwnerName)) matchedRpa.NewOwnerName = part.NewOwnerName;
-                if (!string.IsNullOrWhiteSpace(part.OwnerAddress)) matchedRpa.Address = part.OwnerAddress;
-                if (!string.IsNullOrWhiteSpace(part.LotNumber)) matchedRpa.LotNo = part.LotNumber;
-                if (!string.IsNullOrWhiteSpace(part.StreetLocation)) matchedRpa.PropertyLocation = part.StreetLocation;
-                if (!string.IsNullOrWhiteSpace(part.Memoranda)) matchedRpa.Remarks = part.Memoranda;
+                if (targetIdx == 0)
+                {
+                    if (!string.IsNullOrWhiteSpace(part.NewOwnerName)) matchedRpa.NewOwnerName = part.NewOwnerName;
+                    if (!string.IsNullOrWhiteSpace(part.OwnerAddress)) matchedRpa.Address = part.OwnerAddress;
+                    if (!string.IsNullOrWhiteSpace(part.LotNumber)) matchedRpa.LotNo = part.LotNumber;
+                    if (!string.IsNullOrWhiteSpace(part.StreetLocation)) matchedRpa.PropertyLocation = part.StreetLocation;
+                    if (!string.IsNullOrWhiteSpace(part.Memoranda)) matchedRpa.Remarks = part.Memoranda;
+                }
+                _rpaService.SyncPartitionTaxDeclarationStatuses(matchedRpa);
             }
             else if (matchedRfi != null)
             {
                 matchedRfi.GeneratedPartitionsJson = JsonSerializer.Serialize(partitions, _jsonOptions);
                 matchedRfi.UpdatedDate = DateTime.Now;
-                if (!string.IsNullOrWhiteSpace(part.NewOwnerName)) matchedRfi.OwnerName = part.NewOwnerName;
-                if (!string.IsNullOrWhiteSpace(part.OwnerAddress)) matchedRfi.PropertyLocation = part.OwnerAddress;
-                if (!string.IsNullOrWhiteSpace(part.LotNumber)) matchedRfi.LotNo = part.LotNumber;
-                if (!string.IsNullOrWhiteSpace(part.StreetLocation)) matchedRfi.PropertyLocation = part.StreetLocation;
-                if (!string.IsNullOrWhiteSpace(part.Memoranda)) matchedRfi.Remarks = part.Memoranda;
+                if (targetIdx == 0)
+                {
+                    if (!string.IsNullOrWhiteSpace(part.NewOwnerName)) matchedRfi.OwnerName = part.NewOwnerName;
+                    if (!string.IsNullOrWhiteSpace(part.OwnerAddress)) matchedRfi.PropertyLocation = part.OwnerAddress;
+                    if (!string.IsNullOrWhiteSpace(part.LotNumber)) matchedRfi.LotNo = part.LotNumber;
+                    if (!string.IsNullOrWhiteSpace(part.StreetLocation)) matchedRfi.PropertyLocation = part.StreetLocation;
+                    if (!string.IsNullOrWhiteSpace(part.Memoranda)) matchedRfi.Remarks = part.Memoranda;
+                }
+                _rfiService.SyncPartitionTaxDeclarationStatuses(matchedRfi);
             }
 
             await _context.SaveChangesAsync();
@@ -1385,7 +1309,7 @@ public class MobileApiController : ControllerBase
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { success = false, message = $"Failed to update Building: {ex.Message}" });
+            return StatusCode(500, new { success = false, message = $"Failed to update Building: {ex.Message} | {ex.GetBaseException().Message}" });
         }
     }
 
@@ -1434,11 +1358,34 @@ public class MobileApiController : ControllerBase
 
         try
         {
-            int targetIdx = ResolvePartitionTargetIndex(partitions, dto.TDN);
+            if (matchedRpa != null && string.Equals(matchedRpa.Kind, "Land", StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (var p in partitions)
+                {
+                    if (string.IsNullOrWhiteSpace(p.Kind) || string.Equals(p.Kind, "Building", StringComparison.OrdinalIgnoreCase))
+                    {
+                        p.Kind = "Land";
+                    }
+                }
+            }
+            else if (matchedRfi != null && string.Equals(matchedRfi.Kind, "Land", StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (var p in partitions)
+                {
+                    if (string.IsNullOrWhiteSpace(p.Kind) || string.Equals(p.Kind, "Building", StringComparison.OrdinalIgnoreCase))
+                    {
+                        p.Kind = "Land";
+                    }
+                }
+            }
+
+            int targetIdx = ResolvePartitionTargetIndex(partitions, dto.TDN, "Land");
             var part = partitions[targetIdx];
+            part.Kind = "Land";
 
             string trackingNo = matchedRpa?.TrackingNumber ?? matchedRfi?.TrackingNumber ?? dto.TDN.TrackingNo ?? "general";
             var processedAttachments = ProcessAndSaveAttachments(dto.TDN.Attachments, trackingNo);
+            ProcessAndSaveSketch(dto.TDN, trackingNo);
 
             ApplyLandDTOToPartition(part, dto.TDN, dto.TDNLand, processedAttachments);
 
@@ -1446,21 +1393,29 @@ public class MobileApiController : ControllerBase
             {
                 matchedRpa.GeneratedPartitionsJson = JsonSerializer.Serialize(partitions, _jsonOptions);
                 matchedRpa.UpdatedDate = DateTime.Now;
-                if (!string.IsNullOrWhiteSpace(part.NewOwnerName)) matchedRpa.NewOwnerName = part.NewOwnerName;
-                if (!string.IsNullOrWhiteSpace(part.OwnerAddress)) matchedRpa.Address = part.OwnerAddress;
-                if (!string.IsNullOrWhiteSpace(part.LotNumber)) matchedRpa.LotNo = part.LotNumber;
-                if (!string.IsNullOrWhiteSpace(part.StreetLocation)) matchedRpa.PropertyLocation = part.StreetLocation;
-                if (!string.IsNullOrWhiteSpace(part.Memoranda)) matchedRpa.Remarks = part.Memoranda;
+                if (targetIdx == 0)
+                {
+                    if (!string.IsNullOrWhiteSpace(part.NewOwnerName)) matchedRpa.NewOwnerName = part.NewOwnerName;
+                    if (!string.IsNullOrWhiteSpace(part.OwnerAddress)) matchedRpa.Address = part.OwnerAddress;
+                    if (!string.IsNullOrWhiteSpace(part.LotNumber)) matchedRpa.LotNo = part.LotNumber;
+                    if (!string.IsNullOrWhiteSpace(part.StreetLocation)) matchedRpa.PropertyLocation = part.StreetLocation;
+                    if (!string.IsNullOrWhiteSpace(part.Memoranda)) matchedRpa.Remarks = part.Memoranda;
+                }
+                _rpaService.SyncPartitionTaxDeclarationStatuses(matchedRpa);
             }
             else if (matchedRfi != null)
             {
                 matchedRfi.GeneratedPartitionsJson = JsonSerializer.Serialize(partitions, _jsonOptions);
                 matchedRfi.UpdatedDate = DateTime.Now;
-                if (!string.IsNullOrWhiteSpace(part.NewOwnerName)) matchedRfi.OwnerName = part.NewOwnerName;
-                if (!string.IsNullOrWhiteSpace(part.OwnerAddress)) matchedRfi.PropertyLocation = part.OwnerAddress;
-                if (!string.IsNullOrWhiteSpace(part.LotNumber)) matchedRfi.LotNo = part.LotNumber;
-                if (!string.IsNullOrWhiteSpace(part.StreetLocation)) matchedRfi.PropertyLocation = part.StreetLocation;
-                if (!string.IsNullOrWhiteSpace(part.Memoranda)) matchedRfi.Remarks = part.Memoranda;
+                if (targetIdx == 0)
+                {
+                    if (!string.IsNullOrWhiteSpace(part.NewOwnerName)) matchedRfi.OwnerName = part.NewOwnerName;
+                    if (!string.IsNullOrWhiteSpace(part.OwnerAddress)) matchedRfi.PropertyLocation = part.OwnerAddress;
+                    if (!string.IsNullOrWhiteSpace(part.LotNumber)) matchedRfi.LotNo = part.LotNumber;
+                    if (!string.IsNullOrWhiteSpace(part.StreetLocation)) matchedRfi.PropertyLocation = part.StreetLocation;
+                    if (!string.IsNullOrWhiteSpace(part.Memoranda)) matchedRfi.Remarks = part.Memoranda;
+                }
+                _rfiService.SyncPartitionTaxDeclarationStatuses(matchedRfi);
             }
 
             await _context.SaveChangesAsync();
@@ -1486,7 +1441,7 @@ public class MobileApiController : ControllerBase
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { success = false, message = $"Failed to update Land: {ex.Message}" });
+            return StatusCode(500, new { success = false, message = $"Failed to update Land: {ex.Message} | {ex.GetBaseException().Message}" });
         }
     }
 
@@ -1535,11 +1490,12 @@ public class MobileApiController : ControllerBase
 
         try
         {
-            int targetIdx = ResolvePartitionTargetIndex(partitions, dto.TDN);
+            int targetIdx = ResolvePartitionTargetIndex(partitions, dto.TDN, "Machinery");
             var part = partitions[targetIdx];
 
             string trackingNo = matchedRpa?.TrackingNumber ?? matchedRfi?.TrackingNumber ?? dto.TDN.TrackingNo ?? "general";
             var processedAttachments = ProcessAndSaveAttachments(dto.TDN.Attachments, trackingNo);
+            ProcessAndSaveSketch(dto.TDN, trackingNo);
 
             ApplyMachineryDTOToPartition(part, dto.TDN, dto, processedAttachments);
 
@@ -1547,21 +1503,29 @@ public class MobileApiController : ControllerBase
             {
                 matchedRpa.GeneratedPartitionsJson = JsonSerializer.Serialize(partitions, _jsonOptions);
                 matchedRpa.UpdatedDate = DateTime.Now;
-                if (!string.IsNullOrWhiteSpace(part.NewOwnerName)) matchedRpa.NewOwnerName = part.NewOwnerName;
-                if (!string.IsNullOrWhiteSpace(part.OwnerAddress)) matchedRpa.Address = part.OwnerAddress;
-                if (!string.IsNullOrWhiteSpace(part.LotNumber)) matchedRpa.LotNo = part.LotNumber;
-                if (!string.IsNullOrWhiteSpace(part.StreetLocation)) matchedRpa.PropertyLocation = part.StreetLocation;
-                if (!string.IsNullOrWhiteSpace(part.Memoranda)) matchedRpa.Remarks = part.Memoranda;
+                if (targetIdx == 0)
+                {
+                    if (!string.IsNullOrWhiteSpace(part.NewOwnerName)) matchedRpa.NewOwnerName = part.NewOwnerName;
+                    if (!string.IsNullOrWhiteSpace(part.OwnerAddress)) matchedRpa.Address = part.OwnerAddress;
+                    if (!string.IsNullOrWhiteSpace(part.LotNumber)) matchedRpa.LotNo = part.LotNumber;
+                    if (!string.IsNullOrWhiteSpace(part.StreetLocation)) matchedRpa.PropertyLocation = part.StreetLocation;
+                    if (!string.IsNullOrWhiteSpace(part.Memoranda)) matchedRpa.Remarks = part.Memoranda;
+                }
+                _rpaService.SyncPartitionTaxDeclarationStatuses(matchedRpa);
             }
             else if (matchedRfi != null)
             {
                 matchedRfi.GeneratedPartitionsJson = JsonSerializer.Serialize(partitions, _jsonOptions);
                 matchedRfi.UpdatedDate = DateTime.Now;
-                if (!string.IsNullOrWhiteSpace(part.NewOwnerName)) matchedRfi.OwnerName = part.NewOwnerName;
-                if (!string.IsNullOrWhiteSpace(part.OwnerAddress)) matchedRfi.PropertyLocation = part.OwnerAddress;
-                if (!string.IsNullOrWhiteSpace(part.LotNumber)) matchedRfi.LotNo = part.LotNumber;
-                if (!string.IsNullOrWhiteSpace(part.StreetLocation)) matchedRfi.PropertyLocation = part.StreetLocation;
-                if (!string.IsNullOrWhiteSpace(part.Memoranda)) matchedRfi.Remarks = part.Memoranda;
+                if (targetIdx == 0)
+                {
+                    if (!string.IsNullOrWhiteSpace(part.NewOwnerName)) matchedRfi.OwnerName = part.NewOwnerName;
+                    if (!string.IsNullOrWhiteSpace(part.OwnerAddress)) matchedRfi.PropertyLocation = part.OwnerAddress;
+                    if (!string.IsNullOrWhiteSpace(part.LotNumber)) matchedRfi.LotNo = part.LotNumber;
+                    if (!string.IsNullOrWhiteSpace(part.StreetLocation)) matchedRfi.PropertyLocation = part.StreetLocation;
+                    if (!string.IsNullOrWhiteSpace(part.Memoranda)) matchedRfi.Remarks = part.Memoranda;
+                }
+                _rfiService.SyncPartitionTaxDeclarationStatuses(matchedRfi);
             }
 
             await _context.SaveChangesAsync();
@@ -1587,59 +1551,8 @@ public class MobileApiController : ControllerBase
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { success = false, message = $"Failed to update Machinery: {ex.Message}" });
+            return StatusCode(500, new { success = false, message = $"Failed to update Machinery: {ex.Message} | {ex.GetBaseException().Message}" });
         }
-    }
-
-    // =========================================================================
-    // 3.1 ATTACHMENT UPLOAD (MULTIPLE FILES FOR BUILDING, LAND, MACHINERY)
-    // =========================================================================
-
-    // POST: /api/mobile/upload-attachment
-    [HttpPost("upload-attachment")]
-    public async Task<IActionResult> UploadAttachment([FromForm] Microsoft.AspNetCore.Http.IFormFile? file, [FromForm] string? trackingNo, [FromForm] string? caption, [FromForm] string? fileType)
-    {
-        if (file == null || file.Length == 0)
-        {
-            return BadRequest(new { success = false, message = "No file received." });
-        }
-
-        string cleanTracking = string.IsNullOrWhiteSpace(trackingNo) ? "general" : trackingNo.Trim();
-        string uploadFolder = Path.Combine(_env.WebRootPath, "uploads", "InspectionAttachments", cleanTracking);
-        Directory.CreateDirectory(uploadFolder);
-
-        string ext = Path.GetExtension(file.FileName);
-        string uniqueName = $"{Guid.NewGuid():N}_{Regex.Replace(Path.GetFileNameWithoutExtension(file.FileName), @"[^a-zA-Z0-9_\-]", "_")}{ext}";
-        string fullPath = Path.Combine(uploadFolder, uniqueName);
-
-        using (var stream = new FileStream(fullPath, FileMode.Create))
-        {
-            await file.CopyToAsync(stream);
-        }
-
-        string fileUrl = $"/uploads/InspectionAttachments/{cleanTracking}/{uniqueName}";
-        bool isImage = ext.Equals(".png", StringComparison.OrdinalIgnoreCase) ||
-                       ext.Equals(".jpg", StringComparison.OrdinalIgnoreCase) ||
-                       ext.Equals(".jpeg", StringComparison.OrdinalIgnoreCase) ||
-                       ext.Equals(".webp", StringComparison.OrdinalIgnoreCase);
-
-        var attachment = new MobileAttachmentDTO
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            FileName = file.FileName,
-            FileUrl = fileUrl,
-            FileType = !string.IsNullOrWhiteSpace(fileType) ? fileType : (isImage ? "image" : "document"),
-            FileSize = $"{Math.Round(file.Length / 1024.0, 1)} KB",
-            Caption = caption ?? string.Empty,
-            UploadedAt = DateTime.Now
-        };
-
-        return Ok(new
-        {
-            success = true,
-            message = "File uploaded successfully.",
-            data = attachment
-        });
     }
 
     // =========================================================================
@@ -1742,8 +1655,6 @@ public class MobileApiController : ControllerBase
             message = "Only Property Assessment (RPA) and Field Inspection (RFI) transactions can be synced and forwarded from the mobile app."
         });
     }
-
-
 
     // =========================================================================
     // PRIVATE HELPERS FOR PROPERTY ASSESSMENT & FIELD INSPECTION SYNC
@@ -2336,16 +2247,67 @@ public class MobileApiController : ControllerBase
         if (!string.IsNullOrWhiteSpace(dtoTdn.FloorPlanSketchPath)) part.BuildingFloorPlanSketchPath = dtoTdn.FloorPlanSketchPath;
     }
 
+    // Saves a mobile-captured sketch (base64) during bulk sync and rewrites dtoTdn.FloorPlanSketchPath.
+    // Local device URIs are never persisted.
+    private void ProcessAndSaveSketch(TDNDTO? dtoTdn, string trackingNo)
+    {
+        if (dtoTdn == null) return;
+
+        if (!string.IsNullOrWhiteSpace(dtoTdn.FloorPlanSketchBase64))
+        {
+            try
+            {
+                string cleanTracking = string.IsNullOrWhiteSpace(trackingNo) ? "general" : Regex.Replace(trackingNo.Trim(), @"[^a-zA-Z0-9_\-]", "_");
+                string webRoot = !string.IsNullOrWhiteSpace(_env.WebRootPath)
+                    ? _env.WebRootPath
+                    : Path.Combine(_env.ContentRootPath, "wwwroot");
+                string targetDir = Path.Combine(webRoot, "uploads", "InspectionSketches", cleanTracking);
+                Directory.CreateDirectory(targetDir);
+
+                string raw = dtoTdn.FloorPlanSketchBase64;
+                if (raw.Contains(",")) raw = raw.Substring(raw.IndexOf(",") + 1);
+                byte[] bytes = Convert.FromBase64String(raw);
+
+                string ext = Path.GetExtension(dtoTdn.FloorPlanSketchFileName ?? "");
+                if (string.IsNullOrWhiteSpace(ext)) ext = ".jpg";
+                string baseName = Regex.Replace(Path.GetFileNameWithoutExtension(dtoTdn.FloorPlanSketchFileName ?? "sketch"), @"[^a-zA-Z0-9_\-]", "_");
+                string fileName = $"{Guid.NewGuid():N}_{baseName}{ext}";
+                System.IO.File.WriteAllBytes(Path.Combine(targetDir, fileName), bytes);
+
+                dtoTdn.FloorPlanSketchPath = $"/uploads/InspectionSketches/{cleanTracking}/{fileName}";
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error saving base64 sketch: {ex.Message}");
+            }
+            finally
+            {
+                dtoTdn.FloorPlanSketchBase64 = null;
+            }
+        }
+
+        var p = dtoTdn.FloorPlanSketchPath;
+        if (!string.IsNullOrWhiteSpace(p) &&
+            (p.StartsWith("file:", StringComparison.OrdinalIgnoreCase) || p.StartsWith("content:", StringComparison.OrdinalIgnoreCase) || p.StartsWith("blob:", StringComparison.OrdinalIgnoreCase)))
+        {
+            dtoTdn.FloorPlanSketchPath = null; // unsynced local URI; keep existing server value
+        }
+    }
+
     private List<MobileAttachmentDTO> ProcessAndSaveAttachments(List<MobileAttachmentDTO>? attachments, string trackingNo)
     {
         if (attachments == null || attachments.Count == 0) return new List<MobileAttachmentDTO>();
 
         var result = new List<MobileAttachmentDTO>();
-        string cleanTracking = string.IsNullOrWhiteSpace(trackingNo) ? "general" : trackingNo.Trim();
-        string targetDir = Path.Combine(_env.WebRootPath, "uploads", "InspectionAttachments", cleanTracking);
+        string cleanTracking = string.IsNullOrWhiteSpace(trackingNo) ? "general" : Regex.Replace(trackingNo.Trim(), @"[^a-zA-Z0-9_\-]", "_");
+        string webRoot = !string.IsNullOrWhiteSpace(_env.WebRootPath)
+            ? _env.WebRootPath
+            : Path.Combine(_env.ContentRootPath, "wwwroot");
+        string targetDir = Path.Combine(webRoot, "uploads", "InspectionAttachments", cleanTracking);
 
         foreach (var att in attachments)
         {
+            if (att == null) continue;
             if (!string.IsNullOrWhiteSpace(att.Base64Data))
             {
                 try
@@ -2375,38 +2337,19 @@ public class MobileApiController : ControllerBase
                 }
             }
 
+            if (!string.IsNullOrWhiteSpace(att.FileUrl) &&
+                (att.FileUrl.StartsWith("blob:", StringComparison.OrdinalIgnoreCase) ||
+                 att.FileUrl.StartsWith("file:", StringComparison.OrdinalIgnoreCase) ||
+                 att.FileUrl.StartsWith("content:", StringComparison.OrdinalIgnoreCase)))
+            {
+                continue; // Do not persist un-saved local or temporary blob URIs
+            }
+
             result.Add(att);
         }
 
         return result;
     }
-
-    private async Task<TaxDeclaration?> FindTaxDeclaration(long? numericId, PropertyKind defaultKind)
-    {
-        if (numericId.HasValue && numericId.Value > 0)
-        {
-            var all = await _context.TaxDeclarations
-                .Include(t => t.BuildingDetails)
-                .Include(t => t.LandDetails)
-                .Include(t => t.MachineryDetails)
-                .ThenInclude(m => m != null ? m.TDNMachineryDetails : null)
-                .ToListAsync();
-
-            var matched = all.FirstOrDefault(t => GuidToNumericId(t.Id) == numericId.Value);
-            if (matched != null) return matched;
-        }
-
-        return await _context.TaxDeclarations
-            .Include(t => t.BuildingDetails)
-            .Include(t => t.LandDetails)
-            .Include(t => t.MachineryDetails)
-            .ThenInclude(m => m != null ? m.TDNMachineryDetails : null)
-            .Where(t => t.Kind == defaultKind)
-            .OrderByDescending(t => t.DateEncoded)
-            .FirstOrDefaultAsync();
-    }
-
-
 
     // =========================================================================
     // DEDICATED TAX DECLARATION MAPPERS (FOR EXISTING TDN LOOKUP)

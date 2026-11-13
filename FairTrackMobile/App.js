@@ -121,27 +121,27 @@ const ThemedApp = () => {
 
   const navigationTheme = isDarkMode
     ? {
-        ...DarkTheme,
-        colors: {
-          ...DarkTheme.colors,
-          primary: colors.primary,
-          background: colors.bgLight,
-          card: colors.cardBg,
-          text: colors.textDark,
-          border: colors.border
-        }
+      ...DarkTheme,
+      colors: {
+        ...DarkTheme.colors,
+        primary: colors.primary,
+        background: colors.bgLight,
+        card: colors.cardBg,
+        text: colors.textDark,
+        border: colors.border
       }
+    }
     : {
-        ...DefaultTheme,
-        colors: {
-          ...DefaultTheme.colors,
-          primary: colors.primary,
-          background: colors.bgLight,
-          card: colors.cardBg,
-          text: colors.textDark,
-          border: colors.border
-        }
-      };
+      ...DefaultTheme,
+      colors: {
+        ...DefaultTheme.colors,
+        primary: colors.primary,
+        background: colors.bgLight,
+        card: colors.cardBg,
+        text: colors.textDark,
+        border: colors.border
+      }
+    };
 
   return (
     <NavigationContainer theme={navigationTheme}>

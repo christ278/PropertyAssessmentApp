@@ -136,6 +136,9 @@ public class TDNDTO
 
     // Floor Plan / Site Sketch File & Attachments
     public string? FloorPlanSketchPath { get; set; }
+    // Mobile-captured sketch, sent only during bulk sync (saved to disk by the form update endpoints)
+    public string? FloorPlanSketchBase64 { get; set; }
+    public string? FloorPlanSketchFileName { get; set; }
     public string? AttachmentsJson { get; set; }
     public List<MobileAttachmentDTO>? Attachments { get; set; } = new();
 

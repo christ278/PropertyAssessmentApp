@@ -11,6 +11,7 @@ public interface IRequestForInspectionService
     void Add(RequestForInspection request, IFormFile? fileUpload, string? webRootPath = null);
     void Update(RequestForInspection request, IFormFile? fileUpload, string? webRootPath = null);
     void UpdateStatus(Guid id, RequestForInspectionStatus newStatus, string? remarks = null, string? staff = null);
+    void SyncPartitionTaxDeclarationStatuses(RequestForInspection request);
     void Delete(Guid id);
     string GetConfiguredStorageDirectory(string? webRootPath = null);
     int GetTotalCount();

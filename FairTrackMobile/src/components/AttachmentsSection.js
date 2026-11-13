@@ -13,16 +13,20 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { MobileApi } from '../api/mobileApi';
 import { resolveServerUrl, DEFAULT_BASE_URL } from '../api/apiClient';
 import { useTheme } from '../context/ThemeContext';
 import { ActionModal } from './ActionModal';
+import { saveFileLocally } from '../utils/fileStorage';
 
 export const AttachmentsSection = ({
   trackingNo,
+  formWorkflowId = null,
+  partitionIndex = 0,
   sketchUrl,
+  sketchBase64,
   attachments = [],
   onAttachmentsChange,
+  onSketchChange,
   propertyKind = 'Building', // 'Building' | 'Land' | 'Machinery'
   showSketch = true,
   showAttachments = true
@@ -76,7 +80,7 @@ export const AttachmentsSection = ({
     if (!rawUrl) return '';
     if (resolvedAttachmentUris[itemId]) return resolvedAttachmentUris[itemId];
     if (resolvedAttachmentUris[rawUrl]) return resolvedAttachmentUris[rawUrl];
-    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://') || rawUrl.startsWith('data:') || rawUrl.startsWith('file://')) {
+    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://') || rawUrl.startsWith('data:') || rawUrl.startsWith('file:') || rawUrl.startsWith('content:')) {
       return rawUrl;
     }
     const base = DEFAULT_BASE_URL.replace(/\/+$/, '');
@@ -84,7 +88,11 @@ export const AttachmentsSection = ({
     return `${base}${cleanPath}`;
   };
 
-  const displaySketchUri = resolvedSketchUri || (sketchUrl && (sketchUrl.startsWith('http') ? sketchUrl : `${DEFAULT_BASE_URL.replace(/\/+$/, '')}/${sketchUrl.replace(/^\/+/, '')}`));
+  const displaySketchUri = (sketchBase64 ? `data:image/jpeg;base64,${sketchBase64}` : null)
+    || resolvedSketchUri
+    || (sketchUrl && (/^(https?:|data:|file:|content:)/.test(sketchUrl)
+        ? sketchUrl
+        : `${DEFAULT_BASE_URL.replace(/\/+$/, '')}/${sketchUrl.replace(/^\/+/, '')}`));
 
   // Request permissions for camera
   const requestCameraPermission = async () => {
@@ -169,59 +177,88 @@ export const AttachmentsSection = ({
     }
   };
 
-  // Helper to upload or add photo to attachments
+  // Helper to store photo completely offline on the device
   const processAndAddPhoto = async ({ uri, fileName, fileSize, base64 }) => {
     setUploading(true);
+
+    const saved = await saveFileLocally({
+      trackingNo: trackingNo || 'general',
+      fileName: fileName,
+      base64: base64,
+      uri: uri,
+      type: 'attachment'
+    });
+
     let newAttachment = {
       id: `photo_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
       fileName: fileName,
-      fileUrl: uri,
+      fileUrl: saved.localUri,
       fileType: 'image',
       fileSize: fileSize,
-      base64Data: base64,
+      base64Data: base64 || null,
       caption: '',
       uploadedAt: new Date().toISOString()
     };
 
-    // Try online upload if server is reachable
-    try {
-      const formData = new FormData();
-      formData.append('trackingNo', trackingNo || 'general');
-      formData.append('caption', '');
-      formData.append('fileType', 'image');
-
-      if (Platform.OS === 'web') {
-        const resBlob = await fetch(uri);
-        const blob = await resBlob.blob();
-        formData.append('file', blob, fileName);
-      } else {
-        formData.append('file', {
-          uri: uri,
-          type: 'image/jpeg',
-          name: fileName
-        });
-      }
-
-      const uploadRes = await MobileApi.uploadAttachment(formData);
-      if (uploadRes && uploadRes.success && uploadRes.data) {
-        const serverAtt = uploadRes.data;
-        newAttachment = {
-          ...newAttachment,
-          id: serverAtt.id || newAttachment.id,
-          fileName: serverAtt.fileName || newAttachment.fileName,
-          fileUrl: serverAtt.fileUrl,
-          fileType: 'image',
-          base64Data: null // Saved on server
-        };
-      }
-    } catch (netErr) {
-      // Offline fallback: keep local URI and base64Data for office batch sync
-    } finally {
-      setUploading(false);
-    }
+    setUploading(false);
 
     const updated = [...(attachments || []), newAttachment];
     if (onAttachmentsChange) onAttachmentsChange(updated);
+  };
+
+  // Sketch: store completely offline on the device; uploaded only during office sync
+  const applySketchAsset = async (asset) => {
+    if (!asset || !onSketchChange) return;
+    setUploading(true);
+
+    const saved = await saveFileLocally({
+      trackingNo: trackingNo || 'general',
+      fileName: asset.fileName || `Sketch_${Date.now()}.jpg`,
+      base64: asset.base64,
+      uri: asset.uri,
+      type: 'sketch'
+    });
+
+    setUploading(false);
+    onSketchChange({
+      uri: saved.localUri,
+      base64: asset.base64 || null,
+      fileName: asset.fileName || `Sketch_${Date.now()}.jpg`
+    });
+  };
+
+  const handleSketchCamera = async () => {
+    if (!(await requestCameraPermission())) return;
+    try {
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.8,
+        base64: true
+      });
+      if (!result.canceled && result.assets?.length) applySketchAsset(result.assets[0]);
+    } catch (err) {
+      Alert.alert('Camera Error', 'Could not open camera.');
+    }
+  };
+
+  const handleSketchGallery = async () => {
+    if (!(await requestLibraryPermission())) return;
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.8,
+        base64: true
+      });
+      if (!result.canceled && result.assets?.length) applySketchAsset(result.assets[0]);
+    } catch (err) {
+      Alert.alert('Gallery Error', 'Could not access photo library.');
+    }
+  };
+
+  const handleSketchRemove = () => {
+    if (onSketchChange) onSketchChange({ uri: '', base64: null, fileName: '' });
   };
 
   // Delete photo attachment
@@ -252,12 +289,30 @@ export const AttachmentsSection = ({
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.cardTitle}>Site Sketch & Floor Plan Blueprint</Text>
-              <Text style={styles.cardSubtitle}>Uploaded from Assessor Office Web Portal</Text>
+              <Text style={styles.cardSubtitle}>Upload or replace on site; synced with your next office sync</Text>
             </View>
             <View style={styles.badgeWeb}>
               <Text style={styles.badgeWebText}>Office Web Sketch</Text>
             </View>
           </View>
+
+          {!!onSketchChange && (
+            <View style={styles.actionButtonsRow}>
+              <TouchableOpacity style={[styles.actionBtn, styles.actionBtnCamera]} onPress={handleSketchCamera}>
+                <Ionicons name="camera" size={18} color="#ffffff" />
+                <Text style={styles.actionBtnText}>{sketchUrl ? 'Retake' : 'Take Sketch'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.actionBtn, styles.actionBtnGallery]} onPress={handleSketchGallery}>
+                <Ionicons name="images" size={18} color="#ffffff" />
+                <Text style={styles.actionBtnText}>{sketchUrl ? 'Replace' : 'Upload'}</Text>
+              </TouchableOpacity>
+              {!!sketchUrl && (
+                <TouchableOpacity style={[styles.actionBtn, { backgroundColor: colors.accentRed, flex: 0, paddingHorizontal: 14 }]} onPress={handleSketchRemove}>
+                  <Ionicons name="trash-outline" size={18} color="#ffffff" />
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
 
           {displaySketchUri ? (
             <View style={styles.sketchContainer}>
@@ -286,7 +341,7 @@ export const AttachmentsSection = ({
                 </View>
                 <TouchableOpacity
                   style={styles.viewFullBtn}
-                  onPress={() => setFullscreenImage(resolvedSketchUri)}
+                  onPress={() => setFullscreenImage(displaySketchUri)}
                 >
                   <Ionicons name="expand-outline" size={16} color={colors.primary} />
                   <Text style={styles.viewFullBtnText}>Full View</Text>
@@ -372,7 +427,10 @@ export const AttachmentsSection = ({
               const fileType = (item?.fileType || item?.FileType || 'image').toLowerCase();
               const caption = item?.caption || item?.Caption || '';
               const uploadedAt = item?.uploadedAt || item?.UploadedAt;
-              const itemUri = getFullPhotoUrl(rawUrl, itemId);
+              const itemB64 = item?.base64Data || item?.Base64Data;
+              const itemUri = (rawUrl.startsWith('blob:') && itemB64)
+                ? `data:image/jpeg;base64,${itemB64}`
+                : (itemB64 ? `data:image/jpeg;base64,${itemB64}` : getFullPhotoUrl(rawUrl, itemId));
               const isPdf = fileType === 'document' || fileName.toLowerCase().endsWith('.pdf') || rawUrl.toLowerCase().endsWith('.pdf');
 
               return (

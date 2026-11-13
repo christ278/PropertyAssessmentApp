@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MobileApi } from '../api/mobileApi';
 import storageResetEpoch from '../constants/storageResetEpoch.json';
+import { downloadServerFileToMobile } from '../utils/fileStorage';
 
 export const SyncContext = createContext();
 
@@ -301,12 +302,20 @@ export const SyncProvider = ({ children }) => {
 
   const saveQueue = async (newQueue) => {
     setSyncQueue(newQueue);
-    await AsyncStorage.setItem('@fairtrack_sync_queue', JSON.stringify(newQueue));
+    try {
+      await AsyncStorage.setItem('@fairtrack_sync_queue', JSON.stringify(newQueue));
+    } catch (err) {
+      console.warn('saveQueue storage warning:', err);
+    }
   };
 
   const saveDownloadedForms = async (newDownloads) => {
     setDownloadedForms(newDownloads);
-    await AsyncStorage.setItem('@fairtrack_downloaded_forms', JSON.stringify(newDownloads));
+    try {
+      await AsyncStorage.setItem('@fairtrack_downloaded_forms', JSON.stringify(newDownloads));
+    } catch (err) {
+      console.warn('saveDownloadedForms storage warning:', err);
+    }
     const downloadedList = Object.values(newDownloads)
       .map(d => d?.transItem ? normalizeTransactionItem(d.transItem) : null)
       .filter(item => item && isAllowedMobileTransaction(item));
@@ -340,20 +349,41 @@ export const SyncProvider = ({ children }) => {
           };
         }
         const key = (transItem.TrackingNo || transItem.FormworkflowId).toString();
+        const tracking = transItem.TrackingNo || '';
+        const partitionsWithLocalFiles = await Promise.all((res.partitions || []).map(async (p) => {
+          let updatedAtts = p.attachments || [];
+          if (Platform.OS !== 'web' && Array.isArray(p.attachments)) {
+            updatedAtts = await Promise.all(p.attachments.map(async (a) => {
+              if (a.fileUrl && !a.fileUrl.startsWith('file:') && !a.fileUrl.startsWith('data:')) {
+                const local = await downloadServerFileToMobile(a.fileUrl, tracking, a.fileName, 'attachment');
+                return { ...a, fileUrl: local };
+              }
+              return a;
+            }));
+          }
+          let updatedSketch = p.sketchUrl;
+          if (Platform.OS !== 'web' && p.sketchUrl && !p.sketchUrl.startsWith('file:') && !p.sketchUrl.startsWith('data:')) {
+            updatedSketch = await downloadServerFileToMobile(p.sketchUrl, tracking, p.sketchFileName || 'sketch.jpg', 'sketch');
+          }
+          return {
+            ...p,
+            attachments: updatedAtts,
+            sketchUrl: updatedSketch,
+            formData: p.formData ? withPascalCaseKeys(p.formData) : null
+          };
+        }));
+
         const updated = {
           ...downloadedForms,
           [key]: {
             ...res,
             formData: res.formData ? withPascalCaseKeys(res.formData) : res.formData,
-            partitions: (res.partitions || []).map(p => ({
-              ...p,
-              formData: p.formData ? withPascalCaseKeys(p.formData) : null
-            })),
+            partitions: partitionsWithLocalFiles,
             transItem: {
               ...transItem,
               HasPartition: res.hasPartition,
               PartitionCount: res.partitionCount || (res.partitions?.length || 1),
-              Partitions: res.partitions || []
+              Partitions: partitionsWithLocalFiles
             },
             downloadedAt: new Date().toISOString()
           }
@@ -392,6 +422,89 @@ export const SyncProvider = ({ children }) => {
     } catch (e) {
       console.warn('Failed to remove downloaded transaction:', e);
       return false;
+    }
+  };
+
+  const updatePartitionAttachmentsLocally = async (trackingNo, formWorkflowId, partitionIndex, newAttachments, newSketchUrl) => {
+    if (!downloadedForms || Object.keys(downloadedForms).length === 0) return;
+    try {
+      const tracking = (trackingNo || '').toString().trim().toLowerCase();
+      const wfId = formWorkflowId != null ? formWorkflowId.toString().trim() : '';
+
+      let dKey = null;
+      if (tracking && downloadedForms[tracking]) dKey = tracking;
+      else if (wfId && downloadedForms[wfId]) dKey = wfId;
+      else {
+        dKey = Object.keys(downloadedForms).find(k =>
+          (tracking && k.toLowerCase() === tracking) ||
+          (wfId && k.toString() === wfId)
+        );
+      }
+
+      if (!dKey) {
+        dKey = (trackingNo || formWorkflowId || `record_${Date.now()}`).toString();
+      }
+
+      const itemRecord = (downloadedForms && downloadedForms[dKey])
+        ? { ...downloadedForms[dKey] }
+        : {
+            trackingNo: trackingNo || '',
+            formWorkflowId: formWorkflowId || null,
+            partitions: []
+          };
+
+      const partIdx = typeof partitionIndex === 'number' ? partitionIndex : (parseInt(partitionIndex, 10) || 0);
+      const updatedPartitions = Array.isArray(itemRecord.partitions) ? [...itemRecord.partitions] : [];
+      while (updatedPartitions.length <= partIdx) {
+        updatedPartitions.push({});
+      }
+      const existingPart = { ...(updatedPartitions[partIdx] || {}) };
+
+        if (Array.isArray(newAttachments)) {
+          existingPart.attachments = newAttachments;
+          if (existingPart.formData?.TDN) {
+            existingPart.formData.TDN.Attachments = newAttachments;
+          }
+        }
+        if (newSketchUrl !== undefined) {
+          existingPart.sketchUrl = newSketchUrl;
+          if (existingPart.formData?.TDN) {
+            existingPart.formData.TDN.FloorPlanSketchPath = newSketchUrl;
+          }
+        }
+
+        updatedPartitions[partIdx] = existingPart;
+        itemRecord.partitions = updatedPartitions;
+
+        if (partIdx === 0) {
+          itemRecord.currentPartition = existingPart;
+          if (Array.isArray(newAttachments)) itemRecord.attachments = newAttachments;
+          if (newSketchUrl !== undefined) itemRecord.sketchUrl = newSketchUrl;
+        }
+
+        const nextForms = { ...downloadedForms, [dKey]: itemRecord };
+        setDownloadedForms(nextForms);
+        try {
+          await AsyncStorage.setItem('@fairtrack_downloaded_forms', JSON.stringify(nextForms));
+        } catch (storageErr) {
+          console.warn('AsyncStorage setItem quota reached, saving lightweight metadata copy:', storageErr);
+          const lightweightForms = JSON.parse(JSON.stringify(nextForms));
+          for (const key of Object.keys(lightweightForms)) {
+            const form = lightweightForms[key];
+            if (form?.partitions) {
+              for (const part of form.partitions) {
+                if (part.attachments) {
+                  part.attachments = part.attachments.map(a => ({ ...a, base64Data: null }));
+                }
+              }
+            }
+          }
+          try {
+            await AsyncStorage.setItem('@fairtrack_downloaded_forms', JSON.stringify(lightweightForms));
+          } catch (e2) {}
+        }
+    } catch (e) {
+      console.warn('updatePartitionAttachmentsLocally error:', e);
     }
   };
 
@@ -1143,7 +1256,11 @@ export const SyncProvider = ({ children }) => {
     const formKey = `${type}_${cacheId}_part_${partIdx}`;
     const newCachedForms = { ...cachedForms, [formKey]: payload };
     setCachedForms(newCachedForms);
-    await AsyncStorage.setItem('@fairtrack_cached_forms', JSON.stringify(newCachedForms));
+    try {
+      await AsyncStorage.setItem('@fairtrack_cached_forms', JSON.stringify(newCachedForms));
+    } catch (err) {
+      console.warn('Saving cached forms storage warning:', err);
+    }
 
     // Update downloadedForms cache so switching partitions offline reflects latest edits immediately
     let dKey = null;
@@ -1366,6 +1483,186 @@ export const SyncProvider = ({ children }) => {
     };
   };
 
+  // Transaction-Level Sync Engine: Sync all partitions of a transaction to web, and optionally forward workflow to supervisor
+  const syncTransactionToServer = async (trackingNo, formWorkflowId, forwardToSupervisor = false, remarks = '') => {
+    const online = await checkConnectivity(3000);
+    if (!online) {
+      return {
+        success: false,
+        isOffline: true,
+        message: 'Office server is unreachable. Please connect to the office network or Wi-Fi before syncing.'
+      };
+    }
+
+    const cleanTrack = (trackingNo || '').toString().trim().toLowerCase();
+    const cleanWf = formWorkflowId != null ? formWorkflowId.toString().trim() : '';
+
+    // Match all items in syncQueue for this transaction
+    const targetQueueItems = syncQueue.filter(item => {
+      const p = item.payload;
+      const tdn = p?.TDN || p?.tdn;
+      const itemTracking = (tdn?.TrackingNo || tdn?.trackingNo || p?.TrackingNo || p?.trackingNo || '').toString().trim().toLowerCase();
+      const itemWfId = (tdn?.FormWorkflowId || tdn?.formWorkflowId || p?.FormWorkflowId || p?.formWorkflowId || item.workflowForwardPayload?.FormWorkflowId || item.workflowForwardPayload?.formWorkflowId || '').toString().trim();
+
+      const trackMatches = cleanTrack && itemTracking && cleanTrack === itemTracking;
+      const wfMatches = cleanWf && itemWfId && cleanWf === itemWfId;
+      return trackMatches || wfMatches;
+    });
+
+    setIsSyncing(true);
+    let successCount = 0;
+    let failCount = 0;
+    const processedIds = [];
+    const newLogs = [];
+
+    for (let i = 0; i < targetQueueItems.length; i++) {
+      const item = targetQueueItems[i];
+      try {
+        let res = null;
+        if (item.type === 'UPDATE_BUILDING') {
+          res = await MobileApi.updateBuildingForm(item.payload);
+        } else if (item.type === 'UPDATE_LAND') {
+          res = await MobileApi.updateLandForm(item.payload);
+        } else if (item.type === 'UPDATE_MACHINERY') {
+          res = await MobileApi.updateMachineryForm(item.payload);
+        }
+
+        if (res && res.success) {
+          successCount++;
+          processedIds.push(item.id);
+          const p = item.payload;
+          const tdn = p?.TDN || p?.tdn;
+          const itemTrack = tdn?.TrackingNo || tdn?.trackingNo || trackingNo;
+          const itemWf = tdn?.FormWorkflowId || tdn?.formWorkflowId || formWorkflowId;
+
+          await saveToHistory(p, {
+            type: item.type,
+            trackingNo: itemTrack,
+            formWorkflowId: itemWf,
+            actionType: forwardToSupervisor ? 'TRANSFERRED' : 'SYNCED',
+            statusLabel: forwardToSupervisor ? 'Transferred to Assessor Review' : 'Synced to Office Web Portal'
+          });
+          await updateDownloadedFormWithPayload(itemTrack, itemWf, p);
+
+          newLogs.unshift({
+            id: item.id,
+            title: item.title,
+            status: 'SUCCESS',
+            time: new Date().toLocaleTimeString(),
+            message: res.message || 'Synced partition to office portal.'
+          });
+        } else {
+          failCount++;
+          newLogs.unshift({
+            id: item.id,
+            title: item.title,
+            status: 'FAILED',
+            time: new Date().toLocaleTimeString(),
+            message: res?.message || 'Server rejected partition update.'
+          });
+        }
+      } catch (err) {
+        failCount++;
+        newLogs.unshift({
+          id: item.id,
+          title: item.title,
+          status: 'ERROR',
+          time: new Date().toLocaleTimeString(),
+          message: err.response?.data?.message || err.message || 'Server error syncing partition'
+        });
+      }
+    }
+
+    // Remove successfully processed items from syncQueue
+    if (processedIds.length > 0) {
+      const remainingQueue = syncQueue.filter(q => !processedIds.includes(q.id));
+      await saveQueue(remainingQueue);
+    }
+    if (newLogs.length > 0) {
+      setSyncLogs(prev => [...newLogs, ...prev].slice(0, 50));
+    }
+
+    // Forward to supervisor if requested
+    let forwarded = false;
+    if (forwardToSupervisor) {
+      if (failCount > 0) {
+        setIsSyncing(false);
+        return {
+          success: false,
+          syncedCount: successCount,
+          failCount,
+          message: `Cannot forward to supervisor because ${failCount} partition edit(s) failed to sync.`
+        };
+      }
+
+      const wfNumericId = parseInt(cleanWf, 10);
+      if (!wfNumericId || isNaN(wfNumericId)) {
+        setIsSyncing(false);
+        return {
+          success: false,
+          syncedCount: successCount,
+          message: 'Invalid Form Workflow ID for forwarding to supervisor.'
+        };
+      }
+
+      try {
+        const fwdRes = await MobileApi.forwardWorkflow(
+          wfNumericId,
+          4, // 4 = Checked / Recommend Approval (Supervisor)
+          remarks || 'Field inspection completed and transferred to supervisor.'
+        );
+
+        if (fwdRes && fwdRes.success) {
+          forwarded = true;
+          // Mark transaction as transferred -> removes from downloaded forms and updates history
+          await markTransactionSynced(trackingNo, formWorkflowId, true);
+        } else {
+          setIsSyncing(false);
+          return {
+            success: false,
+            syncedCount: successCount,
+            message: fwdRes?.message || 'Partitions synced, but failed to forward workflow to supervisor.'
+          };
+        }
+      } catch (fwdErr) {
+        setIsSyncing(false);
+        return {
+          success: false,
+          syncedCount: successCount,
+          message: fwdErr.response?.data?.message || fwdErr.message || 'Error forwarding workflow to supervisor.'
+        };
+      }
+    }
+
+    setIsSyncing(false);
+
+    const syncTimeStr = new Date().toLocaleString();
+    setLastSyncTime(syncTimeStr);
+    await AsyncStorage.setItem('@fairtrack_last_sync', syncTimeStr);
+
+    let displayMessage = '';
+    if (failCount > 0) {
+      const firstErr = newLogs.find(l => l.status !== 'SUCCESS');
+      displayMessage = `${failCount} partition(s) failed to sync for ${trackingNo}` +
+        (successCount > 0 ? ` (${successCount} succeeded)` : '') +
+        `. ${firstErr?.message || 'Server error.'}`;
+    } else if (forwardToSupervisor) {
+      displayMessage = `Transaction ${trackingNo} successfully synchronized and transferred to Supervisor!`;
+    } else if (successCount > 0) {
+      displayMessage = `Successfully synchronized ${successCount} partition(s) for ${trackingNo} to the web portal.`;
+    } else {
+      displayMessage = `Transaction ${trackingNo} is already up to date with the web portal.`;
+    }
+
+    return {
+      success: failCount === 0,
+      syncedCount: successCount,
+      failCount,
+      forwarded,
+      message: displayMessage
+    };
+  };
+
   const removeQueueItem = async (itemId) => {
     const updated = syncQueue.filter((q) => q.id !== itemId);
     await saveQueue(updated);
@@ -1398,9 +1695,11 @@ export const SyncProvider = ({ children }) => {
         isTransactionDownloaded,
         hasPendingEdits,
         getDownloadedFormData,
+        updatePartitionAttachmentsLocally,
         updateDownloadedFormWithPayload,
         queueOfflineUpdate,
         syncAllToServer,
+        syncTransactionToServer,
         removeQueueItem,
         clearQueue,
         clearAllOfflineData,

@@ -18,8 +18,10 @@ import { SyncContext } from '../context/SyncContext';
 import { useTheme } from '../context/ThemeContext';
 import { MobileApi } from '../api/mobileApi';
 import { HeaderBar } from '../components/HeaderBar';
+import { ActionModal } from '../components/ActionModal';
 import { DiscardChangesModal } from '../components/DiscardChangesModal';
 import { AttachmentsSection } from '../components/AttachmentsSection';
+import { savePartitionAttachmentsOffline, loadPartitionAttachmentsOffline } from '../utils/fileStorage';
 import { DatePickerModal } from '../components/DatePickerModal';
 import { BARANGAY_OPTIONS, normalizeBarangay } from '../constants/locationData';
 
@@ -44,11 +46,13 @@ export const MachineryFormScreen = ({ route, navigation }) => {
   const formWorkflowIdParam = route?.params?.formWorkflowId || null;
   const partitionIndexParam = route?.params?.partitionIndex ?? 0;
   const partitionLetterParam = route?.params?.partitionLetter || String.fromCharCode(65 + (parseInt(partitionIndexParam, 10) || 0));
+  const fromHistory = route?.params?.fromHistory === true;
 
   const {
     queueOfflineUpdate,
     markTransactionSynced,
     getDownloadedFormData,
+    updatePartitionAttachmentsLocally,
     isTransactionDownloaded,
     hasPendingEdits,
     downloadSingleTransaction,
@@ -60,7 +64,24 @@ export const MachineryFormScreen = ({ route, navigation }) => {
   const [saving, setSaving] = useState(false);
   const [notDownloadedError, setNotDownloadedError] = useState(false);
   const [discardModalVisible, setDiscardModalVisible] = useState(false);
+  const [completeModalConfig, setCompleteModalConfig] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    iconType: 'success',
+    icon: 'checkmark-circle-outline'
+  });
   const isDownloaded = isTransactionDownloaded(trackingNoParam, formWorkflowIdParam);
+
+  const showCompleteModalAndGoBack = (title, message, iconType = 'success', icon = 'checkmark-circle-outline') => {
+    setCompleteModalConfig({
+      visible: true,
+      title,
+      message,
+      iconType,
+      icon
+    });
+  };
 
   const tabScrollRef = useRef(null);
   const [activeTab, setActiveTab] = useState(0);
@@ -326,13 +347,20 @@ export const MachineryFormScreen = ({ route, navigation }) => {
   const loadMachineryData = async () => {
     setNotDownloadedError(false);
 
+    // 0. Load any locally saved partition offline attachments
+    const offlineAttData = await loadPartitionAttachmentsOffline(trackingNoParam, partitionIndexParam);
+    if (offlineAttData.attachments && offlineAttData.attachments.length > 0) {
+      setAttachments(offlineAttData.attachments);
+    }
+
     // 1. Populate from offline downloaded cache if available
     const downloaded = getDownloadedFormData(trackingNoParam, formWorkflowIdParam, partitionIndexParam);
     if (downloaded) {
       if (downloaded.currentPartition) {
         populateFromPartition(downloaded.currentPartition);
       }
-      if (downloaded.formData) {
+      // Top-level formData belongs to Partition 1; never apply it over partitions after the first
+      if (downloaded.formData && ((parseInt(partitionIndexParam, 10) || 0) === 0 || !downloaded.currentPartition)) {
         populateFieldsFromDTO(downloaded.formData);
       }
       if (downloaded.attachments && Array.isArray(downloaded.attachments)) {
@@ -378,6 +406,31 @@ export const MachineryFormScreen = ({ route, navigation }) => {
 
   const populateFromPartition = (p) => {
     if (!p) return;
+    // Partition isolation: for partitions after the first, reset fields unconditionally
+    // so stale state from another partition never leaks.
+    if ((parseInt(partitionIndexParam, 10) || 0) > 0) {
+      setSectionNo(p.sectionNo || '');
+      setLotNo(p.lotNo || p.lotNumber || '');
+      setPin(p.pin || '');
+      setArpNo(p.arpNo || '');
+      setOwnerName(p.ownerName || p.newOwnerName || '');
+      setOwnerGender(p.ownerGender || '');
+      setOwnerTin(p.ownerTin || p.ownerTIN || '');
+      setOwnerAddress(p.ownerAddress || '');
+      setOwnerContact(p.ownerContactNo || '');
+      setOwnerEmail(p.ownerEmail || '');
+      setAdminName(p.administratorName || '');
+      setMachineryRegNo(p.machineryRegNo || '');
+      setImportationPermitNo(p.importationPermitNo || '');
+      setCountryOfOrigin(p.countryOfOrigin || '');
+      setSupplierSeller(p.supplierSeller || '');
+      setAcquisitionCost(p.acquisitionCost != null ? p.acquisitionCost.toString() : '');
+      setOrNo(p.orNo || '');
+      setStreetLocation(p.streetLocation || p.streetNo || p.propertyLocation || '');
+      setDistrictOrBarangay(p.districtOrBarangay ? normalizeBarangay(p.districtOrBarangay) : '');
+      setMemoranda(p.memoranda || '');
+      setRemarks(p.remarks || '');
+    }
     if (p.systemGeneratedTDN) setDeclarationNo(p.systemGeneratedTDN);
     if (p.arpNo) setArpNo(p.arpNo);
     if (p.pin) setPin(p.pin);
@@ -759,14 +812,30 @@ export const MachineryFormScreen = ({ route, navigation }) => {
   // =========================================================================
   const navigateBack = () => {
     setDiscardModalVisible(false);
-    if (navigation && typeof navigation.navigate === 'function') {
-      navigation.navigate('Main', { screen: 'Feed' });
-    } else if (navigation && typeof navigation.goBack === 'function') {
-      navigation.goBack();
+    if (fromHistory) {
+      if (navigation && typeof navigation.canGoBack === 'function' && navigation.canGoBack()) {
+        navigation.goBack();
+      } else if (navigation && typeof navigation.navigate === 'function') {
+        navigation.navigate('Main', { screen: 'HistoryTab' });
+      }
+    } else {
+      if (navigation && typeof navigation.canGoBack === 'function' && navigation.canGoBack()) {
+        navigation.goBack();
+      } else if (navigation && typeof navigation.navigate === 'function') {
+        navigation.navigate('Main', { screen: 'Feed' });
+      }
     }
   };
 
-  const handleSave = async (forceOffline = false, transferStage = false) => {
+  const handleBack = () => {
+    if (fromHistory) {
+      navigateBack();
+    } else {
+      setDiscardModalVisible(true);
+    }
+  };
+
+  const handleSave = async () => {
     if (!ownerName.trim()) {
       Alert.alert('Required Field', 'Owner / Declarant Name is required.');
       setActiveTab(0);
@@ -869,57 +938,20 @@ export const MachineryFormScreen = ({ route, navigation }) => {
       TDNMachineDetail: tdnDetails
     };
 
-    const workflowForwardPayload = transferStage && formWorkflowIdParam ? {
-      formWorkflowId: formWorkflowIdParam,
-      nextStatusId: nextStatusId,
-      remarks: remarks || 'Field machinery appraisal completed and transferred.'
-    } : null;
-
-    if (forceOffline) {
-      setSaving(true);
-      await queueOfflineUpdate(
-        'UPDATE_MACHINERY',
-        payload,
-        `Machinery FAAS [Part ${partitionLetterParam}]: ${trackingNo || arpNo} (${ownerName || 'Company'})`,
-        workflowForwardPayload
-      );
-      setSaving(false);
-      navigateBack();
-      return;
-    }
-
     setSaving(true);
-    try {
-      const res = await MobileApi.updateMachineryForm(payload);
-      if (res && res.success) {
-        if (workflowForwardPayload) {
-          try {
-            await MobileApi.forwardWorkflow(
-              workflowForwardPayload.formWorkflowId,
-              workflowForwardPayload.nextStatusId,
-              workflowForwardPayload.remarks
-            );
-          } catch (fwdErr) { }
-        }
-        if (typeof markTransactionSynced === 'function') {
-          await markTransactionSynced(trackingNo || trackingNoParam, formWorkflowIdParam, transferStage, payload);
-        }
-        setSaving(false);
-        navigateBack();
-        return;
-      }
-    } catch (err) {
-      // Fallback to offline queue
-    }
-
     await queueOfflineUpdate(
       'UPDATE_MACHINERY',
       payload,
       `Machinery FAAS [Part ${partitionLetterParam}]: ${trackingNo || arpNo} (${ownerName || 'Company'})`,
-      workflowForwardPayload
+      null
     );
     setSaving(false);
-    navigateBack();
+    showCompleteModalAndGoBack(
+      'Partition Saved Offline',
+      `Edits for Partition ${partitionLetterParam} have been saved locally. To synchronize to the office database or transfer to supervisor, use the 3-dots (⋮) menu on the transaction card in My Transactions.`,
+      'success',
+      'cloud-offline-outline'
+    );
   };
 
   const renderSelectField = (label, value, options, onSelect) => (
@@ -940,12 +972,22 @@ export const MachineryFormScreen = ({ route, navigation }) => {
   return (
     <View style={styles.container}>
       <HeaderBar
-        title="MACHINERY FAAS"
+        title={fromHistory ? "VIEW MACHINERY RECORD" : "MACHINERY FAAS"}
         subtitle={`Tracking No: ${trackingNo || 'N/A'} • Partition ${partitionLetterParam}${declarationNo ? ` • TDN: ${declarationNo}` : ''}`}
         navigation={navigation}
         showBack={true}
-        onBackPress={() => setDiscardModalVisible(true)}
+        onBackPress={handleBack}
       />
+
+      {/* Historical Record Ribbon */}
+      {fromHistory && (
+        <View style={styles.historyNoticeRibbon}>
+          <Ionicons name="time-outline" size={16} color="#0369a1" />
+          <Text style={styles.historyNoticeText}>
+            Historical Record View • Completed transaction cannot be edited.
+          </Text>
+        </View>
+      )}
 
       {/* Offline Status Ribbon */}
       <View style={[styles.ribbon, isDownloaded ? styles.ribbonDownloaded : styles.ribbonStandard]}>
@@ -1976,37 +2018,19 @@ export const MachineryFormScreen = ({ route, navigation }) => {
                   </View>
                 </View>
 
-                {/* Workflow Transfer */}
-                <View style={[styles.card, shadows.card]}>
-                  <Text style={styles.cardHeaderTitle}>Office Workflow Transfer</Text>
-                  <View style={styles.switchRow}>
-                    <View style={{ flex: 1, paddingRight: 8 }}>
-                      <Text style={styles.switchTitle}>Transfer to Next Step on Sync</Text>
-                      <Text style={styles.switchSubtitle}>Forward to Assessor Review upon save/sync</Text>
-                    </View>
-                    <Switch
-                      value={autoForward}
-                      onValueChange={setAutoForward}
-                      trackColor={{ false: colors.border, true: colors.primary }}
-                      thumbColor="#ffffff"
-                    />
-                  </View>
-
-                  {autoForward && (
-                    <View style={styles.nextStepBox}>
-                      <Text style={styles.nextStepLabel}>NEXT WORKFLOW STEP:</Text>
-                      <View style={styles.nextStepBadge}>
-                        <Ionicons name="arrow-forward-circle" size={16} color={colors.primary} />
-                        <Text style={styles.nextStepBadgeText}>Checked / Recommend Approval (Assessor Review)</Text>
-                      </View>
-                    </View>
-                  )}
-                </View>
-
                 {/* Field Inspection Photos (AttachmentsSection) */}
                 <AttachmentsSection
+                  trackingNo={trackingNo || trackingNoParam}
+                  formWorkflowId={formWorkflowIdParam}
+                  partitionIndex={parseInt(partitionIndexParam, 10) || 0}
                   attachments={attachments}
-                  onAttachmentsChange={setAttachments}
+                  onAttachmentsChange={(newAtts) => {
+                    setAttachments(newAtts);
+                    savePartitionAttachmentsOffline(trackingNo || trackingNoParam, partitionIndexParam, newAtts, undefined);
+                    if (typeof updatePartitionAttachmentsLocally === 'function') {
+                      updatePartitionAttachmentsLocally(trackingNo || trackingNoParam, formWorkflowIdParam, partitionIndexParam, newAtts, undefined);
+                    }
+                  }}
                   isOffline={!isOnline}
                   propertyKind="Machinery"
                   showSketch={false}
@@ -2020,40 +2044,48 @@ export const MachineryFormScreen = ({ route, navigation }) => {
         {/* Action Buttons */}
         {!loading && !notDownloadedError && (
           <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={[styles.saveBtn, autoForward ? styles.saveBtnTransfer : styles.saveBtnPrimary]}
-              onPress={() => handleSave(false, autoForward)}
-              disabled={saving}
-            >
-              {saving ? (
-                <ActivityIndicator color="#ffffff" size="small" />
-              ) : (
-                <>
-                  <Ionicons name={autoForward ? 'checkmark-done-circle' : 'save-outline'} size={18} color="#ffffff" />
-                  <Text style={styles.saveBtnText}>
-                    {autoForward ? 'Save & Transfer to Next Step' : 'Save & Sync Live'}
+            {fromHistory ? (
+              <TouchableOpacity
+                style={[styles.saveBtn, { backgroundColor: colors.primary }]}
+                onPress={handleBack}
+              >
+                <Ionicons name="arrow-back" size={18} color="#ffffff" />
+                <Text style={styles.saveBtnText}>Back to History</Text>
+              </TouchableOpacity>
+            ) : (
+              <>
+                <View style={styles.partitionNoticeRow}>
+                  <Ionicons name="information-circle-outline" size={16} color={colors.primary} />
+                  <Text style={styles.partitionNoticeText}>
+                    Partition edits are saved locally to this device. Synchronizing to web and transferring to supervisor are handled per transaction via the 3-dots (⋮) menu on the transaction card in My Transactions.
                   </Text>
-                </>
-              )}
-            </TouchableOpacity>
+                </View>
 
-            <TouchableOpacity
-              style={[styles.saveBtn, styles.saveBtnOffline]}
-              onPress={() => handleSave(true, autoForward)}
-              disabled={saving}
-            >
-              <Ionicons name="cloud-offline-outline" size={18} color="#ffffff" />
-              <Text style={styles.saveBtnText}>Save Draft Locally (Offline)</Text>
-            </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.saveBtn, styles.saveBtnOffline]}
+                  onPress={handleSave}
+                  disabled={saving}
+                >
+                  {saving ? (
+                    <ActivityIndicator color="#ffffff" size="small" />
+                  ) : (
+                    <>
+                      <Ionicons name="cloud-offline-outline" size={18} color="#ffffff" />
+                      <Text style={styles.saveBtnText}>Save Partition (Offline)</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.saveBtn, styles.cancelBtn]}
-              onPress={() => setDiscardModalVisible(true)}
-              disabled={saving}
-            >
-              <Ionicons name="close-circle-outline" size={18} color={isDarkMode ? '#fda4af' : '#e11d48'} />
-              <Text style={styles.cancelBtnText}>Discard Changes</Text>
-            </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.saveBtn, styles.cancelBtn]}
+                  onPress={() => setDiscardModalVisible(true)}
+                  disabled={saving}
+                >
+                  <Ionicons name="close-circle-outline" size={18} color={isDarkMode ? '#fda4af' : '#e11d48'} />
+                  <Text style={styles.cancelBtnText}>Cancel & Discard Changes</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         )}
       </ScrollView>
@@ -2378,8 +2410,33 @@ export const MachineryFormScreen = ({ route, navigation }) => {
       {/* Discard Changes Modal */}
       <DiscardChangesModal
         visible={discardModalVisible}
-        onDiscard={navigateBack}
-        onKeepEditing={() => setDiscardModalVisible(false)}
+        onClose={() => setDiscardModalVisible(false)}
+        onConfirmDiscard={navigateBack}
+        partitionLetter={partitionLetterParam}
+      />
+
+      {/* Complete / Confirmation Modal */}
+      <ActionModal
+        visible={completeModalConfig.visible}
+        title={completeModalConfig.title}
+        message={completeModalConfig.message}
+        icon={completeModalConfig.icon}
+        iconType={completeModalConfig.iconType}
+        buttons={[
+          {
+            text: 'Return to Transactions',
+            style: 'primary',
+            icon: 'arrow-back',
+            onPress: () => {
+              setCompleteModalConfig(prev => ({ ...prev, visible: false }));
+              navigateBack();
+            }
+          }
+        ]}
+        onClose={() => {
+          setCompleteModalConfig(prev => ({ ...prev, visible: false }));
+          navigateBack();
+        }}
       />
     </View>
   );
@@ -2392,6 +2449,21 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background
+  },
+  historyNoticeRibbon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: isDarkMode ? '#0c4a6e33' : '#e0f2fe',
+    borderBottomWidth: 1,
+    borderBottomColor: isDarkMode ? '#0369a1' : '#bae6fd',
+    paddingHorizontal: 16,
+    paddingVertical: 10
+  },
+  historyNoticeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: isDarkMode ? '#7dd3fc' : '#0369a1'
   },
   ribbon: {
     flexDirection: 'row',
@@ -3021,6 +3093,24 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
   buttonContainer: {
     gap: 10,
     marginTop: 16
+  },
+  partitionNoticeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: isDarkMode ? '#1e293b' : '#f0fdf4',
+    borderWidth: 1,
+    borderColor: isDarkMode ? '#334155' : '#bbf7d0',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 4
+  },
+  partitionNoticeText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 16,
+    color: isDarkMode ? '#94a3b8' : '#166534',
+    fontWeight: '500'
   },
   saveBtn: {
     flexDirection: 'row',

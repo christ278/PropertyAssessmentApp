@@ -150,7 +150,8 @@ export const HistoryScreen = ({ navigation }) => {
       formWorkflowId: item.formWorkflowId,
       partitionIndex: item.partitionIndex || 0,
       partitionLetter: item.partitionLetter || 'A',
-      partitionKind: pKind
+      partitionKind: pKind,
+      fromHistory: true
     };
 
     if (pKind === 'Land') {
@@ -396,8 +397,8 @@ export const HistoryScreen = ({ navigation }) => {
               onPress={() => handleOpenForm(item)}
               activeOpacity={0.7}
             >
-              <Ionicons name="create-outline" size={14} color="#ffffff" />
-              <Text style={[styles.actionBtnText, { color: '#ffffff' }]}>Open Form</Text>
+              <Ionicons name="document-text-outline" size={14} color="#ffffff" />
+              <Text style={[styles.actionBtnText, { color: '#ffffff' }]}>View Form</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -715,8 +716,8 @@ export const HistoryScreen = ({ navigation }) => {
                   if (target) handleOpenForm(target);
                 }}
               >
-                <Ionicons name="create-outline" size={16} color="#ffffff" style={{ marginRight: 6 }} />
-                <Text style={[styles.modalBtnText, { color: '#ffffff' }]}>Open in Form Editor</Text>
+                <Ionicons name="document-text-outline" size={16} color="#ffffff" style={{ marginRight: 6 }} />
+                <Text style={[styles.modalBtnText, { color: '#ffffff' }]}>View Form Details</Text>
               </TouchableOpacity>
             </View>
           </View>
