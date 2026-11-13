@@ -1,0 +1,258 @@
+/* ==========================================================================
+   FairTrack - Local Offline Typography System
+   Font Family: Poppins (Local WOFF2 & TTF Offline Formats)
+   Zero External CDN Reliance • Koronadal City Assessor Portal
+   ========================================================================== */
+
+/* 1. LOCAL @FONT-FACE DEFINITIONS (OFFLINE POPPINS FONT) */
+@font-face {
+    font-family: 'Poppins';
+    font-style: normal;
+    font-weight: 300;
+    font-display: swap;
+    src: url('../fonts/Poppins/poppins-300.ttf') format('truetype'),
+         url('/fonts/Poppins/poppins-300.ttf') format('truetype'),
+         url('../lib/fonts/poppins/poppins-300.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'Poppins';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('../fonts/Poppins/poppins-400.woff2') format('woff2'),
+         url('/fonts/Poppins/poppins-400.woff2') format('woff2'),
+         url('../fonts/Poppins/poppins-400.ttf') format('truetype'),
+         url('/fonts/Poppins/poppins-400.ttf') format('truetype'),
+         url('../lib/fonts/poppins/poppins-400.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'Poppins';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('../fonts/Poppins/poppins-500.woff2') format('woff2'),
+         url('/fonts/Poppins/poppins-500.woff2') format('woff2'),
+         url('../fonts/Poppins/poppins-500.ttf') format('truetype'),
+         url('/fonts/Poppins/poppins-500.ttf') format('truetype'),
+         url('../lib/fonts/poppins/poppins-500.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'Poppins';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('../fonts/Poppins/poppins-600.woff2') format('woff2'),
+         url('/fonts/Poppins/poppins-600.woff2') format('woff2'),
+         url('../fonts/Poppins/poppins-600.ttf') format('truetype'),
+         url('/fonts/Poppins/poppins-600.ttf') format('truetype'),
+         url('../lib/fonts/poppins/poppins-600.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'Poppins';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('../fonts/Poppins/poppins-700.woff2') format('woff2'),
+         url('/fonts/Poppins/poppins-700.woff2') format('woff2'),
+         url('../fonts/Poppins/poppins-700.ttf') format('truetype'),
+         url('/fonts/Poppins/poppins-700.ttf') format('truetype'),
+         url('../lib/fonts/poppins/poppins-700.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'Poppins';
+    font-style: normal;
+    font-weight: 800;
+    font-display: swap;
+    src: url('../fonts/Poppins/poppins-800.ttf') format('truetype'),
+         url('/fonts/Poppins/poppins-800.ttf') format('truetype'),
+         url('../lib/fonts/poppins/poppins-800.ttf') format('truetype');
+}
+
+/* 2. ROOT TYPOGRAPHY SCALE VARIABLES & GLOBAL OVERRIDES (OPTIMIZED FOR POPPINS) */
+:root {
+    /* Font Stacks */
+    --font-poppins: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: 'Poppins', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+    /* Framework Variable Overrides */
+    --bs-body-font-family: var(--font-poppins);
+    --bs-font-sans-serif: var(--font-poppins);
+    --bs-font-monospace: var(--font-poppins);
+
+    /* Scale & Hierarchy Variables (Tuned for Poppins' Circular Form & Tall X-Height) */
+    --type-page-title-size: 1.375rem;     /* 22px */
+    --type-page-title-weight: 700;
+    --type-page-title-line: 1.25;
+    --type-page-title-spacing: -0.015em;
+
+    --type-section-title-size: 1.0625rem; /* 17px */
+    --type-section-title-weight: 600;
+    --type-section-title-line: 1.35;
+    --type-section-title-spacing: -0.01em;
+
+    --type-sub-title-size: 0.90625rem;    /* 14.5px */
+    --type-sub-title-weight: 600;
+    --type-sub-title-line: 1.4;
+
+    --type-body-size: 0.84375rem;         /* 13.5px */
+    --type-body-weight: 400;
+    --type-body-line: 1.55;
+
+    --type-form-label-size: 0.78125rem;   /* 12.5px */
+    --type-form-label-weight: 500;
+    --type-form-label-line: 1.4;
+
+    --type-input-size: 0.84375rem;        /* 13.5px */
+    --type-input-weight: 400;
+    --type-input-line: 1.4;
+
+    --type-btn-size: 0.78125rem;          /* 12.5px */
+    --type-btn-weight: 600;
+    --type-btn-line: 1;
+    --type-btn-spacing: 0.01em;
+
+    --type-caption-size: 0.71875rem;      /* 11.5px */
+    --type-caption-weight: 400;
+    --type-caption-line: 1.4;
+
+    --type-th-size: 0.71875rem;           /* 11.5px */
+    --type-th-weight: 600;
+    --type-th-spacing: 0.04em;
+}
+
+/* 3. STRICT GLOBAL POPPINS APPLICATION ACROSS ALL UI ELEMENTS */
+*, *::before, *::after,
+html, body,
+h1, h2, h3, h4, h5, h6,
+p, span, a, label, small, strong, em, b, i,
+input, select, textarea, button,
+table, th, td, caption,
+.font-sans, .font-mono, .font-serif,
+.form-control, .form-select, .form-label, .btn, .badge,
+.ts-control, .ts-dropdown, .ts-wrapper,
+.select2-container, .select2-selection, .select2-results,
+.toast, #toast-container,
+.modal, .dropdown-menu {
+    font-family: var(--font-poppins) !important;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+    font-size: var(--type-body-size);
+    font-weight: var(--type-body-weight);
+    line-height: var(--type-body-line);
+}
+
+/* 4. STANDARDIZED TYPOGRAPHY SCALE & HIERARCHY */
+
+/* Page Title (h1, .page-title) */
+h1,
+.page-title {
+    font-size: var(--type-page-title-size);
+    font-weight: var(--type-page-title-weight);
+    line-height: var(--type-page-title-line);
+    letter-spacing: var(--type-page-title-spacing);
+}
+
+/* Section / Card Semi-Title (h2, h3, .section-title) */
+h2,
+h3,
+.section-title {
+    font-size: var(--type-section-title-size);
+    font-weight: var(--type-section-title-weight);
+    line-height: var(--type-section-title-line);
+    letter-spacing: var(--type-section-title-spacing);
+}
+
+/* Sub-header / Group Title (h4, .sub-title) */
+h4,
+.sub-title {
+    font-size: var(--type-sub-title-size);
+    font-weight: var(--type-sub-title-weight);
+    line-height: var(--type-sub-title-line);
+}
+
+/* Body / Standard Text (body, p, .body-text) */
+p,
+.body-text {
+    font-size: var(--type-body-size);
+    font-weight: var(--type-body-weight);
+    line-height: var(--type-body-line);
+}
+
+/* Form Labels (label, .form-label) */
+label,
+.form-label {
+    font-size: var(--type-form-label-size);
+    font-weight: var(--type-form-label-weight);
+    line-height: var(--type-form-label-line);
+    margin-bottom: 0.375rem;
+}
+
+/* Form Inputs / Dropdowns / Textareas */
+input,
+select,
+textarea,
+.form-control,
+.form-select {
+    font-size: var(--type-input-size);
+    font-weight: var(--type-input-weight);
+    line-height: var(--type-input-line);
+}
+
+/* Buttons & Badges */
+.btn,
+.badge {
+    font-size: var(--type-btn-size);
+    font-weight: var(--type-btn-weight);
+    line-height: var(--type-btn-line);
+    letter-spacing: var(--type-btn-spacing);
+}
+
+/* Table Headers (th, .table-header) */
+th,
+.table-header {
+    font-size: var(--type-th-size);
+    font-weight: var(--type-th-weight);
+    text-transform: uppercase;
+    letter-spacing: var(--type-th-spacing);
+}
+
+/* Helper Text / Captions */
+.form-text,
+.caption,
+caption,
+small {
+    font-size: var(--type-caption-size);
+    font-weight: var(--type-caption-weight);
+    line-height: var(--type-caption-line);
+}
+
+/* 5. NUMERIC & GIS DATA FORMATTING RULES (TABULAR NUMS) */
+/*
+   Applies tabular alignment so assessment rolls, tax dues, lot/parcel numbers,
+   ARP/TD sequences, and GIS coordinates align vertically without shifting.
+*/
+table,
+td,
+th,
+.numeric-data,
+.tabular-nums,
+.gis-coordinate,
+.pin-code,
+.tdn-badge,
+input[type="number"],
+.font-mono {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+}
+
+.gis-coordinate {
+    letter-spacing: 0.02em;
+}
