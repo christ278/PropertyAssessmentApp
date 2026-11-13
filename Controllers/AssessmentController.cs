@@ -82,10 +82,10 @@ public class AssessmentController : Controller
     }
 
     // GET: /Assessment
-    public IActionResult Index(string? search, PropertyClassification? classification, AssessmentStatus? status)
+    public IActionResult Index(string? search, PropertyKind? kind, string? status)
     {
         ViewBag.Search = search;
-        ViewBag.Classification = classification;
+        ViewBag.Kind = kind;
         ViewBag.Status = status;
 
         ViewBag.TotalMarketValue = _assessmentService.GetTotalMarketValue();
@@ -93,7 +93,7 @@ public class AssessmentController : Controller
         ViewBag.TotalRevenue = _assessmentService.GetTotalEstimatedTaxRevenue();
         ViewBag.TotalProperties = _assessmentService.GetTotalActivePropertiesCount();
 
-        var records = _assessmentService.GetAll(search, classification, status);
+        var records = _assessmentService.GetAll(search, kind, status);
         return View(records);
     }
 

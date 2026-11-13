@@ -5,6 +5,8 @@
 @{
     ViewData["Title"] = "Real Property Assessment Records";
     var search = ViewBag.Search as string ?? "";
+    var selectedKind = ViewBag.Kind as PropertyKind?;
+    var selectedStatus = (ViewBag.Status as string ?? "").Trim().ToLowerInvariant();
     bool canAccess = PermissionService.CanAccess(User, "Assessment");
     bool canPrintTd = PermissionService.CanAccess(User, "Assessment", "PrintPdf");
     bool canPrintTaxDec = PermissionService.CanAccess(User, "Assessment", "PrintTaxDeclaration");
@@ -96,12 +98,18 @@
                 </select>
             </div>
 
-            <select name="classification" asp-items="Html.GetEnumSelectList<PropertyClassification>()" class="bg-slate-50 dark:bg-stone-950 text-slate-900 dark:text-white px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800">
-                <option value="">All Classifications</option>
+            <select name="kind" class="bg-slate-50 dark:bg-stone-950 text-slate-900 dark:text-white px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800">
+                <option value="">All Kinds</option>
+                <option value="@((int)PropertyKind.Land)" selected="@(selectedKind == PropertyKind.Land ? "selected" : null)">Land</option>
+                <option value="@((int)PropertyKind.Building)" selected="@(selectedKind == PropertyKind.Building ? "selected" : null)">Building</option>
+                <option value="@((int)PropertyKind.Machinery)" selected="@(selectedKind == PropertyKind.Machinery ? "selected" : null)">Machinery</option>
             </select>
 
-            <select name="status" asp-items="Html.GetEnumSelectList<AssessmentStatus>()" class="bg-slate-50 dark:bg-stone-950 text-slate-900 dark:text-white px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800">
-                <option value="">All Statuses</option>
+            <select name="status" class="bg-slate-50 dark:bg-stone-950 text-slate-900 dark:text-white px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800">
+                <option value="" selected="@(string.IsNullOrEmpty(selectedStatus) ? "selected" : null)">All</option>
+                <option value="active" selected="@(selectedStatus == "active" ? "selected" : null)">Active</option>
+                <option value="ongoing" selected="@(selectedStatus == "ongoing" ? "selected" : null)">On Going</option>
+                <option value="inactive" selected="@(selectedStatus == "inactive" ? "selected" : null)">Inactive</option>
             </select>
 
             <button type="submit" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-till-950 font-bold">Filter</button>

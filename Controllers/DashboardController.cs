@@ -614,8 +614,13 @@ public class DashboardController : Controller
             }).ToList();
         }
 
+        static bool IsApprovedOfficialTd(TaxDeclaration t) =>
+            t.Status == AssessmentStatus.Active &&
+            !t.IsCancelledAndSuperseded &&
+            !CastTdGenerator.IsUnapprovedCastTd(t.TaxDeclarationNumber);
+
         var activeTds = allTds
-            .Where(t => !t.IsCancelledAndSuperseded && t.Status != AssessmentStatus.Cancelled)
+            .Where(IsApprovedOfficialTd)
             .ToList();
 
         static decimal GetEffectiveMarketValue(TaxDeclaration t) =>
@@ -873,7 +878,7 @@ public class DashboardController : Controller
             }
 
             var brgyTds = groupedByBrgy.TryGetValue(b.Code, out var grp) ? grp.Items : new List<TaxDeclaration>();
-            var activeBrgyTds = brgyTds.Where(t => !t.IsCancelledAndSuperseded && t.Status != AssessmentStatus.Cancelled).ToList();
+            var activeBrgyTds = brgyTds.Where(IsApprovedOfficialTd).ToList();
             var cancelledBrgyTds = brgyTds.Where(t => t.IsCancelledAndSuperseded || t.Status == AssessmentStatus.Cancelled).ToList();
 
             allBrgyRows.Add(new BarangayAnalyticsRowDto

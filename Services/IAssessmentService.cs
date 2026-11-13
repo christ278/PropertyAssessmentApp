@@ -4,7 +4,7 @@ namespace PropertyAssessmentApp.Services;
 
 public interface IAssessmentService
 {
-    IEnumerable<TaxDeclaration> GetAll(string? search = null, PropertyClassification? classification = null, AssessmentStatus? status = null);
+    IEnumerable<TaxDeclaration> GetAll(string? search = null, PropertyKind? kind = null, string? status = null);
     TaxDeclaration? GetById(Guid id);
     TaxDeclaration? GetByTdNumber(string tdNumber);
     void Add(TaxDeclaration declaration);

@@ -16,7 +16,7 @@ public class AssessmentService : IAssessmentService
         _context = context;
     }
 
-    public IEnumerable<TaxDeclaration> GetAll(string? search = null, PropertyClassification? classification = null, AssessmentStatus? status = null)
+    public IEnumerable<TaxDeclaration> GetAll(string? search = null, PropertyKind? kind = null, string? status = null)
     {
         IQueryable<TaxDeclaration> query = _context.TaxDeclarations
             .Include(t => t.BuildingDetails)
@@ -34,15 +34,34 @@ public class AssessmentService : IAssessmentService
                                   || (r.LandDetails != null && r.LandDetails.DistrictOrBarangay != null && r.LandDetails.DistrictOrBarangay.Contains(term)));
         }
 
-        if (classification.HasValue)
+        if (kind.HasValue)
         {
-            query = query.Where(r => (r.LandDetails != null && r.LandDetails.Classification == classification.Value)
-                                  || (r.MachineryDetails != null && r.MachineryDetails.Classification == classification.Value));
+            query = query.Where(r => r.Kind == kind.Value);
         }
 
-        if (status.HasValue)
+        if (!string.IsNullOrWhiteSpace(status))
         {
-            query = query.Where(r => r.Status == status.Value);
+            var normalizedStatus = status.Trim().ToLowerInvariant();
+            if (normalizedStatus == "active")
+            {
+                query = query.Where(r => r.Status == AssessmentStatus.Active
+                                      && !r.IsCancelledAndSuperseded
+                                      && !r.TaxDeclarationNumber.EndsWith("-00000"));
+            }
+            else if (normalizedStatus == "ongoing")
+            {
+                query = query.Where(r => !r.IsCancelledAndSuperseded
+                                      && r.Status != AssessmentStatus.Cancelled
+                                      && (r.Status == AssessmentStatus.Pending || r.TaxDeclarationNumber.EndsWith("-00000")));
+            }
+            else if (normalizedStatus == "inactive")
+            {
+                query = query.Where(r => r.IsCancelledAndSuperseded
+                                      || r.Status == AssessmentStatus.Cancelled
+                                      || (r.Status != AssessmentStatus.Active
+                                          && r.Status != AssessmentStatus.Pending
+                                          && !r.TaxDeclarationNumber.EndsWith("-00000")));
+            }
         }
 
         return query.OrderByDescending(r => r.DateAssessed).ToList();
