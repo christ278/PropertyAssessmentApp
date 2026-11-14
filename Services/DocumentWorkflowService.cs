@@ -401,10 +401,11 @@ public class DocumentWorkflowService : IDocumentWorkflowService
         var targetStatus = _context.TransactionStatuses.FirstOrDefault(s => s.TransactionStatusId == targetStatusId);
         var roleSetting = _context.UserRoleSettings.FirstOrDefault(r => r.TransactionStatusId == targetStatusId);
 
+        bool isReleasingStation = targetStatusId == 10 || targetStatusId == 19 || targetStatusId == 30;
         bool isCompleted = targetStage == WorkflowStage.Completed 
             || targetStatusId == (int) RequestForInspectionStatus.Printing
-            || targetStatus?.IsComplete == true 
-            || (actionTaken == "Released" && (targetStatusId == (int) RequestForInspectionStatus.Releasing
+            || (!isReleasingStation && targetStatus?.IsComplete == true)
+            || (actionTaken == "Released" && (isReleasingStation
             || targetStatusId == (int) TaxMappingRequestStatus.Released
             || targetStatusId == (int) TaxDeclarationRequestStatus.Released));
         bool isDeferred = (actionTaken == "Returned" || targetStage == WorkflowStage.Returned || actionTaken == "Deferred");
@@ -1150,6 +1151,20 @@ public class DocumentWorkflowService : IDocumentWorkflowService
                 lastLog,
                 lh.Status.ToString());
 
+            var certPrintOptions = new List<CertificatePrintOptionDto>();
+            if (lh.CertTotalLandholdings)
+                certPrintOptions.Add(new CertificatePrintOptionDto { ReportId = 6, Label = "Print Certificate of Total Landholdings" });
+            if (lh.CertTypeTaxDeclaration)
+                certPrintOptions.Add(new CertificatePrintOptionDto { ReportId = 1, Label = "Print Certification Type of Tax Declaration" });
+            if (lh.CertAggregateAgriLandholdings)
+                certPrintOptions.Add(new CertificatePrintOptionDto { ReportId = 7, Label = "Print Certificate of Aggregate Agri. Landholdings" });
+            if (lh.CertNoImprovementFromDeath)
+                certPrintOptions.Add(new CertificatePrintOptionDto { ReportId = 2, Label = "Print Certificate of No Improvement" });
+            if (lh.CertNoLandholdings)
+                certPrintOptions.Add(new CertificatePrintOptionDto { ReportId = 5, Label = "Print Certificate of No Landholdings" });
+            if (certPrintOptions.Count == 0)
+                certPrintOptions.Add(new CertificatePrintOptionDto { ReportId = 6, Label = "Print RPT Certificate" });
+
             items.Add(new WorkflowQueueItemDto
             {
                 RequestId = lh.Id,
@@ -1175,7 +1190,8 @@ public class DocumentWorkflowService : IDocumentWorkflowService
                 LastForwardedDate = lastLog?.Timestamp,
                 LastRemarks = lastLog?.Remarks,
                 ORNumber = lh.ORNumber,
-                ORDateIssued = lh.ORDateIssued
+                ORDateIssued = lh.ORDateIssued,
+                CertificatePrintOptions = certPrintOptions
             });
         }
 

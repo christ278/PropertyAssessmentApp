@@ -1,8 +1,28 @@
 @model PropertyAssessmentApp.Models.LandHoldingRequest
 @using PropertyAssessmentApp.Models
+@using System.Text.Json
+@inject PropertyAssessmentApp.Services.IPermissionService PermissionService
 
 @{
     ViewData["Title"] = $"Land Holding Request Details - {Model.TrackingNumber}";
+    bool hasLandHoldingAccess = PermissionService.CanAccess(User, "LandHoldingRequest");
+
+    var selectedProperties = new List<JsonElement>();
+    if (!string.IsNullOrWhiteSpace(Model.SelectedPropertiesJson))
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(Model.SelectedPropertiesJson);
+            if (doc.RootElement.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var el in doc.RootElement.EnumerateArray())
+                {
+                    selectedProperties.Add(el.Clone());
+                }
+            }
+        }
+        catch { }
+    }
 }
 
 <div class="space-y-8 font-mono text-xs">
@@ -19,15 +39,18 @@
         </div>
 
         <div class="flex items-center gap-3">
-            <a asp-action="Index" class="px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 hover:bg-slate-50 dark:hover:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold text-xs font-mono border border-slate-200 dark:border-stone-800 shadow-sm">
-                Back to Directory
-            </a>
-            @if (!(ViewBag.IsClaimed as bool? ?? false))
+            @if (hasLandHoldingAccess)
             {
-                <a asp-action="Edit" asp-route-id="@Model.Id" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs font-mono flex items-center gap-2 shadow-md shadow-emerald-600/20">
-                    <i data-lucide="edit-3" class="w-4 h-4"></i>
-                    Edit Request
+                <a asp-action="Index" class="px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 hover:bg-slate-50 dark:hover:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold text-xs font-mono border border-slate-200 dark:border-stone-800 shadow-sm">
+                    Back to Directory
                 </a>
+                @if (!(ViewBag.IsClaimed as bool? ?? false))
+                {
+                    <a asp-action="Edit" asp-route-id="@Model.Id" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs font-mono flex items-center gap-2 shadow-md shadow-emerald-600/20">
+                        <i data-lucide="edit-3" class="w-4 h-4"></i>
+                        Edit Request
+                    </a>
+                }
             }
         </div>
     </div>
@@ -59,22 +82,14 @@
             </div>
         </div>
 
-        <!-- Property & Owner Info -->
+        <!-- 1. Owner & Related Details -->
         <div class="space-y-4">
             <h3 class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
-                <i data-lucide="building" class="w-4 h-4"></i>
-                Property & Owner Information
+                <i data-lucide="user" class="w-4 h-4"></i>
+                Owner &amp; Request Information
             </h3>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
-                <div>
-                    <span class="text-slate-400 dark:text-stone-500 block">TD NUMBER:</span>
-                    <span class="font-bold text-slate-900 dark:text-white font-mono text-sm">@(string.IsNullOrEmpty(Model.TaxDeclarationNumber) ? "N/A" : Model.TaxDeclarationNumber)</span>
-                </div>
-                <div>
-                    <span class="text-slate-400 dark:text-stone-500 block">PIN / PROPERTY INDEX NO:</span>
-                    <span class="font-bold text-slate-900 dark:text-white font-mono text-sm">@(string.IsNullOrEmpty(Model.PropertyIndexNumber) ? "N/A" : Model.PropertyIndexNumber)</span>
-                </div>
                 <div>
                     <span class="text-slate-400 dark:text-stone-500 block">OWNER NAME:</span>
                     <span class="font-bold text-slate-900 dark:text-white text-sm">@Model.OwnerName</span>
@@ -88,9 +103,102 @@
                     <span class="font-bold text-slate-900 dark:text-white">@(string.IsNullOrEmpty(Model.ContactNo) ? "N/A" : Model.ContactNo)</span>
                 </div>
                 <div class="md:col-span-3">
-                    <span class="text-slate-400 dark:text-stone-500 block">LOCATION OF PROPERTY:</span>
+                    <span class="text-slate-400 dark:text-stone-500 block">OWNER ADDRESS / LOCATION:</span>
                     <span class="font-semibold text-slate-800 dark:text-stone-200">@(string.IsNullOrEmpty(Model.PropertyLocation) ? "N/A" : Model.PropertyLocation)</span>
                 </div>
+                <div>
+                    <span class="text-slate-400 dark:text-stone-500 block">REQUESTER NAME:</span>
+                    <span class="font-bold text-slate-900 dark:text-white">@(string.IsNullOrEmpty(Model.RequesterName) ? "N/A" : Model.RequesterName)</span>
+                </div>
+                <div>
+                    <span class="text-slate-400 dark:text-stone-500 block">O.R. NUMBER:</span>
+                    <span class="font-bold text-slate-900 dark:text-white font-mono">@(string.IsNullOrEmpty(Model.ORNumber) ? "N/A" : Model.ORNumber)</span>
+                </div>
+                <div>
+                    <span class="text-slate-400 dark:text-stone-500 block">O.R. DATE ISSUED:</span>
+                    <span class="font-bold text-slate-900 dark:text-white font-mono">@(Model.ORDateIssued.HasValue ? Model.ORDateIssued.Value.ToString("MMM dd, yyyy") : "N/A")</span>
+                </div>
+                <div class="md:col-span-3">
+                    <span class="text-slate-400 dark:text-stone-500 block">PURPOSE/S:</span>
+                    <span class="font-semibold text-slate-800 dark:text-stone-200">@(string.IsNullOrEmpty(Model.Purposes) ? "N/A" : Model.Purposes)</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Properties in the Request -->
+        <div class="space-y-4">
+            <div class="flex items-center justify-between">
+                <h3 class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+                    <i data-lucide="building-2" class="w-4 h-4"></i>
+                    Properties in the Request
+                </h3>
+                <span class="px-2.5 py-0.5 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 font-bold text-[11px]">
+                    @(selectedProperties.Count > 0 ? $"{selectedProperties.Count} {(selectedProperties.Count == 1 ? "property" : "properties")}" : (!string.IsNullOrWhiteSpace(Model.TaxDeclarationNumber) ? "1 entry" : "0 properties"))
+                </span>
+            </div>
+
+            <div class="overflow-x-auto rounded-2xl border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-950">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-100 dark:bg-stone-900 border-b border-slate-200 dark:border-stone-800 text-slate-500 dark:text-stone-400 uppercase text-[11px]">
+                            <th class="px-4 py-3 font-bold">TDN No.</th>
+                            <th class="px-4 py-3 font-bold">PIN</th>
+                            <th class="px-4 py-3 font-bold">Kind / Class</th>
+                            <th class="px-4 py-3 font-bold">Location</th>
+                            <th class="px-4 py-3 font-bold text-right">Market Value</th>
+                            <th class="px-4 py-3 font-bold text-right">Assessed Value</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200 dark:divide-stone-800 bg-white dark:bg-stone-900">
+                        @if (selectedProperties.Count > 0)
+                        {
+                            foreach (var p in selectedProperties)
+                            {
+                                var tdn = p.TryGetProperty("taxDeclarationNumber", out var tdnEl) ? tdnEl.GetString() : "N/A";
+                                var pin = p.TryGetProperty("propertyIndexNumber", out var pinEl) ? pinEl.GetString() : "N/A";
+                                var kind = p.TryGetProperty("kind", out var kindEl) ? kindEl.GetString() : "";
+                                var cls = p.TryGetProperty("classification", out var clsEl) ? clsEl.GetString() : "";
+                                var loc = p.TryGetProperty("location", out var locEl) ? locEl.GetString() : "N/A";
+                                decimal mv = p.TryGetProperty("marketValue", out var mvEl) && mvEl.TryGetDecimal(out var mvVal) ? mvVal : 0m;
+                                decimal av = p.TryGetProperty("assessedValue", out var avEl) && avEl.TryGetDecimal(out var avVal) ? avVal : 0m;
+
+                                <tr class="hover:bg-slate-50 dark:hover:bg-stone-800/50 transition-colors">
+                                    <td class="px-4 py-3 font-mono font-bold text-slate-900 dark:text-white">@(string.IsNullOrWhiteSpace(tdn) ? "N/A" : tdn)</td>
+                                    <td class="px-4 py-3 font-mono text-slate-600 dark:text-stone-300">@(string.IsNullOrWhiteSpace(pin) ? "N/A" : pin)</td>
+                                    <td class="px-4 py-3">
+                                        <span class="font-bold text-slate-800 dark:text-stone-200">@(string.IsNullOrWhiteSpace(kind) ? "—" : kind)</span>
+                                        @if (!string.IsNullOrWhiteSpace(cls))
+                                        {
+                                            <span class="block text-[10px] text-slate-500 dark:text-stone-400">@cls</span>
+                                        }
+                                    </td>
+                                    <td class="px-4 py-3 text-slate-700 dark:text-stone-300">@(string.IsNullOrWhiteSpace(loc) ? "N/A" : loc)</td>
+                                    <td class="px-4 py-3 text-right font-mono font-bold text-slate-800 dark:text-stone-200">₱@mv.ToString("N2")</td>
+                                    <td class="px-4 py-3 text-right font-mono font-bold text-emerald-700 dark:text-emerald-400">₱@av.ToString("N2")</td>
+                                </tr>
+                            }
+                        }
+                        else if (!string.IsNullOrWhiteSpace(Model.TaxDeclarationNumber))
+                        {
+                            <tr>
+                                <td class="px-4 py-3 font-mono font-bold text-slate-900 dark:text-white">@Model.TaxDeclarationNumber</td>
+                                <td class="px-4 py-3 font-mono text-slate-600 dark:text-stone-300">@(string.IsNullOrWhiteSpace(Model.PropertyIndexNumber) ? "N/A" : Model.PropertyIndexNumber)</td>
+                                <td class="px-4 py-3 text-slate-500 dark:text-stone-400">—</td>
+                                <td class="px-4 py-3 text-slate-700 dark:text-stone-300">@(string.IsNullOrWhiteSpace(Model.PropertyLocation) ? "N/A" : Model.PropertyLocation)</td>
+                                <td class="px-4 py-3 text-right font-mono text-slate-500">—</td>
+                                <td class="px-4 py-3 text-right font-mono text-slate-500">—</td>
+                            </tr>
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="6" class="px-4 py-6 text-center text-slate-400 dark:text-stone-500 italic">
+                                    No properties listed in this request.
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
             </div>
         </div>
 

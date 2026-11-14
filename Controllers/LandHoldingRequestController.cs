@@ -1,4 +1,8 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using PropertyAssessmentApp.Data;
+using PropertyAssessmentApp.Helpers;
 using PropertyAssessmentApp.Models;
 using PropertyAssessmentApp.Services;
 
@@ -13,6 +17,8 @@ public class LandHoldingRequestController : Controller
     private readonly IWebHostEnvironment _env;
     private readonly IWorkflowNotifier _workflowNotifier;
     private readonly IDocumentWorkflowService _workflowService;
+    private readonly ApplicationDbContext _context;
+    private readonly IRPTCertificatePdfService _certPdfService;
 
     public LandHoldingRequestController(
         ILandHoldingRequestService lhRequestService,
@@ -21,7 +27,9 @@ public class LandHoldingRequestController : Controller
         IOwnerService ownerService,
         IWebHostEnvironment env,
         IWorkflowNotifier workflowNotifier,
-        IDocumentWorkflowService workflowService)
+        IDocumentWorkflowService workflowService,
+        ApplicationDbContext context,
+        IRPTCertificatePdfService certPdfService)
     {
         _lhRequestService = lhRequestService;
         _assessmentService = assessmentService;
@@ -30,6 +38,8 @@ public class LandHoldingRequestController : Controller
         _env = env;
         _workflowNotifier = workflowNotifier;
         _workflowService = workflowService;
+        _context = context;
+        _certPdfService = certPdfService;
     }
 
     // GET: /LandHoldingRequest
@@ -268,5 +278,173 @@ public class LandHoldingRequestController : Controller
             contactNo = prop.OwnerPhone,
             propertyLocation = $"{prop.StreetNo}, {prop.DistrictOrBarangay}, {prop.Municipality}, {prop.ProvinceCity}"
         });
+    }
+
+    // GET: /LandHoldingRequest/PrintCertificate/5
+    [HttpGet]
+    public IActionResult PrintCertificate(Guid id, int? reportId = null)
+    {
+        var (certificateModel, errorResult) = BuildCertificateForRequest(id, reportId);
+        if (errorResult != null) return errorResult;
+
+        ViewBag.CustomPdfUrl = Url.Action(nameof(PrintCertificatePdf), "LandHoldingRequest", new { id, reportId = certificateModel!.ReportId });
+        ViewBag.CustomDownloadPdfUrl = Url.Action(nameof(PrintCertificatePdf), "LandHoldingRequest", new { id, reportId = certificateModel.ReportId, download = true });
+        ViewBag.CustomPrintHtmlUrl = Url.Action(nameof(PrintCertificateHtml), "LandHoldingRequest", new { id, reportId = certificateModel.ReportId });
+        ViewBag.CustomBackUrl = Url.Action("MyTransactions", "Workflow");
+        ViewBag.CustomBackLabel = "Back to My Transactions";
+
+        return View("~/Views/RPTReport/ReportDetails.cshtml", certificateModel);
+    }
+
+    // GET: /LandHoldingRequest/PrintCertificatePdf/5
+    [HttpGet]
+    public IActionResult PrintCertificatePdf(Guid id, int? reportId = null, bool download = false)
+    {
+        var (certificateModel, errorResult) = BuildCertificateForRequest(id, reportId);
+        if (errorResult != null) return errorResult;
+
+        var pdfBytes = _certPdfService.GenerateCertificatePdf(certificateModel!);
+        var tdn = certificateModel!.Details.Items.FirstOrDefault()?.TaxDeclarationNo
+            ?? certificateModel.AssessmentDetails?.TaxDeclarationNo
+            ?? certificateModel.NoImprovementDetails?.ArpNo
+            ?? id.ToString("N");
+        var safeTitle = string.Join("_", (certificateModel.RawReportTitle ?? "Certificate").Split(Path.GetInvalidFileNameChars()));
+        var safeTdn = string.Join("_", tdn.Split(Path.GetInvalidFileNameChars()));
+        var fileName = $"{safeTitle}_{safeTdn}.pdf";
+
+        if (download)
+        {
+            return File(pdfBytes, "application/pdf", fileName);
+        }
+
+        return File(pdfBytes, "application/pdf");
+    }
+
+    // GET: /LandHoldingRequest/PrintCertificateHtml/5
+    [HttpGet]
+    public IActionResult PrintCertificateHtml(Guid id, int? reportId = null)
+    {
+        var (certificateModel, errorResult) = BuildCertificateForRequest(id, reportId);
+        if (errorResult != null) return errorResult;
+
+        return View("~/Views/RPTReport/Print.cshtml", certificateModel);
+    }
+
+    private (OfficialCertificateViewModel? Model, IActionResult? ErrorResult) BuildCertificateForRequest(Guid id, int? reportId)
+    {
+        var item = _lhRequestService.GetById(id);
+        if (item == null) return (null, NotFound());
+
+        int targetReportId = reportId ?? (
+            item.CertNoLandholdings ? 5 :
+            item.CertNoImprovementFromDeath ? 2 :
+            item.CertAggregateAgriLandholdings ? 7 :
+            item.CertTotalLandholdings ? 6 :
+            item.CertTypeTaxDeclaration ? 1 :
+            6);
+
+        var report = _context.RPTReports.FirstOrDefault(r => r.RPTReportId == targetReportId)
+            ?? _context.RPTReports.FirstOrDefault();
+
+        if (report == null)
+        {
+            return (null, NotFound("No RPT Report template configured."));
+        }
+
+        var tdnList = new List<string>();
+        var idList = new List<Guid>();
+
+        if (item.TaxDeclarationId.HasValue)
+        {
+            idList.Add(item.TaxDeclarationId.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(item.SelectedPropertiesJson))
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(item.SelectedPropertiesJson);
+                if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var el in doc.RootElement.EnumerateArray())
+                    {
+                        if (el.TryGetProperty("id", out var idProp) || el.TryGetProperty("Id", out idProp))
+                        {
+                            if (Guid.TryParse(idProp.GetString(), out var parsedId) && !idList.Contains(parsedId))
+                            {
+                                idList.Add(parsedId);
+                            }
+                        }
+
+                        if (el.TryGetProperty("taxDeclarationNumber", out var tdnProp) || el.TryGetProperty("TaxDeclarationNumber", out tdnProp))
+                        {
+                            var tdnVal = tdnProp.GetString()?.Trim();
+                            if (!string.IsNullOrWhiteSpace(tdnVal) && !tdnList.Contains(tdnVal, StringComparer.OrdinalIgnoreCase))
+                            {
+                                tdnList.Add(tdnVal);
+                            }
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // Ignore malformed JSON and fallback to TaxDeclarationNumber
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(item.TaxDeclarationNumber))
+        {
+            foreach (var part in item.TaxDeclarationNumber.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                if (!string.IsNullOrWhiteSpace(part) && !tdnList.Contains(part, StringComparer.OrdinalIgnoreCase))
+                {
+                    tdnList.Add(part);
+                }
+            }
+        }
+
+        var matchedProperties = new List<TaxDeclaration>();
+        if (idList.Count > 0 || tdnList.Count > 0)
+        {
+            matchedProperties = _context.TaxDeclarations
+                .Include(t => t.LandDetails)
+                .Where(t => idList.Contains(t.Id) || tdnList.Contains(t.TaxDeclarationNumber))
+                .OrderBy(t => t.TaxDeclarationNumber)
+                .ToList();
+        }
+
+        TaxDeclaration primaryTd;
+        IEnumerable<TaxDeclaration> relatedProperties;
+
+        if (matchedProperties.Count > 0)
+        {
+            primaryTd = matchedProperties[0];
+            relatedProperties = matchedProperties;
+        }
+        else
+        {
+            primaryTd = new TaxDeclaration
+            {
+                TaxDeclarationNumber = item.TaxDeclarationNumber ?? string.Empty,
+                OwnerName = item.OwnerName ?? string.Empty,
+                OwnerAddress = item.PropertyLocation ?? string.Empty,
+                PropertyIndexNumber = item.PropertyIndexNumber ?? string.Empty,
+                StreetNo = item.PropertyLocation ?? string.Empty
+            };
+            relatedProperties = Enumerable.Empty<TaxDeclaration>();
+        }
+
+        var certFee = item.TotalFeesAmount > 0 ? item.TotalFeesAmount : (decimal?)null;
+        var certificateModel = ReportPrintHelper.BuildCertificateModel(
+            primaryTd,
+            report,
+            item.RequesterName,
+            item.Purposes,
+            item.ORNumber,
+            certFee,
+            relatedProperties);
+
+        return (certificateModel, null);
     }
 }

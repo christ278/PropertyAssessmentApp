@@ -254,6 +254,21 @@ public class PermissionService : IPermissionService
             return true;
         }
 
+        // Allow viewing Details / DownloadAttachment / PrintCertificate* on LandHoldingRequest when user has Workflow (Pool / MyTransactions) access
+        if (controllerName.Equals("LandHoldingRequest", StringComparison.OrdinalIgnoreCase) &&
+            actionName != null &&
+            (actionName.Equals("Details", StringComparison.OrdinalIgnoreCase) ||
+             actionName.Equals("DownloadAttachment", StringComparison.OrdinalIgnoreCase) ||
+             actionName.Equals("PrintCertificate", StringComparison.OrdinalIgnoreCase) ||
+             actionName.Equals("PrintCertificatePdf", StringComparison.OrdinalIgnoreCase) ||
+             actionName.Equals("PrintCertificateHtml", StringComparison.OrdinalIgnoreCase)))
+        {
+            if (HasModuleAccess(user, "Workflow", "MyTransactions") || HasModuleAccess(user, "Workflow", "Pool"))
+            {
+                return true;
+            }
+        }
+
         // PER FORM ACCESS:
         // If the user has access to this form, ALL operations (View, Create, Edit/Update, Inactive/Delete, Details) are allowed!
         return HasModuleRecordAccess(roleSetting.Id, module.ModuleId);

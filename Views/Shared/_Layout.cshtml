@@ -1359,6 +1359,11 @@
             if (targetController.toLowerCase() === "home" || targetController.toLowerCase() === "account" || targetController.toLowerCase() === "location") {
                 return;
             }
+            if (targetController.toLowerCase() === "landholdingrequest" &&
+                (targetAction.toLowerCase() === "details" || targetAction.toLowerCase() === "downloadattachment" || targetAction.toLowerCase() === "printcertificate" || targetAction.toLowerCase() === "printcertificatepdf" || targetAction.toLowerCase() === "printcertificatehtml") &&
+                window.UserPermissions.allowedControllers.indexOf("workflow") !== -1) {
+                return;
+            }
 
             // Check if target controller is one of the restricted system modules
             var isRestrictedModule = window.UserPermissions.restrictedControllers.indexOf(targetController.toLowerCase()) !== -1;
