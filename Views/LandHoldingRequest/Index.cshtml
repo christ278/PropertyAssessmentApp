@@ -1,4 +1,4 @@
-﻿@model IEnumerable<PropertyAssessmentApp.Models.LandHoldingRequest>
+@model IEnumerable<PropertyAssessmentApp.Models.LandHoldingRequest>
 @using PropertyAssessmentApp.Models
 @inject PropertyAssessmentApp.Services.IPermissionService PermissionService
 
@@ -6,6 +6,7 @@
     ViewData["Title"] = "Land Holding Certificate Requests";
     var search = ViewBag.Search as string ?? "";
     bool canAccess = PermissionService.CanAccess(User, "LandHoldingRequest");
+    var claimedIds = ViewBag.ClaimedRequestIds as HashSet<Guid> ?? new HashSet<Guid>();
 }
 
 <div class="space-y-8">
@@ -176,10 +177,13 @@
                                                         <i data-lucide="file-text" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
                                                         View Details
                                                     </a>
-                                                    <a asp-action="Edit" asp-route-id="@item.Id" class="flex items-center gap-2.5 px-3.5 py-2 text-slate-700 dark:text-stone-300 hover:bg-emerald-50 dark:hover:bg-stone-800 font-bold">
-                                                        <i data-lucide="edit-3" class="w-3.5 h-3.5 text-teal-600 dark:text-teal-400"></i>
-                                                        Edit Request
-                                                    </a>
+                                                    @if (!claimedIds.Contains(item.Id))
+                                                    {
+                                                        <a asp-action="Edit" asp-route-id="@item.Id" class="flex items-center gap-2.5 px-3.5 py-2 text-slate-700 dark:text-stone-300 hover:bg-emerald-50 dark:hover:bg-stone-800 font-bold">
+                                                            <i data-lucide="edit-3" class="w-3.5 h-3.5 text-teal-600 dark:text-teal-400"></i>
+                                                            Edit Request
+                                                        </a>
+                                                    }
                                                 </div>
                                             </div>
                                         </div>

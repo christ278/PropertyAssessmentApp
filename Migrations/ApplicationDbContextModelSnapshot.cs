@@ -5457,6 +5457,9 @@ namespace PropertyAssessmentApp.Migrations
                     b.Property<string>("RequesterName")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("SelectedPropertiesJson")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("SpouseName")
                         .HasColumnType("nvarchar(max)");
 
