@@ -556,29 +556,28 @@ export const BuildingFormScreen = ({ route, navigation }) => {
 
   const loadBuildingData = async () => {
     setNotDownloadedError(false);
+    const targetIdx = parseInt(partitionIndexParam, 10) || 0;
 
     // 0. Load any locally saved partition offline attachments and sketch
     const offlineAttData = await loadPartitionAttachmentsOffline(trackingNoParam, partitionIndexParam);
-    if (offlineAttData.attachments && offlineAttData.attachments.length > 0) {
-      setAttachments(offlineAttData.attachments);
-    }
-    if (offlineAttData.sketchUrl) {
-      setSketchUrl(offlineAttData.sketchUrl);
-    }
+    setAttachments(offlineAttData.attachments || []);
+    setSketchUrl(offlineAttData.sketchUrl || '');
 
     // 1. Check if downloaded offline copy exists and populate immediately
     const downloaded = getDownloadedFormData(trackingNoParam, formWorkflowIdParam, partitionIndexParam);
     if (downloaded) {
-      if (downloaded.owner) setOwnerName(downloaded.owner);
-      if (downloaded.arpNo) setArpNo(downloaded.arpNo);
-      if (downloaded.tdnId) setTdnId(downloaded.tdnId);
-      if (downloaded.sketchUrl) setSketchUrl(downloaded.sketchUrl);
-      if (downloaded.attachments && Array.isArray(downloaded.attachments)) setAttachments(downloaded.attachments);
+      if (targetIdx === 0) {
+        if (downloaded.owner) setOwnerName(downloaded.owner);
+        if (downloaded.arpNo) setArpNo(downloaded.arpNo);
+        if (downloaded.tdnId) setTdnId(downloaded.tdnId);
+      }
+      setSketchUrl(downloaded.sketchUrl || '');
+      setAttachments(Array.isArray(downloaded.attachments) ? downloaded.attachments : []);
       if (downloaded.trackingNo && !trackingNo) setTrackingNo(downloaded.trackingNo);
       if (downloaded.transItem?.TrackingNo && !trackingNo) setTrackingNo(downloaded.transItem.TrackingNo);
 
-      // Populate downloaded.formData first so partition-specific fields can cleanly override defaults
-      if (downloaded.formData) {
+      // Populate downloaded.formData only if targetIdx === 0 or if there is no partition isolation conflict
+      if (downloaded.formData && (targetIdx === 0 || !downloaded.currentPartition)) {
         populateFieldsFromDTO(downloaded.formData);
         if (downloaded.formData.TDN) {
           hydrateEffectivityAndNotes(downloaded.formData.TDN);
@@ -668,12 +667,12 @@ export const BuildingFormScreen = ({ route, navigation }) => {
         if (liveRes && liveRes.success) {
           const targetIdx = parseInt(partitionIndexParam, 10) || 0;
           const livePart = (liveRes.partitions && liveRes.partitions[targetIdx]) || null;
-          const liveAtts = livePart?.attachments || liveRes.attachments || [];
-          const liveSketch = livePart?.sketchUrl || liveRes.sketchUrl;
+          const liveAtts = Array.isArray(livePart?.attachments) ? livePart.attachments : (targetIdx === 0 ? (liveRes.attachments || []) : []);
+          const liveSketch = livePart?.sketchUrl || (targetIdx === 0 ? liveRes.sketchUrl : null);
 
           const localAtts = (offlineAttData.attachments && offlineAttData.attachments.length > 0)
             ? offlineAttData.attachments
-            : (downloaded?.currentPartition?.attachments || downloaded?.attachments || []);
+            : (downloaded?.currentPartition?.attachments || (targetIdx === 0 ? downloaded?.attachments : []) || []);
 
           if (localAtts.length > 0) {
             const merged = [...localAtts];
@@ -686,7 +685,7 @@ export const BuildingFormScreen = ({ route, navigation }) => {
               }
             }
             setAttachments(merged);
-          } else if (Array.isArray(liveAtts) && liveAtts.length > 0) {
+          } else {
             setAttachments(liveAtts);
           }
 
@@ -696,8 +695,10 @@ export const BuildingFormScreen = ({ route, navigation }) => {
             setSketchUrl(liveSketch);
           } else if (downloaded?.currentPartition?.sketchUrl) {
             setSketchUrl(downloaded.currentPartition.sketchUrl);
-          } else if (downloaded?.sketchUrl) {
+          } else if (targetIdx === 0 && downloaded?.sketchUrl) {
             setSketchUrl(downloaded.sketchUrl);
+          } else {
+            setSketchUrl('');
           }
 
           if (liveRes.tdnId) setTdnId(liveRes.tdnId);

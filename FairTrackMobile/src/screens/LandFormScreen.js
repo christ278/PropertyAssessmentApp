@@ -385,24 +385,23 @@ export const LandFormScreen = ({ route, navigation }) => {
 
   const loadLandData = async () => {
     setNotDownloadedError(false);
+    const targetIdx = parseInt(partitionIndexParam, 10) || 0;
 
     // 0. Load any locally saved partition offline attachments and sketch
     const offlineAttData = await loadPartitionAttachmentsOffline(trackingNoParam, partitionIndexParam);
-    if (offlineAttData.attachments && offlineAttData.attachments.length > 0) {
-      setAttachments(offlineAttData.attachments);
-    }
-    if (offlineAttData.sketchUrl) {
-      setSketchUrl(offlineAttData.sketchUrl);
-    }
+    setAttachments(offlineAttData.attachments || []);
+    setSketchUrl(offlineAttData.sketchUrl || '');
 
     // 1. Check if downloaded offline copy exists and populate immediately
     const downloaded = getDownloadedFormData(trackingNoParam, formWorkflowIdParam, partitionIndexParam);
     if (downloaded) {
-      if (downloaded.owner) setOwnerName(downloaded.owner);
-      if (downloaded.arpNo) setArpNo(downloaded.arpNo);
-      if (downloaded.tdnId) setTdnId(downloaded.tdnId);
-      if (downloaded.sketchUrl) setSketchUrl(downloaded.sketchUrl);
-      if (downloaded.attachments && Array.isArray(downloaded.attachments)) setAttachments(downloaded.attachments);
+      if (targetIdx === 0) {
+        if (downloaded.owner) setOwnerName(downloaded.owner);
+        if (downloaded.arpNo) setArpNo(downloaded.arpNo);
+        if (downloaded.tdnId) setTdnId(downloaded.tdnId);
+      }
+      setSketchUrl(downloaded.sketchUrl || '');
+      setAttachments(Array.isArray(downloaded.attachments) ? downloaded.attachments : []);
       if (downloaded.trackingNo && !trackingNo) setTrackingNo(downloaded.trackingNo);
       if (downloaded.transItem?.TrackingNo && !trackingNo) setTrackingNo(downloaded.transItem.TrackingNo);
 
@@ -447,8 +446,8 @@ export const LandFormScreen = ({ route, navigation }) => {
         hydrateTab5(downloaded.formData?.TDN || cp);
       }
 
-      // If formData exists (holding the latest offline edits), populate it second so offline changes take priority
-      if (downloaded.formData) {
+      // If formData exists (holding the latest offline edits), ONLY populate if partition 0 or this partition's specific draft!
+      if (downloaded.formData && (targetIdx === 0 || !downloaded.currentPartition)) {
         populateFieldsFromDTO(downloaded.formData);
         if (downloaded.formData.TDNLand) {
           hydrateSchedules(downloaded.currentPartition, downloaded.formData.TDNLand);
@@ -467,14 +466,13 @@ export const LandFormScreen = ({ route, navigation }) => {
         if (!downloaded) setLoading(true);
         const liveRes = await MobileApi.downloadTransactionDetails(formWorkflowIdParam, trackingNoParam, partitionIndexParam);
         if (liveRes && liveRes.success) {
-          const targetIdx = parseInt(partitionIndexParam, 10) || 0;
           const livePart = (liveRes.partitions && liveRes.partitions[targetIdx]) || null;
-          const liveAtts = livePart?.attachments || liveRes.attachments || [];
-          const liveSketch = livePart?.sketchUrl || liveRes.sketchUrl;
+          const liveAtts = Array.isArray(livePart?.attachments) ? livePart.attachments : (targetIdx === 0 ? (liveRes.attachments || []) : []);
+          const liveSketch = livePart?.sketchUrl || (targetIdx === 0 ? liveRes.sketchUrl : null);
 
           const localAtts = (offlineAttData.attachments && offlineAttData.attachments.length > 0)
             ? offlineAttData.attachments
-            : (downloaded?.currentPartition?.attachments || downloaded?.attachments || []);
+            : (downloaded?.currentPartition?.attachments || (targetIdx === 0 ? downloaded?.attachments : []) || []);
 
           if (localAtts.length > 0) {
             const merged = [...localAtts];
@@ -487,7 +485,7 @@ export const LandFormScreen = ({ route, navigation }) => {
               }
             }
             setAttachments(merged);
-          } else if (Array.isArray(liveAtts) && liveAtts.length > 0) {
+          } else {
             setAttachments(liveAtts);
           }
 
@@ -497,8 +495,10 @@ export const LandFormScreen = ({ route, navigation }) => {
             setSketchUrl(liveSketch);
           } else if (downloaded?.currentPartition?.sketchUrl) {
             setSketchUrl(downloaded.currentPartition.sketchUrl);
-          } else if (downloaded?.sketchUrl) {
+          } else if (targetIdx === 0 && downloaded?.sketchUrl) {
             setSketchUrl(downloaded.sketchUrl);
+          } else {
+            setSketchUrl('');
           }
 
           if (liveRes.tdnId) setTdnId(liveRes.tdnId);

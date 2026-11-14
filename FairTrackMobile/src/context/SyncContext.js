@@ -1179,11 +1179,11 @@ export const SyncProvider = ({ children }) => {
         selectedPartitionIndex: targetIdx,
         formType: partObj.formType || found?.formType,
         transactionTypeId: partObj.transactionTypeId || found?.transactionTypeId,
-        owner: partObj.ownerName || found?.owner,
-        arpNo: partObj.systemGeneratedTDN || found?.arpNo,
-        sketchUrl: partObj.sketchUrl || found?.sketchUrl,
-        sketchFileName: partObj.sketchFileName || found?.sketchFileName,
-        attachments: partObj.attachments || found?.attachments || [],
+        owner: partObj.ownerName || (targetIdx === 0 ? found?.owner : ''),
+        arpNo: partObj.systemGeneratedTDN || partObj.arpNo || (targetIdx === 0 ? found?.arpNo : ''),
+        sketchUrl: partObj.sketchUrl || (targetIdx === 0 ? found?.sketchUrl : null),
+        sketchFileName: partObj.sketchFileName || (targetIdx === 0 ? found?.sketchFileName : null),
+        attachments: Array.isArray(partObj.attachments) ? partObj.attachments : (targetIdx === 0 ? (found?.attachments || []) : []),
         formData: partFormData,
         currentPartition: partObj
       };

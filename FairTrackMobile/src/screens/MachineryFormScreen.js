@@ -351,12 +351,11 @@ export const MachineryFormScreen = ({ route, navigation }) => {
 
   const loadMachineryData = async () => {
     setNotDownloadedError(false);
+    const targetIdx = parseInt(partitionIndexParam, 10) || 0;
 
     // 0. Load any locally saved partition offline attachments
     const offlineAttData = await loadPartitionAttachmentsOffline(trackingNoParam, partitionIndexParam);
-    if (offlineAttData.attachments && offlineAttData.attachments.length > 0) {
-      setAttachments(offlineAttData.attachments);
-    }
+    setAttachments(offlineAttData.attachments || []);
 
     // 1. Populate from offline downloaded cache if available
     const downloaded = getDownloadedFormData(trackingNoParam, formWorkflowIdParam, partitionIndexParam);
@@ -364,13 +363,11 @@ export const MachineryFormScreen = ({ route, navigation }) => {
       if (downloaded.currentPartition) {
         populateFromPartition(downloaded.currentPartition);
       }
-      // Top-level formData belongs to Partition 1; never apply it over partitions after the first
-      if (downloaded.formData && ((parseInt(partitionIndexParam, 10) || 0) === 0 || !downloaded.currentPartition)) {
+      // Top-level formData belongs to Partition 0; never apply it over partitions after the first
+      if (downloaded.formData && (targetIdx === 0 || !downloaded.currentPartition)) {
         populateFieldsFromDTO(downloaded.formData);
       }
-      if (downloaded.attachments && Array.isArray(downloaded.attachments)) {
-        setAttachments(downloaded.attachments);
-      }
+      setAttachments(Array.isArray(downloaded.attachments) ? downloaded.attachments : []);
     }
 
     // 2. If online and no unsynced edits, fetch latest live transaction details
@@ -380,15 +377,12 @@ export const MachineryFormScreen = ({ route, navigation }) => {
         if (!downloaded) setLoading(true);
         const liveRes = await MobileApi.downloadTransactionDetails(formWorkflowIdParam, trackingNoParam, partitionIndexParam);
         if (liveRes && liveRes.success) {
-          const targetIdx = parseInt(partitionIndexParam, 10) || 0;
           const livePart = (liveRes.partitions && liveRes.partitions[targetIdx]) || null;
           if (livePart) {
             populateFromPartition(livePart);
           }
-          const liveAtts = livePart?.attachments || liveRes.attachments || [];
-          if (Array.isArray(liveAtts) && liveAtts.length > 0) {
-            setAttachments(liveAtts);
-          }
+          const liveAtts = Array.isArray(livePart?.attachments) ? livePart.attachments : (targetIdx === 0 ? (liveRes.attachments || []) : []);
+          setAttachments(liveAtts);
           if (typeof downloadSingleTransaction === 'function') {
             await downloadSingleTransaction({
               TrackingNo: trackingNoParam || liveRes.trackingNo,

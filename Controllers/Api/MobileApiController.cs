@@ -254,7 +254,7 @@ public class MobileApiController : ControllerBase
                 catch { }
             }
 
-            if (pPhotoCount == 0 && fallbackPhotoCount > 0)
+            if (i == 0 && pPhotoCount == 0 && fallbackPhotoCount > 0)
             {
                 pPhotoCount = fallbackPhotoCount;
             }
@@ -275,7 +275,7 @@ public class MobileApiController : ControllerBase
                 LotNo = p.LotNumber,
                 TitleNo = p.TitleNo,
                 SectionNo = p.SectionNo,
-                OwnerName = !string.IsNullOrWhiteSpace(p.NewOwnerName) ? p.NewOwnerName : defaultOwner,
+                OwnerName = !string.IsNullOrWhiteSpace(p.NewOwnerName) ? p.NewOwnerName : (i == 0 ? defaultOwner : string.Empty),
                 AreaSqMeters = p.AreaSqMeters > 0 ? p.AreaSqMeters : p.TotalBuildingAreaSqm,
                 MarketValue = p.MarketValue,
                 AssessedValue = p.AssessedValue,
@@ -746,25 +746,15 @@ public class MobileApiController : ControllerBase
     {
         var list = part != null ? ParseAttachments(part.AttachmentsJson) : new List<MobileAttachmentDTO>();
 
-        // 1. If partition has no attachments, inherit from other partitions if available
-        if (list.Count == 0 && rpa != null && !string.IsNullOrWhiteSpace(rpa.GeneratedPartitionsJson))
+        // STRICT PARTITION ISOLATION:
+        // Partitions after the first (partIndex > 0) must NEVER inherit attachments from other partitions,
+        // the mother transaction dossier (WebRelativePath), or the mother TaxDeclaration images.
+        if (partIndex > 0)
         {
-            var otherParts = PartitionJsonHelper.ParseList(rpa.GeneratedPartitionsJson);
-            var firstWithAtts = otherParts.FirstOrDefault(op => !string.IsNullOrWhiteSpace(op.AttachmentsJson));
-            if (firstWithAtts != null)
-            {
-                var inherited = ParseAttachments(firstWithAtts.AttachmentsJson);
-                foreach (var att in inherited)
-                {
-                    if (!list.Any(a => string.Equals(a.FileUrl, att.FileUrl, StringComparison.OrdinalIgnoreCase)))
-                    {
-                        list.Add(att);
-                    }
-                }
-            }
+            return list;
         }
 
-        // 2. Only if partition still has no attachments, include main file upload / inspection dossier photo as fallback (WebRelativePath)
+        // For Partition 0 only: fallback to transaction-level dossier upload (WebRelativePath) if Partition 0 has no photos
         string? webRelPath = rpa?.WebRelativePath ?? rfi?.WebRelativePath;
         string? attFileName = rpa?.AttachmentFileName ?? rfi?.AttachmentFileName;
         string? attFileSize = rpa?.AttachmentFileSize ?? rfi?.AttachmentFileSize;
@@ -791,7 +781,7 @@ public class MobileApiController : ControllerBase
             }
         }
 
-        // 3. Only if partition still has no attachments, include any TDNPropertyImages matching this TD as fallback
+        // For Partition 0 only: fallback to TDNPropertyImages if still empty
         if (list.Count == 0 && td != null && td.Id != Guid.Empty)
         {
             try
@@ -864,16 +854,17 @@ public class MobileApiController : ControllerBase
             if (int.TryParse(digits, out int q)) effQtrInt = q;
         }
 
+        bool isSeg = partIndex > 0 || (!string.IsNullOrWhiteSpace(part.PartitionIndex) && !string.Equals(part.PartitionIndex, "A", StringComparison.OrdinalIgnoreCase) && !string.Equals(part.PartitionIndex, "1", StringComparison.OrdinalIgnoreCase));
         string pLetter = !string.IsNullOrWhiteSpace(part.PartitionIndex) ? part.PartitionIndex : ((char)('A' + partIndex)).ToString();
-        string cleanArp = !string.IsNullOrWhiteSpace(part.ARPNo) ? part.ARPNo : (!string.IsNullOrWhiteSpace(part.SystemGeneratedTDN) ? part.SystemGeneratedTDN : (baseTd?.ARPNo ?? baseTd?.TaxDeclarationNumber ?? ""));
+        string cleanArp = !string.IsNullOrWhiteSpace(part.ARPNo) ? part.ARPNo : (!string.IsNullOrWhiteSpace(part.SystemGeneratedTDN) ? part.SystemGeneratedTDN : (isSeg ? "" : (baseTd?.ARPNo ?? baseTd?.TaxDeclarationNumber ?? "")));
         string cleanPin = !string.IsNullOrWhiteSpace(part.PIN) ? part.PIN : (baseTd != null && !string.IsNullOrWhiteSpace(baseTd.PropertyIndexNumber) ? $"{baseTd.PropertyIndexNumber}-{pLetter}" : "");
-        string ownerName = !string.IsNullOrWhiteSpace(part.NewOwnerName) ? part.NewOwnerName : (baseTd?.OwnerName ?? "");
-        string ownerAddress = !string.IsNullOrWhiteSpace(part.OwnerAddress) ? part.OwnerAddress : (baseTd?.OwnerAddress ?? "");
-        string street = !string.IsNullOrWhiteSpace(part.StreetLocation) ? part.StreetLocation : (baseTd?.StreetNo ?? "");
+        string ownerName = !string.IsNullOrWhiteSpace(part.NewOwnerName) ? part.NewOwnerName : (isSeg ? "" : (baseTd?.OwnerName ?? ""));
+        string ownerAddress = !string.IsNullOrWhiteSpace(part.OwnerAddress) ? part.OwnerAddress : (isSeg ? "" : (baseTd?.OwnerAddress ?? ""));
+        string street = !string.IsNullOrWhiteSpace(part.StreetLocation) ? part.StreetLocation : (isSeg ? "" : (baseTd?.StreetNo ?? ""));
         string brgy = !string.IsNullOrWhiteSpace(part.DistrictOrBarangay) ? part.DistrictOrBarangay : (baseTd?.DistrictOrBarangay ?? "");
         string city = !string.IsNullOrWhiteSpace(part.CityMunicipality) ? part.CityMunicipality : (baseTd?.Municipality ?? "Koronadal City");
         string prov = !string.IsNullOrWhiteSpace(part.Province) ? part.Province : "South Cotabato";
-        string? rawSketch = sketchPath ?? part.BuildingFloorPlanSketchPath ?? baseTd?.FloorPlanSketchPath;
+        string? rawSketch = sketchPath ?? part.BuildingFloorPlanSketchPath ?? (isSeg ? null : baseTd?.FloorPlanSketchPath);
 
         return new TDNDTO
         {
@@ -882,37 +873,37 @@ public class MobileApiController : ControllerBase
             FormWorkflowId = formWorkflowId,
             PartitionItemIndex = partIndex,
             PartitionIndex = pLetter,
-            DeclarationNo = !string.IsNullOrWhiteSpace(part.SystemGeneratedTDN) ? part.SystemGeneratedTDN : (baseTd?.TaxDeclarationNumber ?? cleanArp),
+            DeclarationNo = !string.IsNullOrWhiteSpace(part.SystemGeneratedTDN) ? part.SystemGeneratedTDN : (isSeg ? cleanArp : (baseTd?.TaxDeclarationNumber ?? cleanArp)),
             ARPNo = cleanArp,
             PIN = cleanPin,
             DisplayName = ownerName,
             OwnerAddress = ownerAddress,
-            OwnerTIN = !string.IsNullOrWhiteSpace(part.OwnerTIN) ? part.OwnerTIN : (baseTd?.OwnerTin ?? string.Empty),
-            OwnerContactNo = !string.IsNullOrWhiteSpace(part.OwnerContactNo) ? part.OwnerContactNo : (baseTd?.OwnerPhone ?? string.Empty),
-            OwnerEmail = part.OwnerEmail ?? baseTd?.OwnerEmail,
+            OwnerTIN = !string.IsNullOrWhiteSpace(part.OwnerTIN) ? part.OwnerTIN : (isSeg ? string.Empty : (baseTd?.OwnerTin ?? string.Empty)),
+            OwnerContactNo = !string.IsNullOrWhiteSpace(part.OwnerContactNo) ? part.OwnerContactNo : (isSeg ? string.Empty : (baseTd?.OwnerPhone ?? string.Empty)),
+            OwnerEmail = part.OwnerEmail ?? (isSeg ? null : baseTd?.OwnerEmail),
             OwnerGender = part.OwnerGender,
             OwnerCivilStatus = part.OwnerCivilStatus,
 
             IsAdministrator = part.IsAdministrator,
             IsBeneficialUser = part.IsBeneficialUser,
             IsPossessor = part.IsPossessor,
-            AdministratorName = part.AdministratorName ?? baseTd?.AdministratorName,
-            AdministratorAddress = part.AdministratorAddress ?? baseTd?.AdministratorAddress,
-            AdministratorContactNo = part.AdministratorContactNo ?? baseTd?.AdministratorContactNo,
+            AdministratorName = part.AdministratorName ?? (isSeg ? null : baseTd?.AdministratorName),
+            AdministratorAddress = part.AdministratorAddress ?? (isSeg ? null : baseTd?.AdministratorAddress),
+            AdministratorContactNo = part.AdministratorContactNo ?? (isSeg ? null : baseTd?.AdministratorContactNo),
             AdministratorTin = part.AdministratorTin,
             AdministratorEmail = part.AdministratorEmail,
             AdministratorGender = part.AdministratorGender,
-            PropAdminName = part.AdministratorName ?? baseTd?.AdministratorName,
-            PropAdminAddress = part.AdministratorAddress ?? baseTd?.AdministratorAddress,
-            PropAdminContactNo = part.AdministratorContactNo ?? baseTd?.AdministratorContactNo,
+            PropAdminName = part.AdministratorName ?? (isSeg ? null : baseTd?.AdministratorName),
+            PropAdminAddress = part.AdministratorAddress ?? (isSeg ? null : baseTd?.AdministratorAddress),
+            PropAdminContactNo = part.AdministratorContactNo ?? (isSeg ? null : baseTd?.AdministratorContactNo),
 
             PropLocationStreet = street,
             Location = !string.IsNullOrWhiteSpace(part.DisplayPropertyLocation) ? part.DisplayPropertyLocation : $"{brgy}, {city}",
-            CadastralSurveyNo = !string.IsNullOrWhiteSpace(part.CadastralSurveyNo) ? part.CadastralSurveyNo : (partIndex == 0 ? baseTd?.CadastralSurveyNo : string.Empty),
-            SurveyNo = !string.IsNullOrWhiteSpace(part.SurveyNumber) ? part.SurveyNumber : (partIndex == 0 ? baseTd?.SurveyNo : string.Empty),
+            CadastralSurveyNo = !string.IsNullOrWhiteSpace(part.CadastralSurveyNo) ? part.CadastralSurveyNo : (isSeg ? string.Empty : (baseTd?.CadastralSurveyNo ?? string.Empty)),
+            SurveyNo = !string.IsNullOrWhiteSpace(part.SurveyNumber) ? part.SurveyNumber : (isSeg ? string.Empty : (baseTd?.SurveyNo ?? string.Empty)),
             LotNo = !string.IsNullOrWhiteSpace(part.LotNumber) ? part.LotNumber : $"Lot {partIndex + 1}-{pLetter}",
-            BlockNo = !string.IsNullOrWhiteSpace(part.BlockNumber) ? part.BlockNumber : (baseTd?.BlockNo ?? string.Empty),
-            SectionNo = !string.IsNullOrWhiteSpace(part.SectionNo) ? part.SectionNo : (baseTd?.SectionNo ?? string.Empty),
+            BlockNo = !string.IsNullOrWhiteSpace(part.BlockNumber) ? part.BlockNumber : (isSeg ? string.Empty : (baseTd?.BlockNo ?? string.Empty)),
+            SectionNo = !string.IsNullOrWhiteSpace(part.SectionNo) ? part.SectionNo : (isSeg ? string.Empty : (baseTd?.SectionNo ?? string.Empty)),
             ParcelNo = !string.IsNullOrWhiteSpace(part.ParcelNo) ? part.ParcelNo : string.Empty,
             TCTNo = part.TitleNo ?? string.Empty,
             TitleNo = part.TitleNo ?? string.Empty,
@@ -934,7 +925,7 @@ public class MobileApiController : ControllerBase
             TransactionCode = baseTd?.TransactionCode,
             YearEffectivity = part.EffectivityYear ?? baseTd?.EffectivityYear ?? DateTime.Now.Year,
             QuarterEffectivity = effQtrInt,
-            Memoranda = !string.IsNullOrWhiteSpace(part.Memoranda) ? part.Memoranda : baseTd?.Memoranda,
+            Memoranda = !string.IsNullOrWhiteSpace(part.Memoranda) ? part.Memoranda : (isSeg ? null : baseTd?.Memoranda),
             Taxability = string.Equals(part.Taxability ?? baseTd?.Taxability, "Taxable", StringComparison.OrdinalIgnoreCase),
             TotalMarketValue = part.MarketValue > 0 ? part.MarketValue : 0m,
             TotalAssessedValue = part.AssessedValue > 0 ? part.AssessedValue : 0m,
@@ -1012,43 +1003,44 @@ public class MobileApiController : ControllerBase
         int storeys = part.NoOfStoreys > 0 ? part.NoOfStoreys : (b?.NoOfStoreys ?? 1);
         decimal areaPerFloor = storeys > 0 ? Math.Round(totalArea / storeys, 2) : totalArea;
 
+        bool isSegBldg = partIndex > 0;
         var bldgDto = new CAST_TDNBuildingDTO
         {
             CAST_TDNBuildingId = b != null ? GuidToNumericId(b.Id) : formWorkflowId,
             TDNId = tdnDto.TDNId,
-            STREET = !string.IsNullOrWhiteSpace(part.StreetLocation) ? part.StreetLocation : (b?.StreetNo ?? baseTd?.StreetNo),
-            LotNo = !string.IsNullOrWhiteSpace(part.LotNumber) ? part.LotNumber : (b?.LandLotNo ?? baseTd?.LotNo),
-            SurveyNo = !string.IsNullOrWhiteSpace(part.SurveyNumber) ? part.SurveyNumber : (b?.LandSurveyNo ?? baseTd?.SurveyNo ?? baseTd?.CadastralSurveyNo),
-            TCTNo = !string.IsNullOrWhiteSpace(part.TitleNo) ? part.TitleNo : (b?.LandTitleNo ?? baseTd?.TitleNo),
-            LandArea = (part.AreaSqMeters > 0 ? part.AreaSqMeters : (b?.LandAreaSqm > 0 ? b.LandAreaSqm : baseTd?.AreaSqMeters ?? 0)).ToString("F2"),
+            STREET = !string.IsNullOrWhiteSpace(part.StreetLocation) ? part.StreetLocation : (isSegBldg ? null : (b?.StreetNo ?? baseTd?.StreetNo)),
+            LotNo = !string.IsNullOrWhiteSpace(part.LotNumber) ? part.LotNumber : (isSegBldg ? null : (b?.LandLotNo ?? baseTd?.LotNo)),
+            SurveyNo = !string.IsNullOrWhiteSpace(part.SurveyNumber) ? part.SurveyNumber : (isSegBldg ? null : (b?.LandSurveyNo ?? baseTd?.SurveyNo ?? baseTd?.CadastralSurveyNo)),
+            TCTNo = !string.IsNullOrWhiteSpace(part.TitleNo) ? part.TitleNo : (isSegBldg ? null : (b?.LandTitleNo ?? baseTd?.TitleNo)),
+            LandArea = (part.AreaSqMeters > 0 ? part.AreaSqMeters : (isSegBldg ? 0m : (b?.LandAreaSqm > 0 ? b.LandAreaSqm : baseTd?.AreaSqMeters ?? 0))).ToString("F2"),
             ARPNo = tdnDto.ARPNo,
-            PermitNo = !string.IsNullOrWhiteSpace(part.BuildingPermitNo) ? part.BuildingPermitNo : b?.BuildingPermitNo,
+            PermitNo = !string.IsNullOrWhiteSpace(part.BuildingPermitNo) ? part.BuildingPermitNo : (isSegBldg ? null : b?.BuildingPermitNo),
             OccupancyPermitNo = part.OccupancyPermitNo,
-            Age = part.BuildingAgeYears > 0 ? part.BuildingAgeYears : b?.BuildingAgeYears,
+            Age = part.BuildingAgeYears > 0 ? part.BuildingAgeYears : (isSegBldg ? null : b?.BuildingAgeYears),
             StoreyNo = storeys,
             AreaPerFloor = areaPerFloor,
             TotalbldgArea = totalArea,
-            SubtotalValCompArea = part.BaseRcnValue > 0 ? part.BaseRcnValue : b?.ReplacementCostNew,
-            TotalAddItem = part.BuildingTotalAdditionsValue > 0 ? part.BuildingTotalAdditionsValue : b?.TotalAdditionalItemsValue,
-            DepreciationRate = part.BuildingDepreciationPercent > 0 ? part.BuildingDepreciationPercent : b?.BuildingDepreciationPercent,
-            DepreciationAccumulated = part.BuildingDepreciationAccumulated > 0 ? part.BuildingDepreciationAccumulated : b?.BuildingDepreciationAccumulated,
-            DepreciationMarketval = part.BuildingDepreciatedMarketValue > 0 ? part.BuildingDepreciatedMarketValue : b?.DepreciatedMarketValue,
-            TotalMarketVal = part.MarketValue > 0 ? part.MarketValue : (b?.MarketValue > 0 ? b.MarketValue : baseTd?.MarketValue),
-            TotalAssessedVal = part.AssessedValue > 0 ? part.AssessedValue : (b?.AssessedValue > 0 ? b.AssessedValue : baseTd?.AssessedValue),
-            StucturalType = !string.IsNullOrWhiteSpace(part.StructuralType) ? part.StructuralType : b?.StructuralType,
-            OtherStructure = !string.IsNullOrWhiteSpace(part.StructuralType) ? part.StructuralType : b?.StructuralType,
+            SubtotalValCompArea = part.BaseRcnValue > 0 ? part.BaseRcnValue : (isSegBldg ? null : b?.ReplacementCostNew),
+            TotalAddItem = part.BuildingTotalAdditionsValue > 0 ? part.BuildingTotalAdditionsValue : (isSegBldg ? null : b?.TotalAdditionalItemsValue),
+            DepreciationRate = part.BuildingDepreciationPercent > 0 ? part.BuildingDepreciationPercent : (isSegBldg ? null : b?.BuildingDepreciationPercent),
+            DepreciationAccumulated = part.BuildingDepreciationAccumulated > 0 ? part.BuildingDepreciationAccumulated : (isSegBldg ? null : b?.BuildingDepreciationAccumulated),
+            DepreciationMarketval = part.BuildingDepreciatedMarketValue > 0 ? part.BuildingDepreciatedMarketValue : (isSegBldg ? null : b?.DepreciatedMarketValue),
+            TotalMarketVal = part.MarketValue > 0 ? part.MarketValue : (isSegBldg ? null : (b?.MarketValue > 0 ? b.MarketValue : baseTd?.MarketValue)),
+            TotalAssessedVal = part.AssessedValue > 0 ? part.AssessedValue : (isSegBldg ? null : (b?.AssessedValue > 0 ? b.AssessedValue : baseTd?.AssessedValue)),
+            StucturalType = !string.IsNullOrWhiteSpace(part.StructuralType) ? part.StructuralType : (isSegBldg ? null : b?.StructuralType),
+            OtherStructure = !string.IsNullOrWhiteSpace(part.StructuralType) ? part.StructuralType : (isSegBldg ? null : b?.StructuralType),
             BuildingClassification = part.BuildingClassification,
-            PropertyTypeAccordUse = !string.IsNullOrWhiteSpace(part.PropertyTypeAccordUse) ? part.PropertyTypeAccordUse : (b?.BuildingUseType ?? baseTd?.BuildingUseType),
-            OtherPropertyTypeAccordUse = !string.IsNullOrWhiteSpace(part.OtherPropertyTypeAccordUse) ? part.OtherPropertyTypeAccordUse : b?.OtherBuildingUseType,
-            MailingAddress = !string.IsNullOrWhiteSpace(part.OwnerAddress) ? part.OwnerAddress : (b?.LandOwnerAddress ?? baseTd?.OwnerAddress),
-            TIN = !string.IsNullOrWhiteSpace(part.OwnerTIN) ? part.OwnerTIN : (b?.LandOwnerTin ?? baseTd?.OwnerTin),
-            MobileNo = !string.IsNullOrWhiteSpace(part.OwnerContactNo) ? part.OwnerContactNo : (b?.LandOwnerPhone ?? baseTd?.OwnerPhone),
-            EmailAddress = !string.IsNullOrWhiteSpace(part.OwnerEmail) ? part.OwnerEmail : (b?.LandOwnerEmail ?? baseTd?.OwnerEmail),
+            PropertyTypeAccordUse = !string.IsNullOrWhiteSpace(part.PropertyTypeAccordUse) ? part.PropertyTypeAccordUse : (isSegBldg ? null : (b?.BuildingUseType ?? baseTd?.BuildingUseType)),
+            OtherPropertyTypeAccordUse = !string.IsNullOrWhiteSpace(part.OtherPropertyTypeAccordUse) ? part.OtherPropertyTypeAccordUse : (isSegBldg ? null : b?.OtherBuildingUseType),
+            MailingAddress = !string.IsNullOrWhiteSpace(part.OwnerAddress) ? part.OwnerAddress : (isSegBldg ? null : (b?.LandOwnerAddress ?? baseTd?.OwnerAddress)),
+            TIN = !string.IsNullOrWhiteSpace(part.OwnerTIN) ? part.OwnerTIN : (isSegBldg ? null : (b?.LandOwnerTin ?? baseTd?.OwnerTin)),
+            MobileNo = !string.IsNullOrWhiteSpace(part.OwnerContactNo) ? part.OwnerContactNo : (isSegBldg ? null : (b?.LandOwnerPhone ?? baseTd?.OwnerPhone)),
+            EmailAddress = !string.IsNullOrWhiteSpace(part.OwnerEmail) ? part.OwnerEmail : (isSegBldg ? null : (b?.LandOwnerEmail ?? baseTd?.OwnerEmail)),
             Gender = part.OwnerGender,
             CivilStatus = part.OwnerCivilStatus,
             TransactionCode = baseTd?.TransactionCode,
-            FloorBreakdownJson = !string.IsNullOrWhiteSpace(part.BuildingFloorBreakdownJson) ? part.BuildingFloorBreakdownJson : b?.FloorBreakdownJson,
-            AdditionalItemsJson = !string.IsNullOrWhiteSpace(part.BuildingAdditionalItemsJson) ? part.BuildingAdditionalItemsJson : b?.AdditionalItemsJson,
+            FloorBreakdownJson = !string.IsNullOrWhiteSpace(part.BuildingFloorBreakdownJson) ? part.BuildingFloorBreakdownJson : (isSegBldg ? null : b?.FloorBreakdownJson),
+            AdditionalItemsJson = !string.IsNullOrWhiteSpace(part.BuildingAdditionalItemsJson) ? part.BuildingAdditionalItemsJson : (isSegBldg ? null : b?.AdditionalItemsJson),
 
             // 17 Structural Materials & Finishes
             StructuralFoundation = part.StructuralFoundation,
@@ -1074,9 +1066,9 @@ public class MobileApiController : ControllerBase
             CctTitleNo = part.CctTitleNo,
             CctDateRegistered = part.CctDateRegistered?.ToString("yyyy-MM-dd"),
             OwnerNameReflectedInCct = part.OwnerNameReflectedInCct,
-            LandOwnerName = !string.IsNullOrWhiteSpace(part.LandOwnerName) ? part.LandOwnerName : b?.LandOwnerName,
-            LandTdNo = !string.IsNullOrWhiteSpace(part.LandTdNo) ? part.LandTdNo : b?.LandTdNo,
-            LandPin = !string.IsNullOrWhiteSpace(part.LandPin) ? part.LandPin : b?.LandPin,
+            LandOwnerName = !string.IsNullOrWhiteSpace(part.LandOwnerName) ? part.LandOwnerName : (isSegBldg ? null : b?.LandOwnerName),
+            LandTdNo = !string.IsNullOrWhiteSpace(part.LandTdNo) ? part.LandTdNo : (isSegBldg ? null : b?.LandTdNo),
+            LandPin = !string.IsNullOrWhiteSpace(part.LandPin) ? part.LandPin : (isSegBldg ? null : b?.LandPin),
 
             DateConstructed = part.DateConstructed?.ToString("yyyy-MM-dd"),
             DateCompleted = part.DateCompleted?.ToString("yyyy-MM-dd"),
@@ -1102,25 +1094,28 @@ public class MobileApiController : ControllerBase
         var tdnDto = BuildCoreTDNDTOFromPartition(part, partIndex, trackingNo, formWorkflowId, baseTd, sketchPath, attachments);
         var m = baseTd?.MachineryDetails;
 
-        var details = m?.TDNMachineryDetails?.Select(d => new TDNMachineDetailDTO
-        {
-            TDNMachineDetailId = GuidToNumericId(d.Id),
-            TDNMachineId = m != null ? GuidToNumericId(m.Id) : formWorkflowId,
-            KindOfMachinery = d.KindOfMachinery ?? "Machinery",
-            BrandModel = d.BrandModel,
-            Capacity = d.Capacity,
-            AcquiredDate = d.AcquiredDate,
-            ConditionWhenAcquired = d.ConditionWhenAcquired,
-            EconomicLifeEstimated = d.EconomicLifeEstimated,
-            OriginalCost = d.OriginalCost,
-            MarketValue = d.OriginalCost,
-            AssessmentLevel = 75,
-            AssessedValue = Math.Round(d.OriginalCost * 0.75m, 2),
-            DepreciatedValue = d.OriginalCost,
-            DepreciationTotalPercentage = 0
-        }).ToList() ?? new List<TDNMachineDetailDTO>();
+        bool isSegMach = partIndex > 0;
+        var details = isSegMach
+            ? new List<TDNMachineDetailDTO>()
+            : (m?.TDNMachineryDetails?.Select(d => new TDNMachineDetailDTO
+            {
+                TDNMachineDetailId = GuidToNumericId(d.Id),
+                TDNMachineId = m != null ? GuidToNumericId(m.Id) : formWorkflowId,
+                KindOfMachinery = d.KindOfMachinery ?? "Machinery",
+                BrandModel = d.BrandModel,
+                Capacity = d.Capacity,
+                AcquiredDate = d.AcquiredDate,
+                ConditionWhenAcquired = d.ConditionWhenAcquired,
+                EconomicLifeEstimated = d.EconomicLifeEstimated,
+                OriginalCost = d.OriginalCost,
+                MarketValue = d.OriginalCost,
+                AssessmentLevel = 75,
+                AssessedValue = Math.Round(d.OriginalCost * 0.75m, 2),
+                DepreciatedValue = d.OriginalCost,
+                DepreciationTotalPercentage = 0
+            }).ToList() ?? new List<TDNMachineDetailDTO>());
 
-        if (details.Count == 0)
+        if (details.Count == 0 && !isSegMach)
         {
             details.Add(new TDNMachineDetailDTO
             {
@@ -1145,10 +1140,10 @@ public class MobileApiController : ControllerBase
             {
                 TDNMachineId = m != null ? GuidToNumericId(m.Id) : formWorkflowId,
                 TDNId = tdnDto.TDNId,
-                LandOwnerPIN = !string.IsNullOrWhiteSpace(part.LandPin) ? part.LandPin : m?.LandPin,
-                BuildingOwnerPIN = !string.IsNullOrWhiteSpace(part.BuildingPin) ? part.BuildingPin : m?.BuildingPin,
-                LandOwner = !string.IsNullOrWhiteSpace(part.LandOwnerName) ? part.LandOwnerName : m?.LandOwnerName,
-                BuildingOwner = !string.IsNullOrWhiteSpace(part.BuildingReferenceName) ? part.BuildingReferenceName : m?.BuildingReferenceName,
+                LandOwnerPIN = !string.IsNullOrWhiteSpace(part.LandPin) ? part.LandPin : (isSegMach ? null : m?.LandPin),
+                BuildingOwnerPIN = !string.IsNullOrWhiteSpace(part.BuildingPin) ? part.BuildingPin : (isSegMach ? null : m?.BuildingPin),
+                LandOwner = !string.IsNullOrWhiteSpace(part.LandOwnerName) ? part.LandOwnerName : (isSegMach ? null : m?.LandOwnerName),
+                BuildingOwner = !string.IsNullOrWhiteSpace(part.BuildingReferenceName) ? part.BuildingReferenceName : (isSegMach ? null : m?.BuildingReferenceName),
                 LandTdNo = part.LandTdNo,
                 BuildingTdNo = part.BuildingTdNo,
                 IsLandOwnerAlsoBuildingOwner = part.IsLandOwnerAlsoBuildingOwner,
@@ -1160,7 +1155,7 @@ public class MobileApiController : ControllerBase
                 CountryOfOrigin = part.CountryOfOrigin,
                 SupplierSeller = part.SupplierSeller,
                 SupplierAddress = part.SupplierAddress,
-                AcquisitionCost = part.AcquisitionCost > 0 ? part.AcquisitionCost : (m?.OriginalCost ?? 0),
+                AcquisitionCost = part.AcquisitionCost > 0 ? part.AcquisitionCost : (isSegMach ? 0 : (m?.OriginalCost ?? 0)),
                 OrNo = part.OrNo,
                 OrDate = part.OrDate,
                 OrNoAndDate = part.OrNoAndDate,
@@ -1264,7 +1259,7 @@ public class MobileApiController : ControllerBase
             }
             var pAttachments = ResolveAllAttachmentsForPartition(p, i, matchedRpa, matchedRfi, td);
             int pKindId = ParsePropertyKindId(p.Kind, ParsePropertyKindId(parentKindStr, 1));
-            string? rawSketch = p.BuildingFloorPlanSketchPath ?? td.FloorPlanSketchPath;
+            string? rawSketch = p.BuildingFloorPlanSketchPath ?? (i == 0 ? td.FloorPlanSketchPath : null);
             string? pSketch = !string.IsNullOrWhiteSpace(rawSketch) ? ResolveFullUrl(rawSketch) : null;
             object pForm = pKindId switch
             {
@@ -1316,14 +1311,14 @@ public class MobileApiController : ControllerBase
                 registrationStatus = !string.IsNullOrWhiteSpace(p.RegistrationStatus) ? p.RegistrationStatus : td.RegistrationStatus,
                 titleType = !string.IsNullOrWhiteSpace(p.TitleType) ? p.TitleType : td.TitleType,
                 purok = p.Purok,
-                streetLocation = !string.IsNullOrWhiteSpace(p.StreetLocation) ? p.StreetLocation : td.StreetNo,
-                streetNo = !string.IsNullOrWhiteSpace(p.StreetLocation) ? p.StreetLocation : td.StreetNo,
-                buildingNo = !string.IsNullOrWhiteSpace(p.StreetLocation) ? p.StreetLocation : td.StreetNo,
+                streetLocation = !string.IsNullOrWhiteSpace(p.StreetLocation) ? p.StreetLocation : (i == 0 ? td.StreetNo : null),
+                streetNo = !string.IsNullOrWhiteSpace(p.StreetLocation) ? p.StreetLocation : (i == 0 ? td.StreetNo : null),
+                buildingNo = !string.IsNullOrWhiteSpace(p.StreetLocation) ? p.StreetLocation : (i == 0 ? td.StreetNo : null),
                 propertyLocation = p.DisplayPropertyLocation,
                 districtOrBarangay = !string.IsNullOrWhiteSpace(p.DistrictOrBarangay) ? p.DistrictOrBarangay : td.DistrictOrBarangay,
                 cityMunicipality = !string.IsNullOrWhiteSpace(p.CityMunicipality) ? p.CityMunicipality : td.Municipality,
                 province = !string.IsNullOrWhiteSpace(p.Province) ? p.Province : "South Cotabato",
-                ownerName = !string.IsNullOrWhiteSpace(p.NewOwnerName) ? p.NewOwnerName : td.OwnerName,
+                ownerName = !string.IsNullOrWhiteSpace(p.NewOwnerName) ? p.NewOwnerName : (i == 0 ? td.OwnerName : string.Empty),
                 ownerTin = p.OwnerTIN,
                 ownerContactNo = p.OwnerContactNo,
                 ownerAddress = p.OwnerAddress,
@@ -1385,7 +1380,7 @@ public class MobileApiController : ControllerBase
                 assessmentBasis = !string.IsNullOrWhiteSpace(p.AssessmentBasis) ? p.AssessmentBasis : td.AssessmentBasis,
                 backTaxesYearFrom = p.BackTaxesYearFrom ?? td.BackTaxesYearFrom,
                 backTaxesYearTo = p.BackTaxesYearTo ?? td.BackTaxesYearTo,
-                memoranda = !string.IsNullOrWhiteSpace(p.Memoranda) ? p.Memoranda : td.Memoranda,
+                memoranda = !string.IsNullOrWhiteSpace(p.Memoranda) ? p.Memoranda : (i == 0 ? td.Memoranda : null),
                 sketchUrl = pSketch,
                 sketchFileName = !string.IsNullOrWhiteSpace(pSketch) ? Path.GetFileName(rawSketch) : null,
                 attachments = pAttachments,
