@@ -11,7 +11,9 @@ import {
   Platform,
   Switch,
   Modal,
-  KeyboardAvoidingView
+  KeyboardAvoidingView,
+  useWindowDimensions,
+  Keyboard
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SyncContext } from '../context/SyncContext';
@@ -63,7 +65,9 @@ const TABS = [
 
 export const LandFormScreen = ({ route, navigation }) => {
   const { isDarkMode, colors, shadows } = useTheme();
-  const styles = React.useMemo(() => getStyles(colors, isDarkMode), [colors, isDarkMode]);
+  const { width } = useWindowDimensions();
+  const isLargeScreen = width >= 600;
+  const styles = React.useMemo(() => getStyles(colors, isDarkMode, isLargeScreen), [colors, isDarkMode, isLargeScreen]);
   const tabScrollRef = useRef(null);
 
   const trackingNoParam = route?.params?.trackingNo || '';
@@ -71,6 +75,7 @@ export const LandFormScreen = ({ route, navigation }) => {
   const partitionIndexParam = route?.params?.partitionIndex ?? 0;
   const partitionLetterParam = route?.params?.partitionLetter || String.fromCharCode(65 + (parseInt(partitionIndexParam, 10) || 0));
   const fromHistory = route?.params?.fromHistory === true;
+
   const {
     queueOfflineUpdate,
     markTransactionSynced,
@@ -1334,12 +1339,29 @@ export const LandFormScreen = ({ route, navigation }) => {
   return (
     <View style={styles.container}>
       <HeaderBar
-        title={fromHistory ? "VIEW LAND RECORD" : "LAND APPRAISAL"}
-        subtitle={`Tracking No: ${trackingNo || 'N/A'} • Partition ${partitionLetterParam}${declarationNo ? ` • TDN: ${declarationNo}` : ''}`}
         navigation={navigation}
         showBack={true}
         onBackPress={handleCancel}
       />
+
+      {/* In-Page Form Header */}
+      <View style={styles.formScreenHeader}>
+        <View style={styles.formScreenHeaderRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.formScreenTitle, { color: colors.textDark }]}>
+              {fromHistory ? "View Land Record" : "Land Appraisal"}
+            </Text>
+            <Text style={[styles.formScreenSubtitle, { color: colors.textMuted }]}>
+              {`Tracking No: ${trackingNo || 'N/A'} • Partition ${partitionLetterParam}${declarationNo ? ` • TDN: ${declarationNo}` : ''}`}
+            </Text>
+          </View>
+          <View style={[styles.partitionBadgeHero, { backgroundColor: isDarkMode ? '#134e4a' : colors.primaryLight }]}>
+            <Text style={[styles.partitionBadgeHeroText, { color: colors.primary }]}>
+              Lot {partitionLetterParam}
+            </Text>
+          </View>
+        </View>
+      </View>
 
       {/* Historical Record Ribbon */}
       {fromHistory && (
@@ -1406,7 +1428,13 @@ export const LandFormScreen = ({ route, navigation }) => {
         </ScrollView>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+        showsVerticalScrollIndicator={true}
+      >
         {loading ? (
           <ActivityIndicator color={colors.primary} size="large" style={{ marginVertical: 30 }} />
         ) : notDownloadedError ? (
@@ -3874,7 +3902,7 @@ export const LandFormScreen = ({ route, navigation }) => {
   );
 };
 
-const getStyles = (colors, isDarkMode) => StyleSheet.create({
+const getStyles = (colors, isDarkMode, isLargeScreen = false) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bgLight
@@ -4039,7 +4067,7 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
   scrollContent: {
     padding: 16,
     gap: 14,
-    paddingBottom: 50
+    paddingBottom: 220
   },
   tabContentBlock: {
     gap: 14
@@ -4131,8 +4159,41 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
     backgroundColor: isDarkMode ? '#064e3b' : '#f0fdf4'
   },
   rowInputs: {
+    flexDirection: isLargeScreen ? 'row' : 'column',
+    gap: isLargeScreen ? 10 : 12
+  },
+  formScreenHeader: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
+    backgroundColor: colors.cardBg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border
+  },
+  formScreenHeaderRow: {
     flexDirection: 'row',
-    gap: 10
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12
+  },
+  formScreenTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: -0.2
+  },
+  formScreenSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
+    fontWeight: '500'
+  },
+  partitionBadgeHero: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8
+  },
+  partitionBadgeHeroText: {
+    fontSize: 12,
+    fontWeight: '800'
   },
   optionPillRow: {
     flexDirection: 'row',

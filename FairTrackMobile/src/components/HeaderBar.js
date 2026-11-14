@@ -99,7 +99,7 @@ export const HeaderBar = ({
           >
             {title || 'FAIRTRACK'}
           </Text>
-          {(subtitle !== undefined ? subtitle : (!showBack ? "City Assessor's Office" : null)) ? (
+          {(subtitle !== undefined ? subtitle : "City Assessor's Office") ? (
             <Text
               style={[styles.subtitle, { color: colors.textMuted }]}
               numberOfLines={1}

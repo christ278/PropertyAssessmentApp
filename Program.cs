@@ -6,6 +6,7 @@ using PropertyAssessmentApp.Hubs;
 using PropertyAssessmentApp.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.WebHost.UseUrls("http://0.0.0.0:5156");
 
 // Add services to the container.
 builder.Services.AddControllersWithViews(options =>
@@ -73,6 +74,7 @@ if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
     app.UseHsts();
+    app.UseHttpsRedirection();
 }
 
 app.UseHttpsRedirection();
@@ -87,6 +89,7 @@ app.UseStaticFiles(new StaticFileOptions
     ContentTypeProvider = contentTypeProvider
 });
 
+app.UseStaticFiles();
 app.UseRouting();
 
 app.UseCors("AllowMobileClients");
