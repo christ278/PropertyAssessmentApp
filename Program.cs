@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 using PropertyAssessmentApp.Data;
@@ -6,6 +7,13 @@ using PropertyAssessmentApp.Hubs;
 using PropertyAssessmentApp.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Add Data Protection with workspace-contained key storage
+var keysFolder = Path.Combine(builder.Environment.ContentRootPath, "App_Data", "DataProtectionKeys");
+if (!Directory.Exists(keysFolder)) Directory.CreateDirectory(keysFolder);
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(keysFolder))
+    .SetApplicationName("PropertyAssessmentApp");
 
 // Add services to the container.
 builder.Services.AddControllersWithViews(options =>

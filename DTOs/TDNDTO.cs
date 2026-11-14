@@ -117,6 +117,7 @@ public class TDNDTO
     public string? AdministratorTin { get; set; }
     public string? AdministratorEmail { get; set; }
     public string? AdministratorGender { get; set; }
+    public string? AdministratorCivilStatus { get; set; }
     public string? AssessmentBasis { get; set; }
     public int? BackTaxesYearFrom { get; set; }
     public int? BackTaxesYearTo { get; set; }

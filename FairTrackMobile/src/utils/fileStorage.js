@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { resolveServerUrl } from '../api/apiClient';
 
 // =============================================================================
 // PERSISTENT OFFLINE STORAGE FOR FAIRTRACK MOBILE (DEVICE FOLDER & INDEXEDDB)
@@ -110,17 +111,54 @@ export const saveFileLocally = async ({ trackingNo, fileName, base64, uri, type 
  * Downloads a server file to the physical mobile device storage when downloading from web.
  */
 export const downloadServerFileToMobile = async (serverUrl, trackingNo, fileName, type = 'attachment') => {
-  if (!serverUrl || serverUrl.startsWith('data:') || serverUrl.startsWith('file:')) {
+  if (!serverUrl || serverUrl.startsWith('data:') || serverUrl.startsWith('file:') || serverUrl.startsWith('blob:')) {
     return serverUrl;
   }
 
-  if (Platform.OS === 'web') {
-    return serverUrl; // Browser can load server URLs over HTTP directly
+  let fullUrl = serverUrl;
+  if (!fullUrl.startsWith('http://') && !fullUrl.startsWith('https://')) {
+    try {
+      fullUrl = await resolveServerUrl(serverUrl);
+    } catch (e) {
+      fullUrl = serverUrl;
+    }
   }
 
+  if (Platform.OS === 'web') {
+    // For Web offline persistence: fetch image and save to IndexedDB as dataUrl
+    try {
+      if (fullUrl.startsWith('http://') || fullUrl.startsWith('https://')) {
+        const resp = await fetch(fullUrl);
+        if (resp.ok) {
+          const blob = await resp.blob();
+          const reader = new FileReader();
+          const dataUrl = await new Promise((resolve) => {
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(blob);
+          });
+          if (dataUrl) {
+            await saveFileLocally({
+              trackingNo,
+              fileName: fileName || fullUrl.split('?')[0].split('/').pop(),
+              base64: dataUrl.split(',')[1] || null,
+              uri: dataUrl,
+              type
+            });
+            return dataUrl;
+          }
+        }
+      }
+    } catch (webErr) {
+      console.warn('Web offline file cache warning:', webErr);
+    }
+    return fullUrl;
+  }
+
+  // Native Mobile (Android / iOS): Physical directory on device storage
   try {
     const cleanTracking = (trackingNo || 'general').replace(/[^a-zA-Z0-9_\-]/g, '_');
-    const cleanName = (fileName || serverUrl.split('/').pop() || `file_${Date.now()}.jpg`).replace(/[^a-zA-Z0-9_\-.]/g, '_');
+    const cleanName = (fileName || fullUrl.split('?')[0].split('/').pop() || `file_${Date.now()}.jpg`).replace(/[^a-zA-Z0-9_\-.]/g, '_');
     const subFolder = type === 'sketch' ? 'InspectionSketches' : 'InspectionAttachments';
     const folderPath = `${FileSystem.documentDirectory}${subFolder}/${cleanTracking}/`;
 
@@ -131,15 +169,22 @@ export const downloadServerFileToMobile = async (serverUrl, trackingNo, fileName
 
     const localFilePath = `${folderPath}${cleanName}`;
     const fileInfo = await FileSystem.getInfoAsync(localFilePath);
-    if (fileInfo.exists) {
+    if (fileInfo.exists && fileInfo.size > 0) {
       return localFilePath;
     }
 
-    const res = await FileSystem.downloadAsync(serverUrl, localFilePath);
-    return res.uri;
+    const res = await FileSystem.downloadAsync(fullUrl, localFilePath);
+    if (res && res.status >= 200 && res.status < 300) {
+      return res.uri;
+    } else {
+      try {
+        await FileSystem.deleteAsync(localFilePath, { idempotent: true });
+      } catch (_) {}
+      return fullUrl;
+    }
   } catch (e) {
     console.warn('downloadServerFileToMobile warning:', e);
-    return serverUrl;
+    return fullUrl;
   }
 };
 
@@ -253,4 +298,88 @@ export const loadPartitionAttachmentsOffline = async (trackingNo, partitionIndex
   }
 
   return { attachments: [], sketchUrl: '' };
+};
+
+/**
+ * Reads physical base64 for local file://, blob:, or data: URIs in a form payload
+ * before network transmission, so sketches and photos are never dropped as null.
+ */
+export const getFileBase64 = async (uri, existingBase64 = null) => {
+  if (existingBase64 && typeof existingBase64 === 'string' && existingBase64.length > 50) {
+    let clean = existingBase64;
+    if (clean.includes(',')) clean = clean.split(',')[1];
+    return clean;
+  }
+  if (!uri || typeof uri !== 'string') return null;
+  if (uri.startsWith('data:')) {
+    const parts = uri.split(',');
+    return parts.length > 1 ? parts[1] : parts[0];
+  }
+  if (Platform.OS === 'web') {
+    if (uri.startsWith('blob:')) {
+      try {
+        const response = await fetch(uri);
+        const blob = await response.blob();
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const res = reader.result;
+            const b64 = typeof res === 'string' && res.includes(',') ? res.split(',')[1] : res;
+            resolve(b64);
+          };
+          reader.onerror = () => resolve(null);
+          reader.readAsDataURL(blob);
+        });
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  }
+  // Native mobile (Android / iOS):
+  try {
+    if (uri.startsWith('file:') || uri.startsWith('/')) {
+      const b64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64
+      });
+      return b64;
+    }
+  } catch (err) {
+    console.warn('Error reading physical file as base64:', err);
+  }
+  return null;
+};
+
+export const ensurePayloadFilesHaveBase64 = async (payload) => {
+  if (!payload) return payload;
+  const tdn = payload.TDN || payload.tdn;
+  if (!tdn) return payload;
+
+  // 1. Resolve Sketch Base64
+  const sketchPath = tdn.FloorPlanSketchPath;
+  if (sketchPath && (sketchPath.startsWith('file:') || sketchPath.startsWith('blob:') || sketchPath.startsWith('data:'))) {
+    const b64 = await getFileBase64(sketchPath, tdn.FloorPlanSketchBase64);
+    if (b64) {
+      tdn.FloorPlanSketchBase64 = b64;
+      if (!tdn.FloorPlanSketchFileName) {
+        tdn.FloorPlanSketchFileName = `Sketch_${Date.now()}.jpg`;
+      }
+    }
+  }
+
+  // 2. Resolve Attachments Base64
+  if (Array.isArray(tdn.Attachments) && tdn.Attachments.length > 0) {
+    for (const att of tdn.Attachments) {
+      const fUrl = att.fileUrl || att.FileUrl;
+      if (fUrl && (fUrl.startsWith('file:') || fUrl.startsWith('blob:') || fUrl.startsWith('data:'))) {
+        const b64 = await getFileBase64(fUrl, att.base64Data || att.Base64Data);
+        if (b64) {
+          att.base64Data = b64;
+          att.Base64Data = b64;
+        }
+      }
+    }
+  }
+
+  return payload;
 };

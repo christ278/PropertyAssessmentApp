@@ -745,6 +745,13 @@ public class MobileApiController : ControllerBase
         TaxDeclaration? td)
     {
         var list = part != null ? ParseAttachments(part.AttachmentsJson) : new List<MobileAttachmentDTO>();
+        foreach (var a in list)
+        {
+            if (!string.IsNullOrWhiteSpace(a.FileUrl))
+            {
+                a.FileUrl = ResolveFullUrl(a.FileUrl);
+            }
+        }
 
         // STRICT PARTITION ISOLATION:
         // Partitions after the first (partIndex > 0) must NEVER inherit attachments from other partitions,
@@ -773,7 +780,7 @@ public class MobileApiController : ControllerBase
                 {
                     Id = $"main_web_{Math.Abs(normalizedUrl.GetHashCode())}",
                     FileName = !string.IsNullOrWhiteSpace(attFileName) ? attFileName : Path.GetFileName(normalizedUrl),
-                    FileUrl = normalizedUrl,
+                    FileUrl = ResolveFullUrl(normalizedUrl),
                     FileType = isImg ? "image" : "document",
                     FileSize = attFileSize ?? "Dossier",
                     UploadedAt = uploadDate ?? DateTime.UtcNow
@@ -799,7 +806,7 @@ public class MobileApiController : ControllerBase
                             {
                                 Id = $"tdn_img_{img.Id}",
                                 FileName = !string.IsNullOrWhiteSpace(img.OriginalFileName) ? img.OriginalFileName : Path.GetFileName(normImg),
-                                FileUrl = normImg,
+                                FileUrl = ResolveFullUrl(normImg),
                                 FileType = "image",
                                 FileSize = "Photo",
                                 Caption = img.Caption,
@@ -1259,7 +1266,7 @@ public class MobileApiController : ControllerBase
             }
             var pAttachments = ResolveAllAttachmentsForPartition(p, i, matchedRpa, matchedRfi, td);
             int pKindId = ParsePropertyKindId(p.Kind, ParsePropertyKindId(parentKindStr, 1));
-            string? rawSketch = p.BuildingFloorPlanSketchPath ?? (i == 0 ? td.FloorPlanSketchPath : null);
+            string? rawSketch = p.BuildingFloorPlanSketchPath ?? (i == 0 ? (td.FloorPlanSketchPath ?? td.BuildingFloorPlanSketchPath) : null);
             string? pSketch = !string.IsNullOrWhiteSpace(rawSketch) ? ResolveFullUrl(rawSketch) : null;
             object pForm = pKindId switch
             {
@@ -1432,8 +1439,8 @@ public class MobileApiController : ControllerBase
             owner = selectedPart != null ? selectedPart.ownerName : td.OwnerName,
             arpNo = selectedPart != null ? (!string.IsNullOrWhiteSpace(selectedPart.arpNo) ? selectedPart.arpNo : (selectedPart.systemGeneratedTDN ?? td.TaxDeclarationNumber)) : (!string.IsNullOrWhiteSpace(td.ARPNo) ? td.ARPNo : td.TaxDeclarationNumber),
             tdnId = resolvedTdnId,
-            sketchUrl = selectedPart != null ? selectedPart.sketchUrl : ResolveFullUrl(td.FloorPlanSketchPath),
-            sketchFileName = selectedPart != null ? selectedPart.sketchFileName : (string.IsNullOrWhiteSpace(td.FloorPlanSketchPath) ? null : Path.GetFileName(td.FloorPlanSketchPath)),
+            sketchUrl = selectedPart != null ? selectedPart.sketchUrl : ResolveFullUrl(td.FloorPlanSketchPath ?? td.BuildingFloorPlanSketchPath),
+            sketchFileName = selectedPart != null ? selectedPart.sketchFileName : (string.IsNullOrWhiteSpace(td.FloorPlanSketchPath ?? td.BuildingFloorPlanSketchPath) ? null : Path.GetFileName(td.FloorPlanSketchPath ?? td.BuildingFloorPlanSketchPath)),
             attachments = selectedPart != null ? selectedPart.attachments : fallbackAttachments,
             formData = selectedPart != null ? selectedPart.formData : fallbackFormData,
             partitions = partitionDetailsList,
@@ -2440,18 +2447,29 @@ public class MobileApiController : ControllerBase
         part.IsBeneficialUser = dtoTdn.IsBeneficialUser;
         part.IsPossessor = dtoTdn.IsPossessor;
 
-        if (!string.IsNullOrWhiteSpace(dtoTdn.AdministratorName) || !string.IsNullOrWhiteSpace(dtoTdn.PropAdminName))
+        if (dtoTdn.IsAdministrator || dtoTdn.IsBeneficialUser || dtoTdn.IsPossessor)
+        {
             part.AdministratorName = dtoTdn.AdministratorName ?? dtoTdn.PropAdminName;
-        if (!string.IsNullOrWhiteSpace(dtoTdn.AdministratorAddress) || !string.IsNullOrWhiteSpace(dtoTdn.PropAdminAddress))
             part.AdministratorAddress = dtoTdn.AdministratorAddress ?? dtoTdn.PropAdminAddress;
-        if (!string.IsNullOrWhiteSpace(dtoTdn.AdministratorContactNo) || !string.IsNullOrWhiteSpace(dtoTdn.PropAdminContactNo))
             part.AdministratorContactNo = dtoTdn.AdministratorContactNo ?? dtoTdn.PropAdminContactNo;
-        if (!string.IsNullOrWhiteSpace(dtoTdn.AdministratorTin)) part.AdministratorTin = dtoTdn.AdministratorTin;
-        if (!string.IsNullOrWhiteSpace(dtoTdn.AdministratorEmail)) part.AdministratorEmail = dtoTdn.AdministratorEmail;
-        if (!string.IsNullOrWhiteSpace(dtoTdn.AdministratorGender)) part.AdministratorGender = dtoTdn.AdministratorGender;
+            part.AdministratorTin = dtoTdn.AdministratorTin;
+            part.AdministratorEmail = dtoTdn.AdministratorEmail;
+            part.AdministratorGender = dtoTdn.AdministratorGender;
+            if (!string.IsNullOrWhiteSpace(dtoTdn.AdministratorCivilStatus))
+                part.AdministratorCivilStatus = dtoTdn.AdministratorCivilStatus;
+        }
+        else
+        {
+            part.AdministratorName = null;
+            part.AdministratorAddress = null;
+            part.AdministratorContactNo = null;
+            part.AdministratorTin = null;
+            part.AdministratorEmail = null;
+            part.AdministratorGender = null;
+            part.AdministratorCivilStatus = null;
+        }
 
-        if (!string.IsNullOrWhiteSpace(dtoTdn.TitleNo)) part.TitleNo = dtoTdn.TitleNo;
-        if (!string.IsNullOrWhiteSpace(dtoTdn.TCTNo) && string.IsNullOrWhiteSpace(part.TitleNo)) part.TitleNo = dtoTdn.TCTNo;
+        if (dtoTdn.TitleNo != null || dtoTdn.TCTNo != null) part.TitleNo = dtoTdn.TitleNo ?? dtoTdn.TCTNo;
         if (!string.IsNullOrWhiteSpace(dtoTdn.RegistrationStatus)) part.RegistrationStatus = dtoTdn.RegistrationStatus;
         if (!string.IsNullOrWhiteSpace(dtoTdn.TitleType)) part.TitleType = dtoTdn.TitleType;
         if (dtoTdn.DateRegistered.HasValue) part.DateRegistered = dtoTdn.DateRegistered.Value;
@@ -2488,7 +2506,14 @@ public class MobileApiController : ControllerBase
         if (!string.IsNullOrWhiteSpace(dtoTdn.LandAdjustmentsJson)) part.LandAdjustmentsJson = dtoTdn.LandAdjustmentsJson;
         if (!string.IsNullOrWhiteSpace(dtoTdn.LandPropertyAssessmentsJson)) part.LandPropertyAssessmentsJson = dtoTdn.LandPropertyAssessmentsJson;
 
-        if (!string.IsNullOrWhiteSpace(dtoTdn.FloorPlanSketchPath)) part.BuildingFloorPlanSketchPath = dtoTdn.FloorPlanSketchPath;
+        if (!string.IsNullOrWhiteSpace(dtoTdn.FloorPlanSketchPath))
+        {
+            part.BuildingFloorPlanSketchPath = dtoTdn.FloorPlanSketchPath;
+        }
+        else if (dtoTdn.FloorPlanSketchPath == string.Empty)
+        {
+            part.BuildingFloorPlanSketchPath = null;
+        }
     }
 
     // Saves a mobile-captured sketch (base64) during bulk sync and rewrites dtoTdn.FloorPlanSketchPath.
@@ -2531,10 +2556,18 @@ public class MobileApiController : ControllerBase
         }
 
         var p = dtoTdn.FloorPlanSketchPath;
-        if (!string.IsNullOrWhiteSpace(p) &&
-            (p.StartsWith("file:", StringComparison.OrdinalIgnoreCase) || p.StartsWith("content:", StringComparison.OrdinalIgnoreCase) || p.StartsWith("blob:", StringComparison.OrdinalIgnoreCase)))
+        if (!string.IsNullOrWhiteSpace(p))
         {
-            dtoTdn.FloorPlanSketchPath = null; // unsynced local URI; keep existing server value
+            if (p.Contains("/uploads/", StringComparison.OrdinalIgnoreCase))
+            {
+                // Normalize full server URL (e.g. http://192.168.1.243:5156/uploads/...) to relative /uploads/...
+                int uploadIdx = p.IndexOf("/uploads/", StringComparison.OrdinalIgnoreCase);
+                dtoTdn.FloorPlanSketchPath = p.Substring(uploadIdx);
+            }
+            else if (p.StartsWith("file:", StringComparison.OrdinalIgnoreCase) || p.StartsWith("content:", StringComparison.OrdinalIgnoreCase) || p.StartsWith("blob:", StringComparison.OrdinalIgnoreCase))
+            {
+                dtoTdn.FloorPlanSketchPath = null; // unsynced local URI without base64; keep existing server value
+            }
         }
     }
 

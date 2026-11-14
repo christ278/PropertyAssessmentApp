@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MobileApi } from '../api/mobileApi';
 import storageResetEpoch from '../constants/storageResetEpoch.json';
-import { downloadServerFileToMobile } from '../utils/fileStorage';
+import { downloadServerFileToMobile, ensurePayloadFilesHaveBase64 } from '../utils/fileStorage';
 
 export const SyncContext = createContext();
 
@@ -322,6 +322,34 @@ export const SyncProvider = ({ children }) => {
     setCachedTransactions(downloadedList);
   };
 
+  // Helper to physically download & cache all partition sketches and attachments to local storage
+  const cachePartitionFilesLocally = async (partitions, tracking) => {
+    if (!Array.isArray(partitions) || partitions.length === 0) return [];
+    return await Promise.all(partitions.map(async (p) => {
+      let updatedAtts = p.attachments || [];
+      if (Array.isArray(p.attachments)) {
+        updatedAtts = await Promise.all(p.attachments.map(async (a) => {
+          const url = a?.fileUrl || a?.FileUrl;
+          if (url && !url.startsWith('file:') && !url.startsWith('data:')) {
+            const local = await downloadServerFileToMobile(url, tracking, a?.fileName || a?.FileName, 'attachment');
+            return { ...a, fileUrl: local, FileUrl: local };
+          }
+          return a;
+        }));
+      }
+      let updatedSketch = p.sketchUrl;
+      if (p.sketchUrl && !p.sketchUrl.startsWith('file:') && !p.sketchUrl.startsWith('data:')) {
+        updatedSketch = await downloadServerFileToMobile(p.sketchUrl, tracking, p.sketchFileName || 'sketch.jpg', 'sketch');
+      }
+      return {
+        ...p,
+        attachments: updatedAtts,
+        sketchUrl: updatedSketch,
+        formData: p.formData ? withPascalCaseKeys(p.formData) : null
+      };
+    }));
+  };
+
   // Download a single transaction form details (strictly Property Assessment & Field Inspection)
   const downloadSingleTransaction = async (rawItem) => {
     const transItem = normalizeTransactionItem(rawItem);
@@ -350,33 +378,30 @@ export const SyncProvider = ({ children }) => {
         }
         const key = (transItem.TrackingNo || transItem.FormworkflowId).toString();
         const tracking = transItem.TrackingNo || '';
-        const partitionsWithLocalFiles = await Promise.all((res.partitions || []).map(async (p) => {
-          let updatedAtts = p.attachments || [];
-          if (Platform.OS !== 'web' && Array.isArray(p.attachments)) {
-            updatedAtts = await Promise.all(p.attachments.map(async (a) => {
-              if (a.fileUrl && !a.fileUrl.startsWith('file:') && !a.fileUrl.startsWith('data:')) {
-                const local = await downloadServerFileToMobile(a.fileUrl, tracking, a.fileName, 'attachment');
-                return { ...a, fileUrl: local };
-              }
-              return a;
-            }));
-          }
-          let updatedSketch = p.sketchUrl;
-          if (Platform.OS !== 'web' && p.sketchUrl && !p.sketchUrl.startsWith('file:') && !p.sketchUrl.startsWith('data:')) {
-            updatedSketch = await downloadServerFileToMobile(p.sketchUrl, tracking, p.sketchFileName || 'sketch.jpg', 'sketch');
-          }
-          return {
-            ...p,
-            attachments: updatedAtts,
-            sketchUrl: updatedSketch,
-            formData: p.formData ? withPascalCaseKeys(p.formData) : null
-          };
-        }));
+        const partitionsWithLocalFiles = await cachePartitionFilesLocally(res.partitions || [], tracking);
+
+        let rootSketch = res.sketchUrl;
+        if (rootSketch && !rootSketch.startsWith('file:') && !rootSketch.startsWith('data:')) {
+          rootSketch = await downloadServerFileToMobile(rootSketch, tracking, res.sketchFileName || 'sketch.jpg', 'sketch');
+        }
+        let rootAtts = res.attachments || [];
+        if (Array.isArray(rootAtts)) {
+          rootAtts = await Promise.all(rootAtts.map(async (a) => {
+            const url = a?.fileUrl || a?.FileUrl;
+            if (url && !url.startsWith('file:') && !url.startsWith('data:')) {
+              const local = await downloadServerFileToMobile(url, tracking, a?.fileName || a?.FileName, 'attachment');
+              return { ...a, fileUrl: local, FileUrl: local };
+            }
+            return a;
+          }));
+        }
 
         const updated = {
           ...downloadedForms,
           [key]: {
             ...res,
+            sketchUrl: rootSketch,
+            attachments: rootAtts,
             formData: res.formData ? withPascalCaseKeys(res.formData) : res.formData,
             partitions: partitionsWithLocalFiles,
             transItem: {
@@ -538,30 +563,84 @@ export const SyncProvider = ({ children }) => {
         const updatedPartitions = [...itemRecord.partitions];
         const existingPart = { ...(updatedPartitions[partIdx] || {}) };
 
-        if (tdn?.LotNo) { existingPart.lotNo = tdn.LotNo; existingPart.lotNumber = tdn.LotNo; }
-        if (tdn?.BlockNo) { existingPart.blockNo = tdn.BlockNo; existingPart.blockNumber = tdn.BlockNo; }
-        if (tdn?.SurveyNo) { existingPart.surveyNo = tdn.SurveyNo; existingPart.surveyNumber = tdn.SurveyNo; }
-        if (tdn?.CadastralSurveyNo) existingPart.cadastralSurveyNo = tdn.CadastralSurveyNo;
-        if (tdn?.SectionNo) existingPart.sectionNo = tdn.SectionNo;
-        if (tdn?.ParcelNo) existingPart.parcelNo = tdn.ParcelNo;
-        if (tdn?.PropLocationStreet) { existingPart.streetLocation = tdn.PropLocationStreet; existingPart.streetNo = tdn.PropLocationStreet; existingPart.buildingNo = tdn.PropLocationStreet; }
+        // Title, Cadastral & Registration
+        if (tdn?.LotNo !== undefined) { existingPart.lotNo = tdn.LotNo; existingPart.lotNumber = tdn.LotNo; }
+        if (tdn?.BlockNo !== undefined) { existingPart.blockNo = tdn.BlockNo; existingPart.blockNumber = tdn.BlockNo; }
+        if (tdn?.SurveyNo !== undefined) { existingPart.surveyNo = tdn.SurveyNo; existingPart.surveyNumber = tdn.SurveyNo; }
+        if (tdn?.CadastralSurveyNo !== undefined) existingPart.cadastralSurveyNo = tdn.CadastralSurveyNo;
+        if (tdn?.SectionNo !== undefined) existingPart.sectionNo = tdn.SectionNo;
+        if (tdn?.ParcelNo !== undefined) existingPart.parcelNo = tdn.ParcelNo;
+        if (tdn?.TitleNo !== undefined || tdn?.TCTNo !== undefined) {
+          existingPart.titleNo = tdn.TitleNo || tdn.TCTNo || '';
+          existingPart.tctNo = tdn.TitleNo || tdn.TCTNo || '';
+        }
+        if (tdn?.DateRegistered !== undefined || tdn?.TCTDate !== undefined) {
+          existingPart.dateRegistered = tdn.DateRegistered || tdn.TCTDate || '';
+          existingPart.tctDate = tdn.DateRegistered || tdn.TCTDate || '';
+        }
+        if (tdn?.RegistrationStatus) existingPart.registrationStatus = tdn.RegistrationStatus;
+        if (tdn?.TitleType) existingPart.titleType = tdn.TitleType;
+        if (tdn?.TransactionCode) existingPart.transactionCode = tdn.TransactionCode;
+
+        // Location
+        if (tdn?.PropLocationStreet || tdn?.Location) {
+          existingPart.streetLocation = tdn.PropLocationStreet || tdn.Location;
+          existingPart.streetNo = tdn.PropLocationStreet || tdn.Location;
+          existingPart.buildingNo = tdn.PropLocationStreet || tdn.Location;
+        }
         if (tdn?.Location) existingPart.location = tdn.Location;
-        if (tdn?.Purok) existingPart.purok = tdn.Purok;
+        if (tdn?.Purok !== undefined) existingPart.purok = tdn.Purok;
         if (tdn?.DistrictOrBarangay) existingPart.districtOrBarangay = tdn.DistrictOrBarangay;
         if (tdn?.CityMunicipality) existingPart.cityMunicipality = tdn.CityMunicipality;
         if (tdn?.Province) existingPart.province = tdn.Province;
+
+        // Owner & Declarant
         if (tdn?.DisplayName) { existingPart.owner = tdn.DisplayName; existingPart.ownerName = tdn.DisplayName; existingPart.newOwnerName = tdn.DisplayName; }
-        if (tdn?.OwnerAddress) existingPart.ownerAddress = tdn.OwnerAddress;
-        if (tdn?.OwnerTIN) existingPart.ownerTin = tdn.OwnerTIN;
-        if (tdn?.OwnerContactNo) existingPart.ownerContactNo = tdn.OwnerContactNo;
-        if (tdn?.OwnerEmail) existingPart.ownerEmail = tdn.OwnerEmail;
+        if (tdn?.OwnerAddress !== undefined) existingPart.ownerAddress = tdn.OwnerAddress;
+        if (tdn?.OwnerTIN !== undefined) existingPart.ownerTin = tdn.OwnerTIN;
+        if (tdn?.OwnerContactNo !== undefined) existingPart.ownerContactNo = tdn.OwnerContactNo;
+        if (tdn?.OwnerEmail !== undefined) existingPart.ownerEmail = tdn.OwnerEmail;
         if (tdn?.OwnerGender) existingPart.ownerGender = tdn.OwnerGender;
         if (tdn?.OwnerCivilStatus) existingPart.ownerCivilStatus = tdn.OwnerCivilStatus;
-        if (tdn?.TotalArea) existingPart.area = tdn.TotalArea;
-        if (tdn?.TotalMarketValue) existingPart.marketValue = tdn.TotalMarketValue;
-        if (tdn?.TotalAssessedValue) existingPart.assessedValue = tdn.TotalAssessedValue;
-        if (tdn?.FloorPlanSketchPath) existingPart.sketchUrl = tdn.FloorPlanSketchPath;
+
+        // Administrator, Beneficial User, Possessor
+        existingPart.isAdministrator = !!tdn?.IsAdministrator;
+        existingPart.isBeneficialUser = !!tdn?.IsBeneficialUser;
+        existingPart.isPossessor = !!tdn?.IsPossessor;
+        existingPart.administratorName = tdn?.AdministratorName || tdn?.PropAdminName || '';
+        existingPart.propAdminName = tdn?.AdministratorName || tdn?.PropAdminName || '';
+        existingPart.administratorAddress = tdn?.AdministratorAddress || tdn?.PropAdminAddress || '';
+        existingPart.propAdminAddress = tdn?.AdministratorAddress || tdn?.PropAdminAddress || '';
+        existingPart.administratorContactNo = tdn?.AdministratorContactNo || tdn?.PropAdminContactNo || '';
+        existingPart.propAdminContactNo = tdn?.AdministratorContactNo || tdn?.PropAdminContactNo || '';
+        existingPart.administratorTin = tdn?.AdministratorTin || '';
+        existingPart.administratorEmail = tdn?.AdministratorEmail || '';
+        existingPart.administratorGender = tdn?.AdministratorGender || 'Male';
+        existingPart.administratorCivilStatus = tdn?.AdministratorCivilStatus || 'Single';
+
+        // Valuation & Effectivity
+        if (tdn?.TotalArea != null) existingPart.area = tdn.TotalArea;
+        if (tdn?.TotalMarketValue != null) existingPart.marketValue = tdn.TotalMarketValue;
+        if (tdn?.TotalAssessedValue != null) existingPart.assessedValue = tdn.TotalAssessedValue;
+        if (tdn?.Classification) existingPart.classification = tdn.Classification;
+        if (tdn?.ActualUse) existingPart.actualUse = tdn.ActualUse;
+        if (tdn?.UnitValue != null) existingPart.unitValue = tdn.UnitValue;
+        if (tdn?.AssessmentLevelPercent != null) existingPart.assessmentLevelPercent = tdn.AssessmentLevelPercent;
+        if (tdn?.FloorPlanSketchPath !== undefined) existingPart.sketchUrl = tdn.FloorPlanSketchPath;
         if (tdn?.Attachments && Array.isArray(tdn.Attachments)) existingPart.attachments = tdn.Attachments;
+
+        // Effectivity & Notes
+        if (tdn?.QuarterEffectivity != null) {
+          existingPart.quarterEffectivity = typeof tdn.QuarterEffectivity === 'number'
+            ? `${tdn.QuarterEffectivity}${tdn.QuarterEffectivity === 1 ? 'st' : tdn.QuarterEffectivity === 2 ? 'nd' : tdn.QuarterEffectivity === 3 ? 'rd' : 'th'} Quarter`
+            : tdn.QuarterEffectivity;
+        }
+        if (tdn?.YearEffectivity != null) existingPart.yearEffectivity = tdn.YearEffectivity.toString();
+        if (tdn?.Taxability !== undefined) existingPart.taxability = tdn.Taxability ? 'Taxable' : 'Exempt';
+        if (tdn?.AssessmentBasis) existingPart.assessmentBasis = tdn.AssessmentBasis;
+        if (tdn?.BackTaxesYearFrom != null) existingPart.backTaxesYearFrom = tdn.BackTaxesYearFrom;
+        if (tdn?.BackTaxesYearTo != null) existingPart.backTaxesYearTo = tdn.BackTaxesYearTo;
+        if (tdn?.Memoranda !== undefined) existingPart.memoranda = tdn.Memoranda;
 
         // Land boundaries & schedules
         if (tdnLand.NorthBoundary !== undefined) existingPart.boundaryNorth = tdnLand.NorthBoundary;
@@ -600,6 +679,9 @@ export const SyncProvider = ({ children }) => {
         itemRecord.partitions = updatedPartitions;
 
         if (partIdx === 0) {
+          itemRecord.currentPartition = existingPart;
+          itemRecord.formData = pascalPayload;
+        } else if (itemRecord.selectedPartitionIndex === partIdx) {
           itemRecord.currentPartition = existingPart;
           itemRecord.formData = pascalPayload;
         }
@@ -901,18 +983,36 @@ export const SyncProvider = ({ children }) => {
         const res = await MobileApi.downloadTransactionDetails(item.FormworkflowId, item.TrackingNo);
         if (res && res.success && res.hasPartition) {
           const key = (item.TrackingNo || item.FormworkflowId).toString();
+          const tracking = item.TrackingNo || '';
+          const partitionsWithLocalFiles = await cachePartitionFilesLocally(res.partitions || [], tracking);
+
+          let rootSketch = res.sketchUrl;
+          if (rootSketch && !rootSketch.startsWith('file:') && !rootSketch.startsWith('data:')) {
+            rootSketch = await downloadServerFileToMobile(rootSketch, tracking, res.sketchFileName || 'sketch.jpg', 'sketch');
+          }
+          let rootAtts = res.attachments || [];
+          if (Array.isArray(rootAtts)) {
+            rootAtts = await Promise.all(rootAtts.map(async (a) => {
+              const url = a?.fileUrl || a?.FileUrl;
+              if (url && !url.startsWith('file:') && !url.startsWith('data:')) {
+                const local = await downloadServerFileToMobile(url, tracking, a?.fileName || a?.FileName, 'attachment');
+                return { ...a, fileUrl: local, FileUrl: local };
+              }
+              return a;
+            }));
+          }
+
           currentDownloads[key] = {
             ...res,
+            sketchUrl: rootSketch,
+            attachments: rootAtts,
             formData: res.formData ? withPascalCaseKeys(res.formData) : res.formData,
-            partitions: (res.partitions || []).map(p => ({
-              ...p,
-              formData: p.formData ? withPascalCaseKeys(p.formData) : null
-            })),
+            partitions: partitionsWithLocalFiles,
             transItem: {
               ...item,
               HasPartition: res.hasPartition,
               PartitionCount: res.partitionCount || (res.partitions?.length || 1),
-              Partitions: res.partitions || []
+              Partitions: partitionsWithLocalFiles
             },
             downloadedAt: new Date().toISOString()
           };
@@ -1115,6 +1215,25 @@ export const SyncProvider = ({ children }) => {
         const tdnLand = draftPascal?.TDNLand || draftPascal?.tdnLand || {};
         const tdnBldg = draftPascal?.TDNBuilding || draftPascal?.tdnBuilding || {};
 
+        // Title, Cadastral & Registration overrides
+        if (tdn.LotNo !== undefined) { partObj.lotNo = tdn.LotNo; partObj.lotNumber = tdn.LotNo; }
+        if (tdn.BlockNo !== undefined) { partObj.blockNo = tdn.BlockNo; partObj.blockNumber = tdn.BlockNo; }
+        if (tdn.SurveyNo !== undefined) { partObj.surveyNo = tdn.SurveyNo; partObj.surveyNumber = tdn.SurveyNo; }
+        if (tdn.CadastralSurveyNo !== undefined) partObj.cadastralSurveyNo = tdn.CadastralSurveyNo;
+        if (tdn.SectionNo !== undefined) partObj.sectionNo = tdn.SectionNo;
+        if (tdn.ParcelNo !== undefined) partObj.parcelNo = tdn.ParcelNo;
+        if (tdn.TitleNo !== undefined || tdn.TCTNo !== undefined) {
+          partObj.titleNo = tdn.TitleNo || tdn.TCTNo || '';
+          partObj.tctNo = tdn.TitleNo || tdn.TCTNo || '';
+        }
+        if (tdn.DateRegistered !== undefined || tdn.TCTDate !== undefined) {
+          partObj.dateRegistered = tdn.DateRegistered || tdn.TCTDate || '';
+          partObj.tctDate = tdn.DateRegistered || tdn.TCTDate || '';
+        }
+        if (tdn.RegistrationStatus) partObj.registrationStatus = tdn.RegistrationStatus;
+        if (tdn.TitleType) partObj.titleType = tdn.TitleType;
+        if (tdn.TransactionCode) partObj.transactionCode = tdn.TransactionCode;
+
         if (tdn.PropLocationStreet || tdn.Location) {
           partObj.streetLocation = tdn.PropLocationStreet || tdn.Location;
           partObj.streetNo = tdn.PropLocationStreet || tdn.Location;
@@ -1132,6 +1251,30 @@ export const SyncProvider = ({ children }) => {
         if (tdn.OwnerTIN) partObj.ownerTin = tdn.OwnerTIN;
         if (tdn.OwnerContactNo) partObj.ownerContactNo = tdn.OwnerContactNo;
         if (tdn.OwnerEmail) partObj.ownerEmail = tdn.OwnerEmail;
+        if (tdn.OwnerGender) partObj.ownerGender = tdn.OwnerGender;
+        if (tdn.OwnerCivilStatus) partObj.ownerCivilStatus = tdn.OwnerCivilStatus;
+
+        // Administrator, Beneficial User, Possessor overrides
+        if (tdn.IsAdministrator !== undefined) partObj.isAdministrator = !!tdn.IsAdministrator;
+        if (tdn.IsBeneficialUser !== undefined) partObj.isBeneficialUser = !!tdn.IsBeneficialUser;
+        if (tdn.IsPossessor !== undefined) partObj.isPossessor = !!tdn.IsPossessor;
+        if (tdn.AdministratorName !== undefined || tdn.PropAdminName !== undefined) {
+          partObj.administratorName = tdn.AdministratorName || tdn.PropAdminName || '';
+          partObj.propAdminName = tdn.AdministratorName || tdn.PropAdminName || '';
+        }
+        if (tdn.AdministratorAddress !== undefined || tdn.PropAdminAddress !== undefined) {
+          partObj.administratorAddress = tdn.AdministratorAddress || tdn.PropAdminAddress || '';
+          partObj.propAdminAddress = tdn.AdministratorAddress || tdn.PropAdminAddress || '';
+        }
+        if (tdn.AdministratorContactNo !== undefined || tdn.PropAdminContactNo !== undefined) {
+          partObj.administratorContactNo = tdn.AdministratorContactNo || tdn.PropAdminContactNo || '';
+          partObj.propAdminContactNo = tdn.AdministratorContactNo || tdn.PropAdminContactNo || '';
+        }
+        if (tdn.AdministratorTin !== undefined) partObj.administratorTin = tdn.AdministratorTin || '';
+        if (tdn.AdministratorEmail !== undefined) partObj.administratorEmail = tdn.AdministratorEmail || '';
+        if (tdn.AdministratorGender !== undefined) partObj.administratorGender = tdn.AdministratorGender || 'Male';
+        if (tdn.AdministratorCivilStatus !== undefined) partObj.administratorCivilStatus = tdn.AdministratorCivilStatus || 'Single';
+
         if (tdn.FloorPlanSketchPath) partObj.sketchUrl = tdn.FloorPlanSketchPath;
         if (tdn.Attachments && Array.isArray(tdn.Attachments)) partObj.attachments = tdn.Attachments;
 
@@ -1287,6 +1430,22 @@ export const SyncProvider = ({ children }) => {
         updatedPartitions[partIdx] = {
           ...existingPart,
           formData: payload,
+          lotNo: tdn?.LotNo !== undefined ? tdn.LotNo : existingPart.lotNo,
+          lotNumber: tdn?.LotNo !== undefined ? tdn.LotNo : existingPart.lotNumber,
+          blockNo: tdn?.BlockNo !== undefined ? tdn.BlockNo : existingPart.blockNo,
+          blockNumber: tdn?.BlockNo !== undefined ? tdn.BlockNo : existingPart.blockNumber,
+          surveyNo: tdn?.SurveyNo !== undefined ? tdn.SurveyNo : existingPart.surveyNo,
+          surveyNumber: tdn?.SurveyNo !== undefined ? tdn.SurveyNo : existingPart.surveyNumber,
+          cadastralSurveyNo: tdn?.CadastralSurveyNo !== undefined ? tdn.CadastralSurveyNo : existingPart.cadastralSurveyNo,
+          sectionNo: tdn?.SectionNo !== undefined ? tdn.SectionNo : existingPart.sectionNo,
+          parcelNo: tdn?.ParcelNo !== undefined ? tdn.ParcelNo : existingPart.parcelNo,
+          titleNo: tdn?.TitleNo || tdn?.TCTNo || existingPart.titleNo,
+          tctNo: tdn?.TitleNo || tdn?.TCTNo || existingPart.tctNo,
+          dateRegistered: tdn?.DateRegistered || tdn?.TCTDate || existingPart.dateRegistered,
+          tctDate: tdn?.DateRegistered || tdn?.TCTDate || existingPart.tctDate,
+          registrationStatus: tdn?.RegistrationStatus || existingPart.registrationStatus,
+          titleType: tdn?.TitleType || existingPart.titleType,
+          transactionCode: tdn?.TransactionCode || existingPart.transactionCode,
           sketchUrl: tdn?.FloorPlanSketchPath || existingPart.sketchUrl,
           attachments: tdn?.Attachments || existingPart.attachments,
           streetLocation: tdn?.PropLocationStreet || tdn?.Location || existingPart.streetLocation,
@@ -1302,6 +1461,21 @@ export const SyncProvider = ({ children }) => {
           ownerTin: tdn?.OwnerTIN || existingPart.ownerTin,
           ownerContactNo: tdn?.OwnerContactNo || existingPart.ownerContactNo,
           ownerEmail: tdn?.OwnerEmail || existingPart.ownerEmail,
+          ownerGender: tdn?.OwnerGender || existingPart.ownerGender,
+          ownerCivilStatus: tdn?.OwnerCivilStatus || existingPart.ownerCivilStatus,
+          isAdministrator: tdn?.IsAdministrator !== undefined ? !!tdn.IsAdministrator : existingPart.isAdministrator,
+          isBeneficialUser: tdn?.IsBeneficialUser !== undefined ? !!tdn.IsBeneficialUser : existingPart.isBeneficialUser,
+          isPossessor: tdn?.IsPossessor !== undefined ? !!tdn.IsPossessor : existingPart.isPossessor,
+          administratorName: tdn?.AdministratorName || tdn?.PropAdminName || existingPart.administratorName,
+          propAdminName: tdn?.AdministratorName || tdn?.PropAdminName || existingPart.propAdminName,
+          administratorAddress: tdn?.AdministratorAddress || tdn?.PropAdminAddress || existingPart.administratorAddress,
+          propAdminAddress: tdn?.AdministratorAddress || tdn?.PropAdminAddress || existingPart.propAdminAddress,
+          administratorContactNo: tdn?.AdministratorContactNo || tdn?.PropAdminContactNo || existingPart.administratorContactNo,
+          propAdminContactNo: tdn?.AdministratorContactNo || tdn?.PropAdminContactNo || existingPart.propAdminContactNo,
+          administratorTin: tdn?.AdministratorTin || existingPart.administratorTin,
+          administratorEmail: tdn?.AdministratorEmail || existingPart.administratorEmail,
+          administratorGender: tdn?.AdministratorGender || existingPart.administratorGender,
+          administratorCivilStatus: tdn?.AdministratorCivilStatus || existingPart.administratorCivilStatus,
           boundaryNorth: tdnLand.NorthBoundary !== undefined ? tdnLand.NorthBoundary : existingPart.boundaryNorth,
           nremarks: tdnLand.Nremarks !== undefined ? tdnLand.Nremarks : existingPart.nremarks,
           boundarySouth: tdnLand.SouthBoundary !== undefined ? tdnLand.SouthBoundary : existingPart.boundarySouth,
@@ -1365,6 +1539,9 @@ export const SyncProvider = ({ children }) => {
     for (let i = 0; i < syncQueue.length; i++) {
       const item = syncQueue[i];
       try {
+        if (item.payload) {
+          await ensurePayloadFilesHaveBase64(item.payload);
+        }
         let res = null;
         if (item.type === 'UPDATE_BUILDING') {
           res = await MobileApi.updateBuildingForm(item.payload);
@@ -1525,6 +1702,9 @@ export const SyncProvider = ({ children }) => {
     for (let i = 0; i < targetQueueItems.length; i++) {
       const item = targetQueueItems[i];
       try {
+        if (item.payload) {
+          await ensurePayloadFilesHaveBase64(item.payload);
+        }
         let res = null;
         if (item.type === 'UPDATE_BUILDING') {
           res = await MobileApi.updateBuildingForm(item.payload);

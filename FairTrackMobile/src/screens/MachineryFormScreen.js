@@ -23,7 +23,7 @@ import { HeaderBar } from '../components/HeaderBar';
 import { ActionModal } from '../components/ActionModal';
 import { DiscardChangesModal } from '../components/DiscardChangesModal';
 import { AttachmentsSection } from '../components/AttachmentsSection';
-import { savePartitionAttachmentsOffline, loadPartitionAttachmentsOffline } from '../utils/fileStorage';
+import { savePartitionAttachmentsOffline, loadPartitionAttachmentsOffline, ensurePayloadFilesHaveBase64 } from '../utils/fileStorage';
 import { DatePickerModal } from '../components/DatePickerModal';
 import { BARANGAY_OPTIONS, normalizeBarangay } from '../constants/locationData';
 
@@ -363,8 +363,8 @@ export const MachineryFormScreen = ({ route, navigation }) => {
       if (downloaded.currentPartition) {
         populateFromPartition(downloaded.currentPartition);
       }
-      // Top-level formData belongs to Partition 0; never apply it over partitions after the first
-      if (downloaded.formData && (targetIdx === 0 || !downloaded.currentPartition)) {
+      // Populate partition's specific formData (holding latest edits)
+      if (downloaded.formData) {
         populateFieldsFromDTO(downloaded.formData);
       }
       setAttachments(Array.isArray(downloaded.attachments) ? downloaded.attachments : []);
@@ -444,15 +444,18 @@ export const MachineryFormScreen = ({ route, navigation }) => {
     if (p.ownerContactNo) setOwnerContact(p.ownerContactNo);
     if (p.ownerEmail) setOwnerEmail(p.ownerEmail);
 
-    setIsAdministrator(!!p.isAdministrator);
-    setIsBeneficialUser(!!p.isBeneficialUser);
-    setIsPossessor(!!p.isPossessor);
-    if (p.administratorName) setAdminName(p.administratorName);
-    if (p.administratorGender) setAdminGender(p.administratorGender);
-    if (p.administratorTin) setAdminTin(p.administratorTin);
-    if (p.administratorAddress) setAdminAddress(p.administratorAddress);
-    if (p.administratorContactNo) setAdminContact(p.administratorContactNo);
-    if (p.administratorEmail) setAdminEmail(p.administratorEmail);
+    const hasAdmin = !!p.isAdministrator || !!p.administratorName;
+    const hasBenef = !hasAdmin && !!p.isBeneficialUser;
+    const hasPoss = !hasAdmin && !hasBenef && !!p.isPossessor;
+    setIsAdministrator(hasAdmin);
+    setIsBeneficialUser(hasBenef);
+    setIsPossessor(hasPoss);
+    setAdminName(p.administratorName || p.propAdminName || '');
+    setAdminGender(p.administratorGender || 'Male');
+    setAdminTin(p.administratorTin || '');
+    setAdminAddress(p.administratorAddress || p.propAdminAddress || '');
+    setAdminContact(p.administratorContactNo || p.propAdminContactNo || '');
+    setAdminEmail(p.administratorEmail || '');
 
     // Registration Details
     if (p.isLocallyManufactured != null) setIsLocallyManufactured(!!p.isLocallyManufactured);
@@ -524,15 +527,18 @@ export const MachineryFormScreen = ({ route, navigation }) => {
       if (t.OwnerContactNo) setOwnerContact(t.OwnerContactNo);
       if (t.OwnerEmail) setOwnerEmail(t.OwnerEmail);
       if (t.OwnerGender) setOwnerGender(t.OwnerGender);
-      setIsAdministrator(!!t.IsAdministrator);
-      setIsBeneficialUser(!!t.IsBeneficialUser);
-      setIsPossessor(!!t.IsPossessor);
-      if (t.AdministratorName) setAdminName(t.AdministratorName);
-      if (t.AdministratorTin) setAdminTin(t.AdministratorTin);
-      if (t.AdministratorAddress) setAdminAddress(t.AdministratorAddress);
-      if (t.AdministratorContactNo) setAdminContact(t.AdministratorContactNo);
-      if (t.AdministratorEmail) setAdminEmail(t.AdministratorEmail);
-      if (t.AdministratorGender) setAdminGender(t.AdministratorGender);
+      const hasAdmin = !!t.IsAdministrator || !!t.AdministratorName || !!t.PropAdminName;
+      const hasBenef = !hasAdmin && !!t.IsBeneficialUser;
+      const hasPoss = !hasAdmin && !hasBenef && !!t.IsPossessor;
+      setIsAdministrator(hasAdmin);
+      setIsBeneficialUser(hasBenef);
+      setIsPossessor(hasPoss);
+      setAdminName(t.AdministratorName || t.PropAdminName || '');
+      setAdminTin(t.AdministratorTin || '');
+      setAdminAddress(t.AdministratorAddress || t.PropAdminAddress || '');
+      setAdminContact(t.AdministratorContactNo || t.PropAdminContactNo || '');
+      setAdminEmail(t.AdministratorEmail || '');
+      setAdminGender(t.AdministratorGender || 'Male');
 
       if (t.PropLocationStreet) setStreetLocation(t.PropLocationStreet);
       if (t.DistrictOrBarangay) setDistrictOrBarangay(normalizeBarangay(t.DistrictOrBarangay));
@@ -938,6 +944,7 @@ export const MachineryFormScreen = ({ route, navigation }) => {
     };
 
     setSaving(true);
+    await ensurePayloadFilesHaveBase64(payload);
     await queueOfflineUpdate(
       'UPDATE_MACHINERY',
       payload,
@@ -1939,18 +1946,25 @@ export const MachineryFormScreen = ({ route, navigation }) => {
               <View style={styles.tabContentBlock}>
                 {/* Effectivity & Taxability (CAST Standard) */}
                 <View style={[styles.card, shadows.card]}>
-                  <Text style={styles.cardHeaderTitle}>Effectivity & Taxability (CAST Standard)</Text>
+                  <Text style={styles.cardHeaderTitle}>Effectivity, Taxability & Assessment Basis (CAST Standard)</Text>
 
                   <View style={styles.rowInputs}>
-                    <View style={{ flex: 1 }}>
-                      {renderSelectField('TAXABILITY STATUS', taxability ? 'Taxable' : 'Exempt', TAXABILITY_OPTIONS, (val) => setTaxability(val === 'Taxable'))}
+                    <View style={[styles.inputGroup, { flex: 1.5 }]}>
+                      <Text style={styles.inputLabel}>EFFECTIVITY QUARTER</Text>
+                      <View style={styles.optionPillRow}>
+                        {['1st Quarter', '2nd Quarter', '3rd Quarter', '4th Quarter'].map((q) => (
+                          <TouchableOpacity
+                            key={q}
+                            style={[styles.optionPill, quarterEffectivity === q && styles.optionPillActive]}
+                            onPress={() => setQuarterEffectivity(q)}
+                          >
+                            <Text style={[styles.optionPillText, quarterEffectivity === q && styles.optionPillTextActive]}>
+                              {q.replace(' Quarter', '')}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
                     </View>
-                    <View style={{ flex: 1 }}>
-                      {renderSelectField('EFFECTIVITY QUARTER', quarterEffectivity, EFFECTIVITY_QUARTERS, setQuarterEffectivity)}
-                    </View>
-                  </View>
-
-                  <View style={styles.rowInputs}>
                     <View style={[styles.inputGroup, { flex: 1 }]}>
                       <Text style={styles.inputLabel}>EFFECTIVITY YEAR (YR.)</Text>
                       <TextInput
@@ -1962,16 +1976,41 @@ export const MachineryFormScreen = ({ route, navigation }) => {
                         placeholderTextColor={colors.placeholder}
                       />
                     </View>
-                    <View style={[styles.inputGroup, { flex: 1.2 }]}>
-                      <Text style={styles.inputLabel}>BASIS OF ASSESSMENT</Text>
-                      <TextInput
-                        style={styles.input}
-                        value={assessmentBasis}
-                        onChangeText={setAssessmentBasis}
-                        placeholder="Sec. 224-225 RA 7160"
-                        placeholderTextColor={colors.placeholder}
-                      />
+                  </View>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>TAXABILITY STATUS</Text>
+                    <View style={styles.optionPillRow}>
+                      <TouchableOpacity
+                        style={[styles.optionPill, taxability && styles.optionPillActive]}
+                        onPress={() => setTaxability(true)}
+                      >
+                        <Ionicons name={taxability ? 'checkmark-circle' : 'ellipse-outline'} size={14} color={taxability ? '#ffffff' : colors.textMuted} />
+                        <Text style={[styles.optionPillText, taxability && styles.optionPillTextActive]}>
+                          Taxable (Standard)
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.optionPill, !taxability && styles.optionPillActive]}
+                        onPress={() => setTaxability(false)}
+                      >
+                        <Ionicons name={!taxability ? 'checkmark-circle' : 'ellipse-outline'} size={14} color={!taxability ? '#ffffff' : colors.textMuted} />
+                        <Text style={[styles.optionPillText, !taxability && styles.optionPillTextActive]}>
+                          Exempt from RPT
+                        </Text>
+                      </TouchableOpacity>
                     </View>
+                  </View>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>BASIS OF ASSESSMENT</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={assessmentBasis}
+                      onChangeText={setAssessmentBasis}
+                      placeholder="Sec. 224-225 RA 7160"
+                      placeholderTextColor={colors.placeholder}
+                    />
                   </View>
 
                   <View style={styles.rowInputs}>
@@ -2101,7 +2140,10 @@ export const MachineryFormScreen = ({ route, navigation }) => {
         visible={detailModalVisible}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => setDetailModalVisible(false)}
+        onRequestClose={() => {
+          if (pickerModal.visible) setPickerModal(prev => ({ ...prev, visible: false }));
+          else setDetailModalVisible(false);
+        }}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -2169,15 +2211,13 @@ export const MachineryFormScreen = ({ route, navigation }) => {
                     </View>
                     <View style={[styles.inputGroup, { flex: 1 }]}>
                       <Text style={styles.inputLabel}>DATE ACQUIRED</Text>
-                      <TouchableOpacity
-                        style={styles.datePickerBtn}
-                        onPress={() => openDatePicker('Select Date Acquired', 'mAcquiredDate', mAcquiredDate)}
-                      >
-                        <Text style={[styles.datePickerBtnText, !mAcquiredDate && { color: colors.placeholder }]}>
-                          {mAcquiredDate || 'YYYY-MM-DD'}
-                        </Text>
-                        <Ionicons name="calendar-outline" size={16} color={colors.textMuted} />
-                      </TouchableOpacity>
+                      <TextInput
+                        style={styles.input}
+                        value={mAcquiredDate}
+                        onChangeText={setMAcquiredDate}
+                        placeholder="YYYY-MM-DD"
+                        placeholderTextColor={colors.placeholder}
+                      />
                     </View>
                   </View>
 
@@ -2352,63 +2392,106 @@ export const MachineryFormScreen = ({ route, navigation }) => {
               </ScrollView>
             </TouchableOpacity>
           </TouchableOpacity>
+
+          {/* Internal Picker Overlay inside Machinery Detail Modal */}
+          {pickerModal.visible && (
+            <View style={styles.innerPickerOverlay}>
+              <TouchableOpacity
+                style={StyleSheet.absoluteFillObject}
+                activeOpacity={1}
+                onPress={() => setPickerModal(prev => ({ ...prev, visible: false }))}
+              />
+              <View style={styles.innerPickerContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>{pickerModal.title}</Text>
+                  <TouchableOpacity onPress={() => setPickerModal(prev => ({ ...prev, visible: false }))}>
+                    <Ionicons name="close" size={24} color={colors.textMuted} />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+                  {(pickerModal.options || []).map((option) => {
+                    const isSelected = pickerModal.selectedValue === option;
+                    return (
+                      <TouchableOpacity
+                        key={option}
+                        style={[styles.typeOptionItem, isSelected && styles.typeOptionItemSelected]}
+                        onPress={() => {
+                          if (pickerModal.onSelect) pickerModal.onSelect(option);
+                          setPickerModal(prev => ({ ...prev, visible: false }));
+                        }}
+                      >
+                        <Text style={[styles.typeOptionText, isSelected && styles.typeOptionTextSelected]}>
+                          {option}
+                        </Text>
+                        {isSelected && (
+                          <Ionicons name="checkmark-circle" size={18} color={colors.primary} />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            </View>
+          )}
         </KeyboardAvoidingView>
       </Modal>
 
       {/* ========================================================================= */}
-      {/* MODAL: SELECTION PICKER                                                   */}
+      {/* MODAL: SELECTION PICKER (Root - for Main Screen Tabs)                     */}
       {/* ========================================================================= */}
-      <Modal
-        visible={pickerModal.visible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setPickerModal(prev => ({ ...prev, visible: false }))}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setPickerModal(prev => ({ ...prev, visible: false }))}
+      {!detailModalVisible && (
+        <Modal
+          visible={pickerModal.visible}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setPickerModal(prev => ({ ...prev, visible: false }))}
         >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{pickerModal.title}</Text>
-              <TouchableOpacity onPress={() => setPickerModal(prev => ({ ...prev, visible: false }))}>
-                <Ionicons name="close" size={24} color={colors.textMuted} />
-              </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setPickerModal(prev => ({ ...prev, visible: false }))}
+          >
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>{pickerModal.title}</Text>
+                <TouchableOpacity onPress={() => setPickerModal(prev => ({ ...prev, visible: false }))}>
+                  <Ionicons name="close" size={24} color={colors.textMuted} />
+                </TouchableOpacity>
+              </View>
+              <ScrollView style={{ maxHeight: 380 }}>
+                {(pickerModal.options || []).map((option) => {
+                  const isSelected = pickerModal.selectedValue === option;
+                  return (
+                    <TouchableOpacity
+                      key={option}
+                      style={[styles.typeOptionItem, isSelected && styles.typeOptionItemSelected]}
+                      onPress={() => {
+                        if (pickerModal.onSelect) pickerModal.onSelect(option);
+                        setPickerModal(prev => ({ ...prev, visible: false }));
+                      }}
+                    >
+                      <Text style={[styles.typeOptionText, isSelected && styles.typeOptionTextSelected]}>
+                        {option}
+                      </Text>
+                      {isSelected && (
+                        <Ionicons name="checkmark-circle" size={18} color={colors.primary} />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
             </View>
-            <ScrollView style={{ maxHeight: 380 }}>
-              {(pickerModal.options || []).map((option) => {
-                const isSelected = pickerModal.selectedValue === option;
-                return (
-                  <TouchableOpacity
-                    key={option}
-                    style={[styles.typeOptionItem, isSelected && styles.typeOptionItemSelected]}
-                    onPress={() => {
-                      if (pickerModal.onSelect) pickerModal.onSelect(option);
-                      setPickerModal(prev => ({ ...prev, visible: false }));
-                    }}
-                  >
-                    <Text style={[styles.typeOptionText, isSelected && styles.typeOptionTextSelected]}>
-                      {option}
-                    </Text>
-                    {isSelected && (
-                      <Ionicons name="checkmark-circle" size={18} color={colors.primary} />
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
-      </Modal>
+          </TouchableOpacity>
+        </Modal>
+      )}
 
       {/* DatePicker Modal */}
       <DatePickerModal
         visible={datePickerState.visible}
         title={datePickerState.title}
-        currentDate={datePickerState.currentDate}
-        onConfirm={handleDateConfirm}
-        onCancel={() => setDatePickerState(prev => ({ ...prev, visible: false }))}
+        value={datePickerState.currentDate}
+        onSelectDate={handleDateConfirm}
+        onClose={() => setDatePickerState(prev => ({ ...prev, visible: false }))}
       />
 
       {/* Discard Changes Modal */}
@@ -3225,6 +3308,25 @@ const getStyles = (colors, isDarkMode, isLargeScreen = false) => StyleSheet.crea
     justifyContent: 'center',
     padding: 16
   },
+  innerPickerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    justifyContent: 'flex-end',
+    zIndex: 9999,
+    elevation: 30
+  },
+  innerPickerContent: {
+    backgroundColor: colors.cardBg,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 35
+  },
   modalContent: {
     backgroundColor: colors.cardBg,
     borderRadius: 20,
@@ -3334,5 +3436,37 @@ const getStyles = (colors, isDarkMode, isLargeScreen = false) => StyleSheet.crea
   typeOptionTextSelected: {
     fontWeight: '800',
     color: isDarkMode ? '#34d399' : '#047857'
+  },
+  optionPillRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 2
+  },
+  optionPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 9,
+    borderRadius: 8,
+    backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc',
+    borderWidth: 1,
+    borderColor: isDarkMode ? colors.border : '#e2e8f0',
+    gap: 4
+  },
+  optionPillActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary
+  },
+  optionPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.textMuted
+  },
+  optionPillTextActive: {
+    color: '#ffffff',
+    fontWeight: '800'
   }
 });

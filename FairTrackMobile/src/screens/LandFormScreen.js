@@ -24,7 +24,7 @@ import { ActionModal } from '../components/ActionModal';
 import { DiscardChangesModal } from '../components/DiscardChangesModal';
 import { DatePickerModal } from '../components/DatePickerModal';
 import { AttachmentsSection } from '../components/AttachmentsSection';
-import { savePartitionAttachmentsOffline, loadPartitionAttachmentsOffline } from '../utils/fileStorage';
+import { savePartitionAttachmentsOffline, loadPartitionAttachmentsOffline, ensurePayloadFilesHaveBase64 } from '../utils/fileStorage';
 import { COLORS, SHADOWS } from '../constants/theme';
 import { BARANGAY_OPTIONS, normalizeBarangay } from '../constants/locationData';
 import {
@@ -411,16 +411,19 @@ export const LandFormScreen = ({ route, navigation }) => {
         if (cp.systemGeneratedTDN) setDeclarationNo(cp.systemGeneratedTDN);
         if (cp.arpNo) setArpNo(cp.arpNo);
         if (cp.pin) setPin(cp.pin);
-        if (cp.lotNo || cp.lotNumber) setLotNo(cp.lotNo || cp.lotNumber);
-        if (cp.blockNo || cp.blockNumber) setBlockNo(cp.blockNo || cp.blockNumber);
+        setLotNo(cp.lotNo || cp.lotNumber || '');
+        setBlockNo(cp.blockNo || cp.blockNumber || '');
         setSectionNo(cp.sectionNo || '');
         setParcelNo(cp.parcelNo || '');
         setSurveyNo(cp.surveyNo || cp.surveyNumber || '');
         setCadastralSurveyNo(cp.cadastralSurveyNo || '');
-        setTctNo(cp.titleNo || '');
+        setTctNo(cp.titleNo || cp.tctNo || '');
         if (cp.dateRegistered) setTctDate(cp.dateRegistered.substring(0, 10));
+        else if (cp.tctDate) setTctDate(cp.tctDate.substring(0, 10));
+        else setTctDate('');
         if (cp.registrationStatus) setRegistrationStatus(cleanRegStatus(cp.registrationStatus));
         if (cp.titleType) setTitleType(cleanTitleType(cp.titleType));
+        if (cp.transactionCode) setTransactionCode(cp.transactionCode);
         if (cp.streetLocation || cp.streetNo || cp.buildingNo) {
           setStreetLocation(cp.streetLocation || cp.streetNo || cp.buildingNo);
         }
@@ -434,6 +437,20 @@ export const LandFormScreen = ({ route, navigation }) => {
         if (cp.ownerContactNo) setOwnerContact(cp.ownerContactNo);
         if (cp.ownerEmail) setOwnerEmail(cp.ownerEmail);
         if (cp.ownerGender) setOwnerGender(cp.ownerGender);
+
+        const hasAdmin = !!cp.isAdministrator || !!cp.administratorName;
+        const hasBenef = !hasAdmin && !!cp.isBeneficialUser;
+        const hasPoss = !hasAdmin && !hasBenef && !!cp.isPossessor;
+        setIsAdministrator(hasAdmin);
+        setIsBeneficialUser(hasBenef);
+        setIsPossessor(hasPoss);
+        setAdminName(cp.administratorName || cp.propAdminName || '');
+        setAdminAddress(cp.administratorAddress || cp.propAdminAddress || '');
+        setAdminContact(cp.administratorContactNo || cp.propAdminContactNo || '');
+        setAdminTin(cp.administratorTin || '');
+        setAdminEmail(cp.administratorEmail || '');
+        setAdminGender(cp.administratorGender || 'Male');
+
         setNorthBoundary(cp.boundaryNorth || '');
         setNRemarks(cp.nremarks || '');
         setSouthBoundary(cp.boundarySouth || '');
@@ -446,8 +463,8 @@ export const LandFormScreen = ({ route, navigation }) => {
         hydrateTab5(downloaded.formData?.TDN || cp);
       }
 
-      // If formData exists (holding the latest offline edits), ONLY populate if partition 0 or this partition's specific draft!
-      if (downloaded.formData && (targetIdx === 0 || !downloaded.currentPartition)) {
+      // If formData exists (holding the latest offline edits), populate it!
+      if (downloaded.formData) {
         populateFieldsFromDTO(downloaded.formData);
         if (downloaded.formData.TDNLand) {
           hydrateSchedules(downloaded.currentPartition, downloaded.formData.TDNLand);
@@ -510,15 +527,18 @@ export const LandFormScreen = ({ route, navigation }) => {
             if (livePart.systemGeneratedTDN) setDeclarationNo(livePart.systemGeneratedTDN);
             if (livePart.arpNo) setArpNo(livePart.arpNo);
             if (livePart.pin) setPin(livePart.pin);
-            if (livePart.blockNo || livePart.blockNumber) setBlockNo(livePart.blockNo || livePart.blockNumber);
+            setBlockNo(livePart.blockNo || livePart.blockNumber || '');
             if (livePart.dateRegistered) setTctDate(livePart.dateRegistered.substring(0, 10));
+            else if (livePart.tctDate) setTctDate(livePart.tctDate.substring(0, 10));
+            else setTctDate('');
             if (livePart.registrationStatus) setRegistrationStatus(cleanRegStatus(livePart.registrationStatus));
             if (livePart.titleType) setTitleType(cleanTitleType(livePart.titleType));
+            if (livePart.transactionCode) setTransactionCode(livePart.transactionCode);
             setSectionNo(livePart.sectionNo || '');
-            if (livePart.lotNo || livePart.lotNumber) setLotNo(livePart.lotNo || livePart.lotNumber);
+            setLotNo(livePart.lotNo || livePart.lotNumber || '');
             setParcelNo(livePart.parcelNo || '');
             setSurveyNo(livePart.surveyNo || livePart.surveyNumber || '');
-            setTctNo(livePart.titleNo || '');
+            setTctNo(livePart.titleNo || livePart.tctNo || '');
             setCadastralSurveyNo(livePart.cadastralSurveyNo || '');
             if (livePart.streetLocation || livePart.streetNo || livePart.buildingNo) {
               setStreetLocation(livePart.streetLocation || livePart.streetNo || livePart.buildingNo);
@@ -533,6 +553,20 @@ export const LandFormScreen = ({ route, navigation }) => {
             if (livePart.ownerContactNo) setOwnerContact(livePart.ownerContactNo);
             if (livePart.ownerEmail) setOwnerEmail(livePart.ownerEmail);
             if (livePart.ownerGender) setOwnerGender(livePart.ownerGender);
+
+            const pAdmin = !!livePart.isAdministrator || !!livePart.administratorName;
+            const pBenef = !pAdmin && !!livePart.isBeneficialUser;
+            const pPoss = !pAdmin && !pBenef && !!livePart.isPossessor;
+            setIsAdministrator(pAdmin);
+            setIsBeneficialUser(pBenef);
+            setIsPossessor(pPoss);
+            setAdminName(livePart.administratorName || livePart.propAdminName || '');
+            setAdminAddress(livePart.administratorAddress || livePart.propAdminAddress || '');
+            setAdminContact(livePart.administratorContactNo || livePart.propAdminContactNo || '');
+            setAdminTin(livePart.administratorTin || '');
+            setAdminEmail(livePart.administratorEmail || '');
+            setAdminGender(livePart.administratorGender || 'Male');
+
             setNorthBoundary(livePart.boundaryNorth || '');
             setNRemarks(livePart.nremarks || '');
             setSouthBoundary(livePart.boundarySouth || '');
@@ -541,6 +575,10 @@ export const LandFormScreen = ({ route, navigation }) => {
             setERemarks(livePart.eremarks || '');
             setWestBoundary(livePart.boundaryWest || '');
             setWRemarks(livePart.wremarks || '');
+
+            if (livePart.formData) {
+              populateFieldsFromDTO(livePart.formData);
+            }
             // Strictly hydrate schedules from this partition's own formData DTO, NEVER from top-level/Partition 1
             hydrateSchedules(livePart, livePart.formData?.TDNLand);
             hydrateTab5(livePart);
@@ -582,16 +620,12 @@ export const LandFormScreen = ({ route, navigation }) => {
       setIsAdministrator(hasAdmin);
       setIsBeneficialUser(hasBenef);
       setIsPossessor(hasPoss);
-      if (t.AdministratorName) {
-        setAdminName(t.AdministratorName);
-      } else if (t.PropAdminName) {
-        setAdminName(t.PropAdminName);
-      }
-      if (t.AdministratorGender) setAdminGender(t.AdministratorGender);
-      if (t.AdministratorTin) setAdminTin(t.AdministratorTin);
-      if (t.AdministratorContactNo || t.PropAdminContactNo) setAdminContact(t.AdministratorContactNo || t.PropAdminContactNo);
-      if (t.AdministratorAddress || t.PropAdminAddress) setAdminAddress(t.AdministratorAddress || t.PropAdminAddress);
-      if (t.AdministratorEmail) setAdminEmail(t.AdministratorEmail);
+      setAdminName(t.AdministratorName || t.PropAdminName || '');
+      setAdminGender(t.AdministratorGender || 'Male');
+      setAdminTin(t.AdministratorTin || '');
+      setAdminContact(t.AdministratorContactNo || t.PropAdminContactNo || '');
+      setAdminAddress(t.AdministratorAddress || t.PropAdminAddress || '');
+      setAdminEmail(t.AdministratorEmail || '');
       if (t.PropLocationStreet) setStreetLocation(t.PropLocationStreet);
       else if (t.Location && !t.Location.includes(',')) setStreetLocation(t.Location);
       if (t.CadastralSurveyNo) setCadastralSurveyNo(t.CadastralSurveyNo);
@@ -654,14 +688,12 @@ export const LandFormScreen = ({ route, navigation }) => {
       setIsAdministrator(pAdmin);
       setIsBeneficialUser(pBenef);
       setIsPossessor(pPoss);
-      if (p.administratorName) {
-        setAdminName(p.administratorName);
-      }
-      if (p.administratorGender) setAdminGender(p.administratorGender);
-      if (p.administratorTin) setAdminTin(p.administratorTin);
-      if (p.administratorContactNo) setAdminContact(p.administratorContactNo);
-      if (p.administratorAddress) setAdminAddress(p.administratorAddress);
-      if (p.administratorEmail) setAdminEmail(p.administratorEmail);
+      setAdminName(p.administratorName || p.propAdminName || '');
+      setAdminGender(p.administratorGender || 'Male');
+      setAdminTin(p.administratorTin || '');
+      setAdminContact(p.administratorContactNo || p.propAdminContactNo || '');
+      setAdminAddress(p.administratorAddress || p.propAdminAddress || '');
+      setAdminEmail(p.administratorEmail || '');
       if (p.ownerAddress) setOwnerAddress(p.ownerAddress);
       if (p.ownerTIN || p.ownerTin) setOwnerTin(p.ownerTIN || p.ownerTin);
       if (p.ownerContactNo) setOwnerContact(p.ownerContactNo);
@@ -1240,6 +1272,7 @@ export const LandFormScreen = ({ route, navigation }) => {
     } : null;
 
     setSaving(true);
+    await ensurePayloadFilesHaveBase64(payload);
 
     if (forceOffline) {
       await queueOfflineUpdate(
@@ -2856,7 +2889,12 @@ export const LandFormScreen = ({ route, navigation }) => {
         visible={editClassModalVisible}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => setEditClassModalVisible(false)}
+        onRequestClose={() => {
+          if (classPickerVisible) setClassPickerVisible(false);
+          else if (subClassPickerVisible) setSubClassPickerVisible(false);
+          else if (actualUsePickerVisible) setActualUsePickerVisible(false);
+          else setEditClassModalVisible(false);
+        }}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -2996,6 +3034,177 @@ export const LandFormScreen = ({ route, navigation }) => {
               </ScrollView>
             </TouchableOpacity>
           </TouchableOpacity>
+
+          {/* Classification Selection Overlay */}
+          {classPickerVisible && (
+            <View style={styles.innerPickerOverlay}>
+              <TouchableOpacity
+                style={StyleSheet.absoluteFillObject}
+                activeOpacity={1}
+                onPress={() => setClassPickerVisible(false)}
+              />
+              <View style={styles.innerPickerContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Select Land Classification</Text>
+                  <TouchableOpacity onPress={() => setClassPickerVisible(false)}>
+                    <Ionicons name="close" size={24} color={colors.textMuted} />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+                  {LAND_CLASSIFICATIONS.map((c) => {
+                    const currentRow = editingClassRow;
+                    const isSelected = currentRow?.classificationId === c.id;
+                    return (
+                      <TouchableOpacity
+                        key={c.id}
+                        style={[styles.typeOptionItem, isSelected && styles.typeOptionItemSelected]}
+                        onPress={() => {
+                          const firstSub = LAND_SUB_CLASSIFICATIONS.find(s => s.classificationId === c.id) || {
+                            id: 1, subClass: c.name, unitValue: 520
+                          };
+                          if (editingClassRow) {
+                            const a = parseFloat(editingClassRow.areaSqMeters) || 0;
+                            const u = firstSub.unitValue;
+                            setEditingClassRow({
+                              ...editingClassRow,
+                              classificationId: c.id,
+                              classificationName: c.name,
+                              subClassId: firstSub.id,
+                              subClassName: firstSub.subClass,
+                              unitValue: String(u),
+                              marketValue: Math.round(a * u * 100) / 100
+                            });
+                          }
+                          setClassPickerVisible(false);
+                        }}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.typeOptionText, isSelected && styles.typeOptionTextSelected]}>
+                            {c.name}
+                          </Text>
+                          <Text style={styles.typeOptionSubtext}>Code: {c.code}</Text>
+                        </View>
+                        {isSelected && (
+                          <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            </View>
+          )}
+
+          {/* Sub-Classification (SMV) Selection Overlay */}
+          {subClassPickerVisible && (
+            <View style={styles.innerPickerOverlay}>
+              <TouchableOpacity
+                style={StyleSheet.absoluteFillObject}
+                activeOpacity={1}
+                onPress={() => setSubClassPickerVisible(false)}
+              />
+              <View style={styles.innerPickerContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Select Sub-Classification (SMV)</Text>
+                  <TouchableOpacity onPress={() => setSubClassPickerVisible(false)}>
+                    <Ionicons name="close" size={24} color={colors.textMuted} />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+                  {(() => {
+                    const currentRow = editingClassRow;
+                    const filteredSubs = currentRow?.classificationId
+                      ? LAND_SUB_CLASSIFICATIONS.filter(s => s.classificationId === currentRow.classificationId)
+                      : LAND_SUB_CLASSIFICATIONS;
+                    const subsToShow = filteredSubs.length > 0 ? filteredSubs : LAND_SUB_CLASSIFICATIONS;
+
+                    return subsToShow.map((sub) => {
+                      const isSelected = currentRow?.subClassId === sub.id;
+                      return (
+                        <TouchableOpacity
+                          key={sub.id}
+                          style={[styles.typeOptionItem, isSelected && styles.typeOptionItemSelected]}
+                          onPress={() => {
+                            if (editingClassRow) {
+                              const a = parseFloat(editingClassRow.areaSqMeters) || 0;
+                              const u = sub.unitValue;
+                              setEditingClassRow({
+                                ...editingClassRow,
+                                subClassId: sub.id,
+                                subClassName: sub.subClass,
+                                unitValue: String(u),
+                                marketValue: Math.round(a * u * 100) / 100
+                              });
+                            }
+                            setSubClassPickerVisible(false);
+                          }}
+                        >
+                          <View style={{ flex: 1 }}>
+                            <Text style={[styles.typeOptionText, isSelected && styles.typeOptionTextSelected]}>
+                              {sub.subClass}
+                            </Text>
+                            <Text style={styles.typeOptionSubtext}>
+                              Unit Value: ₱{sub.unitValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                            </Text>
+                          </View>
+                          {isSelected && (
+                            <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+                          )}
+                        </TouchableOpacity>
+                      );
+                    });
+                  })()}
+                </ScrollView>
+              </View>
+            </View>
+          )}
+
+          {/* Actual Use Selection Overlay */}
+          {actualUsePickerVisible && (
+            <View style={styles.innerPickerOverlay}>
+              <TouchableOpacity
+                style={StyleSheet.absoluteFillObject}
+                activeOpacity={1}
+                onPress={() => setActualUsePickerVisible(false)}
+              />
+              <View style={styles.innerPickerContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Select Actual Use</Text>
+                  <TouchableOpacity onPress={() => setActualUsePickerVisible(false)}>
+                    <Ionicons name="close" size={24} color={colors.textMuted} />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+                  {LAND_ACTUAL_USES.map((u) => {
+                    const currentRow = editingClassRow;
+                    const isSelected = currentRow?.actualUseName === u;
+                    return (
+                      <TouchableOpacity
+                        key={u}
+                        style={[styles.typeOptionItem, isSelected && styles.typeOptionItemSelected]}
+                        onPress={() => {
+                          if (editingClassRow) {
+                            setEditingClassRow({
+                              ...editingClassRow,
+                              actualUseName: u
+                            });
+                          }
+                          setActualUsePickerVisible(false);
+                        }}
+                      >
+                        <Text style={[styles.typeOptionText, isSelected && styles.typeOptionTextSelected]}>
+                          {u}
+                        </Text>
+                        {isSelected && (
+                          <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            </View>
+          )}
         </KeyboardAvoidingView>
       </Modal>
 
@@ -3004,7 +3213,10 @@ export const LandFormScreen = ({ route, navigation }) => {
         visible={editImpModalVisible}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => setEditImpModalVisible(false)}
+        onRequestClose={() => {
+          if (impTypePickerVisible) setImpTypePickerVisible(false);
+          else setEditImpModalVisible(false);
+        }}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -3142,6 +3354,62 @@ export const LandFormScreen = ({ route, navigation }) => {
               </ScrollView>
             </TouchableOpacity>
           </TouchableOpacity>
+
+          {/* Improvement Type Picker Overlay */}
+          {impTypePickerVisible && (
+            <View style={styles.innerPickerOverlay}>
+              <TouchableOpacity
+                style={StyleSheet.absoluteFillObject}
+                activeOpacity={1}
+                onPress={() => setImpTypePickerVisible(false)}
+              />
+              <View style={styles.innerPickerContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Select Plant / Improvement Type</Text>
+                  <TouchableOpacity onPress={() => setImpTypePickerVisible(false)}>
+                    <Ionicons name="close" size={24} color={colors.textMuted} />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+                  {LAND_IMPROVEMENT_TYPES.map((imp) => {
+                    const currentRow = editingImpRow;
+                    const isSelected = currentRow?.typeId === imp.id;
+                    return (
+                      <TouchableOpacity
+                        key={imp.id}
+                        style={[styles.typeOptionItem, isSelected && styles.typeOptionItemSelected]}
+                        onPress={() => {
+                          if (editingImpRow) {
+                            const q = parseFloat(editingImpRow.quantity) || 0;
+                            setEditingImpRow({
+                              ...editingImpRow,
+                              typeId: imp.id,
+                              typeDescription: imp.description,
+                              unitValue: String(imp.baseValue),
+                              marketValue: Math.round(q * imp.baseValue * 100) / 100
+                            });
+                          }
+                          setImpTypePickerVisible(false);
+                        }}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.typeOptionText, isSelected && styles.typeOptionTextSelected]}>
+                            {imp.description}
+                          </Text>
+                          <Text style={styles.typeOptionSubtext}>
+                            Rate: ₱{imp.baseValue.toLocaleString('en-US', { minimumFractionDigits: 2 })} • Kind: {imp.kind}
+                          </Text>
+                        </View>
+                        {isSelected && (
+                          <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            </View>
+          )}
         </KeyboardAvoidingView>
       </Modal>
 
@@ -3150,7 +3418,10 @@ export const LandFormScreen = ({ route, navigation }) => {
         visible={editAdjModalVisible}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => setEditAdjModalVisible(false)}
+        onRequestClose={() => {
+          if (adjFactorPickerVisible) setAdjFactorPickerVisible(false);
+          else setEditAdjModalVisible(false);
+        }}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -3273,6 +3544,67 @@ export const LandFormScreen = ({ route, navigation }) => {
               </ScrollView>
             </TouchableOpacity>
           </TouchableOpacity>
+
+          {/* Adjustment Factor Picker Overlay */}
+          {adjFactorPickerVisible && (
+            <View style={styles.innerPickerOverlay}>
+              <TouchableOpacity
+                style={StyleSheet.absoluteFillObject}
+                activeOpacity={1}
+                onPress={() => setAdjFactorPickerVisible(false)}
+              />
+              <View style={styles.innerPickerContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Select Adjustment Factor</Text>
+                  <TouchableOpacity onPress={() => setAdjFactorPickerVisible(false)}>
+                    <Ionicons name="close" size={24} color={colors.textMuted} />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+                  {LAND_ADJUSTMENT_FACTORS.map((adj) => {
+                    const currentRow = editingAdjRow;
+                    const isSelected = currentRow?.adjustmentFactorId === adj.id;
+                    return (
+                      <TouchableOpacity
+                        key={adj.id}
+                        style={[styles.typeOptionItem, isSelected && styles.typeOptionItemSelected]}
+                        onPress={() => {
+                          if (editingAdjRow) {
+                            const baseMv = parseFloat(editingAdjRow.baseMarketValue) || 0;
+                            const valAdj = Math.round(baseMv * (adj.percent / 100) * 100) / 100;
+                            setEditingAdjRow({
+                              ...editingAdjRow,
+                              adjustmentFactorId: adj.id,
+                              adjustmentFactorDescription: adj.description,
+                              percentAdjustment: String(adj.percent),
+                              valueAdjustment: valAdj,
+                              adjustedMarketValue: Math.round((baseMv + valAdj) * 100) / 100
+                            });
+                          }
+                          setAdjFactorPickerVisible(false);
+                        }}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.typeOptionText, isSelected && styles.typeOptionTextSelected]}>
+                            {adj.description}
+                          </Text>
+                          <Text style={[
+                            styles.typeOptionSubtext,
+                            { color: adj.percent >= 0 ? (isDarkMode ? '#34d399' : '#059669') : '#ef4444', fontWeight: '700' }
+                          ]}>
+                            {adj.percent >= 0 ? `+${adj.percent}%` : `${adj.percent}%`} Adjustment
+                          </Text>
+                        </View>
+                        {isSelected && (
+                          <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            </View>
+          )}
         </KeyboardAvoidingView>
       </Modal>
 
@@ -3281,7 +3613,11 @@ export const LandFormScreen = ({ route, navigation }) => {
         visible={editRollModalVisible}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => setEditRollModalVisible(false)}
+        onRequestClose={() => {
+          if (rollKindPickerVisible) setRollKindPickerVisible(false);
+          else if (rollActualUsePickerVisible) setRollActualUsePickerVisible(false);
+          else setEditRollModalVisible(false);
+        }}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -3407,465 +3743,110 @@ export const LandFormScreen = ({ route, navigation }) => {
               </ScrollView>
             </TouchableOpacity>
           </TouchableOpacity>
-        </KeyboardAvoidingView>
-      </Modal>
 
-      {/* ========================================================= */}
-      {/* 7 DROPDOWN PICKER MODALS                                  */}
-      {/* ========================================================= */}
-
-      {/* Classification Picker Modal */}
-      <Modal
-        visible={classPickerVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setClassPickerVisible(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setClassPickerVisible(false)}
-        >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Land Classification</Text>
-              <TouchableOpacity onPress={() => setClassPickerVisible(false)}>
-                <Ionicons name="close" size={24} color={colors.textMuted} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
-              {LAND_CLASSIFICATIONS.map((c) => {
-                const currentRow = editingClassRow || (activeClassRowIndex !== null ? classificationRows[activeClassRowIndex] : null);
-                const isSelected = currentRow?.classificationId === c.id;
-                return (
-                  <TouchableOpacity
-                    key={c.id}
-                    style={[styles.typeOptionItem, isSelected && styles.typeOptionItemSelected]}
-                    onPress={() => {
-                      const firstSub = LAND_SUB_CLASSIFICATIONS.find(s => s.classificationId === c.id) || {
-                        id: 1, subClass: c.name, unitValue: 520
-                      };
-                      if (editingClassRow) {
-                        const a = parseFloat(editingClassRow.areaSqMeters) || 0;
-                        const u = firstSub.unitValue;
-                        setEditingClassRow({
-                          ...editingClassRow,
-                          classificationId: c.id,
-                          classificationName: c.name,
-                          subClassId: firstSub.id,
-                          subClassName: firstSub.subClass,
-                          unitValue: String(u),
-                          marketValue: Math.round(a * u * 100) / 100
-                        });
-                      } else if (activeClassRowIndex !== null) {
-                        updateClassificationRow(activeClassRowIndex, {
-                          classificationId: c.id,
-                          classificationName: c.name,
-                          subClassId: firstSub.id,
-                          subClassName: firstSub.subClass,
-                          unitValue: firstSub.unitValue
-                        });
-                      }
-                      setClassPickerVisible(false);
-                    }}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.typeOptionText, isSelected && styles.typeOptionTextSelected]}>
-                        {c.name}
-                      </Text>
-                      <Text style={styles.typeOptionSubtext}>Code: {c.code}</Text>
-                    </View>
-                    {isSelected && (
-                      <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-                    )}
+          {/* Assessment Roll Kind Picker Overlay */}
+          {rollKindPickerVisible && (
+            <View style={styles.innerPickerOverlay}>
+              <TouchableOpacity
+                style={StyleSheet.absoluteFillObject}
+                activeOpacity={1}
+                onPress={() => setRollKindPickerVisible(false)}
+              />
+              <View style={styles.innerPickerContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Select Property Component</Text>
+                  <TouchableOpacity onPress={() => setRollKindPickerVisible(false)}>
+                    <Ionicons name="close" size={24} color={colors.textMuted} />
                   </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* Sub-Classification (SMV) Picker Modal */}
-      <Modal
-        visible={subClassPickerVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setSubClassPickerVisible(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setSubClassPickerVisible(false)}
-        >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Sub-Classification (SMV)</Text>
-              <TouchableOpacity onPress={() => setSubClassPickerVisible(false)}>
-                <Ionicons name="close" size={24} color={colors.textMuted} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
-              {(() => {
-                const currentRow = editingClassRow || (activeClassRowIndex !== null ? classificationRows[activeClassRowIndex] : null);
-                const filteredSubs = currentRow?.classificationId
-                  ? LAND_SUB_CLASSIFICATIONS.filter(s => s.classificationId === currentRow.classificationId)
-                  : LAND_SUB_CLASSIFICATIONS;
-                const subsToShow = filteredSubs.length > 0 ? filteredSubs : LAND_SUB_CLASSIFICATIONS;
-
-                return subsToShow.map((sub) => {
-                  const isSelected = currentRow?.subClassId === sub.id;
-                  return (
-                    <TouchableOpacity
-                      key={sub.id}
-                      style={[styles.typeOptionItem, isSelected && styles.typeOptionItemSelected]}
-                      onPress={() => {
-                        if (editingClassRow) {
-                          const a = parseFloat(editingClassRow.areaSqMeters) || 0;
-                          const u = sub.unitValue;
-                          setEditingClassRow({
-                            ...editingClassRow,
-                            subClassId: sub.id,
-                            subClassName: sub.subClass,
-                            unitValue: String(u),
-                            marketValue: Math.round(a * u * 100) / 100
-                          });
-                        } else if (activeClassRowIndex !== null) {
-                          updateClassificationRow(activeClassRowIndex, {
-                            subClassId: sub.id,
-                            subClassName: sub.subClass,
-                            unitValue: sub.unitValue
-                          });
-                        }
-                        setSubClassPickerVisible(false);
-                      }}
-                    >
-                      <View style={{ flex: 1 }}>
+                </View>
+                <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+                  {['LAND', 'PLANTS / TREES', 'OTHER IMPROVEMENTS', 'MACHINERY / OTHERS'].map((k) => {
+                    const currentRow = editingRollRow;
+                    const isSelected = currentRow?.kinds === k;
+                    return (
+                      <TouchableOpacity
+                        key={k}
+                        style={[styles.typeOptionItem, isSelected && styles.typeOptionItemSelected]}
+                        onPress={() => {
+                          if (editingRollRow) {
+                            setEditingRollRow({
+                              ...editingRollRow,
+                              kinds: k
+                            });
+                          }
+                          setRollKindPickerVisible(false);
+                        }}
+                      >
                         <Text style={[styles.typeOptionText, isSelected && styles.typeOptionTextSelected]}>
-                          {sub.subClass}
+                          {k}
                         </Text>
-                        <Text style={styles.typeOptionSubtext}>
-                          Unit Value: ₱{sub.unitValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                        </Text>
-                      </View>
-                      {isSelected && (
-                        <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-                      )}
-                    </TouchableOpacity>
-                  );
-                });
-              })()}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* Actual Use Picker Modal */}
-      <Modal
-        visible={actualUsePickerVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setActualUsePickerVisible(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setActualUsePickerVisible(false)}
-        >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Actual Use</Text>
-              <TouchableOpacity onPress={() => setActualUsePickerVisible(false)}>
-                <Ionicons name="close" size={24} color={colors.textMuted} />
-              </TouchableOpacity>
+                        {isSelected && (
+                          <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
             </View>
-            <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
-              {LAND_ACTUAL_USES.map((u) => {
-                const currentRow = editingClassRow || (activeClassRowIndex !== null ? classificationRows[activeClassRowIndex] : null);
-                const isSelected = currentRow?.actualUseName === u;
-                return (
-                  <TouchableOpacity
-                    key={u}
-                    style={[styles.typeOptionItem, isSelected && styles.typeOptionItemSelected]}
-                    onPress={() => {
-                      if (editingClassRow) {
-                        setEditingClassRow({
-                          ...editingClassRow,
-                          actualUseName: u
-                        });
-                      } else if (activeClassRowIndex !== null) {
-                        updateClassificationRow(activeClassRowIndex, { actualUseName: u });
-                      }
-                      setActualUsePickerVisible(false);
-                    }}
-                  >
-                    <Text style={[styles.typeOptionText, isSelected && styles.typeOptionTextSelected]}>
-                      {u}
-                    </Text>
-                    {isSelected && (
-                      <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
-      </Modal>
+          )}
 
-      {/* Improvement Type Picker Modal */}
-      <Modal
-        visible={impTypePickerVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setImpTypePickerVisible(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setImpTypePickerVisible(false)}
-        >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Plant / Improvement Type</Text>
-              <TouchableOpacity onPress={() => setImpTypePickerVisible(false)}>
-                <Ionicons name="close" size={24} color={colors.textMuted} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
-              {LAND_IMPROVEMENT_TYPES.map((imp) => {
-                const currentRow = editingImpRow || (activeImpRowIndex !== null ? improvementRows[activeImpRowIndex] : null);
-                const isSelected = currentRow?.typeId === imp.id;
-                return (
-                  <TouchableOpacity
-                    key={imp.id}
-                    style={[styles.typeOptionItem, isSelected && styles.typeOptionItemSelected]}
-                    onPress={() => {
-                      if (editingImpRow) {
-                        const q = parseFloat(editingImpRow.quantity) || 0;
-                        setEditingImpRow({
-                          ...editingImpRow,
-                          typeId: imp.id,
-                          typeDescription: imp.description,
-                          unitValue: String(imp.baseValue),
-                          marketValue: Math.round(q * imp.baseValue * 100) / 100
-                        });
-                      } else if (activeImpRowIndex !== null) {
-                        updateImprovementRow(activeImpRowIndex, {
-                          typeId: imp.id,
-                          typeDescription: imp.description,
-                          unitValue: imp.baseValue
-                        });
-                      }
-                      setImpTypePickerVisible(false);
-                    }}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.typeOptionText, isSelected && styles.typeOptionTextSelected]}>
-                        {imp.description}
-                      </Text>
-                      <Text style={styles.typeOptionSubtext}>
-                        Rate: ₱{imp.baseValue.toLocaleString('en-US', { minimumFractionDigits: 2 })} • Kind: {imp.kind}
-                      </Text>
-                    </View>
-                    {isSelected && (
-                      <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-                    )}
+          {/* Assessment Roll Actual Use Picker Overlay */}
+          {rollActualUsePickerVisible && (
+            <View style={styles.innerPickerOverlay}>
+              <TouchableOpacity
+                style={StyleSheet.absoluteFillObject}
+                activeOpacity={1}
+                onPress={() => setRollActualUsePickerVisible(false)}
+              />
+              <View style={styles.innerPickerContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Select Actual Use & Assessment Level</Text>
+                  <TouchableOpacity onPress={() => setRollActualUsePickerVisible(false)}>
+                    <Ionicons name="close" size={24} color={colors.textMuted} />
                   </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* Adjustment Factor Picker Modal */}
-      <Modal
-        visible={adjFactorPickerVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setAdjFactorPickerVisible(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setAdjFactorPickerVisible(false)}
-        >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Adjustment Factor</Text>
-              <TouchableOpacity onPress={() => setAdjFactorPickerVisible(false)}>
-                <Ionicons name="close" size={24} color={colors.textMuted} />
-              </TouchableOpacity>
+                </View>
+                <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+                  {LAND_ACTUAL_USES.map((u) => {
+                    const currentRow = editingRollRow;
+                    const isSelected = currentRow?.actualUseName === u;
+                    const level = getAssessmentLevelForActualUse(u);
+                    return (
+                      <TouchableOpacity
+                        key={u}
+                        style={[styles.typeOptionItem, isSelected && styles.typeOptionItemSelected]}
+                        onPress={() => {
+                          if (editingRollRow) {
+                            const mv = parseFloat(editingRollRow.marketValue) || 0;
+                            setEditingRollRow({
+                              ...editingRollRow,
+                              actualUseName: u,
+                              assessmentLevelPercent: String(level),
+                              assessedValue: Math.round(mv * (level / 100) * 100) / 100
+                            });
+                          }
+                          setRollActualUsePickerVisible(false);
+                        }}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.typeOptionText, isSelected && styles.typeOptionTextSelected]}>
+                            {u}
+                          </Text>
+                          <Text style={styles.typeOptionSubtext}>
+                            Statutory Assessment Level: {level}%
+                          </Text>
+                        </View>
+                        {isSelected && (
+                          <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
             </View>
-            <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
-              {LAND_ADJUSTMENT_FACTORS.map((adj) => {
-                const currentRow = editingAdjRow || (activeAdjRowIndex !== null ? adjustmentRows[activeAdjRowIndex] : null);
-                const isSelected = currentRow?.adjustmentFactorId === adj.id;
-                return (
-                  <TouchableOpacity
-                    key={adj.id}
-                    style={[styles.typeOptionItem, isSelected && styles.typeOptionItemSelected]}
-                    onPress={() => {
-                      if (editingAdjRow) {
-                        const baseMv = parseFloat(editingAdjRow.baseMarketValue) || 0;
-                        const valAdj = Math.round(baseMv * (adj.percent / 100) * 100) / 100;
-                        setEditingAdjRow({
-                          ...editingAdjRow,
-                          adjustmentFactorId: adj.id,
-                          adjustmentFactorDescription: adj.description,
-                          percentAdjustment: String(adj.percent),
-                          valueAdjustment: valAdj,
-                          adjustedMarketValue: Math.round((baseMv + valAdj) * 100) / 100
-                        });
-                      } else if (activeAdjRowIndex !== null) {
-                        updateAdjustmentRow(activeAdjRowIndex, {
-                          adjustmentFactorId: adj.id,
-                          adjustmentFactorDescription: adj.description,
-                          percentAdjustment: adj.percent
-                        });
-                      }
-                      setAdjFactorPickerVisible(false);
-                    }}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.typeOptionText, isSelected && styles.typeOptionTextSelected]}>
-                        {adj.description}
-                      </Text>
-                      <Text style={[
-                        styles.typeOptionSubtext,
-                        { color: adj.percent >= 0 ? (isDarkMode ? '#34d399' : '#059669') : '#ef4444', fontWeight: '700' }
-                      ]}>
-                        {adj.percent >= 0 ? `+${adj.percent}%` : `${adj.percent}%`} Adjustment
-                      </Text>
-                    </View>
-                    {isSelected && (
-                      <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* Assessment Roll Kind Picker Modal */}
-      <Modal
-        visible={rollKindPickerVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setRollKindPickerVisible(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setRollKindPickerVisible(false)}
-        >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Property Component</Text>
-              <TouchableOpacity onPress={() => setRollKindPickerVisible(false)}>
-                <Ionicons name="close" size={24} color={colors.textMuted} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
-              {['LAND', 'PLANTS / TREES', 'OTHER IMPROVEMENTS', 'MACHINERY / OTHERS'].map((k) => {
-                const currentRow = editingRollRow || (activeRollRowIndex !== null ? assessmentRollRows[activeRollRowIndex] : null);
-                const isSelected = currentRow?.kinds === k;
-                return (
-                  <TouchableOpacity
-                    key={k}
-                    style={[styles.typeOptionItem, isSelected && styles.typeOptionItemSelected]}
-                    onPress={() => {
-                      if (editingRollRow) {
-                        setEditingRollRow({
-                          ...editingRollRow,
-                          kinds: k
-                        });
-                      } else if (activeRollRowIndex !== null) {
-                        updateAssessmentRollRow(activeRollRowIndex, { kinds: k });
-                      }
-                      setRollKindPickerVisible(false);
-                    }}
-                  >
-                    <Text style={[styles.typeOptionText, isSelected && styles.typeOptionTextSelected]}>
-                      {k}
-                    </Text>
-                    {isSelected && (
-                      <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* Assessment Roll Actual Use Picker Modal */}
-      <Modal
-        visible={rollActualUsePickerVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setRollActualUsePickerVisible(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setRollActualUsePickerVisible(false)}
-        >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Actual Use & Assessment Level</Text>
-              <TouchableOpacity onPress={() => setRollActualUsePickerVisible(false)}>
-                <Ionicons name="close" size={24} color={colors.textMuted} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
-              {LAND_ACTUAL_USES.map((u) => {
-                const currentRow = editingRollRow || (activeRollRowIndex !== null ? assessmentRollRows[activeRollRowIndex] : null);
-                const isSelected = currentRow?.actualUseName === u;
-                const level = getAssessmentLevelForActualUse(u);
-                return (
-                  <TouchableOpacity
-                    key={u}
-                    style={[styles.typeOptionItem, isSelected && styles.typeOptionItemSelected]}
-                    onPress={() => {
-                      if (editingRollRow) {
-                        const mv = parseFloat(editingRollRow.marketValue) || 0;
-                        setEditingRollRow({
-                          ...editingRollRow,
-                          actualUseName: u,
-                          assessmentLevelPercent: String(level),
-                          assessedValue: Math.round(mv * (level / 100) * 100) / 100
-                        });
-                      } else if (activeRollRowIndex !== null) {
-                        updateAssessmentRollRow(activeRollRowIndex, {
-                          actualUseName: u,
-                          assessmentLevelPercent: level
-                        });
-                      }
-                      setRollActualUsePickerVisible(false);
-                    }}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.typeOptionText, isSelected && styles.typeOptionTextSelected]}>
-                        {u}
-                      </Text>
-                      <Text style={styles.typeOptionSubtext}>
-                        Statutory Assessment Level: {level}%
-                      </Text>
-                    </View>
-                    {isSelected && (
-                      <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
+          )}
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Discard Changes Modal */}
@@ -4461,6 +4442,25 @@ const getStyles = (colors, isDarkMode, isLargeScreen = false) => StyleSheet.crea
     flex: 1,
     backgroundColor: colors.modalOverlay || 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end'
+  },
+  innerPickerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.modalOverlay || 'rgba(0,0,0,0.65)',
+    justifyContent: 'flex-end',
+    zIndex: 9999,
+    elevation: 30
+  },
+  innerPickerContent: {
+    backgroundColor: colors.cardBg,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 35
   },
   modalContent: {
     backgroundColor: colors.cardBg,

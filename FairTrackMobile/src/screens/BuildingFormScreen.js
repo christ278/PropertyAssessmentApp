@@ -23,7 +23,7 @@ import { HeaderBar } from '../components/HeaderBar';
 import { ActionModal } from '../components/ActionModal';
 import { DiscardChangesModal } from '../components/DiscardChangesModal';
 import { AttachmentsSection } from '../components/AttachmentsSection';
-import { savePartitionAttachmentsOffline, loadPartitionAttachmentsOffline } from '../utils/fileStorage';
+import { savePartitionAttachmentsOffline, loadPartitionAttachmentsOffline, ensurePayloadFilesHaveBase64 } from '../utils/fileStorage';
 import { DatePickerModal } from '../components/DatePickerModal';
 import { BARANGAY_OPTIONS, normalizeBarangay } from '../constants/locationData';
 
@@ -576,8 +576,8 @@ export const BuildingFormScreen = ({ route, navigation }) => {
       if (downloaded.trackingNo && !trackingNo) setTrackingNo(downloaded.trackingNo);
       if (downloaded.transItem?.TrackingNo && !trackingNo) setTrackingNo(downloaded.transItem.TrackingNo);
 
-      // Populate downloaded.formData only if targetIdx === 0 or if there is no partition isolation conflict
-      if (downloaded.formData && (targetIdx === 0 || !downloaded.currentPartition)) {
+      // Populate downloaded.formData (holding partition's latest edits)
+      if (downloaded.formData) {
         populateFieldsFromDTO(downloaded.formData);
         if (downloaded.formData.TDN) {
           hydrateEffectivityAndNotes(downloaded.formData.TDN);
@@ -629,13 +629,13 @@ export const BuildingFormScreen = ({ route, navigation }) => {
         const hasBenef = !hasAdmin && !!cp.isBeneficialUser;
         setIsAdministrator(hasAdmin);
         setIsBeneficialUser(hasBenef);
-        if (cp.administratorName) setAdminName(cp.administratorName);
-        if (cp.administratorAddress || cp.propAdminAddress) setAdminAddress(cp.administratorAddress || cp.propAdminAddress);
-        if (cp.administratorContactNo || cp.propAdminContactNo) setAdminContact(cp.administratorContactNo || cp.propAdminContactNo);
-        if (cp.administratorTin) setAdminTin(cp.administratorTin);
-        if (cp.administratorEmail) setAdminEmail(cp.administratorEmail);
-        if (cp.administratorGender) setAdminGender(cp.administratorGender);
-        if (cp.administratorCivilStatus) setAdminCivilStatus(cp.administratorCivilStatus);
+        setAdminName(cp.administratorName || cp.propAdminName || '');
+        setAdminAddress(cp.administratorAddress || cp.propAdminAddress || '');
+        setAdminContact(cp.administratorContactNo || cp.propAdminContactNo || '');
+        setAdminTin(cp.administratorTin || '');
+        setAdminEmail(cp.administratorEmail || '');
+        setAdminGender(cp.administratorGender || 'Male');
+        setAdminCivilStatus(cp.administratorCivilStatus || 'Single');
         if (cp.ownerGender) setOwnerGender(cp.ownerGender);
         if (cp.ownerCivilStatus) setOwnerCivilStatus(cp.ownerCivilStatus);
         if (cp.ownerTin) setOwnerTin(cp.ownerTin);
@@ -725,13 +725,13 @@ export const BuildingFormScreen = ({ route, navigation }) => {
             const pBenef = !pAdmin && !!livePart.isBeneficialUser;
             setIsAdministrator(pAdmin);
             setIsBeneficialUser(pBenef);
-            if (livePart.administratorName) setAdminName(livePart.administratorName);
-            if (livePart.administratorAddress || livePart.propAdminAddress) setAdminAddress(livePart.administratorAddress || livePart.propAdminAddress);
-            if (livePart.administratorContactNo || livePart.propAdminContactNo) setAdminContact(livePart.administratorContactNo || livePart.propAdminContactNo);
-            if (livePart.administratorTin) setAdminTin(livePart.administratorTin);
-            if (livePart.administratorEmail) setAdminEmail(livePart.administratorEmail);
-            if (livePart.administratorGender) setAdminGender(livePart.administratorGender);
-            if (livePart.administratorCivilStatus) setAdminCivilStatus(livePart.administratorCivilStatus);
+            setAdminName(livePart.administratorName || livePart.propAdminName || '');
+            setAdminAddress(livePart.administratorAddress || livePart.propAdminAddress || '');
+            setAdminContact(livePart.administratorContactNo || livePart.propAdminContactNo || '');
+            setAdminTin(livePart.administratorTin || '');
+            setAdminEmail(livePart.administratorEmail || '');
+            setAdminGender(livePart.administratorGender || 'Male');
+            setAdminCivilStatus(livePart.administratorCivilStatus || 'Single');
             if (livePart.ownerGender) setOwnerGender(livePart.ownerGender);
             if (livePart.ownerCivilStatus) setOwnerCivilStatus(livePart.ownerCivilStatus);
             if (livePart.ownerEmail) setOwnerEmail(livePart.ownerEmail);
@@ -791,13 +791,13 @@ export const BuildingFormScreen = ({ route, navigation }) => {
       const tBenef = !tAdmin && !!t.IsBeneficialUser;
       setIsAdministrator(tAdmin);
       setIsBeneficialUser(tBenef);
-      if (t.AdministratorName || t.PropAdminName) setAdminName(t.AdministratorName || t.PropAdminName);
-      if (t.AdministratorAddress || t.PropAdminAddress) setAdminAddress(t.AdministratorAddress || t.PropAdminAddress);
-      if (t.AdministratorContactNo || t.PropAdminContactNo) setAdminContact(t.AdministratorContactNo || t.PropAdminContactNo);
-      if (t.AdministratorTin) setAdminTin(t.AdministratorTin);
-      if (t.AdministratorEmail) setAdminEmail(t.AdministratorEmail);
-      if (t.AdministratorGender) setAdminGender(t.AdministratorGender);
-      if (t.AdministratorCivilStatus) setAdminCivilStatus(t.AdministratorCivilStatus);
+      setAdminName(t.AdministratorName || t.PropAdminName || '');
+      setAdminAddress(t.AdministratorAddress || t.PropAdminAddress || '');
+      setAdminContact(t.AdministratorContactNo || t.PropAdminContactNo || '');
+      setAdminTin(t.AdministratorTin || '');
+      setAdminEmail(t.AdministratorEmail || '');
+      setAdminGender(t.AdministratorGender || 'Male');
+      setAdminCivilStatus(t.AdministratorCivilStatus || 'Single');
       if (t.PropLocationStreet) setStreetLocation(t.PropLocationStreet);
       else if (t.Location && !t.Location.includes(',')) setStreetLocation(t.Location);
       if (t.DistrictOrBarangay || t.Barangay) setDistrictOrBarangay(normalizeBarangay(t.DistrictOrBarangay || t.Barangay));
@@ -905,13 +905,13 @@ export const BuildingFormScreen = ({ route, navigation }) => {
       const cpBenef = !cpAdmin && !!cp.isBeneficialUser;
       setIsAdministrator(cpAdmin);
       setIsBeneficialUser(cpBenef);
-      if (cp.administratorName) setAdminName(cp.administratorName);
-      if (cp.administratorAddress || cp.propAdminAddress) setAdminAddress(cp.administratorAddress || cp.propAdminAddress);
-      if (cp.administratorContactNo || cp.propAdminContactNo) setAdminContact(cp.administratorContactNo || cp.propAdminContactNo);
-      if (cp.administratorTin) setAdminTin(cp.administratorTin);
-      if (cp.administratorEmail) setAdminEmail(cp.administratorEmail);
-      if (cp.administratorGender) setAdminGender(cp.administratorGender);
-      if (cp.administratorCivilStatus) setAdminCivilStatus(cp.administratorCivilStatus);
+      setAdminName(cp.administratorName || cp.propAdminName || '');
+      setAdminAddress(cp.administratorAddress || cp.propAdminAddress || '');
+      setAdminContact(cp.administratorContactNo || cp.propAdminContactNo || '');
+      setAdminTin(cp.administratorTin || '');
+      setAdminEmail(cp.administratorEmail || '');
+      setAdminGender(cp.administratorGender || 'Male');
+      setAdminCivilStatus(cp.administratorCivilStatus || 'Single');
       if (cp.ownerGender) setOwnerGender(cp.ownerGender);
       if (cp.ownerCivilStatus) setOwnerCivilStatus(cp.ownerCivilStatus);
       if (cp.ownerTin) setOwnerTin(cp.ownerTin);
@@ -1166,8 +1166,10 @@ export const BuildingFormScreen = ({ route, navigation }) => {
       remarks: remarks || 'Field building inspection completed and transferred.'
     } : null;
 
+    setSaving(true);
+    await ensurePayloadFilesHaveBase64(payload);
+
     if (forceOffline) {
-      setSaving(true);
       await queueOfflineUpdate(
         'UPDATE_BUILDING',
         payload,
@@ -2398,6 +2400,22 @@ export const BuildingFormScreen = ({ route, navigation }) => {
                   <Text style={styles.cardHeaderTitle}>Effectivity of Assessment, Taxability & Back Taxes</Text>
 
                   <View style={styles.rowInputs}>
+                    <View style={[styles.inputGroup, { flex: 1.5 }]}>
+                      <Text style={styles.inputLabel}>EFFECTIVITY QUARTER</Text>
+                      <View style={styles.optionPillRow}>
+                        {['1', '2', '3', '4'].map((q) => (
+                          <TouchableOpacity
+                            key={q}
+                            style={[styles.optionPill, quarterEffectivity === q && styles.optionPillActive]}
+                            onPress={() => setQuarterEffectivity(q)}
+                          >
+                            <Text style={[styles.optionPillText, quarterEffectivity === q && styles.optionPillTextActive]}>
+                              {q === '1' ? '1st' : q === '2' ? '2nd' : q === '3' ? '3rd' : '4th'}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
                     <View style={[styles.inputGroup, { flex: 1 }]}>
                       <Text style={styles.inputLabel}>EFFECTIVITY YEAR</Text>
                       <TextInput
@@ -2409,16 +2427,29 @@ export const BuildingFormScreen = ({ route, navigation }) => {
                         placeholderTextColor={colors.placeholder}
                       />
                     </View>
-                    <View style={[styles.inputGroup, { flex: 1 }]}>
-                      <Text style={styles.inputLabel}>EFFECTIVITY QUARTER</Text>
-                      <TextInput
-                        style={styles.input}
-                        value={quarterEffectivity}
-                        onChangeText={setQuarterEffectivity}
-                        keyboardType="numeric"
-                        placeholder="1"
-                        placeholderTextColor={colors.placeholder}
-                      />
+                  </View>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>TAXABILITY STATUS</Text>
+                    <View style={styles.optionPillRow}>
+                      <TouchableOpacity
+                        style={[styles.optionPill, taxability && styles.optionPillActive]}
+                        onPress={() => setTaxability(true)}
+                      >
+                        <Ionicons name={taxability ? 'checkmark-circle' : 'ellipse-outline'} size={14} color={taxability ? '#ffffff' : colors.textMuted} />
+                        <Text style={[styles.optionPillText, taxability && styles.optionPillTextActive]}>
+                          Taxable (Standard)
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.optionPill, !taxability && styles.optionPillActive]}
+                        onPress={() => setTaxability(false)}
+                      >
+                        <Ionicons name={!taxability ? 'checkmark-circle' : 'ellipse-outline'} size={14} color={!taxability ? '#ffffff' : colors.textMuted} />
+                        <Text style={[styles.optionPillText, !taxability && styles.optionPillTextActive]}>
+                          Exempt from RPT
+                        </Text>
+                      </TouchableOpacity>
                     </View>
                   </View>
 
@@ -3760,5 +3791,37 @@ const getStyles = (colors, isDarkMode, isLargeScreen = false) => StyleSheet.crea
     fontSize: 13,
     fontWeight: '800',
     color: '#ffffff'
+  },
+  optionPillRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 2
+  },
+  optionPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 9,
+    borderRadius: 8,
+    backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc',
+    borderWidth: 1,
+    borderColor: isDarkMode ? colors.border : '#e2e8f0',
+    gap: 4
+  },
+  optionPillActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary
+  },
+  optionPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.textMuted
+  },
+  optionPillTextActive: {
+    color: '#ffffff',
+    fontWeight: '800'
   }
 });

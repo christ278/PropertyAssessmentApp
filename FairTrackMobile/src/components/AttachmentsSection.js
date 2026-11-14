@@ -36,11 +36,23 @@ export const AttachmentsSection = ({
 
   const [resolvedSketchUri, setResolvedSketchUri] = useState('');
   const [fullscreenImage, setFullscreenImage] = useState(null);
+  const [fullscreenError, setFullscreenError] = useState(false);
+  const [sketchError, setSketchError] = useState(false);
+  const [failedPhotoIds, setFailedPhotoIds] = useState({});
   const [uploading, setUploading] = useState(false);
   const [photoToDelete, setPhotoToDelete] = useState(null);
 
   // Resolve web sketch URL to full address
   const [resolvedAttachmentUris, setResolvedAttachmentUris] = useState({});
+
+  useEffect(() => {
+    setSketchError(false);
+  }, [sketchUrl, sketchBase64]);
+
+  const openFullscreen = (uri) => {
+    setFullscreenError(false);
+    setFullscreenImage(uri);
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -319,33 +331,48 @@ export const AttachmentsSection = ({
               <TouchableOpacity
                 activeOpacity={0.85}
                 style={styles.sketchImageWrap}
-                onPress={() => setFullscreenImage(displaySketchUri)}
+                onPress={() => !sketchError && openFullscreen(displaySketchUri)}
               >
-                <Image
-                  source={{ uri: displaySketchUri }}
-                  style={styles.sketchImage}
-                  resizeMode="contain"
-                />
-                <View style={styles.zoomOverlay}>
-                  <Ionicons name="scan-outline" size={16} color="#ffffff" />
-                  <Text style={styles.zoomOverlayText}>Tap to Enlarge</Text>
-                </View>
+                {sketchError ? (
+                  <View style={styles.sketchErrorWrap}>
+                    <Ionicons name="cloud-offline-outline" size={38} color={colors.textMuted} />
+                    <Text style={styles.sketchErrorTitle}>Sketch Not Cached Offline</Text>
+                    <Text style={styles.sketchErrorText}>
+                      This blueprint could not be loaded from offline storage. You can take or replace a new site sketch using the buttons above.
+                    </Text>
+                  </View>
+                ) : (
+                  <>
+                    <Image
+                      source={{ uri: displaySketchUri }}
+                      style={styles.sketchImage}
+                      resizeMode="contain"
+                      onError={() => setSketchError(true)}
+                    />
+                    <View style={styles.zoomOverlay}>
+                      <Ionicons name="scan-outline" size={16} color="#ffffff" />
+                      <Text style={styles.zoomOverlayText}>Tap to Enlarge</Text>
+                    </View>
+                  </>
+                )}
               </TouchableOpacity>
 
               <View style={styles.sketchFooter}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.sketchFileName} numberOfLines={1}>
-                    {sketchUrl.split('/').pop()}
+                    {(sketchUrl || '').split('/').pop() || 'blueprint.jpg'}
                   </Text>
                   <Text style={styles.sketchHint}>Official blueprint for {propertyKind} inspection</Text>
                 </View>
-                <TouchableOpacity
-                  style={styles.viewFullBtn}
-                  onPress={() => setFullscreenImage(displaySketchUri)}
-                >
-                  <Ionicons name="expand-outline" size={16} color={colors.primary} />
-                  <Text style={styles.viewFullBtnText}>Full View</Text>
-                </TouchableOpacity>
+                {!sketchError && (
+                  <TouchableOpacity
+                    style={styles.viewFullBtn}
+                    onPress={() => openFullscreen(displaySketchUri)}
+                  >
+                    <Ionicons name="expand-outline" size={16} color={colors.primary} />
+                    <Text style={styles.viewFullBtnText}>Full View</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           ) : (
@@ -439,12 +466,16 @@ export const AttachmentsSection = ({
                     {/* Photo Thumbnail */}
                     <TouchableOpacity
                       activeOpacity={0.8}
-                      onPress={() => !isPdf && setFullscreenImage(itemUri)}
+                      onPress={() => !isPdf && !failedPhotoIds[itemId] && openFullscreen(itemUri)}
                       style={styles.attThumbnailWrap}
                     >
                       {isPdf ? (
                         <View style={[styles.attThumbnail, { backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' }]}>
                           <Ionicons name="document-text" size={26} color="#059669" />
+                        </View>
+                      ) : failedPhotoIds[itemId] ? (
+                        <View style={[styles.attThumbnail, { backgroundColor: isDarkMode ? '#334155' : '#f1f5f9', alignItems: 'center', justifyContent: 'center' }]}>
+                          <Ionicons name="cloud-offline-outline" size={22} color={colors.textMuted} />
                         </View>
                       ) : (
                         <Image
@@ -452,9 +483,10 @@ export const AttachmentsSection = ({
                           source={{ uri: itemUri }}
                           style={styles.attThumbnail}
                           resizeMode="cover"
+                          onError={() => setFailedPhotoIds(prev => ({ ...prev, [itemId]: true }))}
                         />
                       )}
-                      {!isPdf && (
+                      {!isPdf && !failedPhotoIds[itemId] && (
                         <View style={styles.thumbZoomPill}>
                           <Ionicons name="search" size={10} color="#ffffff" />
                         </View>
@@ -524,11 +556,22 @@ export const AttachmentsSection = ({
           </View>
 
           {fullscreenImage && (
-            <Image
-              source={{ uri: fullscreenImage }}
-              style={styles.modalFullscreenImage}
-              resizeMode="contain"
-            />
+            fullscreenError ? (
+              <View style={styles.modalErrorContainer}>
+                <Ionicons name="cloud-offline-outline" size={56} color="#94a3b8" />
+                <Text style={styles.modalErrorTitle}>Photo Unavailable Offline</Text>
+                <Text style={styles.modalErrorSubtitle}>
+                  This photo was not saved to local device storage before going offline.
+                </Text>
+              </View>
+            ) : (
+              <Image
+                source={{ uri: fullscreenImage }}
+                style={styles.modalFullscreenImage}
+                resizeMode="contain"
+                onError={() => setFullscreenError(true)}
+              />
+            )
           )}
         </View>
       </Modal>
@@ -629,10 +672,28 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
   },
   sketchImageWrap: {
     height: 220,
-    backgroundColor: '#0f172a',
+    backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc',
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center'
+  },
+  sketchErrorWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20
+  },
+  sketchErrorTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.textDark,
+    marginTop: 8
+  },
+  sketchErrorText: {
+    fontSize: 12,
+    color: colors.textMuted,
+    textAlign: 'center',
+    marginTop: 4,
+    maxWidth: 280
   },
   sketchImage: {
     width: '100%',
@@ -892,5 +953,23 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
   modalFullscreenImage: {
     width: '100%',
     height: '80%'
+  },
+  modalErrorContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 30
+  },
+  modalErrorTitle: {
+    color: '#ffffff',
+    fontSize: 17,
+    fontWeight: '700',
+    marginTop: 14
+  },
+  modalErrorSubtitle: {
+    color: '#94a3b8',
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: 6,
+    maxWidth: 280
   }
 });
