@@ -1376,19 +1376,26 @@ export const SyncProvider = ({ children }) => {
           res = await MobileApi.forwardWorkflow(
             item.payload.formWorkflowId,
             item.payload.nextStatusId,
-            item.payload.remarks
+            item.payload.remarks,
+            item.payload.trackingNo
           );
         }
 
         if (res && res.success) {
           // If this update included a workflow transfer to the next step, forward it too
           let wasTransferred = false;
-          if (item.workflowForwardPayload && item.workflowForwardPayload.formWorkflowId && item.workflowForwardPayload.nextStatusId) {
+          const p = item.payload;
+          const tdn = p?.TDN || p?.tdn;
+          const itemTrack = tdn?.TrackingNo || tdn?.trackingNo;
+          const fwdTrack = item.workflowForwardPayload?.trackingNo || itemTrack;
+
+          if (item.workflowForwardPayload && (item.workflowForwardPayload.formWorkflowId || fwdTrack) && item.workflowForwardPayload.nextStatusId) {
             try {
               await MobileApi.forwardWorkflow(
                 item.workflowForwardPayload.formWorkflowId,
                 item.workflowForwardPayload.nextStatusId,
-                item.workflowForwardPayload.remarks || 'Completed field assessment and synced.'
+                item.workflowForwardPayload.remarks || 'Completed field assessment and synced.',
+                fwdTrack
               );
               wasTransferred = true;
             } catch (fwdErr) {

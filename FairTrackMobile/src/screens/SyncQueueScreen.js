@@ -122,9 +122,40 @@ export const SyncQueueScreen = ({ navigation }) => {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bgLight }]}>
-      <HeaderBar title="OFFICE SYNC CENTER" subtitle="Offline-to-Online Batch Manager" navigation={navigation} />
+      <HeaderBar navigation={navigation} />
 
       <View style={styles.content}>
+        {/* Screen Title */}
+        <View style={styles.screenHeader}>
+          <View style={styles.screenHeaderRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.screenTitle, { color: colors.textDark }]}>Office Sync Center</Text>
+              <Text style={[styles.screenSubtitle, { color: colors.textMuted }]}>
+                Offline-to-Online Batch Manager
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.countBadge,
+                {
+                  backgroundColor:
+                    pendingCount > 0
+                      ? (isDarkMode ? '#78350f' : '#fef3c7')
+                      : (isDarkMode ? '#064e3b' : '#dcfce7')
+                }
+              ]}
+            >
+              <Text
+                style={[
+                  styles.countBadgeText,
+                  { color: pendingCount > 0 ? colors.accentGold : colors.accentGreen }
+                ]}
+              >
+                {pendingCount} Pending
+              </Text>
+            </View>
+          </View>
+        </View>
         {!isOnline && (
           <View style={styles.offlineNoticeBanner}>
             <Ionicons name="cloud-offline-outline" size={18} color="#b45309" />
@@ -404,5 +435,32 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     textAlign: 'center',
     marginTop: 4
+  },
+  screenHeader: {
+    marginBottom: 12
+  },
+  screenHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between'
+  },
+  screenTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.3
+  },
+  screenSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
+    fontWeight: '500'
+  },
+  countBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12
+  },
+  countBadgeText: {
+    fontSize: 11,
+    fontWeight: '800'
   }
 });

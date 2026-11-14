@@ -27,7 +27,7 @@ export const LogoutModal = ({
 
   const handleSyncAndLogout = async () => {
     if (typeof onSyncAll !== 'function') {
-      onConfirmLogout();
+      handleSignOutAction();
       return;
     }
 
@@ -38,7 +38,7 @@ export const LogoutModal = ({
       setSyncingBeforeLogout(false);
 
       if (res && res.success) {
-        onConfirmLogout();
+        handleSignOutAction();
       } else {
         setSyncError(
           `Sync completed with ${res?.failureCount || 0} issues. You can sign out anyway or stay logged in to check.`
@@ -50,15 +50,19 @@ export const LogoutModal = ({
     }
   };
 
-  const handleSignOutAnyway = () => {
+  const handleSignOutAction = () => {
     setSyncError(null);
-    onConfirmLogout();
+    if (typeof onConfirmLogout === 'function') {
+      onConfirmLogout();
+    }
   };
 
   const handleClose = () => {
     if (syncingBeforeLogout) return;
     setSyncError(null);
-    onClose();
+    if (typeof onClose === 'function') {
+      onClose();
+    }
   };
 
   const hasPending = pendingCount > 0;
@@ -181,7 +185,7 @@ export const LogoutModal = ({
                       borderColor: '#7f1d1d'
                     }
                   ]}
-                  onPress={handleSignOutAnyway}
+                  onPress={handleSignOutAction}
                   disabled={syncingBeforeLogout}
                 >
                   <Ionicons name="log-out-outline" size={17} color={isDarkMode ? '#fca5a5' : COLORS.accentRed} />
@@ -207,7 +211,7 @@ export const LogoutModal = ({
               <>
                 <TouchableOpacity
                   style={[styles.primaryBtn, styles.dangerBtn]}
-                  onPress={onConfirmLogout}
+                  onPress={handleSignOutAction}
                 >
                   <Ionicons name="log-out-outline" size={18} color="#ffffff" />
                   <Text style={styles.primaryBtnText}>Yes, Sign Out</Text>

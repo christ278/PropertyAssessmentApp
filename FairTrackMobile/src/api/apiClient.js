@@ -97,6 +97,10 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+    // Never auto-relogin or intercept logout requests
+    if (originalRequest && originalRequest.url && originalRequest.url.includes('logout')) {
+      return Promise.resolve({ data: { success: true } });
+    }
     if (error.response && error.response.status === 401 && originalRequest && !originalRequest._retried) {
       originalRequest._retried = true;
       try {

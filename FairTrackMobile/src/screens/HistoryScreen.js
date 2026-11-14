@@ -417,8 +417,6 @@ export const HistoryScreen = ({ navigation }) => {
   return (
     <View style={[styles.container, { backgroundColor: colors.bgLight }]}>
       <HeaderBar
-        title="APPRAISAL HISTORY"
-        subtitle={`${historyRecords.length} permanent record(s) on device`}
         navigation={navigation}
         onRefresh={() => {
           setRefreshing(true);
@@ -426,6 +424,23 @@ export const HistoryScreen = ({ navigation }) => {
         }}
         isRefreshing={refreshing}
       />
+
+      {/* Screen Title */}
+      <View style={styles.screenHeader}>
+        <View style={styles.screenHeaderRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.screenTitle, { color: colors.textDark }]}>Appraisal History</Text>
+            <Text style={[styles.screenSubtitle, { color: colors.textMuted }]}>
+              Permanent Local Records Archive
+            </Text>
+          </View>
+          <View style={[styles.countBadge, { backgroundColor: isDarkMode ? '#1e1b4b' : '#ede9fe' }]}>
+            <Text style={[styles.countBadgeText, { color: '#8b5cf6' }]}>
+              {historyRecords.length} Saved
+            </Text>
+          </View>
+        </View>
+      </View>
 
       {/* Top Search & Clear Bar */}
       <View style={[styles.topBar, { backgroundColor: colors.cardBg, borderBottomColor: colors.border }]}>
@@ -1108,5 +1123,34 @@ const styles = StyleSheet.create({
   modalBtnText: {
     fontSize: 13,
     fontWeight: '700'
-  }
+  },
+  screenHeader: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 4
+  },
+  screenHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between'
+  },
+  screenTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.3
+  },
+  screenSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
+    fontWeight: '500'
+  },
+  countBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12
+  },
+  countBadgeText: {
+    fontSize: 11,
+    fontWeight: '800'
+  },
 });

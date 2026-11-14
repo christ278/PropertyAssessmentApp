@@ -89,12 +89,19 @@ export const ProfileScreen = ({ navigation }) => {
   return (
     <View style={[styles.container, { backgroundColor: colors.bgLight }]}>
       <HeaderBar
-        title="STAFF PROFILE"
-        subtitle={`Division ${user?.divisionId || 1} • ${user?.username || 'Assessor'}`}
         navigation={navigation}
+        onRefresh={handleTestConnection}
+        isRefreshing={testingConnection}
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Screen Title */}
+        <View style={styles.screenHeader}>
+          <Text style={[styles.screenTitle, { color: colors.textDark }]}>Staff Profile</Text>
+          <Text style={[styles.screenSubtitle, { color: colors.textMuted }]}>
+            Account Settings & Device Diagnostics
+          </Text>
+        </View>
         {/* Profile Identity Card */}
         <View
           style={[
@@ -781,6 +788,19 @@ const styles = StyleSheet.create({
   },
   themePillLabel: {
     fontSize: 13
-  }
+  },
+  screenHeader: {
+    marginBottom: 16
+  },
+  screenTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.3
+  },
+  screenSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
+    fontWeight: '500'
+  },
 });
 

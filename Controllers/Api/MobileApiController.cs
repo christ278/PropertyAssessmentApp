@@ -109,18 +109,99 @@ public class MobileApiController : ControllerBase
     {
         var jwtUser = HttpContext.Items["JwtUser"] as JwtPayload;
         int divisionId = jwtUser?.DivisionId ?? 1;
+        Guid.TryParse(jwtUser?.Uid, out var userId);
 
-        int pendingInspections = await _context.RequestForInspections
-            .CountAsync(r => r.Status != RequestForInspectionStatus.Releasing && r.Status != RequestForInspectionStatus.Deferred);
+        int pendingInspections = 0;
+        int pendingAssessments = 0;
 
-        int pendingAssessments = await _context.PropertyAssessmentRequests
-            .CountAsync(p => p.Status != PropertyAssessmentStatus.Releasing && p.Status != PropertyAssessmentStatus.Deferred);
+        if (userId != Guid.Empty)
+        {
+            var personalQueue = _workflowService.GetPersonalQueueForUser(userId)
+                .Where(q => IsAllowedMobileTransactionType(q.RequestType))
+                .ToList();
+
+            var rpaIds = personalQueue
+                .Where(q => q.RequestType.Equals("PropertyAssessmentRequest", StringComparison.OrdinalIgnoreCase))
+                .Select(q => q.RequestId)
+                .Distinct()
+                .ToList();
+
+            var rfiIds = personalQueue
+                .Where(q => q.RequestType.Equals("RequestForInspection", StringComparison.OrdinalIgnoreCase))
+                .Select(q => q.RequestId)
+                .Distinct()
+                .ToList();
+
+            var rpas = rpaIds.Count > 0
+                ? await _context.PropertyAssessmentRequests
+                    .AsNoTracking()
+                    .Where(r => rpaIds.Contains(r.Id))
+                    .Select(r => new ParentRpaSummary { Id = r.Id, Kind = r.Kind, GeneratedPartitionsJson = r.GeneratedPartitionsJson })
+                    .ToDictionaryAsync(r => r.Id)
+                : new Dictionary<Guid, ParentRpaSummary>();
+
+            var rfis = rfiIds.Count > 0
+                ? await _context.RequestForInspections
+                    .AsNoTracking()
+                    .Where(r => rfiIds.Contains(r.Id))
+                    .Select(r => new ParentRfiSummary { Id = r.Id, Kind = r.Kind, GeneratedPartitionsJson = r.GeneratedPartitionsJson })
+                    .ToDictionaryAsync(r => r.Id)
+                : new Dictionary<Guid, ParentRfiSummary>();
+
+            foreach (var item in personalQueue)
+            {
+                if (item.RequestType.Equals("PropertyAssessmentRequest", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (rpas.TryGetValue(item.RequestId, out var rpa))
+                    {
+                        int? parentKindId = ResolvePropertyKindId((string?)rpa.Kind);
+                        if (!parentKindId.HasValue) continue;
+
+                        var partitions = PartitionJsonHelper.ParseList((string?)rpa.GeneratedPartitionsJson);
+                        bool mismatch = false;
+                        for (int i = 0; i < partitions.Count; i++)
+                        {
+                            var pKind = ResolvePropertyKindId(partitions[i].Kind);
+                            if (!pKind.HasValue || pKind.Value != parentKindId.Value)
+                            {
+                                mismatch = true;
+                                break;
+                            }
+                        }
+                        if (!mismatch) pendingAssessments++;
+                    }
+                }
+                else if (item.RequestType.Equals("RequestForInspection", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (rfis.TryGetValue(item.RequestId, out var rfi))
+                    {
+                        int? parentKindId = ResolvePropertyKindId((string?)rfi.Kind);
+                        if (!parentKindId.HasValue) continue;
+
+                        var partitions = PartitionJsonHelper.ParseList((string?)rfi.GeneratedPartitionsJson);
+                        bool mismatch = false;
+                        for (int i = 0; i < partitions.Count; i++)
+                        {
+                            var pKind = ResolvePropertyKindId(partitions[i].Kind);
+                            if (!pKind.HasValue || pKind.Value != parentKindId.Value)
+                            {
+                                mismatch = true;
+                                break;
+                            }
+                        }
+                        if (!mismatch) pendingInspections++;
+                    }
+                }
+            }
+        }
 
         var today = DateTime.Today;
+        string userName = jwtUser?.Name ?? string.Empty;
         int completedToday = await _context.DocumentForwardingLogs
             .CountAsync(l => l.Timestamp >= today &&
                              (l.RequestType == "PropertyAssessmentRequest" || l.RequestType == "RequestForInspection") &&
-                             (l.ToStage == WorkflowStage.Releasing || l.ToStage == WorkflowStage.Completed || l.ActionTaken == "Approved"));
+                             (string.IsNullOrEmpty(userName) || l.ForwardedByName == userName) &&
+                             (l.ToStage == WorkflowStage.Releasing || l.ToStage == WorkflowStage.Completed || l.ActionTaken == "Approved" || l.ActionTaken == "Forwarded"));
 
         return Ok(new
         {
@@ -137,18 +218,30 @@ public class MobileApiController : ControllerBase
         });
     }
 
-        private List<MobilePartitionSummaryDTO> BuildPartitionSummaries(List<AssessmentPartitionItem> partitions, string defaultOwner, int fallbackPhotoCount = 0, string? parentKind = null)
+    private static int? ResolvePropertyKindId(string? kind)
+    {
+        if (string.IsNullOrWhiteSpace(kind)) return null;
+
+        bool hasLand = Regex.IsMatch(kind, @"\b(Land|R-Land)\b", RegexOptions.IgnoreCase);
+        bool hasBuilding = Regex.IsMatch(kind, @"\b(Building|Build)\b", RegexOptions.IgnoreCase);
+        bool hasMachinery = Regex.IsMatch(kind, @"\b(Machinery|Machine|Machin)\b", RegexOptions.IgnoreCase);
+
+        int matchCount = (hasLand ? 1 : 0) + (hasBuilding ? 1 : 0) + (hasMachinery ? 1 : 0);
+        if (matchCount != 1) return null;
+
+        if (hasLand) return 1;
+        if (hasBuilding) return 2;
+        if (hasMachinery) return 3;
+        return null;
+    }
+
+    private List<MobilePartitionSummaryDTO> BuildPartitionSummaries(List<AssessmentPartitionItem> partitions, string defaultOwner, int fallbackPhotoCount = 0, string? parentKind = null)
     {
         var result = new List<MobilePartitionSummaryDTO>();
         for (int i = 0; i < partitions.Count; i++)
         {
             var p = partitions[i];
-            if (!string.IsNullOrWhiteSpace(parentKind) && (string.IsNullOrWhiteSpace(p.Kind) || (string.Equals(parentKind, "Land", StringComparison.OrdinalIgnoreCase) && string.Equals(p.Kind, "Building", StringComparison.OrdinalIgnoreCase))))
-            {
-                p.Kind = parentKind;
-            }
-            int fallbackKindId = ParsePropertyKindId(parentKind, 1);
-            int pKindId = ParsePropertyKindId(p.Kind, fallbackKindId);
+            int pKindId = ResolvePropertyKindId(p.Kind) ?? (ResolvePropertyKindId(parentKind) ?? 1);
             string fType = pKindId switch { 1 => "LAND", 3 => "MACHINERY", _ => "BUILDING" };
             int pPhotoCount = 0;
             if (!string.IsNullOrWhiteSpace(p.AttachmentsJson))
@@ -286,24 +379,83 @@ public class MobileApiController : ControllerBase
         return $"{baseUrl}{clean}";
     }
 
+    private sealed class ParentRpaSummary
+    {
+        public Guid Id { get; set; }
+        public string TrackingNumber { get; set; } = string.Empty;
+        public string? Kind { get; set; }
+        public string? PrevTDN { get; set; }
+        public string? PrevPIN { get; set; }
+        public string? NewOwnerName { get; set; }
+        public string? PrevOwner { get; set; }
+        public string? Requestor { get; set; }
+        public DateTime RequestDate { get; set; }
+        public string? GeneratedPartitionsJson { get; set; }
+        public string? WebRelativePath { get; set; }
+    }
+
+    private sealed class ParentRfiSummary
+    {
+        public Guid Id { get; set; }
+        public string TrackingNumber { get; set; } = string.Empty;
+        public string? Kind { get; set; }
+        public string? TaxDeclarationNumber { get; set; }
+        public string? PropertyIndexNumber { get; set; }
+        public string? OwnerName { get; set; }
+        public string? Representative { get; set; }
+        public DateTime RequestDate { get; set; }
+        public string? GeneratedPartitionsJson { get; set; }
+        public string? WebRelativePath { get; set; }
+    }
+
     // GET: /api/mobile/transactions
     [HttpGet("transactions")]
     public async Task<IActionResult> Transactions(int? propertyTypeId = null, string trackingNo = "", int page = 1, int pageSize = 50)
     {
         var jwtUser = HttpContext.Items["JwtUser"] as JwtPayload;
-        Guid.TryParse(jwtUser?.Uid, out var userId);
+        if (jwtUser == null || string.IsNullOrWhiteSpace(jwtUser.Uid) || !Guid.TryParse(jwtUser.Uid, out var userId) || userId == Guid.Empty)
+        {
+            return Unauthorized(new
+            {
+                success = false,
+                message = "Unauthorized: Invalid or missing user authentication."
+            });
+        }
 
-        // 1. Fetch personal queue for user and strictly filter to PropertyAssessmentRequest & RequestForInspection
+        if (page < 1)
+        {
+            return BadRequest(new
+            {
+                success = false,
+                message = "Page must be greater than or equal to 1."
+            });
+        }
+
+        if (pageSize < 1 || pageSize > 100)
+        {
+            return BadRequest(new
+            {
+                success = false,
+                message = "PageSize must be between 1 and 100, inclusive."
+            });
+        }
+
+        // 1. Fetch personal queue for user ONLY and strictly filter to PropertyAssessmentRequest & RequestForInspection
         var queue = _workflowService.GetPersonalQueueForUser(userId)
             .Where(q => IsAllowedMobileTransactionType(q.RequestType))
             .ToList();
 
-        // 2. If personal queue has no Property Assessment / Field Inspection items, fall back to Division 1 Pool
+        // An empty Personal Queue must return a successful response with an empty transaction list
         if (queue.Count == 0)
         {
-            queue = _workflowService.GetPoolQueueForDivision(DivisionType.Division1_TaxAssessmentAndLandHolding)
-                .Where(q => IsAllowedMobileTransactionType(q.RequestType))
-                .ToList();
+            return Ok(new
+            {
+                success = true,
+                totalRecords = 0,
+                page = page,
+                pageSize = pageSize,
+                data = new List<TransactionWorkFlowDTO>()
+            });
         }
 
         // Filter by tracking number / owner / reference if specified
@@ -315,180 +467,265 @@ public class MobileApiController : ControllerBase
                                      (q.ReferenceNumber ?? "").ToLower().Contains(clean)).ToList();
         }
 
-        // Preload PropertyAssessmentRequests, RequestForInspections, and TaxDeclarations for accurate kind & TDN resolution
-        var allRpas = await _context.PropertyAssessmentRequests
-            .AsNoTracking()
-            .Select(r => new { r.Id, r.TrackingNumber, r.Kind, r.RefTaxDeclarationId, r.PrevTDN, r.PrevPIN, r.NewOwnerName, r.PrevOwner, r.Requestor, r.RequestDate, r.GeneratedPartitionsJson, r.WebRelativePath })
-            .ToListAsync();
-
-        var allRfis = await _context.RequestForInspections
-            .AsNoTracking()
-            .Select(r => new { r.Id, r.TrackingNumber, r.Kind, r.TaxDeclarationId, r.TaxDeclarationNumber, r.PropertyIndexNumber, r.OwnerName, r.Representative, r.RequestDate, r.GeneratedPartitionsJson, r.WebRelativePath })
-            .ToListAsync();
-
-        var allTds = await _context.TaxDeclarations
-            .AsNoTracking()
-            .Select(t => new { t.Id, t.TaxDeclarationNumber, t.PropertyIndexNumber, t.Kind })
-            .ToListAsync();
-
-        var list = queue.Select(item =>
+        if (queue.Count == 0)
         {
-            long numericWfId = GuidToNumericId(item.RequestId);
-            int transType = 2; // 1: Land, 2: Building, 3: Machinery
-            long? resolvedTdnId = null;
-            string cleanRequestType = item.RequestType.Equals("RequestForInspection", StringComparison.OrdinalIgnoreCase)
-                ? "Field Inspection"
-                : "Property Assessment";
-            string ownerName = item.OwnerOrApplicant;
-            string requestorName = item.OwnerOrApplicant;
-            string arpOrPinRef = item.ReferenceNumber;
-            DateTime submittedDate = item.DateSubmitted;
-            bool hasPart = false;
-            int partitionCount = 0;
-            var partitionSummaries = new List<MobilePartitionSummaryDTO>();
+            return Ok(new
+            {
+                success = true,
+                totalRecords = 0,
+                page = page,
+                pageSize = pageSize,
+                data = new List<TransactionWorkFlowDTO>()
+            });
+        }
 
+        var rpaIds = queue
+            .Where(q => q.RequestType.Equals("PropertyAssessmentRequest", StringComparison.OrdinalIgnoreCase))
+            .Select(q => q.RequestId)
+            .Distinct()
+            .ToList();
+
+        var rfiIds = queue
+            .Where(q => q.RequestType.Equals("RequestForInspection", StringComparison.OrdinalIgnoreCase))
+            .Select(q => q.RequestId)
+            .Distinct()
+            .ToList();
+
+        var rpaDict = rpaIds.Count > 0
+            ? await _context.PropertyAssessmentRequests
+                .AsNoTracking()
+                .Where(r => rpaIds.Contains(r.Id))
+                .Select(r => new ParentRpaSummary
+                {
+                    Id = r.Id,
+                    TrackingNumber = r.TrackingNumber,
+                    Kind = r.Kind,
+                    PrevTDN = r.PrevTDN,
+                    PrevPIN = r.PrevPIN,
+                    NewOwnerName = r.NewOwnerName,
+                    PrevOwner = r.PrevOwner,
+                    Requestor = r.Requestor,
+                    RequestDate = r.RequestDate,
+                    GeneratedPartitionsJson = r.GeneratedPartitionsJson,
+                    WebRelativePath = r.WebRelativePath
+                })
+                .ToDictionaryAsync(r => r.Id)
+            : new Dictionary<Guid, ParentRpaSummary>();
+
+        var rfiDict = rfiIds.Count > 0
+            ? await _context.RequestForInspections
+                .AsNoTracking()
+                .Where(r => rfiIds.Contains(r.Id))
+                .Select(r => new ParentRfiSummary
+                {
+                    Id = r.Id,
+                    TrackingNumber = r.TrackingNumber,
+                    Kind = r.Kind,
+                    TaxDeclarationNumber = r.TaxDeclarationNumber,
+                    PropertyIndexNumber = r.PropertyIndexNumber,
+                    OwnerName = r.OwnerName,
+                    Representative = r.Representative,
+                    RequestDate = r.RequestDate,
+                    GeneratedPartitionsJson = r.GeneratedPartitionsJson,
+                    WebRelativePath = r.WebRelativePath
+                })
+                .ToDictionaryAsync(r => r.Id)
+            : new Dictionary<Guid, ParentRfiSummary>();
+
+        var validatedTransactions = new List<(DateTime? RequestDate, TransactionWorkFlowDTO Dto)>();
+
+        foreach (var item in queue)
+        {
             if (item.RequestType.Equals("PropertyAssessmentRequest", StringComparison.OrdinalIgnoreCase))
             {
-                var rpa = allRpas.FirstOrDefault(r => r.Id == item.RequestId);
-                if (rpa != null)
+                if (!rpaDict.TryGetValue(item.RequestId, out var rpa))
                 {
-                    var partitions = PartitionJsonHelper.ParseList(rpa.GeneratedPartitionsJson);
-                    var firstPart = partitions.FirstOrDefault();
-                    hasPart = partitions.Count > 0;
-                    partitionCount = partitions.Count;
+                    Console.WriteLine($"[MobileApi] Excluded invalid transaction: TrackingNo='{item.TrackingNumber}', RequestId='{item.RequestId}', Reason='Parent PropertyAssessmentRequest record not found in database'");
+                    continue;
+                }
 
-                    int dossierPhotos = !string.IsNullOrWhiteSpace(item.RequestType == "PropertyAssessmentRequest" ? allRpas.FirstOrDefault(r => r.Id == item.RequestId)?.WebRelativePath : allRfis.FirstOrDefault(r => r.Id == item.RequestId)?.WebRelativePath) ? 1 : 0;
-                    partitionSummaries = BuildPartitionSummaries(partitions, ownerName, dossierPhotos, rpa.Kind);
+                int? parentKindId = ResolvePropertyKindId(rpa.Kind);
+                if (!parentKindId.HasValue)
+                {
+                    Console.WriteLine($"[MobileApi] Excluded invalid transaction: TrackingNo='{item.TrackingNumber}', RequestId='{item.RequestId}', ParentKind='{rpa.Kind}', Reason='Parent Kind is missing or cannot be resolved'");
+                    continue;
+                }
 
-                    ownerName = !string.IsNullOrWhiteSpace(rpa.NewOwnerName) ? rpa.NewOwnerName
-                              : !string.IsNullOrWhiteSpace(rpa.PrevOwner) ? rpa.PrevOwner
-                              : !string.IsNullOrWhiteSpace(firstPart?.NewOwnerName) ? firstPart!.NewOwnerName
-                              : !string.IsNullOrWhiteSpace(rpa.Requestor) ? rpa.Requestor
-                              : item.OwnerOrApplicant;
-
-                    requestorName = !string.IsNullOrWhiteSpace(rpa.Requestor) ? rpa.Requestor : ownerName;
-                    submittedDate = rpa.RequestDate != default ? rpa.RequestDate : item.DateSubmitted;
-
-                    arpOrPinRef = !string.IsNullOrWhiteSpace(firstPart?.SystemGeneratedTDN) ? firstPart!.SystemGeneratedTDN
-                                : !string.IsNullOrWhiteSpace(firstPart?.PIN) ? firstPart!.PIN
-                                : !string.IsNullOrWhiteSpace(rpa.PrevTDN) ? rpa.PrevTDN
-                                : !string.IsNullOrWhiteSpace(rpa.PrevPIN) ? rpa.PrevPIN
-                                : string.Empty;
-
-                    transType = ParsePropertyKindId(rpa.Kind, 1);
-                    if (string.Equals(rpa.Kind, "Land", StringComparison.OrdinalIgnoreCase))
+                var partitions = PartitionJsonHelper.ParseList(rpa.GeneratedPartitionsJson);
+                bool partitionKindMismatch = false;
+                for (int i = 0; i < partitions.Count; i++)
+                {
+                    var p = partitions[i];
+                    int? pKindId = ResolvePropertyKindId(p.Kind);
+                    if (!pKindId.HasValue || pKindId.Value != parentKindId.Value)
                     {
-                        transType = 1;
-                    }
-                    else if (string.Equals(rpa.Kind, "Machinery", StringComparison.OrdinalIgnoreCase))
-                    {
-                        transType = 3;
-                    }
-                    else if (firstPart != null && !string.IsNullOrWhiteSpace(firstPart.Kind))
-                    {
-                        transType = ParsePropertyKindId(firstPart.Kind, transType);
-                    }
-
-                    var matchedTd = allTds.FirstOrDefault(t =>
-                        (rpa.RefTaxDeclarationId.HasValue && t.Id == rpa.RefTaxDeclarationId.Value) ||
-                        (firstPart != null && !string.IsNullOrWhiteSpace(firstPart.SystemGeneratedTDN) && t.TaxDeclarationNumber.Equals(firstPart.SystemGeneratedTDN, StringComparison.OrdinalIgnoreCase)) ||
-                        (!string.IsNullOrWhiteSpace(rpa.PrevTDN) && t.TaxDeclarationNumber.Equals(rpa.PrevTDN, StringComparison.OrdinalIgnoreCase)) ||
-                        (!string.IsNullOrWhiteSpace(rpa.PrevPIN) && t.PropertyIndexNumber.Equals(rpa.PrevPIN, StringComparison.OrdinalIgnoreCase)));
-
-                    if (matchedTd != null)
-                    {
-                        resolvedTdnId = GuidToNumericId(matchedTd.Id);
+                        string pIdentifier = !string.IsNullOrWhiteSpace(p.PartitionIndex) ? p.PartitionIndex : ((char)('A' + i)).ToString();
+                        Console.WriteLine($"[MobileApi] Excluded invalid transaction: TrackingNo='{item.TrackingNumber}', RequestId='{item.RequestId}', ParentKind='{rpa.Kind}', PartitionIndex='{pIdentifier}', PartitionKind='{p.Kind}', Reason='Partition Kind differs from parent transaction type'");
+                        partitionKindMismatch = true;
+                        break;
                     }
                 }
+                if (partitionKindMismatch)
+                {
+                    continue;
+                }
+
+                long numericWfId = GuidToNumericId(item.RequestId);
+                var firstPart = partitions.FirstOrDefault();
+                bool hasPart = partitions.Count > 0;
+                int partitionCount = partitions.Count;
+
+                int dossierPhotos = !string.IsNullOrWhiteSpace(rpa.WebRelativePath) ? 1 : 0;
+                var partitionSummaries = BuildPartitionSummaries(partitions, item.OwnerOrApplicant, dossierPhotos, rpa.Kind);
+
+                string ownerName = !string.IsNullOrWhiteSpace(rpa.NewOwnerName) ? rpa.NewOwnerName
+                          : !string.IsNullOrWhiteSpace(rpa.PrevOwner) ? rpa.PrevOwner
+                          : !string.IsNullOrWhiteSpace(firstPart?.NewOwnerName) ? firstPart!.NewOwnerName
+                          : !string.IsNullOrWhiteSpace(rpa.Requestor) ? rpa.Requestor
+                          : item.OwnerOrApplicant;
+
+                string requestorName = !string.IsNullOrWhiteSpace(rpa.Requestor) ? rpa.Requestor : ownerName;
+                DateTime? reqDate = rpa.RequestDate != default ? rpa.RequestDate : (DateTime?)null;
+                DateTime submittedDate = reqDate ?? item.DateSubmitted;
+
+                string arpOrPinRef = !string.IsNullOrWhiteSpace(firstPart?.SystemGeneratedTDN) ? firstPart!.SystemGeneratedTDN
+                            : !string.IsNullOrWhiteSpace(firstPart?.PIN) ? firstPart!.PIN
+                            : !string.IsNullOrWhiteSpace(rpa.PrevTDN) ? rpa.PrevTDN
+                            : !string.IsNullOrWhiteSpace(rpa.PrevPIN) ? rpa.PrevPIN
+                            : string.Empty;
+
+                var dto = new TransactionWorkFlowDTO
+                {
+                    FormworkflowId = numericWfId,
+                    TrackingNo = item.TrackingNumber,
+                    TransactionTypeId = parentKindId.Value,
+                    RequestType = "Property Assessment",
+                    ARPNo = arpOrPinRef,
+                    Owner = ownerName,
+                    Requestor = requestorName,
+                    AcceptedBy = item.AssignedUserName ?? "Staff",
+                    CurrentStatusId = (int)item.CurrentStage,
+                    CurrentStatus = item.CurrentStageName,
+                    Remarks = item.LastRemarks ?? string.Empty,
+                    IsComplete = item.CurrentStage == WorkflowStage.Releasing || item.CurrentStage == WorkflowStage.Completed,
+                    IsDeffered = item.IsDeferred,
+                    IsCheckout = item.IsClaimed,
+                    SubmittedDate = submittedDate,
+                    ForwarderBy = item.LastForwardedBy ?? "Office Staff",
+                    TdnId = null,
+                    HasPartition = hasPart,
+                    PartitionCount = partitionCount,
+                    Partitions = partitionSummaries
+                };
+
+                validatedTransactions.Add((reqDate, dto));
             }
             else if (item.RequestType.Equals("RequestForInspection", StringComparison.OrdinalIgnoreCase))
             {
-                var rfi = allRfis.FirstOrDefault(r => r.Id == item.RequestId);
-
-                if (rfi != null)
+                if (!rfiDict.TryGetValue(item.RequestId, out var rfi))
                 {
-                    var partitions = PartitionJsonHelper.ParseList(rfi.GeneratedPartitionsJson);
-                    var firstPart = partitions.FirstOrDefault();
-                    hasPart = partitions.Count > 0;
-                    partitionCount = partitions.Count;
+                    Console.WriteLine($"[MobileApi] Excluded invalid transaction: TrackingNo='{item.TrackingNumber}', RequestId='{item.RequestId}', Reason='Parent RequestForInspection record not found in database'");
+                    continue;
+                }
 
-                    int dossierPhotos = !string.IsNullOrWhiteSpace(item.RequestType == "PropertyAssessmentRequest" ? allRpas.FirstOrDefault(r => r.Id == item.RequestId)?.WebRelativePath : allRfis.FirstOrDefault(r => r.Id == item.RequestId)?.WebRelativePath) ? 1 : 0;
-                    partitionSummaries = BuildPartitionSummaries(partitions, ownerName, dossierPhotos, rfi.Kind);
+                int? parentKindId = ResolvePropertyKindId(rfi.Kind);
+                if (!parentKindId.HasValue)
+                {
+                    Console.WriteLine($"[MobileApi] Excluded invalid transaction: TrackingNo='{item.TrackingNumber}', RequestId='{item.RequestId}', ParentKind='{rfi.Kind}', Reason='Parent Kind is missing or cannot be resolved'");
+                    continue;
+                }
 
-                    ownerName = !string.IsNullOrWhiteSpace(rfi.OwnerName) ? rfi.OwnerName
-                              : !string.IsNullOrWhiteSpace(firstPart?.NewOwnerName) ? firstPart!.NewOwnerName
-                              : !string.IsNullOrWhiteSpace(rfi.Representative) ? rfi.Representative
-                              : item.OwnerOrApplicant;
-
-                    requestorName = !string.IsNullOrWhiteSpace(rfi.Representative) ? rfi.Representative : ownerName;
-                    submittedDate = rfi.RequestDate != default ? rfi.RequestDate : item.DateSubmitted;
-
-                    arpOrPinRef = !string.IsNullOrWhiteSpace(firstPart?.SystemGeneratedTDN) ? firstPart!.SystemGeneratedTDN
-                                : !string.IsNullOrWhiteSpace(firstPart?.PIN) ? firstPart!.PIN
-                                : !string.IsNullOrWhiteSpace(rfi.TaxDeclarationNumber) ? rfi.TaxDeclarationNumber
-                                : !string.IsNullOrWhiteSpace(rfi.PropertyIndexNumber) ? rfi.PropertyIndexNumber
-                                : string.Empty;
-
-                    transType = ParsePropertyKindId(rfi.Kind, 1);
-                    if (string.Equals(rfi.Kind, "Land", StringComparison.OrdinalIgnoreCase))
+                var partitions = PartitionJsonHelper.ParseList(rfi.GeneratedPartitionsJson);
+                bool partitionKindMismatch = false;
+                for (int i = 0; i < partitions.Count; i++)
+                {
+                    var p = partitions[i];
+                    int? pKindId = ResolvePropertyKindId(p.Kind);
+                    if (!pKindId.HasValue || pKindId.Value != parentKindId.Value)
                     {
-                        transType = 1;
-                    }
-                    else if (string.Equals(rfi.Kind, "Machinery", StringComparison.OrdinalIgnoreCase))
-                    {
-                        transType = 3;
-                    }
-                    else if (firstPart != null && !string.IsNullOrWhiteSpace(firstPart.Kind))
-                    {
-                        transType = ParsePropertyKindId(firstPart.Kind, transType);
-                    }
-
-                    var matchedTd = allTds.FirstOrDefault(t =>
-                        (rfi.TaxDeclarationId.HasValue && t.Id == rfi.TaxDeclarationId.Value) ||
-                        (firstPart != null && !string.IsNullOrWhiteSpace(firstPart.SystemGeneratedTDN) && t.TaxDeclarationNumber.Equals(firstPart.SystemGeneratedTDN, StringComparison.OrdinalIgnoreCase)) ||
-                        (!string.IsNullOrWhiteSpace(rfi.TaxDeclarationNumber) && t.TaxDeclarationNumber.Equals(rfi.TaxDeclarationNumber, StringComparison.OrdinalIgnoreCase)) ||
-                        (!string.IsNullOrWhiteSpace(rfi.PropertyIndexNumber) && t.PropertyIndexNumber.Equals(rfi.PropertyIndexNumber, StringComparison.OrdinalIgnoreCase)));
-
-                    if (matchedTd != null)
-                    {
-                        resolvedTdnId = GuidToNumericId(matchedTd.Id);
+                        string pIdentifier = !string.IsNullOrWhiteSpace(p.PartitionIndex) ? p.PartitionIndex : ((char)('A' + i)).ToString();
+                        Console.WriteLine($"[MobileApi] Excluded invalid transaction: TrackingNo='{item.TrackingNumber}', RequestId='{item.RequestId}', ParentKind='{rfi.Kind}', PartitionIndex='{pIdentifier}', PartitionKind='{p.Kind}', Reason='Partition Kind differs from parent transaction type'");
+                        partitionKindMismatch = true;
+                        break;
                     }
                 }
-            }
+                if (partitionKindMismatch)
+                {
+                    continue;
+                }
 
-            return new TransactionWorkFlowDTO
-            {
-                FormworkflowId = numericWfId,
-                TrackingNo = item.TrackingNumber,
-                TransactionTypeId = transType,
-                RequestType = cleanRequestType,
-                ARPNo = arpOrPinRef,
-                Owner = ownerName,
-                Requestor = requestorName,
-                AcceptedBy = item.AssignedUserName ?? "Staff",
-                CurrentStatusId = (int)item.CurrentStage,
-                CurrentStatus = item.CurrentStageName,
-                Remarks = item.LastRemarks ?? string.Empty,
-                IsComplete = item.CurrentStage == WorkflowStage.Releasing || item.CurrentStage == WorkflowStage.Completed,
-                IsDeffered = item.IsDeferred,
-                IsCheckout = item.IsClaimed,
-                SubmittedDate = submittedDate,
-                ForwarderBy = item.LastForwardedBy ?? "Office Staff",
-                TdnId = resolvedTdnId,
-                HasPartition = hasPart,
-                PartitionCount = partitionCount,
-                Partitions = partitionSummaries
-            };
-        }).ToList();
+                long numericWfId = GuidToNumericId(item.RequestId);
+                var firstPart = partitions.FirstOrDefault();
+                bool hasPart = partitions.Count > 0;
+                int partitionCount = partitions.Count;
+
+                int dossierPhotos = !string.IsNullOrWhiteSpace(rfi.WebRelativePath) ? 1 : 0;
+                var partitionSummaries = BuildPartitionSummaries(partitions, item.OwnerOrApplicant, dossierPhotos, rfi.Kind);
+
+                string ownerName = !string.IsNullOrWhiteSpace(rfi.OwnerName) ? rfi.OwnerName
+                          : !string.IsNullOrWhiteSpace(firstPart?.NewOwnerName) ? firstPart!.NewOwnerName
+                          : !string.IsNullOrWhiteSpace(rfi.Representative) ? rfi.Representative
+                          : item.OwnerOrApplicant;
+
+                string requestorName = !string.IsNullOrWhiteSpace(rfi.Representative) ? rfi.Representative : ownerName;
+                DateTime? reqDate = rfi.RequestDate != default ? rfi.RequestDate : (DateTime?)null;
+                DateTime submittedDate = reqDate ?? item.DateSubmitted;
+
+                string arpOrPinRef = !string.IsNullOrWhiteSpace(firstPart?.SystemGeneratedTDN) ? firstPart!.SystemGeneratedTDN
+                            : !string.IsNullOrWhiteSpace(firstPart?.PIN) ? firstPart!.PIN
+                            : !string.IsNullOrWhiteSpace(rfi.TaxDeclarationNumber) ? rfi.TaxDeclarationNumber
+                            : !string.IsNullOrWhiteSpace(rfi.PropertyIndexNumber) ? rfi.PropertyIndexNumber
+                            : string.Empty;
+
+                var dto = new TransactionWorkFlowDTO
+                {
+                    FormworkflowId = numericWfId,
+                    TrackingNo = item.TrackingNumber,
+                    TransactionTypeId = parentKindId.Value,
+                    RequestType = "Field Inspection",
+                    ARPNo = arpOrPinRef,
+                    Owner = ownerName,
+                    Requestor = requestorName,
+                    AcceptedBy = item.AssignedUserName ?? "Staff",
+                    CurrentStatusId = (int)item.CurrentStage,
+                    CurrentStatus = item.CurrentStageName,
+                    Remarks = item.LastRemarks ?? string.Empty,
+                    IsComplete = item.CurrentStage == WorkflowStage.Releasing || item.CurrentStage == WorkflowStage.Completed,
+                    IsDeffered = item.IsDeferred,
+                    IsCheckout = item.IsClaimed,
+                    SubmittedDate = submittedDate,
+                    ForwarderBy = item.LastForwardedBy ?? "Office Staff",
+                    TdnId = null,
+                    HasPartition = hasPart,
+                    PartitionCount = partitionCount,
+                    Partitions = partitionSummaries
+                };
+
+                validatedTransactions.Add((reqDate, dto));
+            }
+        }
 
         // Filter by propertyTypeId if requested (1: Land, 2: Building, 3: Machinery)
         if (propertyTypeId.HasValue && propertyTypeId.Value > 0)
         {
-            list = list.Where(l => l.TransactionTypeId == propertyTypeId.Value).ToList();
+            validatedTransactions = validatedTransactions
+                .Where(x => x.Dto.TransactionTypeId == propertyTypeId.Value)
+                .ToList();
         }
 
-        int totalRecords = list.Count;
-        var pagedList = list.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+        // Sort by RequestDate descending (valid dates first, null dates last, secondary sort by FormworkflowId)
+        var sortedList = validatedTransactions
+            .OrderByDescending(x => x.RequestDate.HasValue)
+            .ThenByDescending(x => x.RequestDate)
+            .ThenBy(x => x.Dto.FormworkflowId)
+            .Select(x => x.Dto)
+            .ToList();
+
+        int totalRecords = sortedList.Count;
+        long skipOffset = (long)(page - 1) * pageSize;
+        var pagedList = skipOffset >= totalRecords
+            ? new List<TransactionWorkFlowDTO>()
+            : sortedList.Skip((int)skipOffset).Take(pageSize).ToList();
 
         return Ok(new
         {
@@ -942,18 +1179,28 @@ public class MobileApiController : ControllerBase
         string cleanTracking = (trackingNo ?? "").Trim();
 
         // Strictly resolve ONLY PropertyAssessmentRequest or RequestForInspection
-        var allRpas = await _context.PropertyAssessmentRequests.AsNoTracking().ToListAsync();
-        var matchedRpa = allRpas.FirstOrDefault(p =>
-            (formWorkflowId.HasValue && formWorkflowId.Value > 0 && GuidToNumericId(p.Id) == formWorkflowId.Value) ||
-            (!string.IsNullOrEmpty(cleanTracking) && p.TrackingNumber.Equals(cleanTracking, StringComparison.OrdinalIgnoreCase)));
-
+        PropertyAssessmentRequest? matchedRpa = null;
         RequestForInspection? matchedRfi = null;
-        if (matchedRpa == null)
+
+        // 1. Authoritative lookup: By Tracking Number (exact, indexed query)
+        if (!string.IsNullOrEmpty(cleanTracking))
         {
-            var allRfis = await _context.RequestForInspections.AsNoTracking().ToListAsync();
-            matchedRfi = allRfis.FirstOrDefault(r =>
-                (formWorkflowId.HasValue && formWorkflowId.Value > 0 && GuidToNumericId(r.Id) == formWorkflowId.Value) ||
-                (!string.IsNullOrEmpty(cleanTracking) && r.TrackingNumber.Equals(cleanTracking, StringComparison.OrdinalIgnoreCase)));
+            matchedRpa = await _context.PropertyAssessmentRequests.AsNoTracking().FirstOrDefaultAsync(p => p.TrackingNumber == cleanTracking);
+            if (matchedRpa == null)
+            {
+                matchedRfi = await _context.RequestForInspections.AsNoTracking().FirstOrDefaultAsync(r => r.TrackingNumber == cleanTracking);
+            }
+        }
+        // 2. Fallback: By numeric FormWorkflowId if tracking number not provided
+        else if (formWorkflowId.HasValue && formWorkflowId.Value > 0)
+        {
+            var allRpas = await _context.PropertyAssessmentRequests.AsNoTracking().ToListAsync();
+            matchedRpa = allRpas.FirstOrDefault(p => GuidToNumericId(p.Id) == formWorkflowId.Value);
+            if (matchedRpa == null)
+            {
+                var allRfis = await _context.RequestForInspections.AsNoTracking().ToListAsync();
+                matchedRfi = allRfis.FirstOrDefault(r => GuidToNumericId(r.Id) == formWorkflowId.Value);
+            }
         }
 
         if (matchedRpa == null && matchedRfi == null)
@@ -1563,18 +1810,28 @@ public class MobileApiController : ControllerBase
     [HttpPost("workflow/forward")]
     public async Task<IActionResult> ForwardWorkflow([FromBody] MobileForwardWorkflowRequest req)
     {
-        if (req == null || req.FormWorkflowId <= 0 || req.NextStatusId <= 0)
+        if (req == null || req.NextStatusId <= 0 || (req.FormWorkflowId <= 0 && string.IsNullOrWhiteSpace(req.TrackingNo)))
         {
-            return BadRequest(new { success = false, message = "FormWorkflowId and NextStatusId are required." });
+            return BadRequest(new { success = false, message = "TrackingNo or FormWorkflowId, and NextStatusId are required." });
         }
 
         var jwtUser = HttpContext.Items["JwtUser"] as JwtPayload;
         string actorName = jwtUser?.Name ?? "Mobile Field Appraiser";
         string actorRole = "Property Appraiser";
+        string cleanTracking = (req.TrackingNo ?? "").Trim();
 
-        // 1. Check PropertyAssessmentRequests (evaluated in memory because GuidToNumericId is a C# method)
-        var allRpas = await _context.PropertyAssessmentRequests.ToListAsync();
-        var par = allRpas.FirstOrDefault(p => GuidToNumericId(p.Id) == req.FormWorkflowId);
+        // 1. Check PropertyAssessmentRequests
+        PropertyAssessmentRequest? par = null;
+        if (!string.IsNullOrEmpty(cleanTracking))
+        {
+            par = await _context.PropertyAssessmentRequests.FirstOrDefaultAsync(p => p.TrackingNumber == cleanTracking);
+        }
+        if (par == null && req.FormWorkflowId > 0)
+        {
+            var allRpas = await _context.PropertyAssessmentRequests.ToListAsync();
+            par = allRpas.FirstOrDefault(p => GuidToNumericId(p.Id) == req.FormWorkflowId);
+        }
+
         if (par != null)
         {
             par.AssignedAppraiser = actorName;
@@ -1606,13 +1863,22 @@ public class MobileApiController : ControllerBase
                 message = "Property Assessment workflow forwarded successfully from mobile.",
                 trackingNo = par.TrackingNumber,
                 newStatusId = req.NextStatusId,
-                newFormWorkflowId = req.FormWorkflowId
+                newFormWorkflowId = req.FormWorkflowId > 0 ? req.FormWorkflowId : GuidToNumericId(par.Id)
             });
         }
 
-        // 2. Check RequestForInspections (evaluated in memory)
-        var allRfis = await _context.RequestForInspections.ToListAsync();
-        var rfi = allRfis.FirstOrDefault(r => GuidToNumericId(r.Id) == req.FormWorkflowId);
+        // 2. Check RequestForInspections
+        RequestForInspection? rfi = null;
+        if (!string.IsNullOrEmpty(cleanTracking))
+        {
+            rfi = await _context.RequestForInspections.FirstOrDefaultAsync(r => r.TrackingNumber == cleanTracking);
+        }
+        if (rfi == null && req.FormWorkflowId > 0)
+        {
+            var allRfis = await _context.RequestForInspections.ToListAsync();
+            rfi = allRfis.FirstOrDefault(r => GuidToNumericId(r.Id) == req.FormWorkflowId);
+        }
+
         if (rfi != null)
         {
             rfi.AssignedStaff = actorName;
@@ -1644,7 +1910,7 @@ public class MobileApiController : ControllerBase
                 message = "Field Inspection workflow forwarded successfully from mobile.",
                 trackingNo = rfi.TrackingNumber,
                 newStatusId = req.NextStatusId,
-                newFormWorkflowId = req.FormWorkflowId
+                newFormWorkflowId = req.FormWorkflowId > 0 ? req.FormWorkflowId : GuidToNumericId(rfi.Id)
             });
         }
 
@@ -1663,50 +1929,21 @@ public class MobileApiController : ControllerBase
     private async Task<(PropertyAssessmentRequest? rpa, RequestForInspection? rfi, bool isForbiddenOtherType)> FindParentMobileTransactionAsync(
         long? formWorkflowId,
         string? trackingNo,
-        string? arpNo,
-        string? pin)
+        string? arpNo = null,
+        string? pin = null)
     {
         string cleanTracking = (trackingNo ?? "").Trim();
-        string cleanArp = (arpNo ?? "").Trim();
-        string cleanPin = (pin ?? "").Trim();
 
-        var allRpas = await _context.PropertyAssessmentRequests.AsNoTracking().ToListAsync();
-        var matchedRpaCandidate = allRpas.FirstOrDefault(p =>
-            (formWorkflowId.HasValue && formWorkflowId.Value > 0 && GuidToNumericId(p.Id) == formWorkflowId.Value) ||
-            (!string.IsNullOrEmpty(cleanTracking) && p.TrackingNumber.Equals(cleanTracking, StringComparison.OrdinalIgnoreCase)) ||
-            (!string.IsNullOrEmpty(cleanArp) && p.TrackingNumber.Equals(cleanArp, StringComparison.OrdinalIgnoreCase)) ||
-            (!string.IsNullOrEmpty(cleanArp) && !string.IsNullOrEmpty(p.PrevTDN) && p.PrevTDN.Equals(cleanArp, StringComparison.OrdinalIgnoreCase)) ||
-            (!string.IsNullOrEmpty(cleanPin) && !string.IsNullOrEmpty(p.PrevPIN) && p.PrevPIN.Equals(cleanPin, StringComparison.OrdinalIgnoreCase)) ||
-            (!string.IsNullOrEmpty(cleanTracking) && !string.IsNullOrEmpty(p.GeneratedPartitionsJson) && p.GeneratedPartitionsJson.Contains(cleanTracking, StringComparison.OrdinalIgnoreCase)) ||
-            (!string.IsNullOrEmpty(cleanArp) && !string.IsNullOrEmpty(p.GeneratedPartitionsJson) && p.GeneratedPartitionsJson.Contains(cleanArp, StringComparison.OrdinalIgnoreCase)) ||
-            (!string.IsNullOrEmpty(cleanPin) && !string.IsNullOrEmpty(p.GeneratedPartitionsJson) && p.GeneratedPartitionsJson.Contains(cleanPin, StringComparison.OrdinalIgnoreCase)));
-
-        if (matchedRpaCandidate != null)
-        {
-            var trackedRpa = await _context.PropertyAssessmentRequests.FirstOrDefaultAsync(p => p.Id == matchedRpaCandidate.Id);
-            return (trackedRpa ?? matchedRpaCandidate, null, false);
-        }
-
-        var allRfis = await _context.RequestForInspections.AsNoTracking().ToListAsync();
-        var matchedRfiCandidate = allRfis.FirstOrDefault(r =>
-            (formWorkflowId.HasValue && formWorkflowId.Value > 0 && GuidToNumericId(r.Id) == formWorkflowId.Value) ||
-            (!string.IsNullOrEmpty(cleanTracking) && r.TrackingNumber.Equals(cleanTracking, StringComparison.OrdinalIgnoreCase)) ||
-            (!string.IsNullOrEmpty(cleanArp) && r.TrackingNumber.Equals(cleanArp, StringComparison.OrdinalIgnoreCase)) ||
-            (!string.IsNullOrEmpty(cleanArp) && !string.IsNullOrEmpty(r.TaxDeclarationNumber) && r.TaxDeclarationNumber.Equals(cleanArp, StringComparison.OrdinalIgnoreCase)) ||
-            (!string.IsNullOrEmpty(cleanPin) && !string.IsNullOrEmpty(r.PropertyIndexNumber) && r.PropertyIndexNumber.Equals(cleanPin, StringComparison.OrdinalIgnoreCase)) ||
-            (!string.IsNullOrEmpty(cleanTracking) && !string.IsNullOrEmpty(r.GeneratedPartitionsJson) && r.GeneratedPartitionsJson.Contains(cleanTracking, StringComparison.OrdinalIgnoreCase)) ||
-            (!string.IsNullOrEmpty(cleanArp) && !string.IsNullOrEmpty(r.GeneratedPartitionsJson) && r.GeneratedPartitionsJson.Contains(cleanArp, StringComparison.OrdinalIgnoreCase)) ||
-            (!string.IsNullOrEmpty(cleanPin) && !string.IsNullOrEmpty(r.GeneratedPartitionsJson) && r.GeneratedPartitionsJson.Contains(cleanPin, StringComparison.OrdinalIgnoreCase)));
-
-        if (matchedRfiCandidate != null)
-        {
-            var trackedRfi = await _context.RequestForInspections.FirstOrDefaultAsync(r => r.Id == matchedRfiCandidate.Id);
-            return (null, trackedRfi ?? matchedRfiCandidate, false);
-        }
-
-        // Check if the trackingNo or formWorkflowId belongs to a non-mobile request type (TaxMapping, TaxDeclarationRequest, LandHoldingRequest)
+        // 1. Authoritative lookup: By Tracking Number (exact, collision-free indexed query)
         if (!string.IsNullOrEmpty(cleanTracking))
         {
+            var rpa = await _context.PropertyAssessmentRequests.FirstOrDefaultAsync(p => p.TrackingNumber == cleanTracking);
+            if (rpa != null) return (rpa, null, false);
+
+            var rfi = await _context.RequestForInspections.FirstOrDefaultAsync(r => r.TrackingNumber == cleanTracking);
+            if (rfi != null) return (null, rfi, false);
+
+            // Check if the tracking number belongs to a non-mobile request type (TaxMapping, TaxDeclarationRequest, LandHoldingRequest)
             bool isOtherModule =
                 await _context.TaxMappingRequests.AnyAsync(t => t.RequestNumber == cleanTracking) ||
                 await _context.TaxDeclarationRequests.AnyAsync(t => t.TrackingNumber == cleanTracking) ||
@@ -1716,6 +1953,18 @@ public class MobileApiController : ControllerBase
             {
                 return (null, null, true);
             }
+        }
+
+        // 2. Fallback: By numeric FormWorkflowId ONLY if tracking number was not provided or not matched
+        if (formWorkflowId.HasValue && formWorkflowId.Value > 0)
+        {
+            var allRpas = await _context.PropertyAssessmentRequests.ToListAsync();
+            var rpa = allRpas.FirstOrDefault(p => GuidToNumericId(p.Id) == formWorkflowId.Value);
+            if (rpa != null) return (rpa, null, false);
+
+            var allRfis = await _context.RequestForInspections.ToListAsync();
+            var rfi = allRfis.FirstOrDefault(r => GuidToNumericId(r.Id) == formWorkflowId.Value);
+            if (rfi != null) return (null, rfi, false);
         }
 
         return (null, null, false);

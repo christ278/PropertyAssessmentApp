@@ -103,8 +103,7 @@ export const DashboardScreen = ({ navigation }) => {
   return (
     <View style={[styles.container, { backgroundColor: colors.bgLight }]}>
       <HeaderBar
-        title="FAIRTRACK MOBILE"
-        subtitle={`Division ${user?.divisionId || 1} • ${user?.name || 'Staff'}`}
+        title="FAIRTRACK"
         navigation={navigation}
         onRefresh={() => {
           setRefreshing(true);

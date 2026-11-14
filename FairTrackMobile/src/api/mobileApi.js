@@ -9,7 +9,7 @@ export const MobileApi = {
 
   logout: async () => {
     try {
-      const response = await apiClient.post('/api/auth/logout');
+      const response = await apiClient.post('/api/auth/logout', {}, { timeout: 3000 });
       return response.data;
     } catch (e) {
       // Offline fallback
@@ -70,9 +70,10 @@ export const MobileApi = {
   },
 
   // Advance Workflow
-  forwardWorkflow: async (formWorkflowId, nextStatusId, remarks = '') => {
+  forwardWorkflow: async (formWorkflowId, nextStatusId, remarks = '', trackingNo = '') => {
     const response = await apiClient.post('/api/mobile/workflow/forward', {
       formWorkflowId,
+      trackingNo,
       nextStatusId,
       remarks
     });

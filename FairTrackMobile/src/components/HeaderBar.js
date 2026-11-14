@@ -25,7 +25,8 @@ export const HeaderBar = ({
   showBack = false,
   onBackPress,
   onRefresh,
-  isRefreshing = false
+  isRefreshing = false,
+  showReload = true
 }) => {
   const insets = useSafeAreaInsets();
   const { pendingCount, isSyncing, syncAllToServer, isOnline, checkConnectivity } = useContext(SyncContext);
@@ -50,7 +51,11 @@ export const HeaderBar = ({
 
   const handleTriggerLogout = () => {
     setAccountMenuVisible(false);
-    setLogoutModalVisible(true);
+    // On React Native (especially Android), opening a Modal immediately when another Modal is dismissing
+    // causes a native window manager race condition where the second modal fails to display.
+    setTimeout(() => {
+      setLogoutModalVisible(true);
+    }, Platform.OS === 'android' ? 200 : 80);
   };
 
   const handleConfirmLogout = async () => {
@@ -90,11 +95,17 @@ export const HeaderBar = ({
               styles.title,
               { color: isDarkMode ? colors.textDark : colors.primaryDark }
             ]}
+            numberOfLines={1}
           >
             {title || 'FAIRTRACK'}
           </Text>
-          {subtitle ? (
-            <Text style={[styles.subtitle, { color: colors.textMuted }]}>{subtitle}</Text>
+          {(subtitle !== undefined ? subtitle : (!showBack ? "City Assessor's Office" : null)) ? (
+            <Text
+              style={[styles.subtitle, { color: colors.textMuted }]}
+              numberOfLines={1}
+            >
+              {subtitle !== undefined ? subtitle : "City Assessor's Office"}
+            </Text>
           ) : null}
         </View>
       </View>
@@ -116,13 +127,19 @@ export const HeaderBar = ({
         </TouchableOpacity>
 
         {/* Refresh / Update List from Web Server Button */}
-        {onRefresh ? (
+        {showReload !== false ? (
           <TouchableOpacity
             style={[
               styles.syncButton,
               { backgroundColor: isDarkMode ? '#1e293b' : colors.primaryLight }
             ]}
-            onPress={onRefresh}
+            onPress={() => {
+              if (typeof onRefresh === 'function') {
+                onRefresh();
+              } else if (typeof checkConnectivity === 'function') {
+                checkConnectivity();
+              }
+            }}
             disabled={isRefreshing}
             accessibilityLabel="Refresh transactions from web"
           >
@@ -131,7 +148,7 @@ export const HeaderBar = ({
             ) : (
               <Ionicons
                 name="refresh-outline"
-                size={20}
+                size={18}
                 color={colors.primary}
               />
             )}
@@ -419,16 +436,16 @@ const styles = StyleSheet.create({
   actionsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8
+    gap: 6
   },
   networkStatusTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 12,
+    paddingHorizontal: 7,
+    paddingVertical: 4.5,
+    borderRadius: 10,
     borderWidth: 1,
-    gap: 5
+    gap: 4
   },
   networkOnlineTag: {
     backgroundColor: '#ecfdf5',
@@ -450,7 +467,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#d97706'
   },
   networkTagText: {
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: '800',
     letterSpacing: 0.5
   },
@@ -461,9 +478,9 @@ const styles = StyleSheet.create({
     color: '#d97706'
   },
   syncButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative'
@@ -491,15 +508,15 @@ const styles = StyleSheet.create({
     fontWeight: '800'
   },
   avatarButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center'
   },
   avatarButtonText: {
     color: '#ffffff',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800'
   },
   menuOverlay: {

@@ -641,8 +641,6 @@ export const TransactionsScreen = ({ navigation }) => {
   return (
     <View style={[styles.container, { backgroundColor: colors.bgLight }]}>
       <HeaderBar
-        title="MY TRANSACTIONS"
-        subtitle="Property Assessment & Field Inspection"
         navigation={navigation}
         onRefresh={() => {
           setRefreshing(true);
@@ -650,6 +648,23 @@ export const TransactionsScreen = ({ navigation }) => {
         }}
         isRefreshing={refreshing || loading}
       />
+
+      {/* Screen Title */}
+      <View style={styles.screenHeader}>
+        <View style={styles.screenHeaderRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.screenTitle, { color: colors.textDark }]}>My Transactions</Text>
+            <Text style={[styles.screenSubtitle, { color: colors.textMuted }]}>
+              Property Assessment & Field Inspection
+            </Text>
+          </View>
+          <View style={[styles.countBadge, { backgroundColor: isDarkMode ? '#134e4a' : colors.primaryLight }]}>
+            <Text style={[styles.countBadgeText, { color: colors.primary }]}>
+              {transactions.length} Total
+            </Text>
+          </View>
+        </View>
+      </View>
 
       {/* Offline Status Alert */}
       {isOffline ? (
@@ -1833,4 +1848,33 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800'
   },
+  screenHeader: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 4
+  },
+  screenHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between'
+  },
+  screenTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.3
+  },
+  screenSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
+    fontWeight: '500'
+  },
+  countBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12
+  },
+  countBadgeText: {
+    fontSize: 11,
+    fontWeight: '800'
+  }
 });

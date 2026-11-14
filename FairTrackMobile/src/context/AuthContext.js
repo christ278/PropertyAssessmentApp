@@ -154,15 +154,26 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
+    // 1. Immediately clear authentication state so navigation transitions to LoginScreen right away
+    setUser(null);
+    setToken(null);
+
+    // 2. Clear stored session tokens from local storage
     try {
-      await MobileApi.logout();
+      await AsyncStorage.multiRemove([
+        '@fairtrack_jwt_token',
+        '@fairtrack_user'
+      ]);
+    } catch (err) {
+      console.warn('Error removing auth tokens:', err);
+    }
+
+    // 3. Best-effort server notification in the background without blocking the UI
+    try {
+      MobileApi.logout().catch(() => {});
     } catch (err) {
       // Ignore network errors when logging out offline
     }
-    setUser(null);
-    setToken(null);
-    await AsyncStorage.removeItem('@fairtrack_jwt_token');
-    await AsyncStorage.removeItem('@fairtrack_user');
   };
 
   const updateServerUrl = async (newUrl) => {

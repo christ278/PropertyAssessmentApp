@@ -12,6 +12,7 @@ public class MobileLoginRequest
 public class MobileForwardWorkflowRequest
 {
     public long FormWorkflowId { get; set; }
+    public string? TrackingNo { get; set; }
     public int NextStatusId { get; set; }
     public string Remarks { get; set; } = string.Empty;
 }
