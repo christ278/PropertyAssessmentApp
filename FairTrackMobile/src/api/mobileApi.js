@@ -9,7 +9,7 @@ export const MobileApi = {
 
   logout: async () => {
     try {
-      const response = await apiClient.post('/api/auth/logout');
+      const response = await apiClient.post('/api/auth/logout', {}, { timeout: 3000 });
       return response.data;
     } catch (e) {
       // Offline fallback
@@ -42,31 +42,13 @@ export const MobileApi = {
   },
 
   // Download Full Form Assessment Details for Field Inspection
-  downloadTransactionDetails: async (formWorkflowId, trackingNo = '') => {
+  downloadTransactionDetails: async (formWorkflowId, trackingNo = '', partitionIndex = null) => {
+    const params = { formWorkflowId, trackingNo };
+    if (partitionIndex !== null && partitionIndex !== undefined) {
+      params.partitionIndex = partitionIndex;
+    }
     const response = await apiClient.get('/api/mobile/transaction/download-details', {
-      params: { formWorkflowId, trackingNo }
-    });
-    return response.data;
-  },
-
-  // Fetch Form Details (Land, Building, Machinery)
-  getBuildingForm: async (tdnId, castTdnBuildingId = null) => {
-    const response = await apiClient.get('/api/mobile/form/building', {
-      params: { tdnId, castTdnBuildingId }
-    });
-    return response.data;
-  },
-
-  getLandForm: async (tdnId, tdnLandId = null) => {
-    const response = await apiClient.get('/api/mobile/form/land', {
-      params: { tdnId, tdnLandId }
-    });
-    return response.data;
-  },
-
-  getMachineryForm: async (tdnId, tdnMachineryId = null) => {
-    const response = await apiClient.get('/api/mobile/form/machinery', {
-      params: { tdnId, tdnMachineryId }
+      params
     });
     return response.data;
   },
@@ -87,20 +69,11 @@ export const MobileApi = {
     return response.data;
   },
 
-  // Upload Multiple Inspection Attachment Files
-  uploadAttachment: async (formData) => {
-    const response = await apiClient.post('/api/mobile/upload-attachment', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-    return response.data;
-  },
-
   // Advance Workflow
-  forwardWorkflow: async (formWorkflowId, nextStatusId, remarks = '') => {
+  forwardWorkflow: async (formWorkflowId, nextStatusId, remarks = '', trackingNo = '') => {
     const response = await apiClient.post('/api/mobile/workflow/forward', {
       formWorkflowId,
+      trackingNo,
       nextStatusId,
       remarks
     });

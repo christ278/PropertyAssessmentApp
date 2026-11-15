@@ -11,16 +11,20 @@ import {
   Platform,
   Switch,
   Modal,
-  KeyboardAvoidingView
+  KeyboardAvoidingView,
+  useWindowDimensions,
+  Keyboard
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SyncContext } from '../context/SyncContext';
 import { useTheme } from '../context/ThemeContext';
 import { MobileApi } from '../api/mobileApi';
 import { HeaderBar } from '../components/HeaderBar';
+import { ActionModal } from '../components/ActionModal';
 import { DiscardChangesModal } from '../components/DiscardChangesModal';
 import { DatePickerModal } from '../components/DatePickerModal';
 import { AttachmentsSection } from '../components/AttachmentsSection';
+import { savePartitionAttachmentsOffline, loadPartitionAttachmentsOffline, ensurePayloadFilesHaveBase64 } from '../utils/fileStorage';
 import { COLORS, SHADOWS } from '../constants/theme';
 import { BARANGAY_OPTIONS, normalizeBarangay } from '../constants/locationData';
 import {
@@ -49,28 +53,34 @@ const cleanTitleType = (val) => {
   return 'TCT';
 };
 
+const GENDER_OPTIONS = ['Male', 'Female'];
+
 const TABS = [
   { id: 0, label: '1. Cadastral & Title', icon: 'map-outline' },
   { id: 1, label: '2. Location & Boundaries', icon: 'compass-outline' },
   { id: 2, label: '3. Owner & Demographics', icon: 'people-outline' },
   { id: 3, label: '4. Valuation (CAST)', icon: 'calculator-outline' },
-  { id: 4, label: '5. Effectivity & Notes', icon: 'calendar-outline' },
-  { id: 5, label: '6. Field Photos & Sketch', icon: 'images-outline' }
+  { id: 4, label: '5. Effectivity & Attachments', icon: 'calendar-outline' }
 ];
 
 export const LandFormScreen = ({ route, navigation }) => {
   const { isDarkMode, colors, shadows } = useTheme();
-  const styles = React.useMemo(() => getStyles(colors, isDarkMode), [colors, isDarkMode]);
+  const { width } = useWindowDimensions();
+  const isLargeScreen = width >= 600;
+  const styles = React.useMemo(() => getStyles(colors, isDarkMode, isLargeScreen), [colors, isDarkMode, isLargeScreen]);
   const tabScrollRef = useRef(null);
 
   const trackingNoParam = route?.params?.trackingNo || '';
   const formWorkflowIdParam = route?.params?.formWorkflowId || null;
   const partitionIndexParam = route?.params?.partitionIndex ?? 0;
   const partitionLetterParam = route?.params?.partitionLetter || String.fromCharCode(65 + (parseInt(partitionIndexParam, 10) || 0));
+  const fromHistory = route?.params?.fromHistory === true;
+
   const {
     queueOfflineUpdate,
     markTransactionSynced,
     getDownloadedFormData,
+    updatePartitionAttachmentsLocally,
     isTransactionDownloaded,
     hasPendingEdits,
     downloadSingleTransaction,
@@ -84,9 +94,16 @@ export const LandFormScreen = ({ route, navigation }) => {
   const [discardModalVisible, setDiscardModalVisible] = useState(false);
   const [datePickerVisible, setDatePickerVisible] = useState(false);
   const [barangayModalVisible, setBarangayModalVisible] = useState(false);
+  const [genderPickerVisible, setGenderPickerVisible] = useState(false);
+  const [genderPickerTarget, setGenderPickerTarget] = useState('owner'); // 'owner' or 'admin'
+
+  const openGenderPicker = (target) => {
+    setGenderPickerTarget(target);
+    setGenderPickerVisible(true);
+  };
   const isDownloaded = isTransactionDownloaded(trackingNoParam, formWorkflowIdParam);
 
-  // Active section tab (0 to 5)
+  // Active section tab (0 to 4)
   const [activeTab, setActiveTab] = useState(0);
 
   // 1. Cadastral & Title Registration (CAST Reference)
@@ -111,8 +128,8 @@ export const LandFormScreen = ({ route, navigation }) => {
   // 2. Property Location & Boundaries (CAST Reference)
   const [streetLocation, setStreetLocation] = useState('');
   const [purok, setPurok] = useState('');
-  const [districtOrBarangay, setDistrictOrBarangay] = useState('Brgy. Central');
-  const [cityMunicipality, setCityMunicipality] = useState('General Santos City');
+  const [districtOrBarangay, setDistrictOrBarangay] = useState('BRGY. ZONE I');
+  const [cityMunicipality, setCityMunicipality] = useState('Koronadal City');
   const [province, setProvince] = useState('South Cotabato');
 
   const [northBoundary, setNorthBoundary] = useState('');
@@ -216,6 +233,8 @@ export const LandFormScreen = ({ route, navigation }) => {
 
   // 6. Site Sketch & Field Attachments
   const [sketchUrl, setSketchUrl] = useState('');
+  const [sketchBase64, setSketchBase64] = useState(null);
+  const [sketchFileName, setSketchFileName] = useState('');
   const [attachments, setAttachments] = useState([]);
 
   // Workflow Forwarding
@@ -227,7 +246,7 @@ export const LandFormScreen = ({ route, navigation }) => {
     try {
       const parsed = typeof val === 'string' ? JSON.parse(val) : val;
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    } catch (e) {}
+    } catch (e) { }
     return null;
   };
 
@@ -267,7 +286,7 @@ export const LandFormScreen = ({ route, navigation }) => {
     }
 
     const parsedImp = safeParseArray(rawImp);
-    if (parsedImp) {
+    if (parsedImp && parsedImp.length > 0) {
       setImprovementRows(parsedImp.map((i, idx) => ({
         id: i.id || ('imp_' + idx),
         typeId: i.TypeId || i.typeId || 1,
@@ -278,10 +297,12 @@ export const LandFormScreen = ({ route, navigation }) => {
         unitValue: i.UnitValue || i.unitValue || 120,
         marketValue: i.MarketValue || i.marketValue || ((i.Quantity || 1) * (i.UnitValue || 120))
       })));
+    } else {
+      setImprovementRows([]);
     }
 
     const parsedAdj = safeParseArray(rawAdj);
-    if (parsedAdj) {
+    if (parsedAdj && parsedAdj.length > 0) {
       setAdjustmentRows(parsedAdj.map((a, idx) => ({
         id: a.id || ('adj_' + idx),
         classificationName: a.ClassificationName || a.classificationName || 'RESIDENTIAL',
@@ -292,6 +313,8 @@ export const LandFormScreen = ({ route, navigation }) => {
         valueAdjustment: a.ValueAdjustment !== undefined ? a.ValueAdjustment : (a.valueAdjustment || 0),
         adjustedMarketValue: a.AdjustedMarketValue || a.adjustedMarketValue || 78000
       })));
+    } else {
+      setAdjustmentRows([]);
     }
 
     const parsedRoll = safeParseArray(rawRoll);
@@ -304,17 +327,23 @@ export const LandFormScreen = ({ route, navigation }) => {
         assessmentLevelPercent: r.AssessmentLevelPercent || r.assessmentLevelPercent || 20,
         assessedValue: r.AssessmentValue || r.assessmentValue || r.AssessedValue || r.assessedValue || 15600
       })));
-    } else {
-      const mv = parseFloat(partData?.marketValue) || 78000;
+    } else if (partData?.areaSqMeters || partData?.marketValue) {
+      const mv = parseFloat(partData?.marketValue) || 0;
       const lvl = parseFloat(partData?.assessmentLevelPercent) || 20;
-      setAssessmentRollRows([{
-        id: 'roll_default',
-        kinds: 'LAND',
-        actualUseName: partData?.actualUse || 'RESIDENTIAL',
-        marketValue: mv,
-        assessmentLevelPercent: lvl,
-        assessedValue: Math.round(mv * (lvl / 100) * 100) / 100
-      }]);
+      if (mv > 0) {
+        setAssessmentRollRows([{
+          id: 'roll_default',
+          kinds: 'LAND',
+          actualUseName: partData?.actualUse || 'RESIDENTIAL',
+          marketValue: mv,
+          assessmentLevelPercent: lvl,
+          assessedValue: Math.round(mv * (lvl / 100) * 100) / 100
+        }]);
+      } else {
+        setAssessmentRollRows([]);
+      }
+    } else {
+      setAssessmentRollRows([]);
     }
   };
 
@@ -356,15 +385,25 @@ export const LandFormScreen = ({ route, navigation }) => {
 
   const loadLandData = async () => {
     setNotDownloadedError(false);
+    const targetIdx = parseInt(partitionIndexParam, 10) || 0;
+
+    // 0. Load any locally saved partition offline attachments and sketch
+    const offlineAttData = await loadPartitionAttachmentsOffline(trackingNoParam, partitionIndexParam);
+    setAttachments(offlineAttData.attachments || []);
+    setSketchUrl(offlineAttData.sketchUrl || '');
 
     // 1. Check if downloaded offline copy exists and populate immediately
     const downloaded = getDownloadedFormData(trackingNoParam, formWorkflowIdParam, partitionIndexParam);
     if (downloaded) {
-      if (downloaded.owner) setOwnerName(downloaded.owner);
-      if (downloaded.arpNo) setArpNo(downloaded.arpNo);
-      if (downloaded.tdnId) setTdnId(downloaded.tdnId);
-      if (downloaded.sketchUrl) setSketchUrl(downloaded.sketchUrl);
-      if (downloaded.attachments && Array.isArray(downloaded.attachments)) setAttachments(downloaded.attachments);
+      if (targetIdx === 0) {
+        if (downloaded.owner) setOwnerName(downloaded.owner);
+        if (downloaded.arpNo) setArpNo(downloaded.arpNo);
+        if (downloaded.tdnId) setTdnId(downloaded.tdnId);
+      }
+      setSketchUrl(downloaded.sketchUrl || '');
+      setAttachments(Array.isArray(downloaded.attachments) ? downloaded.attachments : []);
+      if (downloaded.trackingNo && !trackingNo) setTrackingNo(downloaded.trackingNo);
+      if (downloaded.transItem?.TrackingNo && !trackingNo) setTrackingNo(downloaded.transItem.TrackingNo);
 
       // Populate partition base properties first
       if (downloaded.currentPartition) {
@@ -372,16 +411,19 @@ export const LandFormScreen = ({ route, navigation }) => {
         if (cp.systemGeneratedTDN) setDeclarationNo(cp.systemGeneratedTDN);
         if (cp.arpNo) setArpNo(cp.arpNo);
         if (cp.pin) setPin(cp.pin);
-        if (cp.lotNo || cp.lotNumber) setLotNo(cp.lotNo || cp.lotNumber);
-        if (cp.blockNo || cp.blockNumber) setBlockNo(cp.blockNo || cp.blockNumber);
-        if (cp.sectionNo) setSectionNo(cp.sectionNo);
-        if (cp.parcelNo) setParcelNo(cp.parcelNo);
-        if (cp.surveyNo || cp.surveyNumber) setSurveyNo(cp.surveyNo || cp.surveyNumber);
-        if (cp.cadastralSurveyNo) setCadastralSurveyNo(cp.cadastralSurveyNo);
-        if (cp.titleNo) setTctNo(cp.titleNo);
+        setLotNo(cp.lotNo || cp.lotNumber || '');
+        setBlockNo(cp.blockNo || cp.blockNumber || '');
+        setSectionNo(cp.sectionNo || '');
+        setParcelNo(cp.parcelNo || '');
+        setSurveyNo(cp.surveyNo || cp.surveyNumber || '');
+        setCadastralSurveyNo(cp.cadastralSurveyNo || '');
+        setTctNo(cp.titleNo || cp.tctNo || '');
         if (cp.dateRegistered) setTctDate(cp.dateRegistered.substring(0, 10));
+        else if (cp.tctDate) setTctDate(cp.tctDate.substring(0, 10));
+        else setTctDate('');
         if (cp.registrationStatus) setRegistrationStatus(cleanRegStatus(cp.registrationStatus));
         if (cp.titleType) setTitleType(cleanTitleType(cp.titleType));
+        if (cp.transactionCode) setTransactionCode(cp.transactionCode);
         if (cp.streetLocation || cp.streetNo || cp.buildingNo) {
           setStreetLocation(cp.streetLocation || cp.streetNo || cp.buildingNo);
         }
@@ -395,19 +437,33 @@ export const LandFormScreen = ({ route, navigation }) => {
         if (cp.ownerContactNo) setOwnerContact(cp.ownerContactNo);
         if (cp.ownerEmail) setOwnerEmail(cp.ownerEmail);
         if (cp.ownerGender) setOwnerGender(cp.ownerGender);
-        if (cp.boundaryNorth) setNorthBoundary(cp.boundaryNorth);
-        if (cp.nremarks) setNRemarks(cp.nremarks);
-        if (cp.boundarySouth) setSouthBoundary(cp.boundarySouth);
-        if (cp.sremarks) setSRemarks(cp.sremarks);
-        if (cp.boundaryEast) setEastBoundary(cp.boundaryEast);
-        if (cp.eremarks) setERemarks(cp.eremarks);
-        if (cp.boundaryWest) setWestBoundary(cp.boundaryWest);
-        if (cp.wremarks) setWRemarks(cp.wremarks);
+
+        const hasAdmin = !!cp.isAdministrator || !!cp.administratorName;
+        const hasBenef = !hasAdmin && !!cp.isBeneficialUser;
+        const hasPoss = !hasAdmin && !hasBenef && !!cp.isPossessor;
+        setIsAdministrator(hasAdmin);
+        setIsBeneficialUser(hasBenef);
+        setIsPossessor(hasPoss);
+        setAdminName(cp.administratorName || cp.propAdminName || '');
+        setAdminAddress(cp.administratorAddress || cp.propAdminAddress || '');
+        setAdminContact(cp.administratorContactNo || cp.propAdminContactNo || '');
+        setAdminTin(cp.administratorTin || '');
+        setAdminEmail(cp.administratorEmail || '');
+        setAdminGender(cp.administratorGender || 'Male');
+
+        setNorthBoundary(cp.boundaryNorth || '');
+        setNRemarks(cp.nremarks || '');
+        setSouthBoundary(cp.boundarySouth || '');
+        setSRemarks(cp.sremarks || '');
+        setEastBoundary(cp.boundaryEast || '');
+        setERemarks(cp.eremarks || '');
+        setWestBoundary(cp.boundaryWest || '');
+        setWRemarks(cp.wremarks || '');
         hydrateSchedules(cp, downloaded.formData?.TDNLand);
         hydrateTab5(downloaded.formData?.TDN || cp);
       }
 
-      // If formData exists (holding the latest offline edits), populate it second so offline changes take priority
+      // If formData exists (holding the latest offline edits), populate it!
       if (downloaded.formData) {
         populateFieldsFromDTO(downloaded.formData);
         if (downloaded.formData.TDNLand) {
@@ -425,30 +481,65 @@ export const LandFormScreen = ({ route, navigation }) => {
     if (!hasUnsynced && (trackingNoParam || formWorkflowIdParam)) {
       try {
         if (!downloaded) setLoading(true);
-        const liveRes = await MobileApi.downloadTransactionDetails(formWorkflowIdParam, trackingNoParam);
+        const liveRes = await MobileApi.downloadTransactionDetails(formWorkflowIdParam, trackingNoParam, partitionIndexParam);
         if (liveRes && liveRes.success) {
-          const targetIdx = parseInt(partitionIndexParam, 10) || 0;
           const livePart = (liveRes.partitions && liveRes.partitions[targetIdx]) || null;
-          const liveAtts = livePart?.attachments || liveRes.attachments || [];
-          const liveSketch = livePart?.sketchUrl || liveRes.sketchUrl;
+          const liveAtts = Array.isArray(livePart?.attachments) ? livePart.attachments : (targetIdx === 0 ? (liveRes.attachments || []) : []);
+          const liveSketch = livePart?.sketchUrl || (targetIdx === 0 ? liveRes.sketchUrl : null);
 
-          if (liveSketch) setSketchUrl(liveSketch);
-          if (Array.isArray(liveAtts)) setAttachments(liveAtts);
+          const localAtts = (offlineAttData.attachments && offlineAttData.attachments.length > 0)
+            ? offlineAttData.attachments
+            : (downloaded?.currentPartition?.attachments || (targetIdx === 0 ? downloaded?.attachments : []) || []);
+
+          if (localAtts.length > 0) {
+            const merged = [...localAtts];
+            if (Array.isArray(liveAtts)) {
+              for (const la of liveAtts) {
+                const laId = la?.id || la?.Id || la?.fileUrl || la?.FileUrl;
+                if (!merged.some(m => (m?.id || m?.Id || m?.fileUrl || m?.FileUrl) === laId)) {
+                  merged.push(la);
+                }
+              }
+            }
+            setAttachments(merged);
+          } else {
+            setAttachments(liveAtts);
+          }
+
+          if (offlineAttData.sketchUrl) {
+            setSketchUrl(offlineAttData.sketchUrl);
+          } else if (liveSketch) {
+            setSketchUrl(liveSketch);
+          } else if (downloaded?.currentPartition?.sketchUrl) {
+            setSketchUrl(downloaded.currentPartition.sketchUrl);
+          } else if (targetIdx === 0 && downloaded?.sketchUrl) {
+            setSketchUrl(downloaded.sketchUrl);
+          } else {
+            setSketchUrl('');
+          }
+
+          if (liveRes.tdnId) setTdnId(liveRes.tdnId);
 
           if (livePart) {
+            if (livePart.tdnId) setTdnId(livePart.tdnId);
+            if (livePart.tdnLandId) setTdnLandId(livePart.tdnLandId);
+            else if (livePart.formData?.TDNLand?.TDNLandId) setTdnLandId(livePart.formData.TDNLand.TDNLandId);
             if (livePart.systemGeneratedTDN) setDeclarationNo(livePart.systemGeneratedTDN);
             if (livePart.arpNo) setArpNo(livePart.arpNo);
             if (livePart.pin) setPin(livePart.pin);
-            if (livePart.blockNo || livePart.blockNumber) setBlockNo(livePart.blockNo || livePart.blockNumber);
+            setBlockNo(livePart.blockNo || livePart.blockNumber || '');
             if (livePart.dateRegistered) setTctDate(livePart.dateRegistered.substring(0, 10));
+            else if (livePart.tctDate) setTctDate(livePart.tctDate.substring(0, 10));
+            else setTctDate('');
             if (livePart.registrationStatus) setRegistrationStatus(cleanRegStatus(livePart.registrationStatus));
             if (livePart.titleType) setTitleType(cleanTitleType(livePart.titleType));
-            if (livePart.sectionNo) setSectionNo(livePart.sectionNo);
-            if (livePart.lotNo || livePart.lotNumber) setLotNo(livePart.lotNo || livePart.lotNumber);
-            if (livePart.parcelNo) setParcelNo(livePart.parcelNo);
-            if (livePart.surveyNo || livePart.surveyNumber) setSurveyNo(livePart.surveyNo || livePart.surveyNumber);
-            if (livePart.titleNo) setTctNo(livePart.titleNo);
-            if (livePart.cadastralSurveyNo) setCadastralSurveyNo(livePart.cadastralSurveyNo);
+            if (livePart.transactionCode) setTransactionCode(livePart.transactionCode);
+            setSectionNo(livePart.sectionNo || '');
+            setLotNo(livePart.lotNo || livePart.lotNumber || '');
+            setParcelNo(livePart.parcelNo || '');
+            setSurveyNo(livePart.surveyNo || livePart.surveyNumber || '');
+            setTctNo(livePart.titleNo || livePart.tctNo || '');
+            setCadastralSurveyNo(livePart.cadastralSurveyNo || '');
             if (livePart.streetLocation || livePart.streetNo || livePart.buildingNo) {
               setStreetLocation(livePart.streetLocation || livePart.streetNo || livePart.buildingNo);
             }
@@ -462,15 +553,34 @@ export const LandFormScreen = ({ route, navigation }) => {
             if (livePart.ownerContactNo) setOwnerContact(livePart.ownerContactNo);
             if (livePart.ownerEmail) setOwnerEmail(livePart.ownerEmail);
             if (livePart.ownerGender) setOwnerGender(livePart.ownerGender);
-            if (livePart.boundaryNorth) setNorthBoundary(livePart.boundaryNorth);
-            if (livePart.nremarks) setNRemarks(livePart.nremarks);
-            if (livePart.boundarySouth) setSouthBoundary(livePart.boundarySouth);
-            if (livePart.sremarks) setSRemarks(livePart.sremarks);
-            if (livePart.boundaryEast) setEastBoundary(livePart.boundaryEast);
-            if (livePart.eremarks) setERemarks(livePart.eremarks);
-            if (livePart.boundaryWest) setWestBoundary(livePart.boundaryWest);
-            if (livePart.wremarks) setWRemarks(livePart.wremarks);
-            hydrateSchedules(livePart, liveRes?.formData?.TDNLand);
+
+            const pAdmin = !!livePart.isAdministrator || !!livePart.administratorName;
+            const pBenef = !pAdmin && !!livePart.isBeneficialUser;
+            const pPoss = !pAdmin && !pBenef && !!livePart.isPossessor;
+            setIsAdministrator(pAdmin);
+            setIsBeneficialUser(pBenef);
+            setIsPossessor(pPoss);
+            setAdminName(livePart.administratorName || livePart.propAdminName || '');
+            setAdminAddress(livePart.administratorAddress || livePart.propAdminAddress || '');
+            setAdminContact(livePart.administratorContactNo || livePart.propAdminContactNo || '');
+            setAdminTin(livePart.administratorTin || '');
+            setAdminEmail(livePart.administratorEmail || '');
+            setAdminGender(livePart.administratorGender || 'Male');
+
+            setNorthBoundary(livePart.boundaryNorth || '');
+            setNRemarks(livePart.nremarks || '');
+            setSouthBoundary(livePart.boundarySouth || '');
+            setSRemarks(livePart.sremarks || '');
+            setEastBoundary(livePart.boundaryEast || '');
+            setERemarks(livePart.eremarks || '');
+            setWestBoundary(livePart.boundaryWest || '');
+            setWRemarks(livePart.wremarks || '');
+
+            if (livePart.formData) {
+              populateFieldsFromDTO(livePart.formData);
+            }
+            // Strictly hydrate schedules from this partition's own formData DTO, NEVER from top-level/Partition 1
+            hydrateSchedules(livePart, livePart.formData?.TDNLand);
             hydrateTab5(livePart);
           }
 
@@ -504,9 +614,18 @@ export const LandFormScreen = ({ route, navigation }) => {
       if (t.PIN) setPin(t.PIN);
       if (t.DisplayName) setOwnerName(t.DisplayName);
       if (t.OwnerAddress) setOwnerAddress(t.OwnerAddress);
-      if (t.PropAdminName) setAdminName(t.PropAdminName);
-      if (t.PropAdminAddress) setAdminAddress(t.PropAdminAddress);
-      if (t.PropAdminContactNo) setAdminContact(t.PropAdminContactNo);
+      const hasAdmin = !!t.IsAdministrator || !!t.AdministratorName || !!t.PropAdminName;
+      const hasBenef = !hasAdmin && !!t.IsBeneficialUser;
+      const hasPoss = !hasAdmin && !hasBenef && !!t.IsPossessor;
+      setIsAdministrator(hasAdmin);
+      setIsBeneficialUser(hasBenef);
+      setIsPossessor(hasPoss);
+      setAdminName(t.AdministratorName || t.PropAdminName || '');
+      setAdminGender(t.AdministratorGender || 'Male');
+      setAdminTin(t.AdministratorTin || '');
+      setAdminContact(t.AdministratorContactNo || t.PropAdminContactNo || '');
+      setAdminAddress(t.AdministratorAddress || t.PropAdminAddress || '');
+      setAdminEmail(t.AdministratorEmail || '');
       if (t.PropLocationStreet) setStreetLocation(t.PropLocationStreet);
       else if (t.Location && !t.Location.includes(',')) setStreetLocation(t.Location);
       if (t.CadastralSurveyNo) setCadastralSurveyNo(t.CadastralSurveyNo);
@@ -555,14 +674,26 @@ export const LandFormScreen = ({ route, navigation }) => {
       else if (p.tctDate) setTctDate(p.tctDate.toString().substring(0, 10));
       if (p.registrationStatus) setRegistrationStatus(cleanRegStatus(p.registrationStatus));
       if (p.titleType) setTitleType(cleanTitleType(p.titleType));
-      if (p.sectionNo) setSectionNo(p.sectionNo);
-      if (p.parcelNo) setParcelNo(p.parcelNo);
-      if (p.surveyNo || p.surveyNumber) setSurveyNo(p.surveyNo || p.surveyNumber);
-      if (p.titleNo) setTctNo(p.titleNo);
+      setSectionNo(p.sectionNo || '');
+      setParcelNo(p.parcelNo || '');
+      setSurveyNo(p.surveyNo || p.surveyNumber || '');
+      setTctNo(p.titleNo || '');
       if (p.streetLocation || p.streetNo || p.buildingNo) setStreetLocation(p.streetLocation || p.streetNo || p.buildingNo);
       if (p.purok) setPurok(p.purok);
       if (p.districtOrBarangay) setDistrictOrBarangay(normalizeBarangay(p.districtOrBarangay));
       if (p.newOwnerName || p.ownerName) setOwnerName(p.newOwnerName || p.ownerName);
+      const pAdmin = !!p.isAdministrator || !!p.administratorName;
+      const pBenef = !pAdmin && !!p.isBeneficialUser;
+      const pPoss = !pAdmin && !pBenef && !!p.isPossessor;
+      setIsAdministrator(pAdmin);
+      setIsBeneficialUser(pBenef);
+      setIsPossessor(pPoss);
+      setAdminName(p.administratorName || p.propAdminName || '');
+      setAdminGender(p.administratorGender || 'Male');
+      setAdminTin(p.administratorTin || '');
+      setAdminContact(p.administratorContactNo || p.propAdminContactNo || '');
+      setAdminAddress(p.administratorAddress || p.propAdminAddress || '');
+      setAdminEmail(p.administratorEmail || '');
       if (p.ownerAddress) setOwnerAddress(p.ownerAddress);
       if (p.ownerTIN || p.ownerTin) setOwnerTin(p.ownerTIN || p.ownerTin);
       if (p.ownerContactNo) setOwnerContact(p.ownerContactNo);
@@ -593,14 +724,14 @@ export const LandFormScreen = ({ route, navigation }) => {
     if (d.TDNLand) {
       const l = d.TDNLand;
       if (l.TDNLandId) setTdnLandId(l.TDNLandId);
-      if (l.NorthBoundary) setNorthBoundary(l.NorthBoundary);
-      if (l.Nremarks) setNRemarks(l.Nremarks);
-      if (l.SouthBoundary) setSouthBoundary(l.SouthBoundary);
-      if (l.Sremarks) setSRemarks(l.Sremarks);
-      if (l.EastBoundary) setEastBoundary(l.EastBoundary);
-      if (l.Eremarks) setERemarks(l.Eremarks);
-      if (l.WestBoundary) setWestBoundary(l.WestBoundary);
-      if (l.Wremarks) setWRemarks(l.Wremarks);
+      setNorthBoundary(l.NorthBoundary || '');
+      setNRemarks(l.Nremarks || '');
+      setSouthBoundary(l.SouthBoundary || '');
+      setSRemarks(l.Sremarks || '');
+      setEastBoundary(l.EastBoundary || '');
+      setERemarks(l.Eremarks || '');
+      setWestBoundary(l.WestBoundary || '');
+      setWRemarks(l.Wremarks || '');
     }
 
     if (d.TDNLandDetails && d.TDNLandDetails.length > 0) {
@@ -992,26 +1123,45 @@ export const LandFormScreen = ({ route, navigation }) => {
 
   const navigateBack = () => {
     setDiscardModalVisible(false);
-    if (navigation && typeof navigation.navigate === 'function') {
-      navigation.navigate('Main', { screen: 'Feed' });
-    } else if (navigation && typeof navigation.goBack === 'function') {
-      navigation.goBack();
+    if (fromHistory) {
+      if (navigation && typeof navigation.canGoBack === 'function' && navigation.canGoBack()) {
+        navigation.goBack();
+      } else if (navigation && typeof navigation.navigate === 'function') {
+        navigation.navigate('Main', { screen: 'HistoryTab' });
+      }
+    } else {
+      if (navigation && typeof navigation.canGoBack === 'function' && navigation.canGoBack()) {
+        navigation.goBack();
+      } else if (navigation && typeof navigation.navigate === 'function') {
+        navigation.navigate('Main', { screen: 'Feed' });
+      }
     }
   };
 
-  const showCompleteAlertAndGoBack = (title, message) => {
-    if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && typeof window.alert === 'function') {
-        window.alert(`${title}\n\n${message}`);
-      }
-      navigateBack();
-    } else {
-      Alert.alert(title, message, [{ text: 'OK', onPress: navigateBack }]);
-    }
+  const [completeModalConfig, setCompleteModalConfig] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    icon: 'cloud-done-outline',
+    iconType: 'success'
+  });
+
+  const showCompleteModalAndGoBack = (title, message, iconType = 'success', icon = 'cloud-done-outline') => {
+    setCompleteModalConfig({
+      visible: true,
+      title,
+      message,
+      icon,
+      iconType
+    });
   };
 
   const handleCancel = () => {
-    setDiscardModalVisible(true);
+    if (fromHistory) {
+      navigateBack();
+    } else {
+      setDiscardModalVisible(true);
+    }
   };
 
   const handleSave = async (forceOffline = false, transferStage = false) => {
@@ -1078,6 +1228,8 @@ export const LandFormScreen = ({ route, navigation }) => {
         AdministratorEmail: adminEmail,
         AdministratorGender: adminGender,
         FloorPlanSketchPath: sketchUrl,
+        FloorPlanSketchBase64: sketchBase64,
+        FloorPlanSketchFileName: sketchFileName,
         Attachments: attachments,
         YearEffectivity: parseInt(yearEffectivity) || null,
         QuarterEffectivity: qNum,
@@ -1112,23 +1264,30 @@ export const LandFormScreen = ({ route, navigation }) => {
       }
     };
 
-    const workflowForwardPayload = transferStage && formWorkflowIdParam ? {
+    const workflowForwardPayload = transferStage && (trackingNoParam || formWorkflowIdParam) ? {
       formWorkflowId: formWorkflowIdParam,
+      trackingNo: trackingNo || trackingNoParam,
       nextStatusId: nextStatusId,
       remarks: remarks || 'Field land appraisal completed and transferred.'
     } : null;
 
     setSaving(true);
+    await ensurePayloadFilesHaveBase64(payload);
 
     if (forceOffline) {
       await queueOfflineUpdate(
         'UPDATE_LAND',
         payload,
         `Land Appraisal [Part ${partitionLetterParam}]: ${trackingNo || arpNo} (${ownerName || 'Owner'})`,
-        workflowForwardPayload
+        null
       );
       setSaving(false);
-      navigateBack();
+      showCompleteModalAndGoBack(
+        'Partition Saved Offline',
+        `Edits for Partition ${partitionLetterParam} have been saved locally. To synchronize to the office database or transfer to supervisor, use the 3-dots (⋮) menu on the transaction card in My Transactions.`,
+        'success',
+        'cloud-offline-outline'
+      );
       return;
     }
 
@@ -1140,7 +1299,8 @@ export const LandFormScreen = ({ route, navigation }) => {
             await MobileApi.forwardWorkflow(
               workflowForwardPayload.formWorkflowId,
               workflowForwardPayload.nextStatusId,
-              workflowForwardPayload.remarks
+              workflowForwardPayload.remarks,
+              workflowForwardPayload.trackingNo
             );
           } catch (fwdErr) {
             // Workflow forward handled
@@ -1150,14 +1310,50 @@ export const LandFormScreen = ({ route, navigation }) => {
           await markTransactionSynced(trackingNo || trackingNoParam, formWorkflowIdParam, transferStage, payload);
         }
         setSaving(false);
-        navigateBack();
+        showCompleteModalAndGoBack(
+          'Land Appraisal Saved & Synced',
+          `Partition ${partitionLetterParam} updates were successfully saved and synchronized directly with the City Assessor Web Portal.`,
+          'success',
+          'cloud-done-outline'
+        );
+        return;
+      } else {
+        // Server rejected live sync: preserve all data safely in the offline queue
+        await queueOfflineUpdate(
+          'UPDATE_LAND',
+          payload,
+          `Land Appraisal [Part ${partitionLetterParam}]: ${trackingNo || arpNo} (${ownerName || 'Owner'})`,
+          workflowForwardPayload
+        );
+        setSaving(false);
+        showCompleteModalAndGoBack(
+          'Saved to Offline Queue (Sync Rejected)',
+          `Live sync could not complete (${res?.message || 'Server rejected the land form update'}). Your edits have been safely preserved in the offline queue and can be re-synced anytime.`,
+          'warning',
+          'cloud-offline-outline'
+        );
         return;
       }
     } catch (err) {
-      // Fallback to offline queue
+      const serverMsg = err.response?.data?.message || err.response?.data || err.message || 'Server returned an error.';
+      // Live sync failed with error: preserve all data safely in the offline queue
+      await queueOfflineUpdate(
+        'UPDATE_LAND',
+        payload,
+        `Land Appraisal [Part ${partitionLetterParam}]: ${trackingNo || arpNo} (${ownerName || 'Owner'})`,
+        workflowForwardPayload
+      );
+      setSaving(false);
+      showCompleteModalAndGoBack(
+        'Saved to Offline Queue (Sync Failed)',
+        `Live sync failed (${serverMsg}). Your edits have been safely preserved in the offline queue and can be re-synced anytime.`,
+        'warning',
+        'cloud-offline-outline'
+      );
+      return;
     }
 
-    // Fallback: Queue offline safely without blocking the user
+    // Fallback: Only queue offline if completely unreachable or network disconnected
     await queueOfflineUpdate(
       'UPDATE_LAND',
       payload,
@@ -1165,45 +1361,75 @@ export const LandFormScreen = ({ route, navigation }) => {
       workflowForwardPayload
     );
     setSaving(false);
-    navigateBack();
+    showCompleteModalAndGoBack(
+      'Saved to Offline Queue',
+      `Device is currently offline or the server was unreachable. Your Partition ${partitionLetterParam} edits have been stored safely in the offline queue and will automatically sync once connected.`,
+      'warning',
+      'cloud-offline-outline'
+    );
   };
 
   return (
     <View style={styles.container}>
       <HeaderBar
-        title="LAND APPRAISAL"
-        subtitle={`Tracking No: ${trackingNo || 'N/A'} • Partition ${partitionLetterParam}${declarationNo ? ` • TDN: ${declarationNo}` : ''}`}
         navigation={navigation}
         showBack={true}
         onBackPress={handleCancel}
       />
 
+      {/* In-Page Form Header */}
+      <View style={styles.formScreenHeader}>
+        <View style={styles.formScreenHeaderRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.formScreenTitle, { color: colors.textDark }]}>
+              {fromHistory ? "View Land Record" : "Land Appraisal"}
+            </Text>
+            <Text style={[styles.formScreenSubtitle, { color: colors.textMuted }]}>
+              {`Tracking No: ${trackingNo || 'N/A'} • Partition ${partitionLetterParam}${declarationNo ? ` • TDN: ${declarationNo}` : ''}`}
+            </Text>
+          </View>
+          <View style={[styles.partitionBadgeHero, { backgroundColor: isDarkMode ? '#134e4a' : colors.primaryLight }]}>
+            <Text style={[styles.partitionBadgeHeroText, { color: colors.primary }]}>
+              Lot {partitionLetterParam}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Historical Record Ribbon */}
+      {fromHistory && (
+        <View style={styles.historyNoticeRibbon}>
+          <Ionicons name="time-outline" size={16} color="#0369a1" />
+          <Text style={styles.historyNoticeText}>
+            Historical Record View • Completed transaction cannot be edited.
+          </Text>
+        </View>
+      )}
+
       {/* Offline Status Ribbon */}
       <View style={[styles.ribbon, isDownloaded ? styles.ribbonDownloaded : styles.ribbonStandard]}>
-        <Ionicons name={isDownloaded ? "shield-checkmark" : "cloud-outline"} size={16} color={isDownloaded ? (isDarkMode ? "#34d399" : "#15803d") : colors.primary} />
-        <Text style={[styles.ribbonText, isDownloaded && { color: isDarkMode ? '#34d399' : '#15803d' }]}>
-          {isDownloaded ? "Downloaded Form • 100% Offline Field Ready" : "Live Online Form"}
-        </Text>
+        <View style={styles.ribbonLeft}>
+          <Ionicons name={isDownloaded ? "shield-checkmark" : "cloud-outline"} size={16} color={isDownloaded ? (isDarkMode ? "#34d399" : "#15803d") : colors.primary} />
+          <Text style={[styles.ribbonText, isDownloaded && { color: isDarkMode ? '#34d399' : '#15803d' }]}>
+            {isDownloaded ? "Downloaded Form • 100% Offline Field Ready" : "Live Online Form"}
+          </Text>
+        </View>
+
+        {/* Live Network Status Tag */}
+        <TouchableOpacity
+          style={[styles.ribbonNetTag, isOnline ? styles.ribbonNetOnline : styles.ribbonNetOffline]}
+          onPress={() => checkConnectivity && checkConnectivity()}
+          accessibilityLabel={`Network Status: ${isOnline ? 'Online' : 'Offline'}. Tap to test.`}
+        >
+          <View style={[styles.ribbonNetDot, isOnline ? styles.ribbonNetDotOnline : styles.ribbonNetDotOffline]} />
+          <Text style={[styles.ribbonNetText, isOnline ? styles.ribbonNetTextOnline : styles.ribbonNetTextOffline]}>
+            {isOnline ? 'ONLINE' : 'OFFLINE'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Sticky, Well-Positioned Tab Bar Header */}
       <View style={styles.topTabsWrapper}>
-        {/* Banner summary bar */}
-        <View style={styles.bannerInfoBox}>
-          <View style={styles.bannerInfoItem}>
-            <Text style={styles.bannerInfoLabel}>TDN:</Text>
-            <Text style={styles.bannerInfoValue}>{declarationNo || 'TDN System Pending'}</Text>
-          </View>
-          <View style={styles.bannerInfoItem}>
-            <Text style={styles.bannerInfoLabel}>• ARP NO:</Text>
-            <Text style={styles.bannerInfoValue}>{arpNo || '187-00-0000-000-000'}</Text>
-          </View>
-          <View style={styles.bannerInfoItem}>
-            <Text style={styles.bannerInfoLabel}>• PIN:</Text>
-            <Text style={styles.bannerInfoValue}>{pin || '126-00-0000-000'}</Text>
-          </View>
-        </View>
-
         {/* Scrollable Tab Pills */}
         <ScrollView
           ref={tabScrollRef}
@@ -1227,7 +1453,7 @@ export const LandFormScreen = ({ route, navigation }) => {
                   color={isActive ? '#ffffff' : (isDarkMode ? colors.textDark : '#475569')}
                 />
                 <Text style={[styles.sectionTabText, isActive && styles.sectionTabTextActive]}>
-                  {tab.label} {idx === 5 && attachments && attachments.length > 0 ? `(${attachments.length})` : ''}
+                  {tab.label} {idx === 4 && attachments && attachments.length > 0 ? `(${attachments.length})` : ''}
                 </Text>
               </TouchableOpacity>
             );
@@ -1235,7 +1461,13 @@ export const LandFormScreen = ({ route, navigation }) => {
         </ScrollView>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+        showsVerticalScrollIndicator={true}
+      >
         {loading ? (
           <ActivityIndicator color={colors.primary} size="large" style={{ marginVertical: 30 }} />
         ) : notDownloadedError ? (
@@ -1257,10 +1489,21 @@ export const LandFormScreen = ({ route, navigation }) => {
             {/* ========================================================= */}
             {activeTab === 0 && (
               <View style={styles.tabContentBlock}>
+                {/* Dedicated Card for Key Property Identifiers (TDN, ARP, PIN) */}
                 <View style={[styles.card, shadows.card]}>
-                  <Text style={styles.cardHeaderTitle}>Cadastral Details & Title Registration (CAST Reference)</Text>
+                  <Text style={styles.cardHeaderTitle}>Property Identification &amp; Reference Numbers</Text>
 
-                  {/* Readonly Numbers: ARP No & TDN */}
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>TAX DECLARATION NO. (TDN)</Text>
+                    <TextInput
+                      style={[styles.input, styles.inputDisabled]}
+                      value={declarationNo}
+                      editable={false}
+                      placeholder="TDN Pending Office Approval"
+                      placeholderTextColor={colors.placeholder}
+                    />
+                  </View>
+
                   <View style={styles.rowInputs}>
                     <View style={[styles.inputGroup, { flex: 1 }]}>
                       <Text style={styles.inputLabel}>ARP NO.</Text>
@@ -1273,16 +1516,20 @@ export const LandFormScreen = ({ route, navigation }) => {
                       />
                     </View>
                     <View style={[styles.inputGroup, { flex: 1 }]}>
-                      <Text style={styles.inputLabel}>TAX DECLARATION NO. (TDN)</Text>
+                      <Text style={styles.inputLabel}>PROPERTY INDEX NUMBER (PIN)</Text>
                       <TextInput
-                        style={[styles.input, styles.inputDisabled]}
-                        value={declarationNo}
-                        editable={false}
-                        placeholder="Generated by Web Portal"
+                        style={[styles.input, { fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontWeight: '700' }]}
+                        value={pin}
+                        onChangeText={setPin}
+                        placeholder="126-00-0000-000"
                         placeholderTextColor={colors.placeholder}
                       />
                     </View>
                   </View>
+                </View>
+
+                <View style={[styles.card, shadows.card]}>
+                  <Text style={styles.cardHeaderTitle}>Cadastral Details &amp; Title Registration (CAST Reference)</Text>
 
                   {/* Registration Status & Title Type Selectors */}
                   <View style={styles.rowInputs}>
@@ -1431,27 +1678,15 @@ export const LandFormScreen = ({ route, navigation }) => {
                     </View>
                   </View>
 
-                  <View style={styles.rowInputs}>
-                    <View style={[styles.inputGroup, { flex: 2 }]}>
-                      <Text style={styles.inputLabel}>PROPERTY INDEX NUMBER (PIN)</Text>
-                      <TextInput
-                        placeholderTextColor={colors.placeholder}
-                        style={styles.input}
-                        value={pin}
-                        onChangeText={setPin}
-                        placeholder="126-00-0000-000"
-                      />
-                    </View>
-                    <View style={[styles.inputGroup, { flex: 1 }]}>
-                      <Text style={styles.inputLabel}>TRANSACTION CODE</Text>
-                      <TextInput
-                        placeholderTextColor={colors.placeholder}
-                        style={styles.input}
-                        value={transactionCode}
-                        onChangeText={setTransactionCode}
-                        placeholder="e.g. TR-LAND"
-                      />
-                    </View>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>TRANSACTION CODE</Text>
+                    <TextInput
+                      placeholderTextColor={colors.placeholder}
+                      style={styles.input}
+                      value={transactionCode}
+                      onChangeText={setTransactionCode}
+                      placeholder="e.g. TR-LAND"
+                    />
                   </View>
                 </View>
               </View>
@@ -1463,7 +1698,7 @@ export const LandFormScreen = ({ route, navigation }) => {
             {activeTab === 1 && (
               <View style={styles.tabContentBlock}>
                 <View style={[styles.card, shadows.card]}>
-                  <Text style={styles.cardHeaderTitle}>Property Location Details (General Santos City Standard)</Text>
+                  <Text style={styles.cardHeaderTitle}>Property Location Details (City of Koronadal Standard)</Text>
 
                   <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>BUILDING NO. / STREET / ROAD</Text>
@@ -1507,7 +1742,7 @@ export const LandFormScreen = ({ route, navigation }) => {
                       <Text style={styles.inputLabel}>CITY / MUNICIPALITY</Text>
                       <TextInput
                         style={[styles.input, styles.inputDisabled]}
-                        value={cityMunicipality}
+                        value={cityMunicipality || 'Koronadal City'}
                         editable={false}
                       />
                     </View>
@@ -1515,7 +1750,7 @@ export const LandFormScreen = ({ route, navigation }) => {
                       <Text style={styles.inputLabel}>PROVINCE</Text>
                       <TextInput
                         style={[styles.input, styles.inputDisabled]}
-                        value={province}
+                        value={province || 'South Cotabato'}
                         editable={false}
                       />
                     </View>
@@ -1606,6 +1841,36 @@ export const LandFormScreen = ({ route, navigation }) => {
                     />
                   </View>
                 </View>
+
+                {/* 2nd Tab: Site Sketch Attachment */}
+                <AttachmentsSection
+                  trackingNo={trackingNo || trackingNoParam}
+                  formWorkflowId={formWorkflowIdParam}
+                  partitionIndex={parseInt(partitionIndexParam, 10) || 0}
+                  sketchUrl={sketchUrl}
+                  sketchBase64={sketchBase64}
+                  attachments={attachments}
+                  onAttachmentsChange={(newAtts) => {
+                    setAttachments(newAtts);
+                    savePartitionAttachmentsOffline(trackingNo || trackingNoParam, partitionIndexParam, newAtts, sketchUrl);
+                    if (typeof updatePartitionAttachmentsLocally === 'function') {
+                      updatePartitionAttachmentsLocally(trackingNo || trackingNoParam, formWorkflowIdParam, partitionIndexParam, newAtts, sketchUrl);
+                    }
+                  }}
+                  onSketchChange={({ uri, base64, fileName }) => {
+                    const newSketch = uri || '';
+                    setSketchUrl(newSketch);
+                    setSketchBase64(base64 || null);
+                    setSketchFileName(fileName || '');
+                    savePartitionAttachmentsOffline(trackingNo || trackingNoParam, partitionIndexParam, attachments, newSketch);
+                    if (typeof updatePartitionAttachmentsLocally === 'function') {
+                      updatePartitionAttachmentsLocally(trackingNo || trackingNoParam, formWorkflowIdParam, partitionIndexParam, attachments, newSketch);
+                    }
+                  }}
+                  propertyKind="Land"
+                  showSketch={true}
+                  showAttachments={false}
+                />
               </View>
             )}
 
@@ -1615,47 +1880,82 @@ export const LandFormScreen = ({ route, navigation }) => {
             {activeTab === 2 && (
               <View style={styles.tabContentBlock}>
                 <View style={[styles.card, shadows.card]}>
-                  <View style={styles.cardHeaderRow}>
-                    <Text style={styles.cardHeaderTitle}>Owner & Declarant Demographics</Text>
-                  </View>
+                  <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 10, marginBottom: 12 }}>
+                    <Text style={[styles.cardHeaderTitle, { borderBottomWidth: 0, paddingBottom: 0, marginBottom: 8 }]}>
+                      Owner & Declarant Demographics
+                    </Text>
 
-                  {/* Administrator, Beneficial User, Possessor Checkbox Pills */}
-                  <View style={styles.rolePillsRow}>
-                    <TouchableOpacity
-                      style={[styles.rolePill, isAdministrator && styles.rolePillActive]}
-                      onPress={() => setIsAdministrator(!isAdministrator)}
-                    >
-                      <Ionicons
-                        name={isAdministrator ? "checkbox" : "square-outline"}
-                        size={16}
-                        color={isAdministrator ? colors.primary : colors.textMuted}
-                      />
-                      <Text style={[styles.rolePillText, isAdministrator && styles.rolePillTextActive]}>ADMINISTRATOR</Text>
-                    </TouchableOpacity>
+                    {/* 3 Options: Administrator, Beneficial User, Possessor (Check only one) */}
+                    <View style={styles.rolePillsRow}>
+                      <TouchableOpacity
+                        style={[styles.rolePill, isAdministrator && styles.rolePillActive]}
+                        onPress={() => {
+                          if (isAdministrator) {
+                            setIsAdministrator(false);
+                          } else {
+                            setIsAdministrator(true);
+                            setIsBeneficialUser(false);
+                            setIsPossessor(false);
+                          }
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons
+                          name={isAdministrator ? "checkbox" : "square-outline"}
+                          size={16}
+                          color={isAdministrator ? colors.primary : colors.textMuted}
+                        />
+                        <Text style={[styles.rolePillText, isAdministrator && styles.rolePillTextActive]}>
+                          ADMINISTRATOR
+                        </Text>
+                      </TouchableOpacity>
 
-                    <TouchableOpacity
-                      style={[styles.rolePill, isBeneficialUser && styles.rolePillActive]}
-                      onPress={() => setIsBeneficialUser(!isBeneficialUser)}
-                    >
-                      <Ionicons
-                        name={isBeneficialUser ? "checkbox" : "square-outline"}
-                        size={16}
-                        color={isBeneficialUser ? colors.primary : colors.textMuted}
-                      />
-                      <Text style={[styles.rolePillText, isBeneficialUser && styles.rolePillTextActive]}>BENEFICIAL USER</Text>
-                    </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.rolePill, isBeneficialUser && styles.rolePillActive]}
+                        onPress={() => {
+                          if (isBeneficialUser) {
+                            setIsBeneficialUser(false);
+                          } else {
+                            setIsBeneficialUser(true);
+                            setIsAdministrator(false);
+                            setIsPossessor(false);
+                          }
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons
+                          name={isBeneficialUser ? "checkbox" : "square-outline"}
+                          size={16}
+                          color={isBeneficialUser ? colors.primary : colors.textMuted}
+                        />
+                        <Text style={[styles.rolePillText, isBeneficialUser && styles.rolePillTextActive]}>
+                          BENEFICIAL USER
+                        </Text>
+                      </TouchableOpacity>
 
-                    <TouchableOpacity
-                      style={[styles.rolePill, isPossessor && styles.rolePillActive]}
-                      onPress={() => setIsPossessor(!isPossessor)}
-                    >
-                      <Ionicons
-                        name={isPossessor ? "checkbox" : "square-outline"}
-                        size={16}
-                        color={isPossessor ? colors.primary : colors.textMuted}
-                      />
-                      <Text style={[styles.rolePillText, isPossessor && styles.rolePillTextActive]}>POSSESSOR</Text>
-                    </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.rolePill, isPossessor && styles.rolePillActive]}
+                        onPress={() => {
+                          if (isPossessor) {
+                            setIsPossessor(false);
+                          } else {
+                            setIsPossessor(true);
+                            setIsAdministrator(false);
+                            setIsBeneficialUser(false);
+                          }
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons
+                          name={isPossessor ? "checkbox" : "square-outline"}
+                          size={16}
+                          color={isPossessor ? colors.primary : colors.textMuted}
+                        />
+                        <Text style={[styles.rolePillText, isPossessor && styles.rolePillTextActive]}>
+                          POSSESSOR
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
 
                   <View style={styles.inputGroup}>
@@ -1717,86 +2017,104 @@ export const LandFormScreen = ({ route, navigation }) => {
                     </View>
                     <View style={[styles.inputGroup, { flex: 1 }]}>
                       <Text style={styles.inputLabel}>SEX / GENDER</Text>
-                      <View style={styles.optionPillRow}>
-                        {['Male', 'Female'].map((gender) => (
+                      <TouchableOpacity
+                        style={styles.selectBtn}
+                        onPress={() => openGenderPicker('owner')}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.selectBtnText, !ownerGender && { color: colors.placeholder }]} numberOfLines={1}>
+                          {ownerGender || 'Select Gender...'}
+                        </Text>
+                        <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {(isAdministrator || isBeneficialUser || isPossessor) && (
+                    <View style={{ marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.border }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+                        <Ionicons name="shield-checkmark-outline" size={16} color={colors.primary} />
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary, textTransform: 'uppercase' }}>
+                          {isAdministrator ? 'Administrator Details' : isBeneficialUser ? 'Beneficial User Details' : 'Possessor Details'}
+                        </Text>
+                      </View>
+
+                      <View style={styles.inputGroup}>
+                        <Text style={styles.inputLabel}>
+                          NAME ({isAdministrator ? 'ADMINISTRATOR' : isBeneficialUser ? 'BENEFICIAL USER' : 'POSSESSOR'})
+                        </Text>
+                        <TextInput
+                          placeholderTextColor={colors.placeholder}
+                          style={styles.input}
+                          value={adminName}
+                          onChangeText={setAdminName}
+                          placeholder="Full name of administrator / representative"
+                        />
+                      </View>
+
+                      <View style={styles.rowInputs}>
+                        <View style={[styles.inputGroup, { flex: 1 }]}>
+                          <Text style={styles.inputLabel}>TAX IDENTIFICATION NO. (TIN)</Text>
+                          <TextInput
+                            placeholderTextColor={colors.placeholder}
+                            style={styles.input}
+                            value={adminTin}
+                            onChangeText={setAdminTin}
+                            placeholder="000-000-000-000"
+                          />
+                        </View>
+                        <View style={[styles.inputGroup, { flex: 1 }]}>
+                          <Text style={styles.inputLabel}>CONTACT NUMBER</Text>
+                          <TextInput
+                            placeholderTextColor={colors.placeholder}
+                            style={styles.input}
+                            value={adminContact}
+                            onChangeText={setAdminContact}
+                            placeholder="09XX-XXX-XXXX"
+                          />
+                        </View>
+                      </View>
+
+                      <View style={styles.inputGroup}>
+                        <Text style={styles.inputLabel}>ADMINISTRATOR ADDRESS</Text>
+                        <TextInput
+                          placeholderTextColor={colors.placeholder}
+                          style={styles.input}
+                          value={adminAddress}
+                          onChangeText={setAdminAddress}
+                          placeholder="House No., Street, Barangay, City, Province"
+                        />
+                      </View>
+
+                      <View style={styles.rowInputs}>
+                        <View style={[styles.inputGroup, { flex: 2 }]}>
+                          <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
+                          <TextInput
+                            placeholderTextColor={colors.placeholder}
+                            style={styles.input}
+                            value={adminEmail}
+                            onChangeText={setAdminEmail}
+                            placeholder="admin@example.com"
+                            keyboardType="email-address"
+                          />
+                        </View>
+                        <View style={[styles.inputGroup, { flex: 1 }]}>
+                          <Text style={styles.inputLabel}>SEX / GENDER</Text>
                           <TouchableOpacity
-                            key={gender}
-                            style={[styles.optionPill, ownerGender === gender && styles.optionPillActive]}
-                            onPress={() => setOwnerGender(gender)}
+                            style={styles.selectBtn}
+                            onPress={() => openGenderPicker('admin')}
+                            activeOpacity={0.7}
                           >
-                            <Text style={[styles.optionPillText, ownerGender === gender && styles.optionPillTextActive]}>
-                              {gender}
+                            <Text style={[styles.selectBtnText, !adminGender && { color: colors.placeholder }]} numberOfLines={1}>
+                              {adminGender || 'Select Gender...'}
                             </Text>
+                            <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
                           </TouchableOpacity>
-                        ))}
+                        </View>
                       </View>
                     </View>
-                  </View>
+                  )}
                 </View>
-
-                {/* Administrator / Beneficial User / Possessor Details */}
-                {Boolean(isAdministrator || isBeneficialUser || isPossessor || adminName) ? (
-                  <View style={[styles.card, shadows.card]}>
-                    <Text style={styles.cardHeaderTitle}>Administrator / Beneficial User / Possessor Details</Text>
-
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.inputLabel}>NAMES (ADMINISTRATOR / BENEFICIAL USER / POSSESSOR)</Text>
-                      <TextInput
-                        placeholderTextColor={colors.placeholder}
-                        style={styles.input}
-                        value={adminName}
-                        onChangeText={setAdminName}
-                        placeholder="Full name of administrator / representative"
-                      />
-                    </View>
-
-                    <View style={styles.rowInputs}>
-                      <View style={[styles.inputGroup, { flex: 1 }]}>
-                        <Text style={styles.inputLabel}>TIN</Text>
-                        <TextInput
-                          placeholderTextColor={colors.placeholder}
-                          style={styles.input}
-                          value={adminTin}
-                          onChangeText={setAdminTin}
-                          placeholder="000-000-000-000"
-                        />
-                      </View>
-                      <View style={[styles.inputGroup, { flex: 1 }]}>
-                        <Text style={styles.inputLabel}>PHONE NO.</Text>
-                        <TextInput
-                          placeholderTextColor={colors.placeholder}
-                          style={styles.input}
-                          value={adminContact}
-                          onChangeText={setAdminContact}
-                          placeholder="09XX-XXX-XXXX"
-                        />
-                      </View>
-                    </View>
-
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.inputLabel}>MAILING ADDRESS</Text>
-                      <TextInput
-                        placeholderTextColor={colors.placeholder}
-                        style={styles.input}
-                        value={adminAddress}
-                        onChangeText={setAdminAddress}
-                        placeholder="Complete mailing address"
-                      />
-                    </View>
-
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.inputLabel}>EMAIL</Text>
-                      <TextInput
-                        placeholderTextColor={colors.placeholder}
-                        style={styles.input}
-                        value={adminEmail}
-                        onChangeText={setAdminEmail}
-                        placeholder="admin@example.com"
-                        keyboardType="email-address"
-                      />
-                    </View>
-                  </View>
-                ) : null}
               </View>
             )}
 
@@ -2392,116 +2710,65 @@ export const LandFormScreen = ({ route, navigation }) => {
                   </View>
                 </View>
 
-                <View style={[styles.card, shadows.card]}>
-                  <Text style={styles.cardHeaderTitle}>Office Workflow Transfer</Text>
-
-                  <View style={styles.switchRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.switchTitle}>Transfer to Next Step on Sync</Text>
-                      <Text style={styles.switchSubtitle}>Automatically forwards workflow after office sync</Text>
-                    </View>
-                    <Switch
-                      value={autoForward}
-                      onValueChange={setAutoForward}
-                      trackColor={{ false: colors.borderDark, true: colors.primary }}
-                    />
-                  </View>
-
-                  {autoForward && (
-                    <View style={styles.nextStepBox}>
-                      <Text style={styles.nextStepLabel}>Target Next Stage:</Text>
-                      <View style={styles.nextStepBadge}>
-                        <Ionicons name="checkmark-circle-outline" size={16} color={colors.primary} />
-                        <Text style={styles.nextStepBadgeText}>Inspection Checked / Recommend Approval</Text>
-                      </View>
-                    </View>
-                  )}
-                </View>
-              </View>
-            )}
-
-            {/* ========================================================= */}
-            {/* TAB 5: 6. FIELD PHOTOS & SITE SKETCH                      */}
-            {/* ========================================================= */}
-            {activeTab === 5 && (
-              <View style={styles.tabContentBlock}>
+                {/* 5th Tab: Field Photos & Attachments */}
                 <AttachmentsSection
                   trackingNo={trackingNo || trackingNoParam}
+                  formWorkflowId={formWorkflowIdParam}
+                  partitionIndex={parseInt(partitionIndexParam, 10) || 0}
                   sketchUrl={sketchUrl}
+                  sketchBase64={sketchBase64}
                   attachments={attachments}
-                  onAttachmentsChange={setAttachments}
+                  onAttachmentsChange={(newAtts) => {
+                    setAttachments(newAtts);
+                    savePartitionAttachmentsOffline(trackingNo || trackingNoParam, partitionIndexParam, newAtts, sketchUrl);
+                    if (typeof updatePartitionAttachmentsLocally === 'function') {
+                      updatePartitionAttachmentsLocally(trackingNo || trackingNoParam, formWorkflowIdParam, partitionIndexParam, newAtts, sketchUrl);
+                    }
+                  }}
                   propertyKind="Land"
+                  showSketch={false}
+                  showAttachments={true}
                 />
               </View>
             )}
 
             {/* Action Buttons */}
-            {!isOnline && (
-              <View style={styles.offlineNoticeRow}>
-                <Ionicons name="cloud-offline-outline" size={15} color="#b45309" />
-                <Text style={styles.offlineNoticeText}>
-                  Offline Mode: Changes will be saved locally to this device.
-                </Text>
-              </View>
-            )}
             <View style={styles.buttonContainer}>
-              {/* Button 1: Save & Sync to Web (Draft - No Transfer) */}
-              <TouchableOpacity
-                style={[
-                  styles.saveBtn,
-                  styles.saveBtnPrimary,
-                  !isOnline && styles.saveBtnOffline
-                ]}
-                onPress={() => handleSave(false, false)}
-                disabled={saving}
-              >
-                {saving ? (
-                  <ActivityIndicator color="#ffffff" />
-                ) : (
-                  <>
-                    <Ionicons
-                      name={isOnline ? "cloud-upload" : "file-tray-full-outline"}
-                      size={18}
-                      color="#ffffff"
-                    />
-                    <Text style={styles.saveBtnText}>
-                      {isOnline
-                        ? "Save & Sync to Web (Draft)"
-                        : "Save to Offline Queue (No Transfer)"}
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
+              {fromHistory ? (
+                <TouchableOpacity
+                  style={[styles.saveBtn, { backgroundColor: colors.primary }]}
+                  onPress={handleCancel}
+                >
+                  <Ionicons name="arrow-back" size={18} color="#ffffff" />
+                  <Text style={styles.saveBtnText}>Back to History</Text>
+                </TouchableOpacity>
+              ) : (
+                <>
+                  <TouchableOpacity
+                    style={[styles.saveBtn, styles.saveBtnOffline]}
+                    onPress={() => handleSave(true, false)}
+                    disabled={saving}
+                  >
+                    {saving ? (
+                      <ActivityIndicator color="#ffffff" />
+                    ) : (
+                      <>
+                        <Ionicons name="cloud-offline-outline" size={18} color="#ffffff" />
+                        <Text style={styles.saveBtnText}>Save Partition (Offline)</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
 
-              {/* Button 2: Save & Transfer to Supervisor (Advances Workflow) */}
-              <TouchableOpacity
-                style={[styles.saveBtn, styles.saveBtnTransfer]}
-                onPress={() => handleSave(false, true)}
-                disabled={saving}
-              >
-                <Ionicons name="send" size={16} color="#ffffff" />
-                <Text style={styles.saveBtnText}>
-                  {isOnline
-                    ? "Save & Transfer to Supervisor"
-                    : "Queue & Transfer to Supervisor"}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.saveBtn, styles.saveBtnSecondary]}
-                onPress={() => handleSave(true)}
-              >
-                <Ionicons name="save-outline" size={18} color={colors.primary} />
-                <Text style={styles.saveBtnSecondaryText}>Save to Offline Queue Only</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.saveBtn, styles.cancelBtn]}
-                onPress={handleCancel}
-                disabled={saving}
-              >
-                <Ionicons name="close-circle-outline" size={18} color="#e11d48" />
-                <Text style={styles.cancelBtnText}>Cancel & Discard Changes</Text>
-              </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.saveBtn, styles.cancelBtn]}
+                    onPress={handleCancel}
+                    disabled={saving}
+                  >
+                    <Ionicons name="close-circle-outline" size={18} color="#e11d48" />
+                    <Text style={styles.cancelBtnText}>Cancel & Discard Changes</Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
           </>
         )}
@@ -2561,6 +2828,58 @@ export const LandFormScreen = ({ route, navigation }) => {
         </TouchableOpacity>
       </Modal>
 
+      {/* Gender Picker Modal */}
+      <Modal
+        visible={genderPickerVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setGenderPickerVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setGenderPickerVisible(false)}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {genderPickerTarget === 'owner' ? 'Select Owner Gender' : 'Select Gender'}
+              </Text>
+              <TouchableOpacity onPress={() => setGenderPickerVisible(false)}>
+                <Ionicons name="close" size={24} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+            <View style={{ paddingVertical: 8 }}>
+              {GENDER_OPTIONS.map((option) => {
+                const currentVal = genderPickerTarget === 'owner' ? ownerGender : adminGender;
+                const isSelected = currentVal === option;
+                return (
+                  <TouchableOpacity
+                    key={option}
+                    style={[styles.typeOptionItem, isSelected && styles.typeOptionItemSelected]}
+                    onPress={() => {
+                      if (genderPickerTarget === 'owner') {
+                        setOwnerGender(option);
+                      } else {
+                        setAdminGender(option);
+                      }
+                      setGenderPickerVisible(false);
+                    }}
+                  >
+                    <Text style={[styles.typeOptionText, isSelected && styles.typeOptionTextSelected]}>
+                      {option}
+                    </Text>
+                    {isSelected && (
+                      <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       {/* ========================================================= */}
       {/* 4 ROW EDITOR MODALS (OPTION B: COMPACT MASTER-DETAIL)     */}
       {/* ========================================================= */}
@@ -2570,7 +2889,12 @@ export const LandFormScreen = ({ route, navigation }) => {
         visible={editClassModalVisible}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => setEditClassModalVisible(false)}
+        onRequestClose={() => {
+          if (classPickerVisible) setClassPickerVisible(false);
+          else if (subClassPickerVisible) setSubClassPickerVisible(false);
+          else if (actualUsePickerVisible) setActualUsePickerVisible(false);
+          else setEditClassModalVisible(false);
+        }}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -2710,6 +3034,177 @@ export const LandFormScreen = ({ route, navigation }) => {
               </ScrollView>
             </TouchableOpacity>
           </TouchableOpacity>
+
+          {/* Classification Selection Overlay */}
+          {classPickerVisible && (
+            <View style={styles.innerPickerOverlay}>
+              <TouchableOpacity
+                style={StyleSheet.absoluteFillObject}
+                activeOpacity={1}
+                onPress={() => setClassPickerVisible(false)}
+              />
+              <View style={styles.innerPickerContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Select Land Classification</Text>
+                  <TouchableOpacity onPress={() => setClassPickerVisible(false)}>
+                    <Ionicons name="close" size={24} color={colors.textMuted} />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+                  {LAND_CLASSIFICATIONS.map((c) => {
+                    const currentRow = editingClassRow;
+                    const isSelected = currentRow?.classificationId === c.id;
+                    return (
+                      <TouchableOpacity
+                        key={c.id}
+                        style={[styles.typeOptionItem, isSelected && styles.typeOptionItemSelected]}
+                        onPress={() => {
+                          const firstSub = LAND_SUB_CLASSIFICATIONS.find(s => s.classificationId === c.id) || {
+                            id: 1, subClass: c.name, unitValue: 520
+                          };
+                          if (editingClassRow) {
+                            const a = parseFloat(editingClassRow.areaSqMeters) || 0;
+                            const u = firstSub.unitValue;
+                            setEditingClassRow({
+                              ...editingClassRow,
+                              classificationId: c.id,
+                              classificationName: c.name,
+                              subClassId: firstSub.id,
+                              subClassName: firstSub.subClass,
+                              unitValue: String(u),
+                              marketValue: Math.round(a * u * 100) / 100
+                            });
+                          }
+                          setClassPickerVisible(false);
+                        }}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.typeOptionText, isSelected && styles.typeOptionTextSelected]}>
+                            {c.name}
+                          </Text>
+                          <Text style={styles.typeOptionSubtext}>Code: {c.code}</Text>
+                        </View>
+                        {isSelected && (
+                          <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            </View>
+          )}
+
+          {/* Sub-Classification (SMV) Selection Overlay */}
+          {subClassPickerVisible && (
+            <View style={styles.innerPickerOverlay}>
+              <TouchableOpacity
+                style={StyleSheet.absoluteFillObject}
+                activeOpacity={1}
+                onPress={() => setSubClassPickerVisible(false)}
+              />
+              <View style={styles.innerPickerContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Select Sub-Classification (SMV)</Text>
+                  <TouchableOpacity onPress={() => setSubClassPickerVisible(false)}>
+                    <Ionicons name="close" size={24} color={colors.textMuted} />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+                  {(() => {
+                    const currentRow = editingClassRow;
+                    const filteredSubs = currentRow?.classificationId
+                      ? LAND_SUB_CLASSIFICATIONS.filter(s => s.classificationId === currentRow.classificationId)
+                      : LAND_SUB_CLASSIFICATIONS;
+                    const subsToShow = filteredSubs.length > 0 ? filteredSubs : LAND_SUB_CLASSIFICATIONS;
+
+                    return subsToShow.map((sub) => {
+                      const isSelected = currentRow?.subClassId === sub.id;
+                      return (
+                        <TouchableOpacity
+                          key={sub.id}
+                          style={[styles.typeOptionItem, isSelected && styles.typeOptionItemSelected]}
+                          onPress={() => {
+                            if (editingClassRow) {
+                              const a = parseFloat(editingClassRow.areaSqMeters) || 0;
+                              const u = sub.unitValue;
+                              setEditingClassRow({
+                                ...editingClassRow,
+                                subClassId: sub.id,
+                                subClassName: sub.subClass,
+                                unitValue: String(u),
+                                marketValue: Math.round(a * u * 100) / 100
+                              });
+                            }
+                            setSubClassPickerVisible(false);
+                          }}
+                        >
+                          <View style={{ flex: 1 }}>
+                            <Text style={[styles.typeOptionText, isSelected && styles.typeOptionTextSelected]}>
+                              {sub.subClass}
+                            </Text>
+                            <Text style={styles.typeOptionSubtext}>
+                              Unit Value: ₱{sub.unitValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                            </Text>
+                          </View>
+                          {isSelected && (
+                            <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+                          )}
+                        </TouchableOpacity>
+                      );
+                    });
+                  })()}
+                </ScrollView>
+              </View>
+            </View>
+          )}
+
+          {/* Actual Use Selection Overlay */}
+          {actualUsePickerVisible && (
+            <View style={styles.innerPickerOverlay}>
+              <TouchableOpacity
+                style={StyleSheet.absoluteFillObject}
+                activeOpacity={1}
+                onPress={() => setActualUsePickerVisible(false)}
+              />
+              <View style={styles.innerPickerContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Select Actual Use</Text>
+                  <TouchableOpacity onPress={() => setActualUsePickerVisible(false)}>
+                    <Ionicons name="close" size={24} color={colors.textMuted} />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+                  {LAND_ACTUAL_USES.map((u) => {
+                    const currentRow = editingClassRow;
+                    const isSelected = currentRow?.actualUseName === u;
+                    return (
+                      <TouchableOpacity
+                        key={u}
+                        style={[styles.typeOptionItem, isSelected && styles.typeOptionItemSelected]}
+                        onPress={() => {
+                          if (editingClassRow) {
+                            setEditingClassRow({
+                              ...editingClassRow,
+                              actualUseName: u
+                            });
+                          }
+                          setActualUsePickerVisible(false);
+                        }}
+                      >
+                        <Text style={[styles.typeOptionText, isSelected && styles.typeOptionTextSelected]}>
+                          {u}
+                        </Text>
+                        {isSelected && (
+                          <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            </View>
+          )}
         </KeyboardAvoidingView>
       </Modal>
 
@@ -2718,7 +3213,10 @@ export const LandFormScreen = ({ route, navigation }) => {
         visible={editImpModalVisible}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => setEditImpModalVisible(false)}
+        onRequestClose={() => {
+          if (impTypePickerVisible) setImpTypePickerVisible(false);
+          else setEditImpModalVisible(false);
+        }}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -2856,6 +3354,62 @@ export const LandFormScreen = ({ route, navigation }) => {
               </ScrollView>
             </TouchableOpacity>
           </TouchableOpacity>
+
+          {/* Improvement Type Picker Overlay */}
+          {impTypePickerVisible && (
+            <View style={styles.innerPickerOverlay}>
+              <TouchableOpacity
+                style={StyleSheet.absoluteFillObject}
+                activeOpacity={1}
+                onPress={() => setImpTypePickerVisible(false)}
+              />
+              <View style={styles.innerPickerContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Select Plant / Improvement Type</Text>
+                  <TouchableOpacity onPress={() => setImpTypePickerVisible(false)}>
+                    <Ionicons name="close" size={24} color={colors.textMuted} />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+                  {LAND_IMPROVEMENT_TYPES.map((imp) => {
+                    const currentRow = editingImpRow;
+                    const isSelected = currentRow?.typeId === imp.id;
+                    return (
+                      <TouchableOpacity
+                        key={imp.id}
+                        style={[styles.typeOptionItem, isSelected && styles.typeOptionItemSelected]}
+                        onPress={() => {
+                          if (editingImpRow) {
+                            const q = parseFloat(editingImpRow.quantity) || 0;
+                            setEditingImpRow({
+                              ...editingImpRow,
+                              typeId: imp.id,
+                              typeDescription: imp.description,
+                              unitValue: String(imp.baseValue),
+                              marketValue: Math.round(q * imp.baseValue * 100) / 100
+                            });
+                          }
+                          setImpTypePickerVisible(false);
+                        }}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.typeOptionText, isSelected && styles.typeOptionTextSelected]}>
+                            {imp.description}
+                          </Text>
+                          <Text style={styles.typeOptionSubtext}>
+                            Rate: ₱{imp.baseValue.toLocaleString('en-US', { minimumFractionDigits: 2 })} • Kind: {imp.kind}
+                          </Text>
+                        </View>
+                        {isSelected && (
+                          <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            </View>
+          )}
         </KeyboardAvoidingView>
       </Modal>
 
@@ -2864,7 +3418,10 @@ export const LandFormScreen = ({ route, navigation }) => {
         visible={editAdjModalVisible}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => setEditAdjModalVisible(false)}
+        onRequestClose={() => {
+          if (adjFactorPickerVisible) setAdjFactorPickerVisible(false);
+          else setEditAdjModalVisible(false);
+        }}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -2987,6 +3544,67 @@ export const LandFormScreen = ({ route, navigation }) => {
               </ScrollView>
             </TouchableOpacity>
           </TouchableOpacity>
+
+          {/* Adjustment Factor Picker Overlay */}
+          {adjFactorPickerVisible && (
+            <View style={styles.innerPickerOverlay}>
+              <TouchableOpacity
+                style={StyleSheet.absoluteFillObject}
+                activeOpacity={1}
+                onPress={() => setAdjFactorPickerVisible(false)}
+              />
+              <View style={styles.innerPickerContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Select Adjustment Factor</Text>
+                  <TouchableOpacity onPress={() => setAdjFactorPickerVisible(false)}>
+                    <Ionicons name="close" size={24} color={colors.textMuted} />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+                  {LAND_ADJUSTMENT_FACTORS.map((adj) => {
+                    const currentRow = editingAdjRow;
+                    const isSelected = currentRow?.adjustmentFactorId === adj.id;
+                    return (
+                      <TouchableOpacity
+                        key={adj.id}
+                        style={[styles.typeOptionItem, isSelected && styles.typeOptionItemSelected]}
+                        onPress={() => {
+                          if (editingAdjRow) {
+                            const baseMv = parseFloat(editingAdjRow.baseMarketValue) || 0;
+                            const valAdj = Math.round(baseMv * (adj.percent / 100) * 100) / 100;
+                            setEditingAdjRow({
+                              ...editingAdjRow,
+                              adjustmentFactorId: adj.id,
+                              adjustmentFactorDescription: adj.description,
+                              percentAdjustment: String(adj.percent),
+                              valueAdjustment: valAdj,
+                              adjustedMarketValue: Math.round((baseMv + valAdj) * 100) / 100
+                            });
+                          }
+                          setAdjFactorPickerVisible(false);
+                        }}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.typeOptionText, isSelected && styles.typeOptionTextSelected]}>
+                            {adj.description}
+                          </Text>
+                          <Text style={[
+                            styles.typeOptionSubtext,
+                            { color: adj.percent >= 0 ? (isDarkMode ? '#34d399' : '#059669') : '#ef4444', fontWeight: '700' }
+                          ]}>
+                            {adj.percent >= 0 ? `+${adj.percent}%` : `${adj.percent}%`} Adjustment
+                          </Text>
+                        </View>
+                        {isSelected && (
+                          <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            </View>
+          )}
         </KeyboardAvoidingView>
       </Modal>
 
@@ -2995,7 +3613,11 @@ export const LandFormScreen = ({ route, navigation }) => {
         visible={editRollModalVisible}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => setEditRollModalVisible(false)}
+        onRequestClose={() => {
+          if (rollKindPickerVisible) setRollKindPickerVisible(false);
+          else if (rollActualUsePickerVisible) setRollActualUsePickerVisible(false);
+          else setEditRollModalVisible(false);
+        }}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -3121,465 +3743,110 @@ export const LandFormScreen = ({ route, navigation }) => {
               </ScrollView>
             </TouchableOpacity>
           </TouchableOpacity>
-        </KeyboardAvoidingView>
-      </Modal>
 
-      {/* ========================================================= */}
-      {/* 7 DROPDOWN PICKER MODALS                                  */}
-      {/* ========================================================= */}
-
-      {/* Classification Picker Modal */}
-      <Modal
-        visible={classPickerVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setClassPickerVisible(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setClassPickerVisible(false)}
-        >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Land Classification</Text>
-              <TouchableOpacity onPress={() => setClassPickerVisible(false)}>
-                <Ionicons name="close" size={24} color={colors.textMuted} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
-              {LAND_CLASSIFICATIONS.map((c) => {
-                const currentRow = editingClassRow || (activeClassRowIndex !== null ? classificationRows[activeClassRowIndex] : null);
-                const isSelected = currentRow?.classificationId === c.id;
-                return (
-                  <TouchableOpacity
-                    key={c.id}
-                    style={[styles.typeOptionItem, isSelected && styles.typeOptionItemSelected]}
-                    onPress={() => {
-                      const firstSub = LAND_SUB_CLASSIFICATIONS.find(s => s.classificationId === c.id) || {
-                        id: 1, subClass: c.name, unitValue: 520
-                      };
-                      if (editingClassRow) {
-                        const a = parseFloat(editingClassRow.areaSqMeters) || 0;
-                        const u = firstSub.unitValue;
-                        setEditingClassRow({
-                          ...editingClassRow,
-                          classificationId: c.id,
-                          classificationName: c.name,
-                          subClassId: firstSub.id,
-                          subClassName: firstSub.subClass,
-                          unitValue: String(u),
-                          marketValue: Math.round(a * u * 100) / 100
-                        });
-                      } else if (activeClassRowIndex !== null) {
-                        updateClassificationRow(activeClassRowIndex, {
-                          classificationId: c.id,
-                          classificationName: c.name,
-                          subClassId: firstSub.id,
-                          subClassName: firstSub.subClass,
-                          unitValue: firstSub.unitValue
-                        });
-                      }
-                      setClassPickerVisible(false);
-                    }}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.typeOptionText, isSelected && styles.typeOptionTextSelected]}>
-                        {c.name}
-                      </Text>
-                      <Text style={styles.typeOptionSubtext}>Code: {c.code}</Text>
-                    </View>
-                    {isSelected && (
-                      <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-                    )}
+          {/* Assessment Roll Kind Picker Overlay */}
+          {rollKindPickerVisible && (
+            <View style={styles.innerPickerOverlay}>
+              <TouchableOpacity
+                style={StyleSheet.absoluteFillObject}
+                activeOpacity={1}
+                onPress={() => setRollKindPickerVisible(false)}
+              />
+              <View style={styles.innerPickerContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Select Property Component</Text>
+                  <TouchableOpacity onPress={() => setRollKindPickerVisible(false)}>
+                    <Ionicons name="close" size={24} color={colors.textMuted} />
                   </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* Sub-Classification (SMV) Picker Modal */}
-      <Modal
-        visible={subClassPickerVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setSubClassPickerVisible(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setSubClassPickerVisible(false)}
-        >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Sub-Classification (SMV)</Text>
-              <TouchableOpacity onPress={() => setSubClassPickerVisible(false)}>
-                <Ionicons name="close" size={24} color={colors.textMuted} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
-              {(() => {
-                const currentRow = editingClassRow || (activeClassRowIndex !== null ? classificationRows[activeClassRowIndex] : null);
-                const filteredSubs = currentRow?.classificationId
-                  ? LAND_SUB_CLASSIFICATIONS.filter(s => s.classificationId === currentRow.classificationId)
-                  : LAND_SUB_CLASSIFICATIONS;
-                const subsToShow = filteredSubs.length > 0 ? filteredSubs : LAND_SUB_CLASSIFICATIONS;
-
-                return subsToShow.map((sub) => {
-                  const isSelected = currentRow?.subClassId === sub.id;
-                  return (
-                    <TouchableOpacity
-                      key={sub.id}
-                      style={[styles.typeOptionItem, isSelected && styles.typeOptionItemSelected]}
-                      onPress={() => {
-                        if (editingClassRow) {
-                          const a = parseFloat(editingClassRow.areaSqMeters) || 0;
-                          const u = sub.unitValue;
-                          setEditingClassRow({
-                            ...editingClassRow,
-                            subClassId: sub.id,
-                            subClassName: sub.subClass,
-                            unitValue: String(u),
-                            marketValue: Math.round(a * u * 100) / 100
-                          });
-                        } else if (activeClassRowIndex !== null) {
-                          updateClassificationRow(activeClassRowIndex, {
-                            subClassId: sub.id,
-                            subClassName: sub.subClass,
-                            unitValue: sub.unitValue
-                          });
-                        }
-                        setSubClassPickerVisible(false);
-                      }}
-                    >
-                      <View style={{ flex: 1 }}>
+                </View>
+                <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+                  {['LAND', 'PLANTS / TREES', 'OTHER IMPROVEMENTS', 'MACHINERY / OTHERS'].map((k) => {
+                    const currentRow = editingRollRow;
+                    const isSelected = currentRow?.kinds === k;
+                    return (
+                      <TouchableOpacity
+                        key={k}
+                        style={[styles.typeOptionItem, isSelected && styles.typeOptionItemSelected]}
+                        onPress={() => {
+                          if (editingRollRow) {
+                            setEditingRollRow({
+                              ...editingRollRow,
+                              kinds: k
+                            });
+                          }
+                          setRollKindPickerVisible(false);
+                        }}
+                      >
                         <Text style={[styles.typeOptionText, isSelected && styles.typeOptionTextSelected]}>
-                          {sub.subClass}
+                          {k}
                         </Text>
-                        <Text style={styles.typeOptionSubtext}>
-                          Unit Value: ₱{sub.unitValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                        </Text>
-                      </View>
-                      {isSelected && (
-                        <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-                      )}
-                    </TouchableOpacity>
-                  );
-                });
-              })()}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* Actual Use Picker Modal */}
-      <Modal
-        visible={actualUsePickerVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setActualUsePickerVisible(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setActualUsePickerVisible(false)}
-        >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Actual Use</Text>
-              <TouchableOpacity onPress={() => setActualUsePickerVisible(false)}>
-                <Ionicons name="close" size={24} color={colors.textMuted} />
-              </TouchableOpacity>
+                        {isSelected && (
+                          <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
             </View>
-            <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
-              {LAND_ACTUAL_USES.map((u) => {
-                const currentRow = editingClassRow || (activeClassRowIndex !== null ? classificationRows[activeClassRowIndex] : null);
-                const isSelected = currentRow?.actualUseName === u;
-                return (
-                  <TouchableOpacity
-                    key={u}
-                    style={[styles.typeOptionItem, isSelected && styles.typeOptionItemSelected]}
-                    onPress={() => {
-                      if (editingClassRow) {
-                        setEditingClassRow({
-                          ...editingClassRow,
-                          actualUseName: u
-                        });
-                      } else if (activeClassRowIndex !== null) {
-                        updateClassificationRow(activeClassRowIndex, { actualUseName: u });
-                      }
-                      setActualUsePickerVisible(false);
-                    }}
-                  >
-                    <Text style={[styles.typeOptionText, isSelected && styles.typeOptionTextSelected]}>
-                      {u}
-                    </Text>
-                    {isSelected && (
-                      <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
-      </Modal>
+          )}
 
-      {/* Improvement Type Picker Modal */}
-      <Modal
-        visible={impTypePickerVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setImpTypePickerVisible(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setImpTypePickerVisible(false)}
-        >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Plant / Improvement Type</Text>
-              <TouchableOpacity onPress={() => setImpTypePickerVisible(false)}>
-                <Ionicons name="close" size={24} color={colors.textMuted} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
-              {LAND_IMPROVEMENT_TYPES.map((imp) => {
-                const currentRow = editingImpRow || (activeImpRowIndex !== null ? improvementRows[activeImpRowIndex] : null);
-                const isSelected = currentRow?.typeId === imp.id;
-                return (
-                  <TouchableOpacity
-                    key={imp.id}
-                    style={[styles.typeOptionItem, isSelected && styles.typeOptionItemSelected]}
-                    onPress={() => {
-                      if (editingImpRow) {
-                        const q = parseFloat(editingImpRow.quantity) || 0;
-                        setEditingImpRow({
-                          ...editingImpRow,
-                          typeId: imp.id,
-                          typeDescription: imp.description,
-                          unitValue: String(imp.baseValue),
-                          marketValue: Math.round(q * imp.baseValue * 100) / 100
-                        });
-                      } else if (activeImpRowIndex !== null) {
-                        updateImprovementRow(activeImpRowIndex, {
-                          typeId: imp.id,
-                          typeDescription: imp.description,
-                          unitValue: imp.baseValue
-                        });
-                      }
-                      setImpTypePickerVisible(false);
-                    }}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.typeOptionText, isSelected && styles.typeOptionTextSelected]}>
-                        {imp.description}
-                      </Text>
-                      <Text style={styles.typeOptionSubtext}>
-                        Rate: ₱{imp.baseValue.toLocaleString('en-US', { minimumFractionDigits: 2 })} • Kind: {imp.kind}
-                      </Text>
-                    </View>
-                    {isSelected && (
-                      <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-                    )}
+          {/* Assessment Roll Actual Use Picker Overlay */}
+          {rollActualUsePickerVisible && (
+            <View style={styles.innerPickerOverlay}>
+              <TouchableOpacity
+                style={StyleSheet.absoluteFillObject}
+                activeOpacity={1}
+                onPress={() => setRollActualUsePickerVisible(false)}
+              />
+              <View style={styles.innerPickerContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Select Actual Use & Assessment Level</Text>
+                  <TouchableOpacity onPress={() => setRollActualUsePickerVisible(false)}>
+                    <Ionicons name="close" size={24} color={colors.textMuted} />
                   </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* Adjustment Factor Picker Modal */}
-      <Modal
-        visible={adjFactorPickerVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setAdjFactorPickerVisible(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setAdjFactorPickerVisible(false)}
-        >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Adjustment Factor</Text>
-              <TouchableOpacity onPress={() => setAdjFactorPickerVisible(false)}>
-                <Ionicons name="close" size={24} color={colors.textMuted} />
-              </TouchableOpacity>
+                </View>
+                <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+                  {LAND_ACTUAL_USES.map((u) => {
+                    const currentRow = editingRollRow;
+                    const isSelected = currentRow?.actualUseName === u;
+                    const level = getAssessmentLevelForActualUse(u);
+                    return (
+                      <TouchableOpacity
+                        key={u}
+                        style={[styles.typeOptionItem, isSelected && styles.typeOptionItemSelected]}
+                        onPress={() => {
+                          if (editingRollRow) {
+                            const mv = parseFloat(editingRollRow.marketValue) || 0;
+                            setEditingRollRow({
+                              ...editingRollRow,
+                              actualUseName: u,
+                              assessmentLevelPercent: String(level),
+                              assessedValue: Math.round(mv * (level / 100) * 100) / 100
+                            });
+                          }
+                          setRollActualUsePickerVisible(false);
+                        }}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.typeOptionText, isSelected && styles.typeOptionTextSelected]}>
+                            {u}
+                          </Text>
+                          <Text style={styles.typeOptionSubtext}>
+                            Statutory Assessment Level: {level}%
+                          </Text>
+                        </View>
+                        {isSelected && (
+                          <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
             </View>
-            <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
-              {LAND_ADJUSTMENT_FACTORS.map((adj) => {
-                const currentRow = editingAdjRow || (activeAdjRowIndex !== null ? adjustmentRows[activeAdjRowIndex] : null);
-                const isSelected = currentRow?.adjustmentFactorId === adj.id;
-                return (
-                  <TouchableOpacity
-                    key={adj.id}
-                    style={[styles.typeOptionItem, isSelected && styles.typeOptionItemSelected]}
-                    onPress={() => {
-                      if (editingAdjRow) {
-                        const baseMv = parseFloat(editingAdjRow.baseMarketValue) || 0;
-                        const valAdj = Math.round(baseMv * (adj.percent / 100) * 100) / 100;
-                        setEditingAdjRow({
-                          ...editingAdjRow,
-                          adjustmentFactorId: adj.id,
-                          adjustmentFactorDescription: adj.description,
-                          percentAdjustment: String(adj.percent),
-                          valueAdjustment: valAdj,
-                          adjustedMarketValue: Math.round((baseMv + valAdj) * 100) / 100
-                        });
-                      } else if (activeAdjRowIndex !== null) {
-                        updateAdjustmentRow(activeAdjRowIndex, {
-                          adjustmentFactorId: adj.id,
-                          adjustmentFactorDescription: adj.description,
-                          percentAdjustment: adj.percent
-                        });
-                      }
-                      setAdjFactorPickerVisible(false);
-                    }}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.typeOptionText, isSelected && styles.typeOptionTextSelected]}>
-                        {adj.description}
-                      </Text>
-                      <Text style={[
-                        styles.typeOptionSubtext,
-                        { color: adj.percent >= 0 ? (isDarkMode ? '#34d399' : '#059669') : '#ef4444', fontWeight: '700' }
-                      ]}>
-                        {adj.percent >= 0 ? `+${adj.percent}%` : `${adj.percent}%`} Adjustment
-                      </Text>
-                    </View>
-                    {isSelected && (
-                      <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* Assessment Roll Kind Picker Modal */}
-      <Modal
-        visible={rollKindPickerVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setRollKindPickerVisible(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setRollKindPickerVisible(false)}
-        >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Property Component</Text>
-              <TouchableOpacity onPress={() => setRollKindPickerVisible(false)}>
-                <Ionicons name="close" size={24} color={colors.textMuted} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
-              {['LAND', 'PLANTS / TREES', 'OTHER IMPROVEMENTS', 'MACHINERY / OTHERS'].map((k) => {
-                const currentRow = editingRollRow || (activeRollRowIndex !== null ? assessmentRollRows[activeRollRowIndex] : null);
-                const isSelected = currentRow?.kinds === k;
-                return (
-                  <TouchableOpacity
-                    key={k}
-                    style={[styles.typeOptionItem, isSelected && styles.typeOptionItemSelected]}
-                    onPress={() => {
-                      if (editingRollRow) {
-                        setEditingRollRow({
-                          ...editingRollRow,
-                          kinds: k
-                        });
-                      } else if (activeRollRowIndex !== null) {
-                        updateAssessmentRollRow(activeRollRowIndex, { kinds: k });
-                      }
-                      setRollKindPickerVisible(false);
-                    }}
-                  >
-                    <Text style={[styles.typeOptionText, isSelected && styles.typeOptionTextSelected]}>
-                      {k}
-                    </Text>
-                    {isSelected && (
-                      <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* Assessment Roll Actual Use Picker Modal */}
-      <Modal
-        visible={rollActualUsePickerVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setRollActualUsePickerVisible(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setRollActualUsePickerVisible(false)}
-        >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Actual Use & Assessment Level</Text>
-              <TouchableOpacity onPress={() => setRollActualUsePickerVisible(false)}>
-                <Ionicons name="close" size={24} color={colors.textMuted} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
-              {LAND_ACTUAL_USES.map((u) => {
-                const currentRow = editingRollRow || (activeRollRowIndex !== null ? assessmentRollRows[activeRollRowIndex] : null);
-                const isSelected = currentRow?.actualUseName === u;
-                const level = getAssessmentLevelForActualUse(u);
-                return (
-                  <TouchableOpacity
-                    key={u}
-                    style={[styles.typeOptionItem, isSelected && styles.typeOptionItemSelected]}
-                    onPress={() => {
-                      if (editingRollRow) {
-                        const mv = parseFloat(editingRollRow.marketValue) || 0;
-                        setEditingRollRow({
-                          ...editingRollRow,
-                          actualUseName: u,
-                          assessmentLevelPercent: String(level),
-                          assessedValue: Math.round(mv * (level / 100) * 100) / 100
-                        });
-                      } else if (activeRollRowIndex !== null) {
-                        updateAssessmentRollRow(activeRollRowIndex, {
-                          actualUseName: u,
-                          assessmentLevelPercent: level
-                        });
-                      }
-                      setRollActualUsePickerVisible(false);
-                    }}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.typeOptionText, isSelected && styles.typeOptionTextSelected]}>
-                        {u}
-                      </Text>
-                      <Text style={styles.typeOptionSubtext}>
-                        Statutory Assessment Level: {level}%
-                      </Text>
-                    </View>
-                    {isSelected && (
-                      <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
+          )}
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Discard Changes Modal */}
@@ -3589,22 +3856,106 @@ export const LandFormScreen = ({ route, navigation }) => {
         onConfirmDiscard={navigateBack}
         partitionLetter={partitionLetterParam}
       />
+
+      {/* Save & Offline Queue Completion Modal */}
+      <ActionModal
+        visible={completeModalConfig.visible}
+        title={completeModalConfig.title}
+        message={completeModalConfig.message}
+        icon={completeModalConfig.icon}
+        iconType={completeModalConfig.iconType}
+        buttons={[
+          {
+            text: 'OK',
+            style: 'primary',
+            onPress: () => {
+              setCompleteModalConfig(prev => ({ ...prev, visible: false }));
+              navigateBack();
+            }
+          }
+        ]}
+        onClose={() => {
+          setCompleteModalConfig(prev => ({ ...prev, visible: false }));
+          navigateBack();
+        }}
+      />
     </View>
   );
 };
 
-const getStyles = (colors, isDarkMode) => StyleSheet.create({
+const getStyles = (colors, isDarkMode, isLargeScreen = false) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bgLight
   },
+  historyNoticeRibbon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: isDarkMode ? '#0c4a6e33' : '#e0f2fe',
+    borderBottomWidth: 1,
+    borderBottomColor: isDarkMode ? '#0369a1' : '#bae6fd',
+    paddingHorizontal: 16,
+    paddingVertical: 10
+  },
+  historyNoticeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: isDarkMode ? '#7dd3fc' : '#0369a1'
+  },
   ribbon: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 8,
     gap: 8,
     borderBottomWidth: 1
+  },
+  ribbonLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1
+  },
+  ribbonNetTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 4
+  },
+  ribbonNetOnline: {
+    backgroundColor: isDarkMode ? 'rgba(5, 150, 105, 0.2)' : '#ecfdf5',
+    borderColor: isDarkMode ? '#059669' : '#a7f3d0'
+  },
+  ribbonNetOffline: {
+    backgroundColor: isDarkMode ? 'rgba(217, 119, 6, 0.2)' : '#fffbeb',
+    borderColor: isDarkMode ? '#d97706' : '#fde68a'
+  },
+  ribbonNetDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3
+  },
+  ribbonNetDotOnline: {
+    backgroundColor: '#059669'
+  },
+  ribbonNetDotOffline: {
+    backgroundColor: '#d97706'
+  },
+  ribbonNetText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5
+  },
+  ribbonNetTextOnline: {
+    color: isDarkMode ? '#34d399' : '#059669'
+  },
+  ribbonNetTextOffline: {
+    color: isDarkMode ? '#fbbf24' : '#d97706'
   },
   ribbonDownloaded: {
     backgroundColor: isDarkMode ? '#064e3b' : '#dcfce7',
@@ -3697,7 +4048,7 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
   scrollContent: {
     padding: 16,
     gap: 14,
-    paddingBottom: 50
+    paddingBottom: 220
   },
   tabContentBlock: {
     gap: 14
@@ -3789,8 +4140,41 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
     backgroundColor: isDarkMode ? '#064e3b' : '#f0fdf4'
   },
   rowInputs: {
+    flexDirection: isLargeScreen ? 'row' : 'column',
+    gap: isLargeScreen ? 10 : 12
+  },
+  formScreenHeader: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
+    backgroundColor: colors.cardBg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border
+  },
+  formScreenHeaderRow: {
     flexDirection: 'row',
-    gap: 10
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12
+  },
+  formScreenTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: -0.2
+  },
+  formScreenSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
+    fontWeight: '500'
+  },
+  partitionBadgeHero: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8
+  },
+  partitionBadgeHeroText: {
+    fontSize: 12,
+    fontWeight: '800'
   },
   optionPillRow: {
     flexDirection: 'row',
@@ -3921,6 +4305,24 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
     gap: 10,
     marginTop: 8
   },
+  partitionNoticeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: isDarkMode ? '#1e293b' : '#f0fdf4',
+    borderWidth: 1,
+    borderColor: isDarkMode ? '#334155' : '#bbf7d0',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 4
+  },
+  partitionNoticeText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 16,
+    color: isDarkMode ? '#94a3b8' : '#166534',
+    fontWeight: '500'
+  },
   saveBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -4040,6 +4442,25 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
     flex: 1,
     backgroundColor: colors.modalOverlay || 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end'
+  },
+  innerPickerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.modalOverlay || 'rgba(0,0,0,0.65)',
+    justifyContent: 'flex-end',
+    zIndex: 9999,
+    elevation: 30
+  },
+  innerPickerContent: {
+    backgroundColor: colors.cardBg,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 35
   },
   modalContent: {
     backgroundColor: colors.cardBg,

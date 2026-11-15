@@ -877,26 +877,26 @@
             document.getElementById("kpiTaxableRatioSub").innerText = `Taxable: ${taxRatio}% | Exempt: ${exemptRatio}%`;
 
             // 2. Valuation by Property Use Bars
-            const mv = k.totalMarketValue || 28919507.10;
-            const av = k.totalAssessmentRollValue || 5127638.72;
+            const mv = k.totalMarketValue ?? 0;
+            const av = k.totalAssessmentRollValue ?? 0;
             document.getElementById("chartValuationMvText").innerText = formatPHP(mv);
             document.getElementById("chartValuationAvText").innerText = formatPHP(av);
             document.getElementById("chartValuationMvBar").innerText = formatPHP(mv);
             document.getElementById("chartValuationAvBar").innerText = formatPHP(av);
 
-            let avWidth = mv > 0 ? Math.max(10, Math.min(100, (av / mv) * 100)) : 18;
+            let avWidth = mv > 0 ? Math.max(10, Math.min(100, (av / mv) * 100)) : 0;
             document.getElementById("chartValuationAvBar").style.width = avWidth + "%";
 
             // 3. RPU Distribution Donut Chart
             const rpuDist = data.rpuDistribution || {};
-            const landCount = rpuDist.landCount || 55532;
-            const bldgCount = rpuDist.buildingCount || 21502;
-            const machCount = rpuDist.machineryCount || 576;
-            const totalRpus = rpuDist.totalRpus || 77610;
+            const landCount = rpuDist.landCount ?? 0;
+            const bldgCount = rpuDist.buildingCount ?? 0;
+            const machCount = rpuDist.machineryCount ?? 0;
+            const totalRpus = rpuDist.totalRpus ?? 0;
 
-            document.getElementById("legendLandShare").innerText = `${(rpuDist.landPct || 71.6).toFixed(1)}% (${landCount.toLocaleString()})`;
-            document.getElementById("legendBuildingShare").innerText = `${(rpuDist.buildingPct || 27.7).toFixed(1)}% (${bldgCount.toLocaleString()})`;
-            document.getElementById("legendMachineryShare").innerText = `${(rpuDist.machineryPct || 0.7).toFixed(1)}% (${machCount.toLocaleString()})`;
+            document.getElementById("legendLandShare").innerText = `${(rpuDist.landPct ?? 0).toFixed(1)}% (${landCount.toLocaleString()})`;
+            document.getElementById("legendBuildingShare").innerText = `${(rpuDist.buildingPct ?? 0).toFixed(1)}% (${bldgCount.toLocaleString()})`;
+            document.getElementById("legendMachineryShare").innerText = `${(rpuDist.machineryPct ?? 0).toFixed(1)}% (${machCount.toLocaleString()})`;
 
             const optionsRpu = {
                 series: [landCount, bldgCount, machCount],

@@ -1,10 +1,12 @@
 @model IEnumerable<PropertyAssessmentApp.Models.Owner>
 @using PropertyAssessmentApp.Models
+@inject PropertyAssessmentApp.Services.IPermissionService PermissionService
 
 @{
     ViewData["Title"] = "Real Property Owner Directory";
     var search = ViewBag.Search as string ?? "";
     var currentType = ViewBag.Type as OwnerType?;
+    bool canSms = PermissionService.CanAccess(User, "Sms");
 }
 
 <div class="space-y-8">
@@ -20,10 +22,19 @@
             <p class="text-slate-500 dark:text-stone-400 text-sm">Register land owners, corporate entities, TIN records, and taxpayer profiles.</p>
         </div>
 
-        <a asp-action="Create" class="px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-till-950 font-bold text-xs font-mono flex items-center gap-2 shadow-md shadow-emerald-600/20 transition-all">
-            <i data-lucide="user-plus" class="w-4 h-4"></i>
-            Register New Owner
-        </a>
+        <div class="flex items-center gap-2.5 flex-wrap">
+            @if (canSms)
+            {
+                <a asp-controller="Sms" asp-action="Index" class="px-4 py-3 rounded-xl border border-slate-200 dark:border-stone-800 bg-white dark:bg-stone-900 hover:bg-slate-50 dark:hover:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold text-xs font-mono flex items-center gap-2 shadow-2xs transition-all">
+                    <i data-lucide="message-square" class="w-4 h-4 text-sky-600 dark:text-sky-400"></i>
+                    SMS Delivery Logs
+                </a>
+            }
+            <a asp-action="Create" class="px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-till-950 font-bold text-xs font-mono flex items-center gap-2 shadow-md shadow-emerald-600/20 transition-all">
+                <i data-lucide="user-plus" class="w-4 h-4"></i>
+                Register New Owner
+            </a>
+        </div>
     </div>
 
     <!-- Summary Metrics Cards -->
@@ -166,16 +177,19 @@
                                                     <i data-lucide="edit-3" class="w-3.5 h-3.5 text-teal-600 dark:text-teal-400"></i>
                                                     Edit Profile
                                                 </a>
-                                                <button type="button"
-                                                        data-owner-id="@item.Id"
-                                                        data-owner-name="@item.DisplayName"
-                                                        data-owner-phone="@(item.ContactNo ?? "")"
-                                                        data-owner-rptin="@(item.RptinNumber ?? "")"
-                                                        onclick="openPhilSmsModal(this)"
-                                                        class="w-full flex items-center gap-2.5 px-3.5 py-2 text-slate-700 dark:text-stone-300 hover:bg-sky-50 dark:hover:bg-stone-800 font-bold text-left">
-                                                    <i data-lucide="message-square" class="w-3.5 h-3.5 text-sky-600 dark:text-sky-400"></i>
-                                                    Send SMS (PhilSMS)
-                                                </button>
+                                                @if (canSms)
+                                                {
+                                                    <button type="button"
+                                                            data-owner-id="@item.Id"
+                                                            data-owner-name="@item.DisplayName"
+                                                            data-owner-phone="@(item.ContactNo ?? "")"
+                                                            data-owner-rptin="@(item.RptinNumber ?? "")"
+                                                            onclick="openPhilSmsModal(this)"
+                                                            class="w-full flex items-center gap-2.5 px-3.5 py-2 text-slate-700 dark:text-stone-300 hover:bg-sky-50 dark:hover:bg-stone-800 font-bold text-left">
+                                                        <i data-lucide="message-square" class="w-3.5 h-3.5 text-sky-600 dark:text-sky-400"></i>
+                                                        Send SMS (PhilSMS)
+                                                    </button>
+                                                }
                                             </div>
                                         </div>
                                     </div>

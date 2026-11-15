@@ -25,7 +25,7 @@ export const DEFAULT_BASE_URL = Platform.OS === 'web'
 
 export const resolveServerUrl = async (path) => {
   if (!path) return '';
-  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:') || path.startsWith('file://')) {
+  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:') || path.startsWith('file:') || path.startsWith('blob:') || path.startsWith('content:')) {
     return path;
   }
   let base = DEFAULT_BASE_URL.replace(/\/+$/, '');
@@ -97,33 +97,36 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+    // Never auto-relogin or intercept logout requests
+    if (originalRequest && originalRequest.url && originalRequest.url.includes('logout')) {
+      return Promise.resolve({ data: { success: true } });
+    }
     if (error.response && error.response.status === 401 && originalRequest && !originalRequest._retried) {
       originalRequest._retried = true;
       try {
-        const currentToken = await AsyncStorage.getItem('@fairtrack_jwt_token');
-        if (currentToken && currentToken.startsWith('offline-token-')) {
-          const rawUser = await AsyncStorage.getItem('@fairtrack_user');
-          const rawAccounts = await AsyncStorage.getItem('@fairtrack_offline_accounts');
-          const userObj = rawUser ? JSON.parse(rawUser) : null;
-          const accounts = rawAccounts ? JSON.parse(rawAccounts) : {};
-          const userKey = (userObj?.username || '').toLowerCase();
-          const cachedAccount = userKey ? accounts[userKey] : null;
+        const rawUser = await AsyncStorage.getItem('@fairtrack_user');
+        const rawAccounts = await AsyncStorage.getItem('@fairtrack_offline_accounts');
+        const userObj = rawUser ? JSON.parse(rawUser) : null;
+        const accounts = rawAccounts ? JSON.parse(rawAccounts) : {};
+        const userKey = (userObj?.username || '').toLowerCase();
+        const cachedAccount = userKey ? accounts[userKey] : null;
 
-          if (cachedAccount && cachedAccount.password) {
-            const loginRes = await axios.post(
-              `${originalRequest.baseURL || DEFAULT_BASE_URL + '/'}api/auth/login`,
-              { username: userObj.username, password: cachedAccount.password }
-            );
-            if (loginRes.data && loginRes.data.success && loginRes.data.accessToken) {
-              const newToken = loginRes.data.accessToken;
-              await AsyncStorage.setItem('@fairtrack_jwt_token', newToken);
-              if (loginRes.data.user) {
-                await AsyncStorage.setItem('@fairtrack_user', JSON.stringify(loginRes.data.user));
-                await AsyncStorage.setItem('@fairtrack_last_user', JSON.stringify(loginRes.data.user));
-              }
-              originalRequest.headers.Authorization = `Bearer ${newToken}`;
-              return apiClient(originalRequest);
+        if (cachedAccount && cachedAccount.password) {
+          const base = (originalRequest.baseURL || DEFAULT_BASE_URL).replace(/\/+$/, '');
+          const targetUrl = `${base}/api/auth/login`;
+          const loginRes = await axios.post(
+            targetUrl,
+            { username: userObj?.username || cachedAccount.user?.username || userKey, password: cachedAccount.password }
+          );
+          if (loginRes.data && loginRes.data.success && loginRes.data.accessToken) {
+            const newToken = loginRes.data.accessToken;
+            await AsyncStorage.setItem('@fairtrack_jwt_token', newToken);
+            if (loginRes.data.user) {
+              await AsyncStorage.setItem('@fairtrack_user', JSON.stringify(loginRes.data.user));
+              await AsyncStorage.setItem('@fairtrack_last_user', JSON.stringify(loginRes.data.user));
             }
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            return apiClient(originalRequest);
           }
         }
       } catch (reAuthErr) {

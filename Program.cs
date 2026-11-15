@@ -1,10 +1,19 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 using PropertyAssessmentApp.Data;
 using PropertyAssessmentApp.Hubs;
 using PropertyAssessmentApp.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Add Data Protection with workspace-contained key storage
+var keysFolder = Path.Combine(builder.Environment.ContentRootPath, "App_Data", "DataProtectionKeys");
+if (!Directory.Exists(keysFolder)) Directory.CreateDirectory(keysFolder);
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(keysFolder))
+    .SetApplicationName("PropertyAssessmentApp");
 
 // Add services to the container.
 builder.Services.AddControllersWithViews(options =>
@@ -72,9 +81,21 @@ if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
     app.UseHsts();
+    app.UseHttpsRedirection();
 }
 
 app.UseHttpsRedirection();
+
+// Configure Static Files with explicit font MIME types for offline intranet deployment
+var contentTypeProvider = new FileExtensionContentTypeProvider();
+contentTypeProvider.Mappings[".woff2"] = "font/woff2";
+contentTypeProvider.Mappings[".woff"] = "font/woff";
+contentTypeProvider.Mappings[".ttf"] = "font/ttf";
+app.UseStaticFiles(new StaticFileOptions
+{
+    ContentTypeProvider = contentTypeProvider
+});
+
 app.UseStaticFiles();
 app.UseRouting();
 

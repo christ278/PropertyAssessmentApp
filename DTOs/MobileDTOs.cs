@@ -12,6 +12,7 @@ public class MobileLoginRequest
 public class MobileForwardWorkflowRequest
 {
     public long FormWorkflowId { get; set; }
+    public string? TrackingNo { get; set; }
     public int NextStatusId { get; set; }
     public string Remarks { get; set; } = string.Empty;
 }
@@ -90,11 +91,11 @@ public class CAST_TDNBuildingDTO
     public string? LandArea { get; set; }
     public string? ARPNo { get; set; }
     public byte? BuildingMakeId { get; set; }
-    public DateTime? DateConstructed { get; set; }
+    public string? DateConstructed { get; set; }
     public byte? ClassificationId { get; set; }
-    public DateTime? DateCompleted { get; set; }
+    public string? DateCompleted { get; set; }
     public string? PermitNo { get; set; }
-    public DateTime? DateOccupied { get; set; }
+    public string? DateOccupied { get; set; }
     public int? Age { get; set; }
     public int? StoreyNo { get; set; }
     public decimal? AreaPerFloor { get; set; }
@@ -114,7 +115,20 @@ public class CAST_TDNBuildingDTO
     public string? TIN { get; set; }
     public string? MobileNo { get; set; }
     public string? EmailAddress { get; set; }
+    public string? Email { get; set; }
+    public string? Gender { get; set; }
+    public string? CivilStatus { get; set; }
     public string? TransactionCode { get; set; }
+
+    // Land references & CCT
+    public string? LandOwnerName { get; set; }
+    public string? LandTdNo { get; set; }
+    public string? LandPin { get; set; }
+    public bool? IsCct { get; set; }
+    public string? CctTitleNo { get; set; }
+    public string? CctDateRegistered { get; set; }
+    public string? OwnerNameReflectedInCct { get; set; }
+    public decimal? AssessmentLevelPercent { get; set; }
 
     // 17 Structural Parts & Materials (CAST Reference)
     public string? StructuralFoundation { get; set; }
@@ -136,6 +150,8 @@ public class CAST_TDNBuildingDTO
     public string? PlumbingSewer { get; set; }
     public string? BuildingClassification { get; set; }
     public string? OccupancyPermitNo { get; set; }
+    public string? FloorBreakdownJson { get; set; }
+    public string? AdditionalItemsJson { get; set; }
 }
 
 public class TDNBuildingDTO
@@ -181,6 +197,24 @@ public class TDNMachineDataDTO
     public string? LandOwnerPIN { get; set; }
     public string? BuildingOwner { get; set; }
     public string? BuildingOwnerPIN { get; set; }
+    public string? LandTdNo { get; set; }
+    public string? BuildingTdNo { get; set; }
+    public bool IsLandOwnerAlsoBuildingOwner { get; set; }
+    public bool IsLocallyManufactured { get; set; }
+    public string? MachineryRegNo { get; set; }
+    public DateTime? MachineryDateRegistered { get; set; }
+    public string? ImportationPermitNo { get; set; }
+    public DateTime? ImportationDateIssued { get; set; }
+    public string? CountryOfOrigin { get; set; }
+    public string? SupplierSeller { get; set; }
+    public string? SupplierAddress { get; set; }
+    public decimal? AcquisitionCost { get; set; }
+    public string? OrNo { get; set; }
+    public DateTime? OrDate { get; set; }
+    public string? OrNoAndDate { get; set; }
+    public DateTime? LocalDateIssued { get; set; }
+    public string? MachineryAppraisalDetailsJson { get; set; }
+    public string? MachineryPropertyAssessmentsJson { get; set; }
 }
 
 public class TDNMachineDetailDTO

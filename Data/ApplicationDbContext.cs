@@ -32,6 +32,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<TransactionStatus> TransactionStatuses { get; set; } = null!;
     public DbSet<WorkflowSequence> WorkflowSequences { get; set; } = null!;
     public DbSet<DataTransferLog> DataTransferLogs { get; set; } = null!;
+    public DbSet<SmsNotificationLog> SmsNotificationLogs { get; set; } = null!;
     public DbSet<BuildingClassification> BuildingClassifications { get; set; } = null!;
     public DbSet<BuildingAdditionalItem> BuildingAdditionalItems { get; set; } = null!;
     public DbSet<BuildingStructuralType> BuildingStructuralTypes { get; set; } = null!;
@@ -80,6 +81,14 @@ public class ApplicationDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<SmsNotificationLog>(entity =>
+        {
+            entity.HasOne(e => e.Owner)
+                  .WithMany()
+                  .HasForeignKey(e => e.OwnerId)
+                  .OnDelete(DeleteBehavior.SetNull);
+        });
 
         modelBuilder.Entity<FileLocation>(entity =>
         {

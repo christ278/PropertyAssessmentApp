@@ -279,6 +279,7 @@ public class PropertyAssessmentRequestController : Controller
         }
         ModelState.Remove(nameof(request.TrackingNumber));
 
+        SyncKindFromPartitions(request);
         ValidateAssessmentRequest(request);
 
         if (ModelState.IsValid)
@@ -402,6 +403,7 @@ public class PropertyAssessmentRequestController : Controller
         }
         ModelState.Remove(nameof(request.TrackingNumber));
 
+        SyncKindFromPartitions(request);
         ValidateAssessmentRequest(request);
 
         if (ModelState.IsValid)
@@ -1355,6 +1357,41 @@ public class PropertyAssessmentRequestController : Controller
         public decimal UnitCost { get; set; }
         public decimal Quantity { get; set; }
         public decimal TotalCost { get; set; }
+    }
+
+    private static void SyncKindFromPartitions(PropertyAssessmentRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.GeneratedPartitionsJson)) return;
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(request.GeneratedPartitionsJson);
+            if (doc.RootElement.ValueKind != System.Text.Json.JsonValueKind.Array || doc.RootElement.GetArrayLength() == 0)
+                return;
+
+            var distinctKinds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in doc.RootElement.EnumerateArray())
+            {
+                if (item.TryGetProperty("kind", out var kProp) && kProp.ValueKind == System.Text.Json.JsonValueKind.String)
+                {
+                    var kVal = kProp.GetString()?.Trim();
+                    if (!string.IsNullOrWhiteSpace(kVal))
+                        distinctKinds.Add(kVal);
+                }
+            }
+
+            if (distinctKinds.Count == 1)
+            {
+                request.Kind = distinctKinds.First();
+            }
+            else if (distinctKinds.Contains("Building") && distinctKinds.Contains("Land"))
+            {
+                request.Kind = "Building and Land";
+            }
+        }
+        catch
+        {
+            // Keep existing request.Kind if JSON is malformed
+        }
     }
 
     private void ValidateAssessmentRequest(PropertyAssessmentRequest request)

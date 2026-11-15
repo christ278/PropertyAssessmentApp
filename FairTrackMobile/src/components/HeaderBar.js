@@ -25,10 +25,11 @@ export const HeaderBar = ({
   showBack = false,
   onBackPress,
   onRefresh,
-  isRefreshing = false
+  isRefreshing = false,
+  showReload = true
 }) => {
   const insets = useSafeAreaInsets();
-  const { pendingCount, isSyncing, syncAllToServer } = useContext(SyncContext);
+  const { pendingCount, isSyncing, syncAllToServer, isOnline, checkConnectivity } = useContext(SyncContext);
   const { user, logout } = useContext(AuthContext);
   const { isDarkMode, colors, shadows, setThemeMode } = useTheme();
 
@@ -50,7 +51,11 @@ export const HeaderBar = ({
 
   const handleTriggerLogout = () => {
     setAccountMenuVisible(false);
-    setLogoutModalVisible(true);
+    // On React Native (especially Android), opening a Modal immediately when another Modal is dismissing
+    // causes a native window manager race condition where the second modal fails to display.
+    setTimeout(() => {
+      setLogoutModalVisible(true);
+    }, Platform.OS === 'android' ? 200 : 80);
   };
 
   const handleConfirmLogout = async () => {
@@ -90,24 +95,51 @@ export const HeaderBar = ({
               styles.title,
               { color: isDarkMode ? colors.textDark : colors.primaryDark }
             ]}
+            numberOfLines={1}
           >
             {title || 'FAIRTRACK'}
           </Text>
-          {subtitle ? (
-            <Text style={[styles.subtitle, { color: colors.textMuted }]}>{subtitle}</Text>
+          {(subtitle !== undefined ? subtitle : "City Assessor's Office") ? (
+            <Text
+              style={[styles.subtitle, { color: colors.textMuted }]}
+              numberOfLines={1}
+            >
+              {subtitle !== undefined ? subtitle : "City Assessor's Office"}
+            </Text>
           ) : null}
         </View>
       </View>
 
       <View style={styles.actionsContainer}>
+        {/* Live Network Connectivity Status Tag */}
+        <TouchableOpacity
+          style={[
+            styles.networkStatusTag,
+            isOnline ? styles.networkOnlineTag : styles.networkOfflineTag
+          ]}
+          onPress={() => checkConnectivity && checkConnectivity()}
+          accessibilityLabel={`Network Status: ${isOnline ? 'Online' : 'Offline'}. Tap to refresh.`}
+        >
+          <View style={[styles.networkDot, isOnline ? styles.networkDotOnline : styles.networkDotOffline]} />
+          <Text style={[styles.networkTagText, isOnline ? styles.networkTextOnline : styles.networkTextOffline]}>
+            {isOnline ? 'ONLINE' : 'OFFLINE'}
+          </Text>
+        </TouchableOpacity>
+
         {/* Refresh / Update List from Web Server Button */}
-        {onRefresh ? (
+        {showReload !== false ? (
           <TouchableOpacity
             style={[
               styles.syncButton,
               { backgroundColor: isDarkMode ? '#1e293b' : colors.primaryLight }
             ]}
-            onPress={onRefresh}
+            onPress={() => {
+              if (typeof onRefresh === 'function') {
+                onRefresh();
+              } else if (typeof checkConnectivity === 'function') {
+                checkConnectivity();
+              }
+            }}
             disabled={isRefreshing}
             accessibilityLabel="Refresh transactions from web"
           >
@@ -116,7 +148,7 @@ export const HeaderBar = ({
             ) : (
               <Ionicons
                 name="refresh-outline"
-                size={20}
+                size={18}
                 color={colors.primary}
               />
             )}
@@ -404,12 +436,51 @@ const styles = StyleSheet.create({
   actionsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8
+    gap: 6
+  },
+  networkStatusTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 7,
+    paddingVertical: 4.5,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 4
+  },
+  networkOnlineTag: {
+    backgroundColor: '#ecfdf5',
+    borderColor: '#a7f3d0'
+  },
+  networkOfflineTag: {
+    backgroundColor: '#fffbeb',
+    borderColor: '#fde68a'
+  },
+  networkDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3
+  },
+  networkDotOnline: {
+    backgroundColor: '#059669'
+  },
+  networkDotOffline: {
+    backgroundColor: '#d97706'
+  },
+  networkTagText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    letterSpacing: 0.5
+  },
+  networkTextOnline: {
+    color: '#059669'
+  },
+  networkTextOffline: {
+    color: '#d97706'
   },
   syncButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative'
@@ -437,15 +508,15 @@ const styles = StyleSheet.create({
     fontWeight: '800'
   },
   avatarButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center'
   },
   avatarButtonText: {
     color: '#ffffff',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800'
   },
   menuOverlay: {

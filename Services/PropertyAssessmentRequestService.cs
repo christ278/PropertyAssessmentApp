@@ -110,6 +110,20 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
         request.UpdatedDate = DateTime.Now;
         request.OwnerId = ResolveOwnerId(request.OwnerId, request.OwnerTIN, request.NewOwnerName);
 
+        if (!string.IsNullOrWhiteSpace(request.GeneratedPartitionsJson))
+        {
+            try
+            {
+                var partitions = PartitionJsonHelper.ParseList(request.GeneratedPartitionsJson);
+                var firstKind = partitions?.FirstOrDefault(p => !string.IsNullOrWhiteSpace(p.Kind))?.Kind;
+                if (!string.IsNullOrWhiteSpace(firstKind))
+                {
+                    request.Kind = firstKind;
+                }
+            }
+            catch { }
+        }
+
         ProcessFileUpload(request, fileUpload, webRootPath);
 
         _context.PropertyAssessmentRequests.Add(request);
@@ -280,26 +294,26 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                             // CAST Land Appraisal & Registration (CAST Standard)
                             RegistrationStatus = !string.IsNullOrWhiteSpace(p.RegistrationStatus) ? p.RegistrationStatus : "Titled",
                             TitleType = !string.IsNullOrWhiteSpace(p.TitleType) ? p.TitleType : "OCT",
-                            TitleNo = !string.IsNullOrWhiteSpace(p.TitleNo) ? p.TitleNo : (refTd?.TitleNo ?? string.Empty),
+                            TitleNo = !string.IsNullOrWhiteSpace(p.TitleNo) ? p.TitleNo : (!string.Equals(p.PartitionIndex, "A", StringComparison.OrdinalIgnoreCase) && !string.Equals(p.PartitionIndex, "1", StringComparison.OrdinalIgnoreCase) ? string.Empty : (refTd?.TitleNo ?? string.Empty)),
                             DateRegistered = p.DateRegistered,
-                            CadastralSurveyNo = !string.IsNullOrWhiteSpace(p.CadastralSurveyNo) ? p.CadastralSurveyNo : refTd?.CadastralSurveyNo,
-                            SectionNo = !string.IsNullOrWhiteSpace(p.SectionNo) ? p.SectionNo : refTd?.SectionNo,
-                            ParcelNo = !string.IsNullOrWhiteSpace(p.ParcelNo) ? p.ParcelNo : refTd?.ParcelNo,
+                            CadastralSurveyNo = !string.IsNullOrWhiteSpace(p.CadastralSurveyNo) ? p.CadastralSurveyNo : (!string.Equals(p.PartitionIndex, "A", StringComparison.OrdinalIgnoreCase) && !string.Equals(p.PartitionIndex, "1", StringComparison.OrdinalIgnoreCase) ? string.Empty : refTd?.CadastralSurveyNo),
+                            SectionNo = !string.IsNullOrWhiteSpace(p.SectionNo) ? p.SectionNo : (!string.Equals(p.PartitionIndex, "A", StringComparison.OrdinalIgnoreCase) && !string.Equals(p.PartitionIndex, "1", StringComparison.OrdinalIgnoreCase) ? string.Empty : refTd?.SectionNo),
+                            ParcelNo = !string.IsNullOrWhiteSpace(p.ParcelNo) ? p.ParcelNo : (!string.Equals(p.PartitionIndex, "A", StringComparison.OrdinalIgnoreCase) && !string.Equals(p.PartitionIndex, "1", StringComparison.OrdinalIgnoreCase) ? string.Empty : refTd?.ParcelNo),
                             ARPNo = partitionArpNo,
                             Purok = !string.IsNullOrWhiteSpace(p.Purok) ? p.Purok : refTd?.Purok,
-                            LotNo = !string.IsNullOrWhiteSpace(p.LotNumber) ? p.LotNumber : (refTd?.LotNo ?? string.Empty),
-                            BlockNo = !string.IsNullOrWhiteSpace(p.BlockNumber) ? p.BlockNumber : (refTd?.BlockNo ?? string.Empty),
-                            SurveyNo = !string.IsNullOrWhiteSpace(p.SurveyNumber) ? p.SurveyNumber : (refTd?.SurveyNo ?? string.Empty),
+                            LotNo = !string.IsNullOrWhiteSpace(p.LotNumber) ? p.LotNumber : (!string.Equals(p.PartitionIndex, "A", StringComparison.OrdinalIgnoreCase) && !string.Equals(p.PartitionIndex, "1", StringComparison.OrdinalIgnoreCase) ? $"Lot {p.PartitionIndex}" : (refTd?.LotNo ?? string.Empty)),
+                            BlockNo = !string.IsNullOrWhiteSpace(p.BlockNumber) ? p.BlockNumber : (!string.Equals(p.PartitionIndex, "A", StringComparison.OrdinalIgnoreCase) && !string.Equals(p.PartitionIndex, "1", StringComparison.OrdinalIgnoreCase) ? string.Empty : (refTd?.BlockNo ?? string.Empty)),
+                            SurveyNo = !string.IsNullOrWhiteSpace(p.SurveyNumber) ? p.SurveyNumber : (!string.Equals(p.PartitionIndex, "A", StringComparison.OrdinalIgnoreCase) && !string.Equals(p.PartitionIndex, "1", StringComparison.OrdinalIgnoreCase) ? string.Empty : (refTd?.SurveyNo ?? string.Empty)),
 
-                            // CAST Land Boundaries & Remarks
-                            BoundaryNorth = !string.IsNullOrWhiteSpace(p.BoundaryNorth) ? p.BoundaryNorth : (refTd?.BoundaryNorth ?? string.Empty),
-                            BoundaryEast = !string.IsNullOrWhiteSpace(p.BoundaryEast) ? p.BoundaryEast : (refTd?.BoundaryEast ?? string.Empty),
-                            BoundarySouth = !string.IsNullOrWhiteSpace(p.BoundarySouth) ? p.BoundarySouth : (refTd?.BoundarySouth ?? string.Empty),
-                            BoundaryWest = !string.IsNullOrWhiteSpace(p.BoundaryWest) ? p.BoundaryWest : (refTd?.BoundaryWest ?? string.Empty),
-                            Nremarks = !string.IsNullOrWhiteSpace(p.Nremarks) ? p.Nremarks : refTd?.Nremarks,
-                            Eremarks = !string.IsNullOrWhiteSpace(p.Eremarks) ? p.Eremarks : refTd?.Eremarks,
-                            Sremarks = !string.IsNullOrWhiteSpace(p.Sremarks) ? p.Sremarks : refTd?.Sremarks,
-                            Wremarks = !string.IsNullOrWhiteSpace(p.Wremarks) ? p.Wremarks : refTd?.Wremarks,
+                            // CAST Land Boundaries & Remarks (Segregated partitions must have their own independent boundaries)
+                            BoundaryNorth = !string.IsNullOrWhiteSpace(p.BoundaryNorth) ? p.BoundaryNorth : (!string.Equals(p.PartitionIndex, "A", StringComparison.OrdinalIgnoreCase) && !string.Equals(p.PartitionIndex, "1", StringComparison.OrdinalIgnoreCase) ? string.Empty : (refTd?.BoundaryNorth ?? string.Empty)),
+                            BoundaryEast = !string.IsNullOrWhiteSpace(p.BoundaryEast) ? p.BoundaryEast : (!string.Equals(p.PartitionIndex, "A", StringComparison.OrdinalIgnoreCase) && !string.Equals(p.PartitionIndex, "1", StringComparison.OrdinalIgnoreCase) ? string.Empty : (refTd?.BoundaryEast ?? string.Empty)),
+                            BoundarySouth = !string.IsNullOrWhiteSpace(p.BoundarySouth) ? p.BoundarySouth : (!string.Equals(p.PartitionIndex, "A", StringComparison.OrdinalIgnoreCase) && !string.Equals(p.PartitionIndex, "1", StringComparison.OrdinalIgnoreCase) ? string.Empty : (refTd?.BoundarySouth ?? string.Empty)),
+                            BoundaryWest = !string.IsNullOrWhiteSpace(p.BoundaryWest) ? p.BoundaryWest : (!string.Equals(p.PartitionIndex, "A", StringComparison.OrdinalIgnoreCase) && !string.Equals(p.PartitionIndex, "1", StringComparison.OrdinalIgnoreCase) ? string.Empty : (refTd?.BoundaryWest ?? string.Empty)),
+                            Nremarks = !string.IsNullOrWhiteSpace(p.Nremarks) ? p.Nremarks : (!string.Equals(p.PartitionIndex, "A", StringComparison.OrdinalIgnoreCase) && !string.Equals(p.PartitionIndex, "1", StringComparison.OrdinalIgnoreCase) ? string.Empty : refTd?.Nremarks),
+                            Eremarks = !string.IsNullOrWhiteSpace(p.Eremarks) ? p.Eremarks : (!string.Equals(p.PartitionIndex, "A", StringComparison.OrdinalIgnoreCase) && !string.Equals(p.PartitionIndex, "1", StringComparison.OrdinalIgnoreCase) ? string.Empty : refTd?.Eremarks),
+                            Sremarks = !string.IsNullOrWhiteSpace(p.Sremarks) ? p.Sremarks : (!string.Equals(p.PartitionIndex, "A", StringComparison.OrdinalIgnoreCase) && !string.Equals(p.PartitionIndex, "1", StringComparison.OrdinalIgnoreCase) ? string.Empty : refTd?.Sremarks),
+                            Wremarks = !string.IsNullOrWhiteSpace(p.Wremarks) ? p.Wremarks : (!string.Equals(p.PartitionIndex, "A", StringComparison.OrdinalIgnoreCase) && !string.Equals(p.PartitionIndex, "1", StringComparison.OrdinalIgnoreCase) ? string.Empty : refTd?.Wremarks),
 
                             // CAST Land 4 Schedules JSON
                             LandAppraisalDetailsJson = p.LandAppraisalDetailsJson,
@@ -363,6 +377,19 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
             else if (string.IsNullOrWhiteSpace(existing.TransactionNo))
             {
                 existing.TransactionNo = $"TX-{existing.RequestDate:yyyyMMdd}-{new Random().Next(100, 999)}";
+            }
+            if (!string.IsNullOrWhiteSpace(request.GeneratedPartitionsJson))
+            {
+                try
+                {
+                    var partitions = PartitionJsonHelper.ParseList(request.GeneratedPartitionsJson);
+                    var firstKind = partitions?.FirstOrDefault(p => !string.IsNullOrWhiteSpace(p.Kind))?.Kind;
+                    if (!string.IsNullOrWhiteSpace(firstKind))
+                    {
+                        request.Kind = firstKind;
+                    }
+                }
+                catch { }
             }
             existing.Kind = request.Kind;
             existing.Partitions = request.Partitions;
@@ -479,7 +506,7 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                 if (partitions.Count > 0)
                 {
                     tdnList = partitions
-                        .Where(p => !string.IsNullOrWhiteSpace(p.SystemGeneratedTDN))
+                        .Where(p => !string.IsNullOrWhiteSpace(p.SystemGeneratedTDN) && !CastTdGenerator.IsUnapprovedCastTd(p.SystemGeneratedTDN))
                         .Select(p => p.SystemGeneratedTDN)
                         .Where(s => !string.IsNullOrWhiteSpace(s))
                         .Distinct()
@@ -514,16 +541,29 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
             }
 
             // Sync OwnerId & Owner Demographics from matching partition item (or parent request)
+            // Match by PartitionIndex or PIN first so unapproved "-00000" TDNs don't collide across partitions A and B
             var matchingPartition = partitions.FirstOrDefault(p =>
-                (string.IsNullOrWhiteSpace(p.Kind) ||
-                 string.Equals(p.Kind.Trim(), td.Kind.ToString(), StringComparison.OrdinalIgnoreCase)) &&
-                ((!string.IsNullOrWhiteSpace(p.SystemGeneratedTDN) &&
-                 string.Equals(p.SystemGeneratedTDN, td.TaxDeclarationNumber, StringComparison.OrdinalIgnoreCase)) ||
-                (!string.IsNullOrWhiteSpace(p.ARPNo) &&
-                 string.Equals(p.ARPNo, td.TaxDeclarationNumber, StringComparison.OrdinalIgnoreCase))));
+                ((!string.IsNullOrWhiteSpace(p.PartitionIndex) &&
+                  td.Memoranda != null && td.Memoranda.Contains($"Partition {p.PartitionIndex}")) ||
+                 (!string.IsNullOrWhiteSpace(p.PIN) &&
+                  string.Equals(p.PIN, td.PropertyIndexNumber, StringComparison.OrdinalIgnoreCase)) ||
+                 (!string.IsNullOrWhiteSpace(p.SystemGeneratedTDN) &&
+                  !CastTdGenerator.IsUnapprovedCastTd(p.SystemGeneratedTDN) &&
+                  string.Equals(p.SystemGeneratedTDN, td.TaxDeclarationNumber, StringComparison.OrdinalIgnoreCase)) ||
+                 (!string.IsNullOrWhiteSpace(p.ARPNo) &&
+                  p.ARPNo != CastTdGenerator.DefaultArpNumber &&
+                  string.Equals(p.ARPNo, td.ARPNo, StringComparison.OrdinalIgnoreCase))))
+                ?? partitions.FirstOrDefault(p =>
+                    string.IsNullOrWhiteSpace(p.Kind) ||
+                    string.Equals(p.Kind.Trim(), td.Kind.ToString(), StringComparison.OrdinalIgnoreCase))
+                ?? (partitions.Count == 1 ? partitions[0] : null);
 
             if (matchingPartition != null)
             {
+                if (!string.IsNullOrWhiteSpace(matchingPartition.Kind))
+                {
+                    request.Kind = matchingPartition.Kind;
+                }
                 var effOwnerName = !string.IsNullOrWhiteSpace(matchingPartition.NewOwnerName) ? matchingPartition.NewOwnerName : request.NewOwnerName;
                 var effOwnerTin = !string.IsNullOrWhiteSpace(matchingPartition.OwnerTIN) ? matchingPartition.OwnerTIN : (request.OwnerTIN ?? td.OwnerTin);
                 var resolvedId = ResolveOwnerId(matchingPartition.OwnerId ?? request.OwnerId ?? td.OwnerId, effOwnerTin, effOwnerName);
@@ -552,6 +592,50 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                 if (!string.IsNullOrWhiteSpace(matchingPartition.SectionNo)) td.SectionNo = matchingPartition.SectionNo;
                 if (!string.IsNullOrWhiteSpace(matchingPartition.LotNumber)) td.LotNo = matchingPartition.LotNumber;
                 if (!string.IsNullOrWhiteSpace(matchingPartition.ParcelNo)) td.ParcelNo = matchingPartition.ParcelNo;
+                if (!string.IsNullOrWhiteSpace(matchingPartition.StreetLocation)) td.StreetNo = matchingPartition.StreetLocation;
+                if (!string.IsNullOrWhiteSpace(matchingPartition.CityMunicipality)) td.Municipality = matchingPartition.CityMunicipality;
+                if (!string.IsNullOrWhiteSpace(matchingPartition.Province)) td.ProvinceCity = matchingPartition.Province;
+                if (!string.IsNullOrWhiteSpace(matchingPartition.TitleNo)) td.TitleNo = matchingPartition.TitleNo;
+                if (!string.IsNullOrWhiteSpace(matchingPartition.SurveyNumber)) td.SurveyNo = matchingPartition.SurveyNumber;
+                else if (!string.IsNullOrWhiteSpace(matchingPartition.CadastralSurveyNo)) td.SurveyNo = matchingPartition.CadastralSurveyNo;
+
+                // Boundaries & Remarks
+                if (!string.IsNullOrWhiteSpace(matchingPartition.BoundaryNorth)) td.BoundaryNorth = matchingPartition.BoundaryNorth;
+                if (!string.IsNullOrWhiteSpace(matchingPartition.BoundarySouth)) td.BoundarySouth = matchingPartition.BoundarySouth;
+                if (!string.IsNullOrWhiteSpace(matchingPartition.BoundaryEast)) td.BoundaryEast = matchingPartition.BoundaryEast;
+                if (!string.IsNullOrWhiteSpace(matchingPartition.BoundaryWest)) td.BoundaryWest = matchingPartition.BoundaryWest;
+                if (!string.IsNullOrWhiteSpace(matchingPartition.Nremarks)) td.Nremarks = matchingPartition.Nremarks;
+                if (!string.IsNullOrWhiteSpace(matchingPartition.Sremarks)) td.Sremarks = matchingPartition.Sremarks;
+                if (!string.IsNullOrWhiteSpace(matchingPartition.Eremarks)) td.Eremarks = matchingPartition.Eremarks;
+                if (!string.IsNullOrWhiteSpace(matchingPartition.Wremarks)) td.Wremarks = matchingPartition.Wremarks;
+
+                // Land Schedules JSON
+                if (!string.IsNullOrWhiteSpace(matchingPartition.LandAppraisalDetailsJson)) td.LandAppraisalDetailsJson = matchingPartition.LandAppraisalDetailsJson;
+                if (!string.IsNullOrWhiteSpace(matchingPartition.LandImprovementsJson)) td.LandImprovementsJson = matchingPartition.LandImprovementsJson;
+                if (!string.IsNullOrWhiteSpace(matchingPartition.LandAdjustmentsJson)) td.LandAdjustmentsJson = matchingPartition.LandAdjustmentsJson;
+                if (!string.IsNullOrWhiteSpace(matchingPartition.LandPropertyAssessmentsJson)) td.LandPropertyAssessmentsJson = matchingPartition.LandPropertyAssessmentsJson;
+
+                // Kind, Classification & Actual Use
+                if (Enum.TryParse<PropertyKind>(matchingPartition.Kind, true, out var parsedPk)) td.Kind = parsedPk;
+                if (Enum.TryParse<PropertyClassification>(matchingPartition.Classification, true, out var parsedPc)) td.Classification = parsedPc;
+                if (!string.IsNullOrWhiteSpace(matchingPartition.ActualUse)) td.ActualUse = matchingPartition.ActualUse;
+
+                // Valuation & Area
+                if (matchingPartition.AreaSqMeters > 0) td.AreaSqMeters = matchingPartition.AreaSqMeters;
+                if (matchingPartition.UnitValue > 0) td.UnitValue = matchingPartition.UnitValue;
+                if (matchingPartition.MarketValue > 0)
+                {
+                    td.MarketValue = matchingPartition.MarketValue;
+                    td.AdjustedMarketValue = matchingPartition.MarketValue;
+                }
+                if (matchingPartition.AssessmentLevelPercent > 0) td.AssessmentLevelPercent = matchingPartition.AssessmentLevelPercent;
+                if (matchingPartition.AssessedValue > 0) td.AssessedValue = matchingPartition.AssessedValue;
+                else if (td.MarketValue > 0 && td.AssessmentLevelPercent > 0)
+                {
+                    td.AssessedValue = Math.Round(td.MarketValue * (td.AssessmentLevelPercent / 100m), 2);
+                }
+                if (td.AssessedValue > 0) td.AnnualTaxDue = Math.Round(td.AssessedValue * 0.03m, 2);
+
                 if (matchingPartition.EffectivityYear.HasValue && matchingPartition.EffectivityYear.Value > 1900)
                 {
                     td.EffectivityYear = matchingPartition.EffectivityYear.Value;
@@ -614,10 +698,38 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                 if (matchingPartition.PropertyImagesJson != null)
                 {
                     td.PropertyImagesJson = matchingPartition.PropertyImagesJson;
-                    if ( td.Kind != PropertyKind.Machinery ) _assessmentService.Update(td);
                 }
 
-                // Sync Machinery & Land Appraisal JSONs if updated via EditPartition
+                // Sync Building specs
+                if (td.Kind == PropertyKind.Building)
+                {
+                    if (!string.IsNullOrWhiteSpace(matchingPartition.BuildingClassification)) td.BuildingClassification = matchingPartition.BuildingClassification;
+                    if (!string.IsNullOrWhiteSpace(matchingPartition.StructuralType)) td.StructuralType = matchingPartition.StructuralType;
+                    if (matchingPartition.NoOfStoreys > 0) td.NoOfStoreys = matchingPartition.NoOfStoreys;
+                    if (!string.IsNullOrWhiteSpace(matchingPartition.BuildingPermitNo)) td.BuildingPermitNo = matchingPartition.BuildingPermitNo;
+                    if (!string.IsNullOrWhiteSpace(matchingPartition.OccupancyPermitNo)) td.OccupancyPermitNo = matchingPartition.OccupancyPermitNo;
+                    if (matchingPartition.BuildingAgeYears > 0) td.BuildingAgeYears = matchingPartition.BuildingAgeYears;
+                    if (matchingPartition.DateConstructed.HasValue) td.DateConstructed = matchingPartition.DateConstructed;
+                    if (matchingPartition.DateCompleted.HasValue) td.DateCompleted = matchingPartition.DateCompleted;
+                    if (matchingPartition.DateOccupied.HasValue) td.DateOccupied = matchingPartition.DateOccupied;
+                    if (matchingPartition.TotalBuildingAreaSqm > 0) td.TotalBuildingAreaSqm = matchingPartition.TotalBuildingAreaSqm;
+
+                    if (!string.IsNullOrWhiteSpace(matchingPartition.StructuralFoundation)) td.StructuralFoundation = matchingPartition.StructuralFoundation;
+                    if (!string.IsNullOrWhiteSpace(matchingPartition.StructuralColumns)) td.StructuralColumns = matchingPartition.StructuralColumns;
+                    if (!string.IsNullOrWhiteSpace(matchingPartition.StructuralBeams)) td.StructuralBeams = matchingPartition.StructuralBeams;
+                    if (!string.IsNullOrWhiteSpace(matchingPartition.StructuralTrussRoof)) td.StructuralTrussRoof = matchingPartition.StructuralTrussRoof;
+                    if (!string.IsNullOrWhiteSpace(matchingPartition.StructuralRoof)) td.StructuralRoof = matchingPartition.StructuralRoof;
+                    if (!string.IsNullOrWhiteSpace(matchingPartition.StructuralExteriorWalls)) td.StructuralExteriorWalls = matchingPartition.StructuralExteriorWalls;
+                    if (!string.IsNullOrWhiteSpace(matchingPartition.StructuralFlooring)) td.StructuralFlooring = matchingPartition.StructuralFlooring;
+                    if (!string.IsNullOrWhiteSpace(matchingPartition.DoorMain)) td.DoorMain = matchingPartition.DoorMain;
+                    if (!string.IsNullOrWhiteSpace(matchingPartition.Ceiling)) td.Ceiling = matchingPartition.Ceiling;
+                    if (!string.IsNullOrWhiteSpace(matchingPartition.StructuralWindows)) td.StructuralWindows = matchingPartition.StructuralWindows;
+                    if (!string.IsNullOrWhiteSpace(matchingPartition.StructuralStairs)) td.StructuralStairs = matchingPartition.StructuralStairs;
+                    if (!string.IsNullOrWhiteSpace(matchingPartition.StructuralPartitionWalls)) td.StructuralPartitionWalls = matchingPartition.StructuralPartitionWalls;
+                    if (!string.IsNullOrWhiteSpace(matchingPartition.StructuralFloorFinish)) td.StructuralFloorFinish = matchingPartition.StructuralFloorFinish;
+                }
+
+                // Sync Machinery specs
                 if (td.Kind == PropertyKind.Machinery)
                 {
                     td.IsLandOwnerAlsoBuildingOwner = matchingPartition.IsLandOwnerAlsoBuildingOwner;
@@ -642,10 +754,9 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                     if (matchingPartition.LocalDateIssued.HasValue) td.LocalDateIssued = matchingPartition.LocalDateIssued;
                     if (!string.IsNullOrWhiteSpace(matchingPartition.MachineryAppraisalDetailsJson)) td.MachineryAppraisalDetailsJson = matchingPartition.MachineryAppraisalDetailsJson;
                     if (!string.IsNullOrWhiteSpace(matchingPartition.MachineryPropertyAssessmentsJson)) td.MachineryPropertyAssessmentsJson = matchingPartition.MachineryPropertyAssessmentsJson;
-                    if (matchingPartition.MarketValue > 0) td.MarketValue = matchingPartition.MarketValue;
-                    if (matchingPartition.AssessmentLevelPercent > 0) td.AssessmentLevelPercent = matchingPartition.AssessmentLevelPercent; _assessmentService.Update(td);
-                    if ( td.Kind != PropertyKind.Machinery ) _assessmentService.Update(td);
                 }
+
+                _assessmentService.Update(td);
                 partitionsModified = true;
             }
             else
@@ -1022,26 +1133,26 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                 // CAST Land Appraisal & Registration (CAST Standard)
                 RegistrationStatus = !string.IsNullOrWhiteSpace(conf?.RegistrationStatus) ? conf.RegistrationStatus : "Titled",
                 TitleType = !string.IsNullOrWhiteSpace(conf?.TitleType) ? conf.TitleType : "OCT",
-                TitleNo = !string.IsNullOrWhiteSpace(conf?.TitleNo) ? conf.TitleNo : (refTd?.TitleNo ?? string.Empty),
+                TitleNo = !string.IsNullOrWhiteSpace(conf?.TitleNo) ? conf.TitleNo : (!string.Equals(conf?.PartitionIndex, "A", StringComparison.OrdinalIgnoreCase) && !string.Equals(conf?.PartitionIndex, "1", StringComparison.OrdinalIgnoreCase) ? string.Empty : (refTd?.TitleNo ?? string.Empty)),
                 DateRegistered = conf?.DateRegistered,
-                CadastralSurveyNo = !string.IsNullOrWhiteSpace(conf?.CadastralSurveyNo) ? conf.CadastralSurveyNo : refTd?.CadastralSurveyNo,
-                SectionNo = !string.IsNullOrWhiteSpace(conf?.SectionNo) ? conf.SectionNo : refTd?.SectionNo,
-                ParcelNo = !string.IsNullOrWhiteSpace(conf?.ParcelNo) ? conf.ParcelNo : refTd?.ParcelNo,
+                CadastralSurveyNo = !string.IsNullOrWhiteSpace(conf?.CadastralSurveyNo) ? conf.CadastralSurveyNo : (!string.Equals(conf?.PartitionIndex, "A", StringComparison.OrdinalIgnoreCase) && !string.Equals(conf?.PartitionIndex, "1", StringComparison.OrdinalIgnoreCase) ? string.Empty : refTd?.CadastralSurveyNo),
+                SectionNo = !string.IsNullOrWhiteSpace(conf?.SectionNo) ? conf.SectionNo : (!string.Equals(conf?.PartitionIndex, "A", StringComparison.OrdinalIgnoreCase) && !string.Equals(conf?.PartitionIndex, "1", StringComparison.OrdinalIgnoreCase) ? string.Empty : refTd?.SectionNo),
+                ParcelNo = !string.IsNullOrWhiteSpace(conf?.ParcelNo) ? conf.ParcelNo : (!string.Equals(conf?.PartitionIndex, "A", StringComparison.OrdinalIgnoreCase) && !string.Equals(conf?.PartitionIndex, "1", StringComparison.OrdinalIgnoreCase) ? string.Empty : refTd?.ParcelNo),
                 ARPNo = partitionArpNo,
                 Purok = !string.IsNullOrWhiteSpace(conf?.Purok) ? conf.Purok : refTd?.Purok,
-                LotNo = !string.IsNullOrWhiteSpace(conf?.LotNumber) ? conf.LotNumber : (refTd?.LotNo ?? string.Empty),
-                BlockNo = !string.IsNullOrWhiteSpace(conf?.BlockNumber) ? conf.BlockNumber : (refTd?.BlockNo ?? string.Empty),
-                SurveyNo = !string.IsNullOrWhiteSpace(conf?.SurveyNumber) ? conf.SurveyNumber : (refTd?.SurveyNo ?? string.Empty),
+                LotNo = !string.IsNullOrWhiteSpace(conf?.LotNumber) ? conf.LotNumber : (!string.Equals(conf?.PartitionIndex, "A", StringComparison.OrdinalIgnoreCase) && !string.Equals(conf?.PartitionIndex, "1", StringComparison.OrdinalIgnoreCase) ? $"Lot {conf?.PartitionIndex}" : (refTd?.LotNo ?? string.Empty)),
+                BlockNo = !string.IsNullOrWhiteSpace(conf?.BlockNumber) ? conf.BlockNumber : (!string.Equals(conf?.PartitionIndex, "A", StringComparison.OrdinalIgnoreCase) && !string.Equals(conf?.PartitionIndex, "1", StringComparison.OrdinalIgnoreCase) ? string.Empty : (refTd?.BlockNo ?? string.Empty)),
+                SurveyNo = !string.IsNullOrWhiteSpace(conf?.SurveyNumber) ? conf.SurveyNumber : (!string.Equals(conf?.PartitionIndex, "A", StringComparison.OrdinalIgnoreCase) && !string.Equals(conf?.PartitionIndex, "1", StringComparison.OrdinalIgnoreCase) ? string.Empty : (refTd?.SurveyNo ?? string.Empty)),
 
-                // CAST Land Boundaries & Remarks
-                BoundaryNorth = !string.IsNullOrWhiteSpace(conf?.BoundaryNorth) ? conf.BoundaryNorth : (refTd?.BoundaryNorth ?? string.Empty),
-                BoundaryEast = !string.IsNullOrWhiteSpace(conf?.BoundaryEast) ? conf.BoundaryEast : (refTd?.BoundaryEast ?? string.Empty),
-                BoundarySouth = !string.IsNullOrWhiteSpace(conf?.BoundarySouth) ? conf.BoundarySouth : (refTd?.BoundarySouth ?? string.Empty),
-                BoundaryWest = !string.IsNullOrWhiteSpace(conf?.BoundaryWest) ? conf.BoundaryWest : (refTd?.BoundaryWest ?? string.Empty),
-                Nremarks = !string.IsNullOrWhiteSpace(conf?.Nremarks) ? conf.Nremarks : refTd?.Nremarks,
-                Eremarks = !string.IsNullOrWhiteSpace(conf?.Eremarks) ? conf.Eremarks : refTd?.Eremarks,
-                Sremarks = !string.IsNullOrWhiteSpace(conf?.Sremarks) ? conf.Sremarks : refTd?.Sremarks,
-                Wremarks = !string.IsNullOrWhiteSpace(conf?.Wremarks) ? conf.Wremarks : refTd?.Wremarks,
+                // CAST Land Boundaries & Remarks (Segregated partitions must have their own independent boundaries)
+                BoundaryNorth = !string.IsNullOrWhiteSpace(conf?.BoundaryNorth) ? conf.BoundaryNorth : (!string.Equals(conf?.PartitionIndex, "A", StringComparison.OrdinalIgnoreCase) && !string.Equals(conf?.PartitionIndex, "1", StringComparison.OrdinalIgnoreCase) ? string.Empty : (refTd?.BoundaryNorth ?? string.Empty)),
+                BoundaryEast = !string.IsNullOrWhiteSpace(conf?.BoundaryEast) ? conf.BoundaryEast : (!string.Equals(conf?.PartitionIndex, "A", StringComparison.OrdinalIgnoreCase) && !string.Equals(conf?.PartitionIndex, "1", StringComparison.OrdinalIgnoreCase) ? string.Empty : (refTd?.BoundaryEast ?? string.Empty)),
+                BoundarySouth = !string.IsNullOrWhiteSpace(conf?.BoundarySouth) ? conf.BoundarySouth : (!string.Equals(conf?.PartitionIndex, "A", StringComparison.OrdinalIgnoreCase) && !string.Equals(conf?.PartitionIndex, "1", StringComparison.OrdinalIgnoreCase) ? string.Empty : (refTd?.BoundarySouth ?? string.Empty)),
+                BoundaryWest = !string.IsNullOrWhiteSpace(conf?.BoundaryWest) ? conf.BoundaryWest : (!string.Equals(conf?.PartitionIndex, "A", StringComparison.OrdinalIgnoreCase) && !string.Equals(conf?.PartitionIndex, "1", StringComparison.OrdinalIgnoreCase) ? string.Empty : (refTd?.BoundaryWest ?? string.Empty)),
+                Nremarks = !string.IsNullOrWhiteSpace(conf?.Nremarks) ? conf.Nremarks : (!string.Equals(conf?.PartitionIndex, "A", StringComparison.OrdinalIgnoreCase) && !string.Equals(conf?.PartitionIndex, "1", StringComparison.OrdinalIgnoreCase) ? string.Empty : refTd?.Nremarks),
+                Eremarks = !string.IsNullOrWhiteSpace(conf?.Eremarks) ? conf.Eremarks : (!string.Equals(conf?.PartitionIndex, "A", StringComparison.OrdinalIgnoreCase) && !string.Equals(conf?.PartitionIndex, "1", StringComparison.OrdinalIgnoreCase) ? string.Empty : refTd?.Eremarks),
+                Sremarks = !string.IsNullOrWhiteSpace(conf?.Sremarks) ? conf.Sremarks : (!string.Equals(conf?.PartitionIndex, "A", StringComparison.OrdinalIgnoreCase) && !string.Equals(conf?.PartitionIndex, "1", StringComparison.OrdinalIgnoreCase) ? string.Empty : refTd?.Sremarks),
+                Wremarks = !string.IsNullOrWhiteSpace(conf?.Wremarks) ? conf.Wremarks : (!string.Equals(conf?.PartitionIndex, "A", StringComparison.OrdinalIgnoreCase) && !string.Equals(conf?.PartitionIndex, "1", StringComparison.OrdinalIgnoreCase) ? string.Empty : refTd?.Wremarks),
 
                 // CAST Land 4 Schedules JSON
                 LandAppraisalDetailsJson = conf?.LandAppraisalDetailsJson,

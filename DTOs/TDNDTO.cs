@@ -107,6 +107,7 @@ public class TDNDTO
     public string? OwnerContactNo { get; set; }
     public string? OwnerEmail { get; set; }
     public string? OwnerGender { get; set; }
+    public string? OwnerCivilStatus { get; set; }
     public bool IsAdministrator { get; set; }
     public bool IsBeneficialUser { get; set; }
     public bool IsPossessor { get; set; }
@@ -116,6 +117,7 @@ public class TDNDTO
     public string? AdministratorTin { get; set; }
     public string? AdministratorEmail { get; set; }
     public string? AdministratorGender { get; set; }
+    public string? AdministratorCivilStatus { get; set; }
     public string? AssessmentBasis { get; set; }
     public int? BackTaxesYearFrom { get; set; }
     public int? BackTaxesYearTo { get; set; }
@@ -124,6 +126,10 @@ public class TDNDTO
     public string? LandImprovementsJson { get; set; }
     public string? LandAdjustmentsJson { get; set; }
     public string? LandPropertyAssessmentsJson { get; set; }
+    public string? FloorBreakdownJson { get; set; }
+    public string? AdditionalItemsJson { get; set; }
+    public string? MachineryAppraisalDetailsJson { get; set; }
+    public string? MachineryPropertyAssessmentsJson { get; set; }
     public string? Classification { get; set; }
     public string? SubClassification { get; set; }
     public string? ActualUse { get; set; }
@@ -131,6 +137,9 @@ public class TDNDTO
 
     // Floor Plan / Site Sketch File & Attachments
     public string? FloorPlanSketchPath { get; set; }
+    // Mobile-captured sketch, sent only during bulk sync (saved to disk by the form update endpoints)
+    public string? FloorPlanSketchBase64 { get; set; }
+    public string? FloorPlanSketchFileName { get; set; }
     public string? AttachmentsJson { get; set; }
     public List<MobileAttachmentDTO>? Attachments { get; set; } = new();
 

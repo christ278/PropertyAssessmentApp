@@ -13,28 +13,46 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { MobileApi } from '../api/mobileApi';
 import { resolveServerUrl, DEFAULT_BASE_URL } from '../api/apiClient';
 import { useTheme } from '../context/ThemeContext';
 import { ActionModal } from './ActionModal';
+import { saveFileLocally } from '../utils/fileStorage';
 
 export const AttachmentsSection = ({
   trackingNo,
+  formWorkflowId = null,
+  partitionIndex = 0,
   sketchUrl,
+  sketchBase64,
   attachments = [],
   onAttachmentsChange,
-  propertyKind = 'Building' // 'Building' | 'Land' | 'Machinery'
+  onSketchChange,
+  propertyKind = 'Building', // 'Building' | 'Land' | 'Machinery'
+  showSketch = true,
+  showAttachments = true
 }) => {
   const { isDarkMode, colors, shadows } = useTheme();
   const styles = React.useMemo(() => getStyles(colors, isDarkMode), [colors, isDarkMode]);
 
   const [resolvedSketchUri, setResolvedSketchUri] = useState('');
   const [fullscreenImage, setFullscreenImage] = useState(null);
+  const [fullscreenError, setFullscreenError] = useState(false);
+  const [sketchError, setSketchError] = useState(false);
+  const [failedPhotoIds, setFailedPhotoIds] = useState({});
   const [uploading, setUploading] = useState(false);
   const [photoToDelete, setPhotoToDelete] = useState(null);
 
   // Resolve web sketch URL to full address
   const [resolvedAttachmentUris, setResolvedAttachmentUris] = useState({});
+
+  useEffect(() => {
+    setSketchError(false);
+  }, [sketchUrl, sketchBase64]);
+
+  const openFullscreen = (uri) => {
+    setFullscreenError(false);
+    setFullscreenImage(uri);
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -74,7 +92,7 @@ export const AttachmentsSection = ({
     if (!rawUrl) return '';
     if (resolvedAttachmentUris[itemId]) return resolvedAttachmentUris[itemId];
     if (resolvedAttachmentUris[rawUrl]) return resolvedAttachmentUris[rawUrl];
-    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://') || rawUrl.startsWith('data:') || rawUrl.startsWith('file://')) {
+    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://') || rawUrl.startsWith('data:') || rawUrl.startsWith('file:') || rawUrl.startsWith('content:')) {
       return rawUrl;
     }
     const base = DEFAULT_BASE_URL.replace(/\/+$/, '');
@@ -82,7 +100,11 @@ export const AttachmentsSection = ({
     return `${base}${cleanPath}`;
   };
 
-  const displaySketchUri = resolvedSketchUri || (sketchUrl && (sketchUrl.startsWith('http') ? sketchUrl : `${DEFAULT_BASE_URL.replace(/\/+$/, '')}/${sketchUrl.replace(/^\/+/, '')}`));
+  const displaySketchUri = (sketchBase64 ? `data:image/jpeg;base64,${sketchBase64}` : null)
+    || resolvedSketchUri
+    || (sketchUrl && (/^(https?:|data:|file:|content:)/.test(sketchUrl)
+        ? sketchUrl
+        : `${DEFAULT_BASE_URL.replace(/\/+$/, '')}/${sketchUrl.replace(/^\/+/, '')}`));
 
   // Request permissions for camera
   const requestCameraPermission = async () => {
@@ -167,59 +189,88 @@ export const AttachmentsSection = ({
     }
   };
 
-  // Helper to upload or add photo to attachments
+  // Helper to store photo completely offline on the device
   const processAndAddPhoto = async ({ uri, fileName, fileSize, base64 }) => {
     setUploading(true);
+
+    const saved = await saveFileLocally({
+      trackingNo: trackingNo || 'general',
+      fileName: fileName,
+      base64: base64,
+      uri: uri,
+      type: 'attachment'
+    });
+
     let newAttachment = {
       id: `photo_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
       fileName: fileName,
-      fileUrl: uri,
+      fileUrl: saved.localUri,
       fileType: 'image',
       fileSize: fileSize,
-      base64Data: base64,
+      base64Data: base64 || null,
       caption: '',
       uploadedAt: new Date().toISOString()
     };
 
-    // Try online upload if server is reachable
-    try {
-      const formData = new FormData();
-      formData.append('trackingNo', trackingNo || 'general');
-      formData.append('caption', '');
-      formData.append('fileType', 'image');
-
-      if (Platform.OS === 'web') {
-        const resBlob = await fetch(uri);
-        const blob = await resBlob.blob();
-        formData.append('file', blob, fileName);
-      } else {
-        formData.append('file', {
-          uri: uri,
-          type: 'image/jpeg',
-          name: fileName
-        });
-      }
-
-      const uploadRes = await MobileApi.uploadAttachment(formData);
-      if (uploadRes && uploadRes.success && uploadRes.data) {
-        const serverAtt = uploadRes.data;
-        newAttachment = {
-          ...newAttachment,
-          id: serverAtt.id || newAttachment.id,
-          fileName: serverAtt.fileName || newAttachment.fileName,
-          fileUrl: serverAtt.fileUrl,
-          fileType: 'image',
-          base64Data: null // Saved on server
-        };
-      }
-    } catch (netErr) {
-      // Offline fallback: keep local URI and base64Data for office batch sync
-    } finally {
-      setUploading(false);
-    }
+    setUploading(false);
 
     const updated = [...(attachments || []), newAttachment];
     if (onAttachmentsChange) onAttachmentsChange(updated);
+  };
+
+  // Sketch: store completely offline on the device; uploaded only during office sync
+  const applySketchAsset = async (asset) => {
+    if (!asset || !onSketchChange) return;
+    setUploading(true);
+
+    const saved = await saveFileLocally({
+      trackingNo: trackingNo || 'general',
+      fileName: asset.fileName || `Sketch_${Date.now()}.jpg`,
+      base64: asset.base64,
+      uri: asset.uri,
+      type: 'sketch'
+    });
+
+    setUploading(false);
+    onSketchChange({
+      uri: saved.localUri,
+      base64: asset.base64 || null,
+      fileName: asset.fileName || `Sketch_${Date.now()}.jpg`
+    });
+  };
+
+  const handleSketchCamera = async () => {
+    if (!(await requestCameraPermission())) return;
+    try {
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.8,
+        base64: true
+      });
+      if (!result.canceled && result.assets?.length) applySketchAsset(result.assets[0]);
+    } catch (err) {
+      Alert.alert('Camera Error', 'Could not open camera.');
+    }
+  };
+
+  const handleSketchGallery = async () => {
+    if (!(await requestLibraryPermission())) return;
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.8,
+        base64: true
+      });
+      if (!result.canceled && result.assets?.length) applySketchAsset(result.assets[0]);
+    } catch (err) {
+      Alert.alert('Gallery Error', 'Could not access photo library.');
+    }
+  };
+
+  const handleSketchRemove = () => {
+    if (onSketchChange) onSketchChange({ uri: '', base64: null, fileName: '' });
   };
 
   // Delete photo attachment
@@ -242,69 +293,105 @@ export const AttachmentsSection = ({
       {/* =========================================================================
           SECTION 1: WEB-UPLOADED SITE SKETCH / FLOOR PLAN BLUEPRINT
           ========================================================================= */}
-      <View style={[styles.card, shadows.card]}>
-        <View style={styles.headerRow}>
-          <View style={styles.headerIconBox}>
-            <Ionicons name="map-outline" size={20} color={colors.primary} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.cardTitle}>Site Sketch & Floor Plan Blueprint</Text>
-            <Text style={styles.cardSubtitle}>Uploaded from Assessor Office Web Portal</Text>
-          </View>
-          <View style={styles.badgeWeb}>
-            <Text style={styles.badgeWebText}>Office Web Sketch</Text>
-          </View>
-        </View>
-
-        {displaySketchUri ? (
-          <View style={styles.sketchContainer}>
-            <TouchableOpacity
-              activeOpacity={0.85}
-              style={styles.sketchImageWrap}
-              onPress={() => setFullscreenImage(displaySketchUri)}
-            >
-              <Image
-                source={{ uri: displaySketchUri }}
-                style={styles.sketchImage}
-                resizeMode="contain"
-              />
-              <View style={styles.zoomOverlay}>
-                <Ionicons name="scan-outline" size={16} color="#ffffff" />
-                <Text style={styles.zoomOverlayText}>Tap to Enlarge</Text>
-              </View>
-            </TouchableOpacity>
-
-            <View style={styles.sketchFooter}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.sketchFileName} numberOfLines={1}>
-                  {sketchUrl.split('/').pop()}
-                </Text>
-                <Text style={styles.sketchHint}>Official blueprint for {propertyKind} inspection</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.viewFullBtn}
-                onPress={() => setFullscreenImage(resolvedSketchUri)}
-              >
-                <Ionicons name="expand-outline" size={16} color={colors.primary} />
-                <Text style={styles.viewFullBtnText}>Full View</Text>
-              </TouchableOpacity>
+      {showSketch && (
+        <View style={[styles.card, shadows.card]}>
+          <View style={styles.headerRow}>
+            <View style={styles.headerIconBox}>
+              <Ionicons name="map-outline" size={20} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.cardTitle}>Site Sketch & Floor Plan Blueprint</Text>
+              <Text style={styles.cardSubtitle}>Upload or replace on site; synced with your next office sync</Text>
+            </View>
+            <View style={styles.badgeWeb}>
+              <Text style={styles.badgeWebText}>Office Web Sketch</Text>
             </View>
           </View>
-        ) : (
-          <View style={styles.emptySketchBox}>
-            <Ionicons name="document-text-outline" size={38} color={colors.textMuted} />
-            <Text style={styles.emptySketchTitle}>No Blueprint Sketch Uploaded</Text>
-            <Text style={styles.emptySketchText}>
-              No Site Sketch or Floor Plan blueprint has been attached from the Office Web Portal for this partition yet.
-            </Text>
-          </View>
-        )}
-      </View>
+
+          {!!onSketchChange && (
+            <View style={styles.actionButtonsRow}>
+              <TouchableOpacity style={[styles.actionBtn, styles.actionBtnCamera]} onPress={handleSketchCamera}>
+                <Ionicons name="camera" size={18} color="#ffffff" />
+                <Text style={styles.actionBtnText}>{sketchUrl ? 'Retake' : 'Take Sketch'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.actionBtn, styles.actionBtnGallery]} onPress={handleSketchGallery}>
+                <Ionicons name="images" size={18} color="#ffffff" />
+                <Text style={styles.actionBtnText}>{sketchUrl ? 'Replace' : 'Upload'}</Text>
+              </TouchableOpacity>
+              {!!sketchUrl && (
+                <TouchableOpacity style={[styles.actionBtn, { backgroundColor: colors.accentRed, flex: 0, paddingHorizontal: 14 }]} onPress={handleSketchRemove}>
+                  <Ionicons name="trash-outline" size={18} color="#ffffff" />
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
+          {displaySketchUri ? (
+            <View style={styles.sketchContainer}>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                style={styles.sketchImageWrap}
+                onPress={() => !sketchError && openFullscreen(displaySketchUri)}
+              >
+                {sketchError ? (
+                  <View style={styles.sketchErrorWrap}>
+                    <Ionicons name="cloud-offline-outline" size={38} color={colors.textMuted} />
+                    <Text style={styles.sketchErrorTitle}>Sketch Not Cached Offline</Text>
+                    <Text style={styles.sketchErrorText}>
+                      This blueprint could not be loaded from offline storage. You can take or replace a new site sketch using the buttons above.
+                    </Text>
+                  </View>
+                ) : (
+                  <>
+                    <Image
+                      source={{ uri: displaySketchUri }}
+                      style={styles.sketchImage}
+                      resizeMode="contain"
+                      onError={() => setSketchError(true)}
+                    />
+                    <View style={styles.zoomOverlay}>
+                      <Ionicons name="scan-outline" size={16} color="#ffffff" />
+                      <Text style={styles.zoomOverlayText}>Tap to Enlarge</Text>
+                    </View>
+                  </>
+                )}
+              </TouchableOpacity>
+
+              <View style={styles.sketchFooter}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.sketchFileName} numberOfLines={1}>
+                    {(sketchUrl || '').split('/').pop() || 'blueprint.jpg'}
+                  </Text>
+                  <Text style={styles.sketchHint}>Official blueprint for {propertyKind} inspection</Text>
+                </View>
+                {!sketchError && (
+                  <TouchableOpacity
+                    style={styles.viewFullBtn}
+                    onPress={() => openFullscreen(displaySketchUri)}
+                  >
+                    <Ionicons name="expand-outline" size={16} color={colors.primary} />
+                    <Text style={styles.viewFullBtnText}>Full View</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          ) : (
+            <View style={styles.emptySketchBox}>
+              <Ionicons name="document-text-outline" size={38} color={colors.textMuted} />
+              <Text style={styles.emptySketchTitle}>No Blueprint Sketch Uploaded</Text>
+              <Text style={styles.emptySketchText}>
+                No Site Sketch or Floor Plan blueprint has been attached from the Office Web Portal for this partition yet.
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
 
       {/* =========================================================================
           SECTION 2: MULTIPLE FIELD INSPECTION PHOTOS (CAMERA & GALLERY ONLY)
           ========================================================================= */}
-      <View style={[styles.card, shadows.card, { marginTop: 14 }]}>
+      {showAttachments && (
+        <View style={[styles.card, shadows.card, { marginTop: showSketch ? 14 : 0 }]}>
         <View style={styles.headerRow}>
           <View style={[styles.headerIconBox, { backgroundColor: isDarkMode ? '#064e3b' : '#ecfdf5' }]}>
             <Ionicons name="camera-outline" size={20} color={isDarkMode ? '#34d399' : '#059669'} />
@@ -367,7 +454,10 @@ export const AttachmentsSection = ({
               const fileType = (item?.fileType || item?.FileType || 'image').toLowerCase();
               const caption = item?.caption || item?.Caption || '';
               const uploadedAt = item?.uploadedAt || item?.UploadedAt;
-              const itemUri = getFullPhotoUrl(rawUrl, itemId);
+              const itemB64 = item?.base64Data || item?.Base64Data;
+              const itemUri = (rawUrl.startsWith('blob:') && itemB64)
+                ? `data:image/jpeg;base64,${itemB64}`
+                : (itemB64 ? `data:image/jpeg;base64,${itemB64}` : getFullPhotoUrl(rawUrl, itemId));
               const isPdf = fileType === 'document' || fileName.toLowerCase().endsWith('.pdf') || rawUrl.toLowerCase().endsWith('.pdf');
 
               return (
@@ -376,12 +466,16 @@ export const AttachmentsSection = ({
                     {/* Photo Thumbnail */}
                     <TouchableOpacity
                       activeOpacity={0.8}
-                      onPress={() => !isPdf && setFullscreenImage(itemUri)}
+                      onPress={() => !isPdf && !failedPhotoIds[itemId] && openFullscreen(itemUri)}
                       style={styles.attThumbnailWrap}
                     >
                       {isPdf ? (
                         <View style={[styles.attThumbnail, { backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' }]}>
                           <Ionicons name="document-text" size={26} color="#059669" />
+                        </View>
+                      ) : failedPhotoIds[itemId] ? (
+                        <View style={[styles.attThumbnail, { backgroundColor: isDarkMode ? '#334155' : '#f1f5f9', alignItems: 'center', justifyContent: 'center' }]}>
+                          <Ionicons name="cloud-offline-outline" size={22} color={colors.textMuted} />
                         </View>
                       ) : (
                         <Image
@@ -389,9 +483,10 @@ export const AttachmentsSection = ({
                           source={{ uri: itemUri }}
                           style={styles.attThumbnail}
                           resizeMode="cover"
+                          onError={() => setFailedPhotoIds(prev => ({ ...prev, [itemId]: true }))}
                         />
                       )}
-                      {!isPdf && (
+                      {!isPdf && !failedPhotoIds[itemId] && (
                         <View style={styles.thumbZoomPill}>
                           <Ionicons name="search" size={10} color="#ffffff" />
                         </View>
@@ -438,6 +533,7 @@ export const AttachmentsSection = ({
           </View>
         )}
       </View>
+      )}
 
       {/* =========================================================================
           FULL-SCREEN IMAGE PREVIEW MODAL
@@ -460,11 +556,22 @@ export const AttachmentsSection = ({
           </View>
 
           {fullscreenImage && (
-            <Image
-              source={{ uri: fullscreenImage }}
-              style={styles.modalFullscreenImage}
-              resizeMode="contain"
-            />
+            fullscreenError ? (
+              <View style={styles.modalErrorContainer}>
+                <Ionicons name="cloud-offline-outline" size={56} color="#94a3b8" />
+                <Text style={styles.modalErrorTitle}>Photo Unavailable Offline</Text>
+                <Text style={styles.modalErrorSubtitle}>
+                  This photo was not saved to local device storage before going offline.
+                </Text>
+              </View>
+            ) : (
+              <Image
+                source={{ uri: fullscreenImage }}
+                style={styles.modalFullscreenImage}
+                resizeMode="contain"
+                onError={() => setFullscreenError(true)}
+              />
+            )
           )}
         </View>
       </Modal>
@@ -565,10 +672,28 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
   },
   sketchImageWrap: {
     height: 220,
-    backgroundColor: '#0f172a',
+    backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc',
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center'
+  },
+  sketchErrorWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20
+  },
+  sketchErrorTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.textDark,
+    marginTop: 8
+  },
+  sketchErrorText: {
+    fontSize: 12,
+    color: colors.textMuted,
+    textAlign: 'center',
+    marginTop: 4,
+    maxWidth: 280
   },
   sketchImage: {
     width: '100%',
@@ -828,5 +953,23 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
   modalFullscreenImage: {
     width: '100%',
     height: '80%'
+  },
+  modalErrorContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 30
+  },
+  modalErrorTitle: {
+    color: '#ffffff',
+    fontSize: 17,
+    fontWeight: '700',
+    marginTop: 14
+  },
+  modalErrorSubtitle: {
+    color: '#94a3b8',
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: 6,
+    maxWidth: 280
   }
 });

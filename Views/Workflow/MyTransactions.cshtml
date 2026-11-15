@@ -1,4 +1,4 @@
-﻿@model IEnumerable<PropertyAssessmentApp.Services.WorkflowQueueItemDto>
+@model IEnumerable<PropertyAssessmentApp.Services.WorkflowQueueItemDto>
 @using PropertyAssessmentApp.Models
 @using PropertyAssessmentApp.Services
 @inject PropertyAssessmentApp.Services.IPermissionService PermissionService
@@ -331,55 +331,91 @@
                                     }
                                     else
                                     {
-                                        <div class="flex items-center justify-center gap-1.5 flex-wrap">
-                                            @if (isRegularStaff)
-                                            {
-                                                <!-- Forward / Route Button for Regular Employees -->
-                                                <button type="button" onclick="openForwardModal('@item.RequestId', '@item.RequestType', '@item.TrackingNumber', '@((int)item.CurrentStage)', '@((int)item.Division)', '@(item.ORNumber ?? "")', '@(item.ORDateIssued?.ToString("yyyy-MM-dd") ?? "")')" class="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[11px] flex items-center gap-1 shadow-xs transition-all" title="Route transaction to next workflow stage">
-                                                    <i data-lucide="git-pull-request" class="w-3.5 h-3.5"></i>
-                                                    Forward
-                                                </button>
-                                            }
-                                            else
-                                            {
-                                                <!-- Tag For Approval Button for Non-Regular Staff -->
-                                                <button type="button" onclick="openTagForApprovalModal('@item.RequestId', '@item.RequestType', '@item.TrackingNumber', '@((int)item.Division)')" class="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-semibold text-[11px] flex items-center gap-1 shadow-xs transition-all" title="Tag transaction For Approval and return to pool">
-                                                    <i data-lucide="stamp" class="w-3.5 h-3.5"></i>
-                                                    Tag For Approval
-                                                </button>
-                                            }
+                                        string detailsUrl = item.RequestType switch
+                                        {
+                                            "TaxDeclarationRequest" => Url.Action("Details", "TaxDeclarationRequest", new { id = item.RequestId }) ?? "#",
+                                            "LandHoldingRequest" => Url.Action("Details", "LandHoldingRequest", new { id = item.RequestId }) ?? "#",
+                                            "TaxMappingRequest" => Url.Action("Details", "TaxMapping", new { id = item.RequestId }) ?? "#",
+                                            "PropertyAssessmentRequest" => Url.Action("Details", "PropertyAssessmentRequest", new { id = item.RequestId }) ?? "#",
+                                            "RequestForInspection" => Url.Action("Details", "RequestForInspection", new { id = item.RequestId }) ?? "#",
+                                            _ => "#"
+                                        };
+                                        bool isReleasingStage = (int)item.CurrentStage == 10 ||
+                                                                (int)item.CurrentStage == 19 ||
+                                                                (int)item.CurrentStage == 30 ||
+                                                                (item.CurrentStageName != null && item.CurrentStageName.Contains("Releas", StringComparison.OrdinalIgnoreCase));
 
-                                            <!-- Release Back to Pool -->
-                                            <form asp-action="Release" method="post" class="inline">
-                                                <input type="hidden" name="requestId" value="@item.RequestId" />
-                                                <input type="hidden" name="requestType" value="@item.RequestType" />
-                                                <input type="hidden" name="division" value="@item.Division" />
-                                                <button type="submit" class="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-slate-700 dark:text-stone-300 border border-slate-200 dark:border-stone-700" title="Release document back to Department Pool">
-                                                    <i data-lucide="arrow-left-right" class="w-3.5 h-3.5"></i>
-                                                </button>
-                                            </form>
-
-                                            <!-- Return / Defer Button -->
-                                            <button type="button" onclick="openDeferModal('@item.RequestId', '@item.RequestType', '@item.TrackingNumber', '@((int)item.Division)')" class="p-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800/60" title="Mark as Deferred / Returned for revision">
-                                                <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                                        <div class="relative inline-block text-left workflow-action-menu-wrapper">
+                                            <button type="button"
+                                                    onclick="toggleWorkflowActionMenu(this, event)"
+                                                    class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-slate-700 dark:text-stone-300 border border-slate-200 dark:border-stone-700 transition-colors"
+                                                    title="Actions"
+                                                    aria-haspopup="true"
+                                                    aria-expanded="false">
+                                                <i data-lucide="more-vertical" class="w-4 h-4"></i>
                                             </button>
 
-                                            <!-- Details Deep Link -->
-                                            @{
-                                                string detailsUrl = item.RequestType switch
+                                            <div class="workflow-action-dropdown hidden fixed z-50 w-64 rounded-2xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-700 shadow-xl py-1.5 text-left">
+                                                @if (isRegularStaff)
                                                 {
-                                                    "TaxDeclarationRequest" => Url.Action("Details", "TaxDeclarationRequest", new { id = item.RequestId }) ?? "#",
-                                                    "LandHoldingRequest" => Url.Action("Details", "LandHoldingRequest", new { id = item.RequestId }) ?? "#",
-                                                    "TaxMappingRequest" => Url.Action("Details", "TaxMapping", new { id = item.RequestId }) ?? "#",
-                                                    "PropertyAssessmentRequest" => Url.Action("Details", "PropertyAssessmentRequest", new { id = item.RequestId }) ?? "#",
-                                                    "RequestForInspection" => Url.Action("Details", "RequestForInspection", new { id = item.RequestId }) ?? "#",
-                                                    _ => "#"
-                                                };
-                                            }
-                                            <a href="@detailsUrl" class="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-slate-700 dark:text-stone-300 font-bold text-[10px] flex items-center gap-1 border border-slate-200 dark:border-stone-700" title="Open Document Details">
-                                                <i data-lucide="eye" class="w-3.5 h-3.5"></i>
-                                                Details
-                                            </a>
+                                                    <button type="button"
+                                                            onclick="closeAllWorkflowActionMenus(); openForwardModal('@item.RequestId', '@item.RequestType', '@item.TrackingNumber', '@((int)item.CurrentStage)', '@((int)item.Division)', '@(item.ORNumber ?? "")', '@(item.ORDateIssued?.ToString("yyyy-MM-dd") ?? "")')"
+                                                            class="w-full px-3.5 py-2 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 flex items-center gap-2.5 transition-colors">
+                                                        <i data-lucide="git-pull-request" class="w-4 h-4"></i>
+                                                        <span>Forward</span>
+                                                    </button>
+                                                }
+                                                else
+                                                {
+                                                    <button type="button"
+                                                            onclick="closeAllWorkflowActionMenus(); openTagForApprovalModal('@item.RequestId', '@item.RequestType', '@item.TrackingNumber', '@((int)item.Division)')"
+                                                            class="w-full px-3.5 py-2 text-xs font-semibold text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 flex items-center gap-2.5 transition-colors">
+                                                        <i data-lucide="stamp" class="w-4 h-4"></i>
+                                                        <span>Tag For Approval</span>
+                                                    </button>
+                                                }
+
+                                                @if (item.RequestType == "LandHoldingRequest" && isReleasingStage)
+                                                {
+                                                    @foreach (var certOpt in item.CertificatePrintOptions)
+                                                    {
+                                                        <a href="@Url.Action("PrintCertificate", "LandHoldingRequest", new { id = item.RequestId, reportId = certOpt.ReportId })"
+                                                           target="_blank"
+                                                           onclick="closeAllWorkflowActionMenus()"
+                                                           class="w-full px-3.5 py-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 flex items-center gap-2.5 transition-colors">
+                                                            <i data-lucide="printer" class="w-4 h-4 shrink-0"></i>
+                                                            <span>@certOpt.Label</span>
+                                                        </a>
+                                                    }
+                                                }
+
+                                                <a href="@detailsUrl"
+                                                   onclick="closeAllWorkflowActionMenus()"
+                                                   class="w-full px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-stone-200 hover:bg-slate-100 dark:hover:bg-stone-800 flex items-center gap-2.5 transition-colors">
+                                                    <i data-lucide="eye" class="w-4 h-4"></i>
+                                                    <span>Details</span>
+                                                </a>
+
+                                                <div class="my-1 border-t border-slate-100 dark:border-stone-800"></div>
+
+                                                <form asp-action="Release" method="post" class="block">
+                                                    <input type="hidden" name="requestId" value="@item.RequestId" />
+                                                    <input type="hidden" name="requestType" value="@item.RequestType" />
+                                                    <input type="hidden" name="division" value="@item.Division" />
+                                                    <button type="submit"
+                                                            class="w-full px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-stone-300 hover:bg-slate-100 dark:hover:bg-stone-800 flex items-center gap-2.5 transition-colors">
+                                                        <i data-lucide="arrow-left-right" class="w-4 h-4"></i>
+                                                        <span>Release to Pool</span>
+                                                    </button>
+                                                </form>
+
+                                                <button type="button"
+                                                        onclick="closeAllWorkflowActionMenus(); openDeferModal('@item.RequestId', '@item.RequestType', '@item.TrackingNumber', '@((int)item.Division)')"
+                                                        class="w-full px-3.5 py-2 text-xs font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20 flex items-center gap-2.5 transition-colors">
+                                                    <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                                                    <span>Return / Defer</span>
+                                                </button>
+                                            </div>
                                         </div>
                                     }
                                 </td>
@@ -724,6 +760,54 @@
         function closeTagForApprovalModal() {
             document.getElementById('tagForApprovalModal').classList.add('hidden');
         }
+
+        function closeAllWorkflowActionMenus() {
+            document.querySelectorAll('.workflow-action-dropdown').forEach(function (menu) {
+                menu.classList.add('hidden');
+            });
+            document.querySelectorAll('.workflow-action-menu-wrapper button[aria-expanded="true"]').forEach(function (btn) {
+                btn.setAttribute('aria-expanded', 'false');
+            });
+        }
+
+        function toggleWorkflowActionMenu(btn, event) {
+            event.stopPropagation();
+            var wrapper = btn.closest('.workflow-action-menu-wrapper');
+            var menu = wrapper ? wrapper.querySelector('.workflow-action-dropdown') : null;
+            if (!menu) return;
+
+            var isCurrentlyOpen = !menu.classList.contains('hidden');
+            closeAllWorkflowActionMenus();
+            if (isCurrentlyOpen) return;
+
+            menu.classList.remove('hidden');
+            btn.setAttribute('aria-expanded', 'true');
+
+            var rect = btn.getBoundingClientRect();
+            var menuRect = menu.getBoundingClientRect();
+            var top = rect.bottom + 6;
+            if (top + menuRect.height > window.innerHeight - 12) {
+                top = Math.max(12, rect.top - menuRect.height - 6);
+            }
+            var left = Math.max(12, rect.right - menuRect.width);
+
+            menu.style.top = top + 'px';
+            menu.style.left = left + 'px';
+        }
+
+        document.addEventListener('click', function (e) {
+            if (!e.target.closest('.workflow-action-menu-wrapper')) {
+                closeAllWorkflowActionMenus();
+            }
+        });
+
+        window.addEventListener('scroll', closeAllWorkflowActionMenus, true);
+        window.addEventListener('resize', closeAllWorkflowActionMenus);
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                closeAllWorkflowActionMenus();
+            }
+        });
 
         window.currentActiveDivisionId = '@(ViewBag.DivisionId ?? 0)';
 

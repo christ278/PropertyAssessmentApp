@@ -28,6 +28,13 @@ public class WorkflowQueueItemDto
     public string? LastRemarks { get; set; }
     public string? ORNumber { get; set; }
     public DateTime? ORDateIssued { get; set; }
+    public List<CertificatePrintOptionDto> CertificatePrintOptions { get; set; } = new();
+}
+
+public class CertificatePrintOptionDto
+{
+    public int ReportId { get; set; }
+    public string Label { get; set; } = string.Empty;
 }
 
 public class WorkflowDivisionStatsDto

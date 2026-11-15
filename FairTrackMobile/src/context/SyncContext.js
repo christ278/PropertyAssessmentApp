@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MobileApi } from '../api/mobileApi';
 import storageResetEpoch from '../constants/storageResetEpoch.json';
+import { downloadServerFileToMobile, ensurePayloadFilesHaveBase64 } from '../utils/fileStorage';
 
 export const SyncContext = createContext();
 
@@ -129,6 +130,7 @@ export const SyncProvider = ({ children }) => {
   const [cachedForms, setCachedForms] = useState({});
   const [downloadedForms, setDownloadedForms] = useState({});
   const [cachedTransactions, setCachedTransactions] = useState([]);
+  const [historyRecords, setHistoryRecords] = useState([]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState(null);
@@ -254,6 +256,18 @@ export const SyncProvider = ({ children }) => {
 
       const storedTime = await AsyncStorage.getItem('@fairtrack_last_sync');
       if (storedTime) setLastSyncTime(storedTime);
+
+      const storedHistory = await AsyncStorage.getItem('@fairtrack_history_records');
+      if (storedHistory) {
+        try {
+          const parsed = JSON.parse(storedHistory);
+          if (Array.isArray(parsed)) {
+            setHistoryRecords(parsed);
+          }
+        } catch (e) {
+          console.warn('Failed parsing @fairtrack_history_records:', e);
+        }
+      }
     } catch (err) {
       console.warn('Failed to load local sync queue:', err);
     }
@@ -288,16 +302,52 @@ export const SyncProvider = ({ children }) => {
 
   const saveQueue = async (newQueue) => {
     setSyncQueue(newQueue);
-    await AsyncStorage.setItem('@fairtrack_sync_queue', JSON.stringify(newQueue));
+    try {
+      await AsyncStorage.setItem('@fairtrack_sync_queue', JSON.stringify(newQueue));
+    } catch (err) {
+      console.warn('saveQueue storage warning:', err);
+    }
   };
 
   const saveDownloadedForms = async (newDownloads) => {
     setDownloadedForms(newDownloads);
-    await AsyncStorage.setItem('@fairtrack_downloaded_forms', JSON.stringify(newDownloads));
+    try {
+      await AsyncStorage.setItem('@fairtrack_downloaded_forms', JSON.stringify(newDownloads));
+    } catch (err) {
+      console.warn('saveDownloadedForms storage warning:', err);
+    }
     const downloadedList = Object.values(newDownloads)
       .map(d => d?.transItem ? normalizeTransactionItem(d.transItem) : null)
       .filter(item => item && isAllowedMobileTransaction(item));
     setCachedTransactions(downloadedList);
+  };
+
+  // Helper to physically download & cache all partition sketches and attachments to local storage
+  const cachePartitionFilesLocally = async (partitions, tracking) => {
+    if (!Array.isArray(partitions) || partitions.length === 0) return [];
+    return await Promise.all(partitions.map(async (p) => {
+      let updatedAtts = p.attachments || [];
+      if (Array.isArray(p.attachments)) {
+        updatedAtts = await Promise.all(p.attachments.map(async (a) => {
+          const url = a?.fileUrl || a?.FileUrl;
+          if (url && !url.startsWith('file:') && !url.startsWith('data:')) {
+            const local = await downloadServerFileToMobile(url, tracking, a?.fileName || a?.FileName, 'attachment');
+            return { ...a, fileUrl: local, FileUrl: local };
+          }
+          return a;
+        }));
+      }
+      let updatedSketch = p.sketchUrl;
+      if (p.sketchUrl && !p.sketchUrl.startsWith('file:') && !p.sketchUrl.startsWith('data:')) {
+        updatedSketch = await downloadServerFileToMobile(p.sketchUrl, tracking, p.sketchFileName || 'sketch.jpg', 'sketch');
+      }
+      return {
+        ...p,
+        attachments: updatedAtts,
+        sketchUrl: updatedSketch,
+        formData: p.formData ? withPascalCaseKeys(p.formData) : null
+      };
+    }));
   };
 
   // Download a single transaction form details (strictly Property Assessment & Field Inspection)
@@ -327,20 +377,38 @@ export const SyncProvider = ({ children }) => {
           };
         }
         const key = (transItem.TrackingNo || transItem.FormworkflowId).toString();
+        const tracking = transItem.TrackingNo || '';
+        const partitionsWithLocalFiles = await cachePartitionFilesLocally(res.partitions || [], tracking);
+
+        let rootSketch = res.sketchUrl;
+        if (rootSketch && !rootSketch.startsWith('file:') && !rootSketch.startsWith('data:')) {
+          rootSketch = await downloadServerFileToMobile(rootSketch, tracking, res.sketchFileName || 'sketch.jpg', 'sketch');
+        }
+        let rootAtts = res.attachments || [];
+        if (Array.isArray(rootAtts)) {
+          rootAtts = await Promise.all(rootAtts.map(async (a) => {
+            const url = a?.fileUrl || a?.FileUrl;
+            if (url && !url.startsWith('file:') && !url.startsWith('data:')) {
+              const local = await downloadServerFileToMobile(url, tracking, a?.fileName || a?.FileName, 'attachment');
+              return { ...a, fileUrl: local, FileUrl: local };
+            }
+            return a;
+          }));
+        }
+
         const updated = {
           ...downloadedForms,
           [key]: {
             ...res,
+            sketchUrl: rootSketch,
+            attachments: rootAtts,
             formData: res.formData ? withPascalCaseKeys(res.formData) : res.formData,
-            partitions: (res.partitions || []).map(p => ({
-              ...p,
-              formData: p.formData ? withPascalCaseKeys(p.formData) : null
-            })),
+            partitions: partitionsWithLocalFiles,
             transItem: {
               ...transItem,
               HasPartition: res.hasPartition,
               PartitionCount: res.partitionCount || (res.partitions?.length || 1),
-              Partitions: res.partitions || []
+              Partitions: partitionsWithLocalFiles
             },
             downloadedAt: new Date().toISOString()
           }
@@ -382,6 +450,89 @@ export const SyncProvider = ({ children }) => {
     }
   };
 
+  const updatePartitionAttachmentsLocally = async (trackingNo, formWorkflowId, partitionIndex, newAttachments, newSketchUrl) => {
+    if (!downloadedForms || Object.keys(downloadedForms).length === 0) return;
+    try {
+      const tracking = (trackingNo || '').toString().trim().toLowerCase();
+      const wfId = formWorkflowId != null ? formWorkflowId.toString().trim() : '';
+
+      let dKey = null;
+      if (tracking && downloadedForms[tracking]) dKey = tracking;
+      else if (wfId && downloadedForms[wfId]) dKey = wfId;
+      else {
+        dKey = Object.keys(downloadedForms).find(k =>
+          (tracking && k.toLowerCase() === tracking) ||
+          (wfId && k.toString() === wfId)
+        );
+      }
+
+      if (!dKey) {
+        dKey = (trackingNo || formWorkflowId || `record_${Date.now()}`).toString();
+      }
+
+      const itemRecord = (downloadedForms && downloadedForms[dKey])
+        ? { ...downloadedForms[dKey] }
+        : {
+            trackingNo: trackingNo || '',
+            formWorkflowId: formWorkflowId || null,
+            partitions: []
+          };
+
+      const partIdx = typeof partitionIndex === 'number' ? partitionIndex : (parseInt(partitionIndex, 10) || 0);
+      const updatedPartitions = Array.isArray(itemRecord.partitions) ? [...itemRecord.partitions] : [];
+      while (updatedPartitions.length <= partIdx) {
+        updatedPartitions.push({});
+      }
+      const existingPart = { ...(updatedPartitions[partIdx] || {}) };
+
+        if (Array.isArray(newAttachments)) {
+          existingPart.attachments = newAttachments;
+          if (existingPart.formData?.TDN) {
+            existingPart.formData.TDN.Attachments = newAttachments;
+          }
+        }
+        if (newSketchUrl !== undefined) {
+          existingPart.sketchUrl = newSketchUrl;
+          if (existingPart.formData?.TDN) {
+            existingPart.formData.TDN.FloorPlanSketchPath = newSketchUrl;
+          }
+        }
+
+        updatedPartitions[partIdx] = existingPart;
+        itemRecord.partitions = updatedPartitions;
+
+        if (partIdx === 0) {
+          itemRecord.currentPartition = existingPart;
+          if (Array.isArray(newAttachments)) itemRecord.attachments = newAttachments;
+          if (newSketchUrl !== undefined) itemRecord.sketchUrl = newSketchUrl;
+        }
+
+        const nextForms = { ...downloadedForms, [dKey]: itemRecord };
+        setDownloadedForms(nextForms);
+        try {
+          await AsyncStorage.setItem('@fairtrack_downloaded_forms', JSON.stringify(nextForms));
+        } catch (storageErr) {
+          console.warn('AsyncStorage setItem quota reached, saving lightweight metadata copy:', storageErr);
+          const lightweightForms = JSON.parse(JSON.stringify(nextForms));
+          for (const key of Object.keys(lightweightForms)) {
+            const form = lightweightForms[key];
+            if (form?.partitions) {
+              for (const part of form.partitions) {
+                if (part.attachments) {
+                  part.attachments = part.attachments.map(a => ({ ...a, base64Data: null }));
+                }
+              }
+            }
+          }
+          try {
+            await AsyncStorage.setItem('@fairtrack_downloaded_forms', JSON.stringify(lightweightForms));
+          } catch (e2) {}
+        }
+    } catch (e) {
+      console.warn('updatePartitionAttachmentsLocally error:', e);
+    }
+  };
+
   const updateDownloadedFormWithPayload = async (trackingNo, formWorkflowId, payload) => {
     if (!payload || !downloadedForms || Object.keys(downloadedForms).length === 0) return;
     try {
@@ -403,37 +554,138 @@ export const SyncProvider = ({ children }) => {
       const itemRecord = { ...downloadedForms[dKey] };
       const tdn = payload.TDN || payload.tdn;
       const partIdx = tdn?.PartitionItemIndex != null ? parseInt(tdn.PartitionItemIndex, 10) : 0;
+      const tdnBldg = payload.CAST_TDNBuildingDTO || payload.cast_TDNBuildingDTO || payload.TDNBuilding || payload.tdnBuilding || {};
+      const tdnLand = payload.TDNLand || payload.tdnLand || {};
 
-      const cp = itemRecord.currentPartition ? { ...itemRecord.currentPartition } : {};
-      if (tdn?.LotNo) { cp.lotNo = tdn.LotNo; cp.lotNumber = tdn.LotNo; }
-      if (tdn?.BlockNo) { cp.blockNo = tdn.BlockNo; cp.blockNumber = tdn.BlockNo; }
-      if (tdn?.SurveyNo) { cp.surveyNo = tdn.SurveyNo; cp.surveyNumber = tdn.SurveyNo; }
-      if (tdn?.CadastralSurveyNo) cp.cadastralSurveyNo = tdn.CadastralSurveyNo;
-      if (tdn?.SectionNo) cp.sectionNo = tdn.SectionNo;
-      if (tdn?.ParcelNo) cp.parcelNo = tdn.ParcelNo;
-      if (tdn?.PropLocationStreet) { cp.streetLocation = tdn.PropLocationStreet; cp.streetNo = tdn.PropLocationStreet; }
-      if (tdn?.Location) cp.location = tdn.Location;
-      if (tdn?.Purok) cp.purok = tdn.Purok;
-      if (tdn?.DistrictOrBarangay) cp.districtOrBarangay = tdn.DistrictOrBarangay;
-      if (tdn?.CityMunicipality) cp.cityMunicipality = tdn.CityMunicipality;
-      if (tdn?.Province) cp.province = tdn.Province;
-      if (tdn?.DisplayName) cp.owner = tdn.DisplayName;
-      if (tdn?.OwnerAddress) cp.ownerAddress = tdn.OwnerAddress;
-      if (tdn?.OwnerTIN) cp.ownerTin = tdn.OwnerTIN;
-      if (tdn?.TotalArea) cp.area = tdn.TotalArea;
-      if (tdn?.TotalMarketValue) cp.marketValue = tdn.TotalMarketValue;
-      if (tdn?.TotalAssessedValue) cp.assessedValue = tdn.TotalAssessedValue;
-      itemRecord.currentPartition = cp;
+      const pascalPayload = withPascalCaseKeys(payload);
 
       if (Array.isArray(itemRecord.partitions) && itemRecord.partitions.length > partIdx) {
         const updatedPartitions = [...itemRecord.partitions];
-        updatedPartitions[partIdx] = {
-          ...updatedPartitions[partIdx],
-          ...cp
-        };
-        itemRecord.partitions = updatedPartitions;
-      }
+        const existingPart = { ...(updatedPartitions[partIdx] || {}) };
 
+        // Title, Cadastral & Registration
+        if (tdn?.LotNo !== undefined) { existingPart.lotNo = tdn.LotNo; existingPart.lotNumber = tdn.LotNo; }
+        if (tdn?.BlockNo !== undefined) { existingPart.blockNo = tdn.BlockNo; existingPart.blockNumber = tdn.BlockNo; }
+        if (tdn?.SurveyNo !== undefined) { existingPart.surveyNo = tdn.SurveyNo; existingPart.surveyNumber = tdn.SurveyNo; }
+        if (tdn?.CadastralSurveyNo !== undefined) existingPart.cadastralSurveyNo = tdn.CadastralSurveyNo;
+        if (tdn?.SectionNo !== undefined) existingPart.sectionNo = tdn.SectionNo;
+        if (tdn?.ParcelNo !== undefined) existingPart.parcelNo = tdn.ParcelNo;
+        if (tdn?.TitleNo !== undefined || tdn?.TCTNo !== undefined) {
+          existingPart.titleNo = tdn.TitleNo || tdn.TCTNo || '';
+          existingPart.tctNo = tdn.TitleNo || tdn.TCTNo || '';
+        }
+        if (tdn?.DateRegistered !== undefined || tdn?.TCTDate !== undefined) {
+          existingPart.dateRegistered = tdn.DateRegistered || tdn.TCTDate || '';
+          existingPart.tctDate = tdn.DateRegistered || tdn.TCTDate || '';
+        }
+        if (tdn?.RegistrationStatus) existingPart.registrationStatus = tdn.RegistrationStatus;
+        if (tdn?.TitleType) existingPart.titleType = tdn.TitleType;
+        if (tdn?.TransactionCode) existingPart.transactionCode = tdn.TransactionCode;
+
+        // Location
+        if (tdn?.PropLocationStreet || tdn?.Location) {
+          existingPart.streetLocation = tdn.PropLocationStreet || tdn.Location;
+          existingPart.streetNo = tdn.PropLocationStreet || tdn.Location;
+          existingPart.buildingNo = tdn.PropLocationStreet || tdn.Location;
+        }
+        if (tdn?.Location) existingPart.location = tdn.Location;
+        if (tdn?.Purok !== undefined) existingPart.purok = tdn.Purok;
+        if (tdn?.DistrictOrBarangay) existingPart.districtOrBarangay = tdn.DistrictOrBarangay;
+        if (tdn?.CityMunicipality) existingPart.cityMunicipality = tdn.CityMunicipality;
+        if (tdn?.Province) existingPart.province = tdn.Province;
+
+        // Owner & Declarant
+        if (tdn?.DisplayName) { existingPart.owner = tdn.DisplayName; existingPart.ownerName = tdn.DisplayName; existingPart.newOwnerName = tdn.DisplayName; }
+        if (tdn?.OwnerAddress !== undefined) existingPart.ownerAddress = tdn.OwnerAddress;
+        if (tdn?.OwnerTIN !== undefined) existingPart.ownerTin = tdn.OwnerTIN;
+        if (tdn?.OwnerContactNo !== undefined) existingPart.ownerContactNo = tdn.OwnerContactNo;
+        if (tdn?.OwnerEmail !== undefined) existingPart.ownerEmail = tdn.OwnerEmail;
+        if (tdn?.OwnerGender) existingPart.ownerGender = tdn.OwnerGender;
+        if (tdn?.OwnerCivilStatus) existingPart.ownerCivilStatus = tdn.OwnerCivilStatus;
+
+        // Administrator, Beneficial User, Possessor
+        existingPart.isAdministrator = !!tdn?.IsAdministrator;
+        existingPart.isBeneficialUser = !!tdn?.IsBeneficialUser;
+        existingPart.isPossessor = !!tdn?.IsPossessor;
+        existingPart.administratorName = tdn?.AdministratorName || tdn?.PropAdminName || '';
+        existingPart.propAdminName = tdn?.AdministratorName || tdn?.PropAdminName || '';
+        existingPart.administratorAddress = tdn?.AdministratorAddress || tdn?.PropAdminAddress || '';
+        existingPart.propAdminAddress = tdn?.AdministratorAddress || tdn?.PropAdminAddress || '';
+        existingPart.administratorContactNo = tdn?.AdministratorContactNo || tdn?.PropAdminContactNo || '';
+        existingPart.propAdminContactNo = tdn?.AdministratorContactNo || tdn?.PropAdminContactNo || '';
+        existingPart.administratorTin = tdn?.AdministratorTin || '';
+        existingPart.administratorEmail = tdn?.AdministratorEmail || '';
+        existingPart.administratorGender = tdn?.AdministratorGender || 'Male';
+        existingPart.administratorCivilStatus = tdn?.AdministratorCivilStatus || 'Single';
+
+        // Valuation & Effectivity
+        if (tdn?.TotalArea != null) existingPart.area = tdn.TotalArea;
+        if (tdn?.TotalMarketValue != null) existingPart.marketValue = tdn.TotalMarketValue;
+        if (tdn?.TotalAssessedValue != null) existingPart.assessedValue = tdn.TotalAssessedValue;
+        if (tdn?.Classification) existingPart.classification = tdn.Classification;
+        if (tdn?.ActualUse) existingPart.actualUse = tdn.ActualUse;
+        if (tdn?.UnitValue != null) existingPart.unitValue = tdn.UnitValue;
+        if (tdn?.AssessmentLevelPercent != null) existingPart.assessmentLevelPercent = tdn.AssessmentLevelPercent;
+        if (tdn?.FloorPlanSketchPath !== undefined) existingPart.sketchUrl = tdn.FloorPlanSketchPath;
+        if (tdn?.Attachments && Array.isArray(tdn.Attachments)) existingPart.attachments = tdn.Attachments;
+
+        // Effectivity & Notes
+        if (tdn?.QuarterEffectivity != null) {
+          existingPart.quarterEffectivity = typeof tdn.QuarterEffectivity === 'number'
+            ? `${tdn.QuarterEffectivity}${tdn.QuarterEffectivity === 1 ? 'st' : tdn.QuarterEffectivity === 2 ? 'nd' : tdn.QuarterEffectivity === 3 ? 'rd' : 'th'} Quarter`
+            : tdn.QuarterEffectivity;
+        }
+        if (tdn?.YearEffectivity != null) existingPart.yearEffectivity = tdn.YearEffectivity.toString();
+        if (tdn?.Taxability !== undefined) existingPart.taxability = tdn.Taxability ? 'Taxable' : 'Exempt';
+        if (tdn?.AssessmentBasis) existingPart.assessmentBasis = tdn.AssessmentBasis;
+        if (tdn?.BackTaxesYearFrom != null) existingPart.backTaxesYearFrom = tdn.BackTaxesYearFrom;
+        if (tdn?.BackTaxesYearTo != null) existingPart.backTaxesYearTo = tdn.BackTaxesYearTo;
+        if (tdn?.Memoranda !== undefined) existingPart.memoranda = tdn.Memoranda;
+
+        // Land boundaries & schedules
+        if (tdnLand.NorthBoundary !== undefined) existingPart.boundaryNorth = tdnLand.NorthBoundary;
+        if (tdnLand.Nremarks !== undefined) existingPart.nremarks = tdnLand.Nremarks;
+        if (tdnLand.SouthBoundary !== undefined) existingPart.boundarySouth = tdnLand.SouthBoundary;
+        if (tdnLand.Sremarks !== undefined) existingPart.sremarks = tdnLand.Sremarks;
+        if (tdnLand.EastBoundary !== undefined) existingPart.boundaryEast = tdnLand.EastBoundary;
+        if (tdnLand.Eremarks !== undefined) existingPart.eremarks = tdnLand.Eremarks;
+        if (tdnLand.WestBoundary !== undefined) existingPart.boundaryWest = tdnLand.WestBoundary;
+        if (tdnLand.Wremarks !== undefined) existingPart.wremarks = tdnLand.Wremarks;
+        if (tdn?.LandAppraisalDetailsJson || tdnLand.LandAppraisalDetailsJson) {
+          existingPart.landAppraisalDetailsJson = tdn?.LandAppraisalDetailsJson || tdnLand.LandAppraisalDetailsJson;
+        }
+        if (tdn?.LandImprovementsJson || tdnLand.LandImprovementsJson) {
+          existingPart.landImprovementsJson = tdn?.LandImprovementsJson || tdnLand.LandImprovementsJson;
+        }
+        if (tdn?.LandAdjustmentsJson || tdnLand.LandAdjustmentsJson) {
+          existingPart.landAdjustmentsJson = tdn?.LandAdjustmentsJson || tdnLand.LandAdjustmentsJson;
+        }
+        if (tdn?.LandPropertyAssessmentsJson || tdnLand.LandPropertyAssessmentsJson) {
+          existingPart.landPropertyAssessmentsJson = tdn?.LandPropertyAssessmentsJson || tdnLand.LandPropertyAssessmentsJson;
+        }
+
+        // Building specifics
+        if (tdnBldg.StucturalType || tdnBldg.StructuralType) existingPart.structuralType = tdnBldg.StucturalType || tdnBldg.StructuralType;
+        if (tdnBldg.BuildingClassification) existingPart.buildingClassification = tdnBldg.BuildingClassification;
+        if (tdnBldg.TotalbldgArea || tdnBldg.TotalFloorArea) {
+          existingPart.areaSqMeters = tdnBldg.TotalbldgArea || tdnBldg.TotalFloorArea;
+          existingPart.area = tdnBldg.TotalbldgArea || tdnBldg.TotalFloorArea;
+        }
+        if (tdnBldg.TotalMarketVal) existingPart.marketValue = tdnBldg.TotalMarketVal;
+        if (tdnBldg.TotalAssessedVal) existingPart.assessedValue = tdnBldg.TotalAssessedVal;
+
+        existingPart.formData = pascalPayload;
+        updatedPartitions[partIdx] = existingPart;
+        itemRecord.partitions = updatedPartitions;
+
+        if (partIdx === 0) {
+          itemRecord.currentPartition = existingPart;
+          itemRecord.formData = pascalPayload;
+        } else if (itemRecord.selectedPartitionIndex === partIdx) {
+          itemRecord.currentPartition = existingPart;
+          itemRecord.formData = pascalPayload;
+        }
+      }
       if (tdn?.DisplayName) itemRecord.owner = tdn.DisplayName;
 
       const newDownloads = { ...downloadedForms, [dKey]: itemRecord };
@@ -443,11 +695,204 @@ export const SyncProvider = ({ children }) => {
     }
   };
 
-  // Mark transaction synced: clears pending syncQueue items, and if transferred, removes from downloadedForms
+  // =========================================================================
+  // PERMANENT LOCAL HISTORY STORE (@fairtrack_history_records)
+  // Preserves offline drafts, live syncs, and completed/transferred appraisals
+  // =========================================================================
+  const saveToHistory = async (payload, options = {}) => {
+    try {
+      if (!payload && !options.transItem) return;
+      const tdn = payload?.TDN || payload?.tdn || {};
+      const tdnLand = payload?.TDNLand || payload?.tdnLand || {};
+      const tdnBldg = payload?.TDNBuilding || payload?.tdnBuilding || {};
+      const tdnMach = payload?.TDNMachinery || payload?.tdnMachinery || {};
+
+      const trackingNo = (
+        options.trackingNo ||
+        tdn.TrackingNo ||
+        tdn.trackingNo ||
+        payload?.TrackingNo ||
+        payload?.trackingNo ||
+        options.transItem?.TrackingNo ||
+        ''
+      ).toString().trim();
+
+      const formWorkflowId =
+        options.formWorkflowId != null
+          ? options.formWorkflowId
+          : (tdn.FormWorkflowId ?? tdn.formWorkflowId ?? payload?.FormWorkflowId ?? payload?.formWorkflowId ?? options.transItem?.FormworkflowId);
+
+      const partitionIndex = parseInt(
+        options.partitionIndex ?? tdn.PartitionItemIndex ?? payload?.partitionIndex ?? 0,
+        10
+      ) || 0;
+
+      const partitionLetter =
+        options.partitionLetter ||
+        tdn.PartitionItemLetter ||
+        tdn.PartitionIndex ||
+        payload?.partitionLetter ||
+        payload?.partitionIndexLetter ||
+        String.fromCharCode(65 + partitionIndex);
+
+      let propertyKind = options.propertyKind;
+      if (!propertyKind) {
+        if (tdnLand && (tdnLand.CadastralSurveyNo || tdnLand.NorthBoundary || tdnLand.LandAppraisalDetailsJson || tdnLand.TDNLandId)) propertyKind = 'Land';
+        else if (tdnBldg && (tdnBldg.BuildingClassification || tdnBldg.StructuralType || tdnBldg.TotalFloorArea || tdnBldg.BuildingFloorsJson || tdnBldg.TDNBuildingId)) propertyKind = 'Building';
+        else if (tdnMach && (tdnMach.AppraisalDetailsJson || tdnMach.PropertyAssessmentsJson || tdnMach.TDNMachineId)) propertyKind = 'Machinery';
+        else if (options.transItem?.PropertyType) propertyKind = options.transItem.PropertyType;
+        else if (options.type) {
+          if (options.type.includes('LAND')) propertyKind = 'Land';
+          else if (options.type.includes('BUILDING')) propertyKind = 'Building';
+          else if (options.type.includes('MACHINERY')) propertyKind = 'Machinery';
+        }
+        if (!propertyKind) propertyKind = 'Property';
+      }
+
+      let marketValue = 0;
+      let assessedValue = 0;
+      if (tdn.TotalMarketValue != null) marketValue = parseFloat(tdn.TotalMarketValue) || 0;
+      else if (tdnLand.TotalMarketValue != null) marketValue = parseFloat(tdnLand.TotalMarketValue) || 0;
+      else if (tdnBldg.TotalMarketValue != null) marketValue = parseFloat(tdnBldg.TotalMarketValue) || 0;
+      else if (tdnMach.TotalMarketValue != null) marketValue = parseFloat(tdnMach.TotalMarketValue) || 0;
+
+      if (tdn.TotalAssessedValue != null) assessedValue = parseFloat(tdn.TotalAssessedValue) || 0;
+      else if (tdnLand.TotalAssessedValue != null) assessedValue = parseFloat(tdnLand.TotalAssessedValue) || 0;
+      else if (tdnBldg.TotalAssessedValue != null) assessedValue = parseFloat(tdnBldg.TotalAssessedValue) || 0;
+      else if (tdnMach.TotalAssessedValue != null) assessedValue = parseFloat(tdnMach.TotalAssessedValue) || 0;
+
+      const ownerName =
+        tdn.DisplayName ||
+        tdn.OwnerName ||
+        payload?.ownerName ||
+        options.transItem?.OwnerName ||
+        options.ownerName ||
+        'Unknown Owner';
+
+      const arpNo = tdn.ARPNo || tdn.ArpNo || payload?.arpNo || options.transItem?.ArpNo || 'N/A';
+      const pin = tdn.PIN || tdn.Pin || payload?.pin || options.transItem?.PIN || 'N/A';
+      const declarationNo = tdn.DeclarationNo || tdn.SystemGeneratedTDN || tdn.declarationNo || 'N/A';
+      const barangay = tdn.DistrictOrBarangay || tdn.Barangay || options.transItem?.Barangay || '';
+      const cityMunicipality = tdn.CityMunicipality || options.transItem?.CityMunicipality || 'Koronadal City';
+      const province = tdn.Province || options.transItem?.Province || 'South Cotabato';
+      const streetLocation = tdn.PropLocationStreet || tdn.Location || '';
+      const attachments = Array.isArray(tdn.Attachments) ? tdn.Attachments : (payload?.attachments || []);
+      const sketchUrl = tdn.FloorPlanSketchPath || payload?.sketchUrl || null;
+
+      const recordKey = `${(trackingNo || formWorkflowId || 'TX').toLowerCase()}_part_${partitionIndex}`;
+      const nowIso = new Date().toISOString();
+
+      const newRecord = {
+        id: `${trackingNo || 'TX'}_${partitionLetter}_${Date.now()}`,
+        recordKey,
+        trackingNo,
+        formWorkflowId,
+        propertyKind,
+        partitionIndex,
+        partitionLetter,
+        declarationNo,
+        ownerName,
+        arpNo,
+        pin,
+        barangay,
+        cityMunicipality,
+        province,
+        streetLocation,
+        marketValue,
+        assessedValue,
+        actionType: options.actionType || 'SYNCED', // 'TRANSFERRED' | 'SYNCED' | 'DRAFT' | 'DRAFT_TRANSFER'
+        statusLabel: options.statusLabel || (options.actionType === 'TRANSFERRED' ? 'Transferred to Assessor Review' : 'Synced to Office Web Portal'),
+        savedAt: nowIso,
+        attachmentsCount: attachments.length,
+        sketchUrl,
+        payload,
+        transItem: options.transItem || {
+          TrackingNo: trackingNo,
+          FormworkflowId: formWorkflowId,
+          OwnerName: ownerName,
+          Barangay: barangay,
+          PropertyType: propertyKind,
+          Status: options.statusLabel || 'Completed Field Assessment',
+          HasPartition: true,
+          PartitionCount: 1
+        }
+      };
+
+      setHistoryRecords(prev => {
+        const filtered = prev.filter(r => r.recordKey !== recordKey);
+        const updated = [newRecord, ...filtered];
+        AsyncStorage.setItem('@fairtrack_history_records', JSON.stringify(updated)).catch(e => {
+          console.warn('Failed to persist history records', e);
+        });
+        return updated;
+      });
+
+      return newRecord;
+    } catch (err) {
+      console.warn('saveToHistory error:', err);
+    }
+  };
+
+  const removeHistoryRecord = async (recordIdOrKey) => {
+    try {
+      const updated = historyRecords.filter(r => r.id !== recordIdOrKey && r.recordKey !== recordIdOrKey);
+      setHistoryRecords(updated);
+      await AsyncStorage.setItem('@fairtrack_history_records', JSON.stringify(updated));
+      return { success: true };
+    } catch (e) {
+      return { success: false, message: e?.message };
+    }
+  };
+
+  const clearHistoryRecords = async () => {
+    try {
+      setHistoryRecords([]);
+      await AsyncStorage.removeItem('@fairtrack_history_records');
+      return { success: true };
+    } catch (e) {
+      return { success: false, message: e?.message };
+    }
+  };
+
+  // Mark transaction synced: clears pending syncQueue items, saves to History, and if transferred, removes from downloadedForms
   const markTransactionSynced = async (trackingNo, formWorkflowId, isTransferred = false, payload = null) => {
     try {
       const cleanTrack = (trackingNo || '').toString().trim().toLowerCase();
       const cleanWf = formWorkflowId != null ? formWorkflowId.toString().trim() : '';
+
+      // Find existing downloaded record before removing if payload was not provided
+      let effectivePayload = payload;
+      let existingDownloaded = null;
+      if (downloadedForms) {
+        if (trackingNo && downloadedForms[trackingNo]) existingDownloaded = downloadedForms[trackingNo];
+        else if (formWorkflowId && downloadedForms[formWorkflowId.toString()]) existingDownloaded = downloadedForms[formWorkflowId.toString()];
+        else {
+          for (const [k, item] of Object.entries(downloadedForms)) {
+            const keyLower = k.toLowerCase();
+            const itemTNo = (item?.transItem?.TrackingNo || item?.trackingNo || '').toString().trim().toLowerCase();
+            const itemWfId = (item?.transItem?.FormworkflowId || item?.formWorkflowId || '').toString().trim();
+            if ((cleanTrack && (keyLower === cleanTrack || itemTNo === cleanTrack)) || (cleanWf && (k === cleanWf || itemWfId === cleanWf))) {
+              existingDownloaded = item;
+              break;
+            }
+          }
+        }
+      }
+
+      if (!effectivePayload && existingDownloaded) {
+        effectivePayload = existingDownloaded.formData || existingDownloaded;
+      }
+
+      // Save permanently to History before purging
+      if (effectivePayload || existingDownloaded) {
+        await saveToHistory(effectivePayload, {
+          trackingNo,
+          formWorkflowId,
+          actionType: isTransferred ? 'TRANSFERRED' : 'SYNCED',
+          statusLabel: isTransferred ? 'Transferred to Assessor Review' : 'Synced to Office Web Portal',
+          transItem: existingDownloaded?.transItem || null
+        });
+      }
 
       // 1. Remove from syncQueue
       const filteredQueue = syncQueue.filter(item => {
@@ -469,7 +914,7 @@ export const SyncProvider = ({ children }) => {
         await updateDownloadedFormWithPayload(trackingNo, formWorkflowId, payload);
       }
     } catch (e) {
-      // Handled silently
+      console.warn('markTransactionSynced error:', e);
     }
   };
 
@@ -538,18 +983,36 @@ export const SyncProvider = ({ children }) => {
         const res = await MobileApi.downloadTransactionDetails(item.FormworkflowId, item.TrackingNo);
         if (res && res.success && res.hasPartition) {
           const key = (item.TrackingNo || item.FormworkflowId).toString();
+          const tracking = item.TrackingNo || '';
+          const partitionsWithLocalFiles = await cachePartitionFilesLocally(res.partitions || [], tracking);
+
+          let rootSketch = res.sketchUrl;
+          if (rootSketch && !rootSketch.startsWith('file:') && !rootSketch.startsWith('data:')) {
+            rootSketch = await downloadServerFileToMobile(rootSketch, tracking, res.sketchFileName || 'sketch.jpg', 'sketch');
+          }
+          let rootAtts = res.attachments || [];
+          if (Array.isArray(rootAtts)) {
+            rootAtts = await Promise.all(rootAtts.map(async (a) => {
+              const url = a?.fileUrl || a?.FileUrl;
+              if (url && !url.startsWith('file:') && !url.startsWith('data:')) {
+                const local = await downloadServerFileToMobile(url, tracking, a?.fileName || a?.FileName, 'attachment');
+                return { ...a, fileUrl: local, FileUrl: local };
+              }
+              return a;
+            }));
+          }
+
           currentDownloads[key] = {
             ...res,
+            sketchUrl: rootSketch,
+            attachments: rootAtts,
             formData: res.formData ? withPascalCaseKeys(res.formData) : res.formData,
-            partitions: (res.partitions || []).map(p => ({
-              ...p,
-              formData: p.formData ? withPascalCaseKeys(p.formData) : null
-            })),
+            partitions: partitionsWithLocalFiles,
             transItem: {
               ...item,
               HasPartition: res.hasPartition,
               PartitionCount: res.partitionCount || (res.partitions?.length || 1),
-              Partitions: res.partitions || []
+              Partitions: partitionsWithLocalFiles
             },
             downloadedAt: new Date().toISOString()
           };
@@ -642,11 +1105,107 @@ export const SyncProvider = ({ children }) => {
       }
     }
 
-    if (!found && !pendingDraft) return null;
+    if (!found && !pendingDraft) {
+      if (historyRecords && historyRecords.length > 0) {
+        const histMatch = historyRecords.find(h => {
+          const hTrack = (h.trackingNo || '').toString().trim().toLowerCase();
+          const hWf = (h.formWorkflowId || '').toString().trim();
+          const hIdx = parseInt(h.partitionIndex ?? 0, 10) || 0;
+          const trackMatches = tNo && hTrack && tNo === hTrack;
+          const wfMatches = wfId && hWf && wfId === hWf;
+          return (trackMatches || wfMatches) && hIdx === targetIdx;
+        }) || historyRecords.find(h => {
+          const hTrack = (h.trackingNo || '').toString().trim().toLowerCase();
+          const hWf = (h.formWorkflowId || '').toString().trim();
+          const trackMatches = tNo && hTrack && tNo === hTrack;
+          const wfMatches = wfId && hWf && wfId === hWf;
+          return trackMatches || wfMatches;
+        });
+
+        if (histMatch) {
+          const histPayload = histMatch.payload ? withPascalCaseKeys(histMatch.payload) : {};
+          const tdn = histPayload?.TDN || histPayload?.tdn || {};
+          const tdnLand = histPayload?.TDNLand || histPayload?.tdnLand || {};
+          const tdnBldg = histPayload?.TDNBuilding || histPayload?.tdnBuilding || {};
+          const tdnMach = histPayload?.TDNMachinery || histPayload?.tdnMachinery || {};
+
+          return {
+            trackingNo: histMatch.trackingNo,
+            formWorkflowId: histMatch.formWorkflowId,
+            owner: histMatch.ownerName,
+            arpNo: histMatch.arpNo,
+            pin: histMatch.pin,
+            tdnId: tdn?.TDNId || tdn?.tdnId,
+            sketchUrl: histMatch.sketchUrl || tdn?.FloorPlanSketchPath,
+            attachments: tdn?.Attachments || histPayload?.attachments || [],
+            isHistorySnapshot: true,
+            historyActionType: histMatch.actionType,
+            historySavedAt: histMatch.savedAt,
+            transItem: histMatch.transItem || {
+              TrackingNo: histMatch.trackingNo,
+              FormworkflowId: histMatch.formWorkflowId,
+              OwnerName: histMatch.ownerName,
+              Barangay: histMatch.barangay,
+              PropertyType: histMatch.propertyKind,
+              Status: histMatch.statusLabel,
+              HasPartition: true,
+              PartitionCount: 1
+            },
+            formData: histPayload,
+            currentPartition: {
+              partitionLetter: histMatch.partitionLetter || 'A',
+              systemGeneratedTDN: tdn?.SystemGeneratedTDN || tdn?.DeclarationNo || histMatch.declarationNo || '',
+              arpNo: histMatch.arpNo,
+              pin: histMatch.pin,
+              ownerName: histMatch.ownerName,
+              ownerAddress: tdn?.OwnerAddress,
+              ownerTin: tdn?.OwnerTIN || tdn?.OwnerTin,
+              ownerContactNo: tdn?.OwnerContactNo,
+              ownerEmail: tdn?.OwnerEmail,
+              ownerGender: tdn?.OwnerGender || 'Male',
+              districtOrBarangay: histMatch.barangay,
+              cityMunicipality: histMatch.cityMunicipality,
+              province: histMatch.province,
+              streetLocation: histMatch.streetLocation,
+              sketchUrl: histMatch.sketchUrl || tdn?.FloorPlanSketchPath,
+              attachments: tdn?.Attachments || histPayload?.attachments || [],
+              boundaryNorth: tdnLand?.NorthBoundary,
+              nremarks: tdnLand?.Nremarks,
+              boundarySouth: tdnLand?.SouthBoundary,
+              sremarks: tdnLand?.Sremarks,
+              boundaryEast: tdnLand?.EastBoundary,
+              eremarks: tdnLand?.Eremarks,
+              boundaryWest: tdnLand?.WestBoundary,
+              wremarks: tdnLand?.Wremarks,
+              landAppraisalDetailsJson: tdn?.LandAppraisalDetailsJson || tdnLand?.LandAppraisalDetailsJson,
+              landImprovementsJson: tdn?.LandImprovementsJson || tdnLand?.LandImprovementsJson,
+              landAdjustmentsJson: tdn?.LandAdjustmentsJson || tdnLand?.LandAdjustmentsJson,
+              landPropertyAssessmentsJson: tdn?.LandPropertyAssessmentsJson || tdnLand?.LandPropertyAssessmentsJson,
+              buildingType: tdnBldg?.BuildingClassification || tdnBldg?.BuildingType,
+              structuralType: tdnBldg?.StucturalType || tdnBldg?.StructuralType,
+              areaSqMeters: tdnBldg?.TotalbldgArea || tdnBldg?.TotalFloorArea,
+              buildingFloorsJson: tdnBldg?.BuildingFloorsJson,
+              additionalItemsJson: tdnBldg?.AdditionalItemsJson,
+              machineryAppraisalDetailsJson: tdn?.MachineryAppraisalDetailsJson || tdnMach?.MachineryAppraisalDetailsJson || tdn?.AppraisalDetailsJson || tdnMach?.AppraisalDetailsJson,
+              machineryPropertyAssessmentsJson: tdn?.MachineryPropertyAssessmentsJson || tdnMach?.MachineryPropertyAssessmentsJson || tdn?.PropertyAssessmentsJson || tdnMach?.PropertyAssessmentsJson,
+              formData: histPayload
+            },
+            partitions: [
+              {
+                partitionLetter: histMatch.partitionLetter || 'A',
+                formData: histPayload
+              }
+            ]
+          };
+        }
+      }
+      return null;
+    }
 
     if (found && Array.isArray(found.partitions) && found.partitions.length > targetIdx && found.partitions[targetIdx]) {
       const partObj = { ...found.partitions[targetIdx] };
-      let partFormData = partObj.formData ? withPascalCaseKeys(partObj.formData) : (found.formData ? withPascalCaseKeys(found.formData) : null);
+      // Strict isolation: partition must only use its own formData, never cross-pollinate from another partition
+      let partFormData = partObj.formData ? withPascalCaseKeys(partObj.formData) : null;
 
       // If an unsynced draft exists in syncQueue, overlay it into partFormData and partObj!
       if (pendingDraft) {
@@ -655,6 +1214,25 @@ export const SyncProvider = ({ children }) => {
         const tdn = draftPascal?.TDN || draftPascal?.tdn || {};
         const tdnLand = draftPascal?.TDNLand || draftPascal?.tdnLand || {};
         const tdnBldg = draftPascal?.TDNBuilding || draftPascal?.tdnBuilding || {};
+
+        // Title, Cadastral & Registration overrides
+        if (tdn.LotNo !== undefined) { partObj.lotNo = tdn.LotNo; partObj.lotNumber = tdn.LotNo; }
+        if (tdn.BlockNo !== undefined) { partObj.blockNo = tdn.BlockNo; partObj.blockNumber = tdn.BlockNo; }
+        if (tdn.SurveyNo !== undefined) { partObj.surveyNo = tdn.SurveyNo; partObj.surveyNumber = tdn.SurveyNo; }
+        if (tdn.CadastralSurveyNo !== undefined) partObj.cadastralSurveyNo = tdn.CadastralSurveyNo;
+        if (tdn.SectionNo !== undefined) partObj.sectionNo = tdn.SectionNo;
+        if (tdn.ParcelNo !== undefined) partObj.parcelNo = tdn.ParcelNo;
+        if (tdn.TitleNo !== undefined || tdn.TCTNo !== undefined) {
+          partObj.titleNo = tdn.TitleNo || tdn.TCTNo || '';
+          partObj.tctNo = tdn.TitleNo || tdn.TCTNo || '';
+        }
+        if (tdn.DateRegistered !== undefined || tdn.TCTDate !== undefined) {
+          partObj.dateRegistered = tdn.DateRegistered || tdn.TCTDate || '';
+          partObj.tctDate = tdn.DateRegistered || tdn.TCTDate || '';
+        }
+        if (tdn.RegistrationStatus) partObj.registrationStatus = tdn.RegistrationStatus;
+        if (tdn.TitleType) partObj.titleType = tdn.TitleType;
+        if (tdn.TransactionCode) partObj.transactionCode = tdn.TransactionCode;
 
         if (tdn.PropLocationStreet || tdn.Location) {
           partObj.streetLocation = tdn.PropLocationStreet || tdn.Location;
@@ -673,6 +1251,30 @@ export const SyncProvider = ({ children }) => {
         if (tdn.OwnerTIN) partObj.ownerTin = tdn.OwnerTIN;
         if (tdn.OwnerContactNo) partObj.ownerContactNo = tdn.OwnerContactNo;
         if (tdn.OwnerEmail) partObj.ownerEmail = tdn.OwnerEmail;
+        if (tdn.OwnerGender) partObj.ownerGender = tdn.OwnerGender;
+        if (tdn.OwnerCivilStatus) partObj.ownerCivilStatus = tdn.OwnerCivilStatus;
+
+        // Administrator, Beneficial User, Possessor overrides
+        if (tdn.IsAdministrator !== undefined) partObj.isAdministrator = !!tdn.IsAdministrator;
+        if (tdn.IsBeneficialUser !== undefined) partObj.isBeneficialUser = !!tdn.IsBeneficialUser;
+        if (tdn.IsPossessor !== undefined) partObj.isPossessor = !!tdn.IsPossessor;
+        if (tdn.AdministratorName !== undefined || tdn.PropAdminName !== undefined) {
+          partObj.administratorName = tdn.AdministratorName || tdn.PropAdminName || '';
+          partObj.propAdminName = tdn.AdministratorName || tdn.PropAdminName || '';
+        }
+        if (tdn.AdministratorAddress !== undefined || tdn.PropAdminAddress !== undefined) {
+          partObj.administratorAddress = tdn.AdministratorAddress || tdn.PropAdminAddress || '';
+          partObj.propAdminAddress = tdn.AdministratorAddress || tdn.PropAdminAddress || '';
+        }
+        if (tdn.AdministratorContactNo !== undefined || tdn.PropAdminContactNo !== undefined) {
+          partObj.administratorContactNo = tdn.AdministratorContactNo || tdn.PropAdminContactNo || '';
+          partObj.propAdminContactNo = tdn.AdministratorContactNo || tdn.PropAdminContactNo || '';
+        }
+        if (tdn.AdministratorTin !== undefined) partObj.administratorTin = tdn.AdministratorTin || '';
+        if (tdn.AdministratorEmail !== undefined) partObj.administratorEmail = tdn.AdministratorEmail || '';
+        if (tdn.AdministratorGender !== undefined) partObj.administratorGender = tdn.AdministratorGender || 'Male';
+        if (tdn.AdministratorCivilStatus !== undefined) partObj.administratorCivilStatus = tdn.AdministratorCivilStatus || 'Single';
+
         if (tdn.FloorPlanSketchPath) partObj.sketchUrl = tdn.FloorPlanSketchPath;
         if (tdn.Attachments && Array.isArray(tdn.Attachments)) partObj.attachments = tdn.Attachments;
 
@@ -720,17 +1322,17 @@ export const SyncProvider = ({ children }) => {
         selectedPartitionIndex: targetIdx,
         formType: partObj.formType || found?.formType,
         transactionTypeId: partObj.transactionTypeId || found?.transactionTypeId,
-        owner: partObj.ownerName || found?.owner,
-        arpNo: partObj.systemGeneratedTDN || found?.arpNo,
-        sketchUrl: partObj.sketchUrl || found?.sketchUrl,
-        sketchFileName: partObj.sketchFileName || found?.sketchFileName,
-        attachments: partObj.attachments || found?.attachments || [],
+        owner: partObj.ownerName || (targetIdx === 0 ? found?.owner : ''),
+        arpNo: partObj.systemGeneratedTDN || partObj.arpNo || (targetIdx === 0 ? found?.arpNo : ''),
+        sketchUrl: partObj.sketchUrl || (targetIdx === 0 ? found?.sketchUrl : null),
+        sketchFileName: partObj.sketchFileName || (targetIdx === 0 ? found?.sketchFileName : null),
+        attachments: Array.isArray(partObj.attachments) ? partObj.attachments : (targetIdx === 0 ? (found?.attachments || []) : []),
         formData: partFormData,
         currentPartition: partObj
       };
     }
 
-    if (found && found.formData) {
+    if (found && found.formData && targetIdx === 0) {
       return {
         ...found,
         formData: withPascalCaseKeys(found.formData)
@@ -785,12 +1387,23 @@ export const SyncProvider = ({ children }) => {
     const updated = [queueItem, ...filteredQueue];
     await saveQueue(updated);
 
+    // Save to permanent device history as offline draft
+    await saveToHistory(payload, {
+      type,
+      actionType: workflowForwardPayload ? 'DRAFT_TRANSFER' : 'DRAFT',
+      statusLabel: workflowForwardPayload ? 'Queued to Transfer (Offline)' : 'Saved Offline Draft'
+    });
+
     // Update cachedForms
     const cacheId = tdn?.TDNId || tracking || wfId || 'temp';
     const formKey = `${type}_${cacheId}_part_${partIdx}`;
     const newCachedForms = { ...cachedForms, [formKey]: payload };
     setCachedForms(newCachedForms);
-    await AsyncStorage.setItem('@fairtrack_cached_forms', JSON.stringify(newCachedForms));
+    try {
+      await AsyncStorage.setItem('@fairtrack_cached_forms', JSON.stringify(newCachedForms));
+    } catch (err) {
+      console.warn('Saving cached forms storage warning:', err);
+    }
 
     // Update downloadedForms cache so switching partitions offline reflects latest edits immediately
     let dKey = null;
@@ -817,6 +1430,22 @@ export const SyncProvider = ({ children }) => {
         updatedPartitions[partIdx] = {
           ...existingPart,
           formData: payload,
+          lotNo: tdn?.LotNo !== undefined ? tdn.LotNo : existingPart.lotNo,
+          lotNumber: tdn?.LotNo !== undefined ? tdn.LotNo : existingPart.lotNumber,
+          blockNo: tdn?.BlockNo !== undefined ? tdn.BlockNo : existingPart.blockNo,
+          blockNumber: tdn?.BlockNo !== undefined ? tdn.BlockNo : existingPart.blockNumber,
+          surveyNo: tdn?.SurveyNo !== undefined ? tdn.SurveyNo : existingPart.surveyNo,
+          surveyNumber: tdn?.SurveyNo !== undefined ? tdn.SurveyNo : existingPart.surveyNumber,
+          cadastralSurveyNo: tdn?.CadastralSurveyNo !== undefined ? tdn.CadastralSurveyNo : existingPart.cadastralSurveyNo,
+          sectionNo: tdn?.SectionNo !== undefined ? tdn.SectionNo : existingPart.sectionNo,
+          parcelNo: tdn?.ParcelNo !== undefined ? tdn.ParcelNo : existingPart.parcelNo,
+          titleNo: tdn?.TitleNo || tdn?.TCTNo || existingPart.titleNo,
+          tctNo: tdn?.TitleNo || tdn?.TCTNo || existingPart.tctNo,
+          dateRegistered: tdn?.DateRegistered || tdn?.TCTDate || existingPart.dateRegistered,
+          tctDate: tdn?.DateRegistered || tdn?.TCTDate || existingPart.tctDate,
+          registrationStatus: tdn?.RegistrationStatus || existingPart.registrationStatus,
+          titleType: tdn?.TitleType || existingPart.titleType,
+          transactionCode: tdn?.TransactionCode || existingPart.transactionCode,
           sketchUrl: tdn?.FloorPlanSketchPath || existingPart.sketchUrl,
           attachments: tdn?.Attachments || existingPart.attachments,
           streetLocation: tdn?.PropLocationStreet || tdn?.Location || existingPart.streetLocation,
@@ -832,6 +1461,21 @@ export const SyncProvider = ({ children }) => {
           ownerTin: tdn?.OwnerTIN || existingPart.ownerTin,
           ownerContactNo: tdn?.OwnerContactNo || existingPart.ownerContactNo,
           ownerEmail: tdn?.OwnerEmail || existingPart.ownerEmail,
+          ownerGender: tdn?.OwnerGender || existingPart.ownerGender,
+          ownerCivilStatus: tdn?.OwnerCivilStatus || existingPart.ownerCivilStatus,
+          isAdministrator: tdn?.IsAdministrator !== undefined ? !!tdn.IsAdministrator : existingPart.isAdministrator,
+          isBeneficialUser: tdn?.IsBeneficialUser !== undefined ? !!tdn.IsBeneficialUser : existingPart.isBeneficialUser,
+          isPossessor: tdn?.IsPossessor !== undefined ? !!tdn.IsPossessor : existingPart.isPossessor,
+          administratorName: tdn?.AdministratorName || tdn?.PropAdminName || existingPart.administratorName,
+          propAdminName: tdn?.AdministratorName || tdn?.PropAdminName || existingPart.propAdminName,
+          administratorAddress: tdn?.AdministratorAddress || tdn?.PropAdminAddress || existingPart.administratorAddress,
+          propAdminAddress: tdn?.AdministratorAddress || tdn?.PropAdminAddress || existingPart.propAdminAddress,
+          administratorContactNo: tdn?.AdministratorContactNo || tdn?.PropAdminContactNo || existingPart.administratorContactNo,
+          propAdminContactNo: tdn?.AdministratorContactNo || tdn?.PropAdminContactNo || existingPart.propAdminContactNo,
+          administratorTin: tdn?.AdministratorTin || existingPart.administratorTin,
+          administratorEmail: tdn?.AdministratorEmail || existingPart.administratorEmail,
+          administratorGender: tdn?.AdministratorGender || existingPart.administratorGender,
+          administratorCivilStatus: tdn?.AdministratorCivilStatus || existingPart.administratorCivilStatus,
           boundaryNorth: tdnLand.NorthBoundary !== undefined ? tdnLand.NorthBoundary : existingPart.boundaryNorth,
           nremarks: tdnLand.Nremarks !== undefined ? tdnLand.Nremarks : existingPart.nremarks,
           boundarySouth: tdnLand.SouthBoundary !== undefined ? tdnLand.SouthBoundary : existingPart.boundarySouth,
@@ -844,19 +1488,21 @@ export const SyncProvider = ({ children }) => {
           landImprovementsJson: tdn?.LandImprovementsJson || tdnLand.LandImprovementsJson || existingPart.landImprovementsJson,
           landAdjustmentsJson: tdn?.LandAdjustmentsJson || tdnLand.LandAdjustmentsJson || existingPart.landAdjustmentsJson,
           landPropertyAssessmentsJson: tdn?.LandPropertyAssessmentsJson || tdnLand.LandPropertyAssessmentsJson || existingPart.landPropertyAssessmentsJson,
-          buildingType: tdnBldg.BuildingType || existingPart.buildingType,
-          structuralType: tdnBldg.StructuralType || existingPart.structuralType,
-          areaSqMeters: tdnBldg.TotalFloorArea || existingPart.areaSqMeters,
+          buildingType: tdnBldg.BuildingClassification || tdnBldg.BuildingType || existingPart.buildingType,
+          buildingClassification: tdnBldg.BuildingClassification || existingPart.buildingClassification,
+          structuralType: tdnBldg.StucturalType || tdnBldg.StructuralType || existingPart.structuralType,
+          areaSqMeters: tdnBldg.TotalbldgArea || tdnBldg.TotalFloorArea || existingPart.areaSqMeters,
           quarterEffectivity: tdn?.QuarterEffectivity ? (typeof tdn.QuarterEffectivity === 'number' ? `${tdn.QuarterEffectivity}${tdn.QuarterEffectivity === 1 ? 'st' : tdn.QuarterEffectivity === 2 ? 'nd' : tdn.QuarterEffectivity === 3 ? 'rd' : 'th'} Quarter` : tdn.QuarterEffectivity) : existingPart.quarterEffectivity,
           yearEffectivity: tdn?.YearEffectivity ? tdn.YearEffectivity.toString() : existingPart.yearEffectivity,
           taxability: tdn?.Taxability !== undefined ? (tdn.Taxability ? 'Taxable' : 'Exempt') : existingPart.taxability,
           assessmentBasis: tdn?.AssessmentBasis || existingPart.assessmentBasis,
-          memoranda: tdn?.Memoranda || existingPart.memoranda
+          memoranda: tdn?.Memoranda || existingPart.memoranda,
+          formData: withPascalCaseKeys(payload)
         };
         itemRecord.partitions = updatedPartitions;
       }
-      if (partIdx === 0) {
-        itemRecord.formData = payload;
+      if (partIdx === 0 && !itemRecord.formData) {
+        itemRecord.formData = withPascalCaseKeys(payload);
         if (tdn?.DisplayName) itemRecord.owner = tdn.DisplayName;
       }
       const newDownloads = { ...downloadedForms, [dKey]: itemRecord };
@@ -893,6 +1539,9 @@ export const SyncProvider = ({ children }) => {
     for (let i = 0; i < syncQueue.length; i++) {
       const item = syncQueue[i];
       try {
+        if (item.payload) {
+          await ensurePayloadFilesHaveBase64(item.payload);
+        }
         let res = null;
         if (item.type === 'UPDATE_BUILDING') {
           res = await MobileApi.updateBuildingForm(item.payload);
@@ -904,19 +1553,26 @@ export const SyncProvider = ({ children }) => {
           res = await MobileApi.forwardWorkflow(
             item.payload.formWorkflowId,
             item.payload.nextStatusId,
-            item.payload.remarks
+            item.payload.remarks,
+            item.payload.trackingNo
           );
         }
 
         if (res && res.success) {
           // If this update included a workflow transfer to the next step, forward it too
           let wasTransferred = false;
-          if (item.workflowForwardPayload && item.workflowForwardPayload.formWorkflowId && item.workflowForwardPayload.nextStatusId) {
+          const p = item.payload;
+          const tdn = p?.TDN || p?.tdn;
+          const itemTrack = tdn?.TrackingNo || tdn?.trackingNo;
+          const fwdTrack = item.workflowForwardPayload?.trackingNo || itemTrack;
+
+          if (item.workflowForwardPayload && (item.workflowForwardPayload.formWorkflowId || fwdTrack) && item.workflowForwardPayload.nextStatusId) {
             try {
               await MobileApi.forwardWorkflow(
                 item.workflowForwardPayload.formWorkflowId,
                 item.workflowForwardPayload.nextStatusId,
-                item.workflowForwardPayload.remarks || 'Completed field assessment and synced.'
+                item.workflowForwardPayload.remarks || 'Completed field assessment and synced.',
+                fwdTrack
               );
               wasTransferred = true;
             } catch (fwdErr) {
@@ -929,12 +1585,26 @@ export const SyncProvider = ({ children }) => {
             const tdn = p?.TDN || p?.tdn;
             const itemTrack = tdn?.TrackingNo || tdn?.trackingNo;
             const itemWf = tdn?.FormWorkflowId || tdn?.formWorkflowId;
+            await saveToHistory(p, {
+              type: item.type,
+              trackingNo: itemTrack,
+              formWorkflowId: itemWf,
+              actionType: 'TRANSFERRED',
+              statusLabel: 'Transferred to Assessor Review'
+            });
             await removeDownloadedTransaction(itemTrack, itemWf);
           } else {
             const p = item.payload;
             const tdn = p?.TDN || p?.tdn;
             const itemTrack = tdn?.TrackingNo || tdn?.trackingNo;
             const itemWf = tdn?.FormWorkflowId || tdn?.formWorkflowId;
+            await saveToHistory(p, {
+              type: item.type,
+              trackingNo: itemTrack,
+              formWorkflowId: itemWf,
+              actionType: 'SYNCED',
+              statusLabel: 'Synced to Office Web Portal'
+            });
             await updateDownloadedFormWithPayload(itemTrack, itemWf, p);
           }
 
@@ -997,6 +1667,189 @@ export const SyncProvider = ({ children }) => {
     };
   };
 
+  // Transaction-Level Sync Engine: Sync all partitions of a transaction to web, and optionally forward workflow to supervisor
+  const syncTransactionToServer = async (trackingNo, formWorkflowId, forwardToSupervisor = false, remarks = '') => {
+    const online = await checkConnectivity(3000);
+    if (!online) {
+      return {
+        success: false,
+        isOffline: true,
+        message: 'Office server is unreachable. Please connect to the office network or Wi-Fi before syncing.'
+      };
+    }
+
+    const cleanTrack = (trackingNo || '').toString().trim().toLowerCase();
+    const cleanWf = formWorkflowId != null ? formWorkflowId.toString().trim() : '';
+
+    // Match all items in syncQueue for this transaction
+    const targetQueueItems = syncQueue.filter(item => {
+      const p = item.payload;
+      const tdn = p?.TDN || p?.tdn;
+      const itemTracking = (tdn?.TrackingNo || tdn?.trackingNo || p?.TrackingNo || p?.trackingNo || '').toString().trim().toLowerCase();
+      const itemWfId = (tdn?.FormWorkflowId || tdn?.formWorkflowId || p?.FormWorkflowId || p?.formWorkflowId || item.workflowForwardPayload?.FormWorkflowId || item.workflowForwardPayload?.formWorkflowId || '').toString().trim();
+
+      const trackMatches = cleanTrack && itemTracking && cleanTrack === itemTracking;
+      const wfMatches = cleanWf && itemWfId && cleanWf === itemWfId;
+      return trackMatches || wfMatches;
+    });
+
+    setIsSyncing(true);
+    let successCount = 0;
+    let failCount = 0;
+    const processedIds = [];
+    const newLogs = [];
+
+    for (let i = 0; i < targetQueueItems.length; i++) {
+      const item = targetQueueItems[i];
+      try {
+        if (item.payload) {
+          await ensurePayloadFilesHaveBase64(item.payload);
+        }
+        let res = null;
+        if (item.type === 'UPDATE_BUILDING') {
+          res = await MobileApi.updateBuildingForm(item.payload);
+        } else if (item.type === 'UPDATE_LAND') {
+          res = await MobileApi.updateLandForm(item.payload);
+        } else if (item.type === 'UPDATE_MACHINERY') {
+          res = await MobileApi.updateMachineryForm(item.payload);
+        }
+
+        if (res && res.success) {
+          successCount++;
+          processedIds.push(item.id);
+          const p = item.payload;
+          const tdn = p?.TDN || p?.tdn;
+          const itemTrack = tdn?.TrackingNo || tdn?.trackingNo || trackingNo;
+          const itemWf = tdn?.FormWorkflowId || tdn?.formWorkflowId || formWorkflowId;
+
+          await saveToHistory(p, {
+            type: item.type,
+            trackingNo: itemTrack,
+            formWorkflowId: itemWf,
+            actionType: forwardToSupervisor ? 'TRANSFERRED' : 'SYNCED',
+            statusLabel: forwardToSupervisor ? 'Transferred to Assessor Review' : 'Synced to Office Web Portal'
+          });
+          await updateDownloadedFormWithPayload(itemTrack, itemWf, p);
+
+          newLogs.unshift({
+            id: item.id,
+            title: item.title,
+            status: 'SUCCESS',
+            time: new Date().toLocaleTimeString(),
+            message: res.message || 'Synced partition to office portal.'
+          });
+        } else {
+          failCount++;
+          newLogs.unshift({
+            id: item.id,
+            title: item.title,
+            status: 'FAILED',
+            time: new Date().toLocaleTimeString(),
+            message: res?.message || 'Server rejected partition update.'
+          });
+        }
+      } catch (err) {
+        failCount++;
+        newLogs.unshift({
+          id: item.id,
+          title: item.title,
+          status: 'ERROR',
+          time: new Date().toLocaleTimeString(),
+          message: err.response?.data?.message || err.message || 'Server error syncing partition'
+        });
+      }
+    }
+
+    // Remove successfully processed items from syncQueue
+    if (processedIds.length > 0) {
+      const remainingQueue = syncQueue.filter(q => !processedIds.includes(q.id));
+      await saveQueue(remainingQueue);
+    }
+    if (newLogs.length > 0) {
+      setSyncLogs(prev => [...newLogs, ...prev].slice(0, 50));
+    }
+
+    // Forward to supervisor if requested
+    let forwarded = false;
+    if (forwardToSupervisor) {
+      if (failCount > 0) {
+        setIsSyncing(false);
+        return {
+          success: false,
+          syncedCount: successCount,
+          failCount,
+          message: `Cannot forward to supervisor because ${failCount} partition edit(s) failed to sync.`
+        };
+      }
+
+      const wfNumericId = parseInt(cleanWf, 10);
+      if (!wfNumericId || isNaN(wfNumericId)) {
+        setIsSyncing(false);
+        return {
+          success: false,
+          syncedCount: successCount,
+          message: 'Invalid Form Workflow ID for forwarding to supervisor.'
+        };
+      }
+
+      try {
+        const fwdRes = await MobileApi.forwardWorkflow(
+          wfNumericId,
+          4, // 4 = Checked / Recommend Approval (Supervisor)
+          remarks || 'Field inspection completed and transferred to supervisor.'
+        );
+
+        if (fwdRes && fwdRes.success) {
+          forwarded = true;
+          // Mark transaction as transferred -> removes from downloaded forms and updates history
+          await markTransactionSynced(trackingNo, formWorkflowId, true);
+        } else {
+          setIsSyncing(false);
+          return {
+            success: false,
+            syncedCount: successCount,
+            message: fwdRes?.message || 'Partitions synced, but failed to forward workflow to supervisor.'
+          };
+        }
+      } catch (fwdErr) {
+        setIsSyncing(false);
+        return {
+          success: false,
+          syncedCount: successCount,
+          message: fwdErr.response?.data?.message || fwdErr.message || 'Error forwarding workflow to supervisor.'
+        };
+      }
+    }
+
+    setIsSyncing(false);
+
+    const syncTimeStr = new Date().toLocaleString();
+    setLastSyncTime(syncTimeStr);
+    await AsyncStorage.setItem('@fairtrack_last_sync', syncTimeStr);
+
+    let displayMessage = '';
+    if (failCount > 0) {
+      const firstErr = newLogs.find(l => l.status !== 'SUCCESS');
+      displayMessage = `${failCount} partition(s) failed to sync for ${trackingNo}` +
+        (successCount > 0 ? ` (${successCount} succeeded)` : '') +
+        `. ${firstErr?.message || 'Server error.'}`;
+    } else if (forwardToSupervisor) {
+      displayMessage = `Transaction ${trackingNo} successfully synchronized and transferred to Supervisor!`;
+    } else if (successCount > 0) {
+      displayMessage = `Successfully synchronized ${successCount} partition(s) for ${trackingNo} to the web portal.`;
+    } else {
+      displayMessage = `Transaction ${trackingNo} is already up to date with the web portal.`;
+    }
+
+    return {
+      success: failCount === 0,
+      syncedCount: successCount,
+      failCount,
+      forwarded,
+      message: displayMessage
+    };
+  };
+
   const removeQueueItem = async (itemId) => {
     const updated = syncQueue.filter((q) => q.id !== itemId);
     await saveQueue(updated);
@@ -1029,11 +1882,19 @@ export const SyncProvider = ({ children }) => {
         isTransactionDownloaded,
         hasPendingEdits,
         getDownloadedFormData,
+        updatePartitionAttachmentsLocally,
+        updateDownloadedFormWithPayload,
         queueOfflineUpdate,
         syncAllToServer,
+        syncTransactionToServer,
         removeQueueItem,
         clearQueue,
-        clearAllOfflineData
+        clearAllOfflineData,
+        historyRecords,
+        historyCount: historyRecords.length,
+        saveToHistory,
+        removeHistoryRecord,
+        clearHistoryRecords
       }}
     >
       {children}

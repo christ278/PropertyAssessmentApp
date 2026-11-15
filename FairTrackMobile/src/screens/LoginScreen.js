@@ -33,16 +33,21 @@ export const LoginScreen = () => {
   const [tempUrl, setTempUrl] = useState(serverUrl);
   const [modalConfig, setModalConfig] = useState({ visible: false });
 
-  const showInfoModal = (title, message, icon = 'information-circle', iconColor = colors.primary) => {
+  const showInfoModal = (title, message, icon = 'information-circle', iconType = 'primary') => {
     setModalConfig({
       visible: true,
       title,
       message,
       icon,
-      iconColor,
-      singleButton: true,
-      confirmText: 'OK',
-      confirmColor: colors.primary,
+      iconType,
+      buttons: [
+        {
+          text: 'OK',
+          style: 'primary',
+          onPress: () => setModalConfig({ visible: false })
+        }
+      ],
+      onClose: () => setModalConfig({ visible: false }),
       onConfirm: () => setModalConfig({ visible: false }),
       onCancel: () => setModalConfig({ visible: false })
     });
@@ -50,7 +55,7 @@ export const LoginScreen = () => {
 
   const handleLogin = async () => {
     if (!username.trim() || !password.trim()) {
-      showInfoModal('Required Fields', 'Please enter your username and password.', 'alert-circle', colors.warning);
+      showInfoModal('Required Fields', 'Please enter your username and password.', 'alert-circle', 'warning');
       return;
     }
 
@@ -63,7 +68,7 @@ export const LoginScreen = () => {
         'Login Failed',
         res.message || 'Please check your credentials and server connection.',
         'close-circle',
-        colors.danger
+        'danger'
       );
     }
   };
@@ -71,7 +76,7 @@ export const LoginScreen = () => {
   const handleSaveSettings = async () => {
     await updateServerUrl(tempUrl);
     setSettingsVisible(false);
-    showInfoModal('Settings Saved', `Server URL updated to: ${tempUrl}`, 'checkmark-circle', colors.success);
+    showInfoModal('Settings Saved', `Server URL updated to: ${tempUrl}`, 'checkmark-circle', 'success');
   };
 
   return (
@@ -197,10 +202,18 @@ export const LoginScreen = () => {
             <View style={styles.quickUrls}>
               <TouchableOpacity
                 style={[styles.quickTag, { backgroundColor: colors.primaryLight }]}
+                onPress={() => setTempUrl('http://192.168.1.243:5156')}
+              >
+                <Text style={[styles.quickTagText, { color: colors.primary }]}>
+                  LAN Wi-Fi (192.168.1.243:5156)
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.quickTag, { marginTop: 6, backgroundColor: colors.primaryLight }]}
                 onPress={() => setTempUrl('http://192.168.50.9:5156')}
               >
                 <Text style={[styles.quickTagText, { color: colors.primary }]}>
-                  LAN Wi-Fi (192.168.50.9:5156)
+                  LAN Wi-Fi Alt (192.168.50.9:5156)
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -232,7 +245,10 @@ export const LoginScreen = () => {
         </View>
       </Modal>
 
-      <ActionModal {...modalConfig} />
+      <ActionModal
+        {...modalConfig}
+        onClose={() => setModalConfig(prev => ({ ...prev, visible: false }))}
+      />
     </KeyboardAvoidingView>
   );
 };

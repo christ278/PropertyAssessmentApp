@@ -16,7 +16,7 @@ public class AssessmentService : IAssessmentService
         _context = context;
     }
 
-    public IEnumerable<TaxDeclaration> GetAll(string? search = null, PropertyClassification? classification = null, AssessmentStatus? status = null)
+    public IEnumerable<TaxDeclaration> GetAll(string? search = null, PropertyKind? kind = null, string? status = null)
     {
         IQueryable<TaxDeclaration> query = _context.TaxDeclarations
             .Include(t => t.BuildingDetails)
@@ -34,15 +34,34 @@ public class AssessmentService : IAssessmentService
                                   || (r.LandDetails != null && r.LandDetails.DistrictOrBarangay != null && r.LandDetails.DistrictOrBarangay.Contains(term)));
         }
 
-        if (classification.HasValue)
+        if (kind.HasValue)
         {
-            query = query.Where(r => (r.LandDetails != null && r.LandDetails.Classification == classification.Value)
-                                  || (r.MachineryDetails != null && r.MachineryDetails.Classification == classification.Value));
+            query = query.Where(r => r.Kind == kind.Value);
         }
 
-        if (status.HasValue)
+        if (!string.IsNullOrWhiteSpace(status))
         {
-            query = query.Where(r => r.Status == status.Value);
+            var normalizedStatus = status.Trim().ToLowerInvariant();
+            if (normalizedStatus == "active")
+            {
+                query = query.Where(r => r.Status == AssessmentStatus.Active
+                                      && !r.IsCancelledAndSuperseded
+                                      && !r.TaxDeclarationNumber.EndsWith("-00000"));
+            }
+            else if (normalizedStatus == "ongoing")
+            {
+                query = query.Where(r => !r.IsCancelledAndSuperseded
+                                      && r.Status != AssessmentStatus.Cancelled
+                                      && (r.Status == AssessmentStatus.Pending || r.TaxDeclarationNumber.EndsWith("-00000")));
+            }
+            else if (normalizedStatus == "inactive")
+            {
+                query = query.Where(r => r.IsCancelledAndSuperseded
+                                      || r.Status == AssessmentStatus.Cancelled
+                                      || (r.Status != AssessmentStatus.Active
+                                          && r.Status != AssessmentStatus.Pending
+                                          && !r.TaxDeclarationNumber.EndsWith("-00000")));
+            }
         }
 
         return query.OrderByDescending(r => r.DateAssessed).ToList();
@@ -487,6 +506,7 @@ public class AssessmentService : IAssessmentService
             }
 
             // Sync multi-floor breakdown json if present to FloorLevels lines
+            List<TDNBuildingFloor>? newFloors = null;
             if (!string.IsNullOrWhiteSpace(bldg.FloorBreakdownJson))
             {
                 try
@@ -496,11 +516,11 @@ public class AssessmentService : IAssessmentService
                         new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                     if (floors != null && floors.Any())
                     {
-                        bldg.FloorLevels.Clear();
+                        newFloors = new List<TDNBuildingFloor>();
                         int order = 1;
                         foreach (var f in floors)
                         {
-                            bldg.FloorLevels.Add(new TDNBuildingFloor
+                            newFloors.Add(new TDNBuildingFloor
                             {
                                 TDNBuildingId = bldg.Id,
                                 FloorOrder = order++,
@@ -517,6 +537,7 @@ public class AssessmentService : IAssessmentService
             }
 
             // Sync additional items json if present to AdditionalItems lines
+            List<TDNBuildingAdditionalItem>? newAddItems = null;
             if (!string.IsNullOrWhiteSpace(bldg.AdditionalItemsJson))
             {
                 try
@@ -526,10 +547,10 @@ public class AssessmentService : IAssessmentService
                         new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                     if (items != null && items.Any())
                     {
-                        bldg.AdditionalItems.Clear();
+                        newAddItems = new List<TDNBuildingAdditionalItem>();
                         foreach (var item in items)
                         {
-                            bldg.AdditionalItems.Add(new TDNBuildingAdditionalItem
+                            newAddItems.Add(new TDNBuildingAdditionalItem
                             {
                                 TDNBuildingId = bldg.Id,
                                 ItemDescription = item.ItemDescription,
@@ -549,14 +570,22 @@ public class AssessmentService : IAssessmentService
 
             // Sync 16 Structural Materials (Local Assessment Manual - Table 3)
             var materials = GetDefaultStructuralMaterials(declaration, bldg.Id);
-            bldg.StructuralMaterials.Clear();
-            foreach (var m in materials)
-            {
-                bldg.StructuralMaterials.Add(m);
-            }
 
             if (existingBldg == null)
             {
+                if (newFloors != null)
+                {
+                    bldg.FloorLevels.Clear();
+                    foreach (var fl in newFloors) bldg.FloorLevels.Add(fl);
+                }
+                if (newAddItems != null)
+                {
+                    bldg.AdditionalItems.Clear();
+                    foreach (var ai in newAddItems) bldg.AdditionalItems.Add(ai);
+                }
+                bldg.StructuralMaterials.Clear();
+                foreach (var sm in materials) bldg.StructuralMaterials.Add(sm);
+
                 _context.TDNBuildings.Add(bldg);
             }
             else
@@ -565,20 +594,35 @@ public class AssessmentService : IAssessmentService
                 {
                     _context.Entry(existingBldg).CurrentValues.SetValues(bldg);
                 }
-                if (bldg.FloorLevels.Any())
+                if (newFloors != null)
                 {
+                    if (existingBldg.FloorLevels.Any()) _context.TDNBuildingFloors.RemoveRange(existingBldg.FloorLevels);
                     existingBldg.FloorLevels.Clear();
-                    foreach (var fl in bldg.FloorLevels) existingBldg.FloorLevels.Add(fl);
+                    foreach (var fl in newFloors)
+                    {
+                        _context.TDNBuildingFloors.Add(fl);
+                        existingBldg.FloorLevels.Add(fl);
+                    }
                 }
-                if (bldg.AdditionalItems.Any())
+                if (newAddItems != null)
                 {
+                    if (existingBldg.AdditionalItems.Any()) _context.TDNBuildingAdditionalItems.RemoveRange(existingBldg.AdditionalItems);
                     existingBldg.AdditionalItems.Clear();
-                    foreach (var ai in bldg.AdditionalItems) existingBldg.AdditionalItems.Add(ai);
+                    foreach (var ai in newAddItems)
+                    {
+                        _context.TDNBuildingAdditionalItems.Add(ai);
+                        existingBldg.AdditionalItems.Add(ai);
+                    }
                 }
-                if (bldg.StructuralMaterials.Any())
+                if (materials.Any())
                 {
+                    if (existingBldg.StructuralMaterials.Any()) _context.TDNBuildingStructuralMaterials.RemoveRange(existingBldg.StructuralMaterials);
                     existingBldg.StructuralMaterials.Clear();
-                    foreach (var sm in bldg.StructuralMaterials) existingBldg.StructuralMaterials.Add(sm);
+                    foreach (var sm in materials)
+                    {
+                        _context.TDNBuildingStructuralMaterials.Add(sm);
+                        existingBldg.StructuralMaterials.Add(sm);
+                    }
                 }
             }
         }
@@ -586,6 +630,18 @@ public class AssessmentService : IAssessmentService
         {
             var land = declaration.EnsureLandDetails();
             land.TaxDeclarationId = declaration.Id;
+
+            var existingLand = _context.TDNLands
+                .Include(l => l.TDNLandDetails)
+                .Include(l => l.TDNLandImprovements)
+                .Include(l => l.TDNLandBaseMarkets)
+                .Include(l => l.TDNLandPropertyAssessments)
+                .FirstOrDefault(l => l.TaxDeclarationId == declaration.Id);
+
+            if (existingLand != null)
+            {
+                land.Id = existingLand.Id;
+            }
 
             // Sync Administrator / Beneficial User / Possessor flags & demographics
             land.IsAdministrator = declaration.IsAdministrator;
@@ -599,6 +655,7 @@ public class AssessmentService : IAssessmentService
             if (!string.IsNullOrWhiteSpace(declaration.AdminPossessorEmail)) land.AdministratorEmail = declaration.AdminPossessorEmail;
 
             // 1. Sync Land Appraisal / Classification Breakdown lines
+            List<TDNLandDetail>? newLandDetails = null;
             if (!string.IsNullOrWhiteSpace(land.LandAppraisalDetailsJson))
             {
                 try
@@ -608,11 +665,11 @@ public class AssessmentService : IAssessmentService
                         new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                     if (items != null && items.Any())
                     {
-                        land.TDNLandDetails.Clear();
+                        newLandDetails = new List<TDNLandDetail>();
                         int order = 1;
                         foreach (var item in items)
                         {
-                            land.TDNLandDetails.Add(new TDNLandDetail
+                            newLandDetails.Add(new TDNLandDetail
                             {
                                 TDNLandId = land.Id,
                                 OrderNo = order++,
@@ -635,6 +692,7 @@ public class AssessmentService : IAssessmentService
             }
 
             // 2. Sync Other Improvements / Plants & Trees lines
+            List<TDNLandImprovement>? newLandImps = null;
             if (!string.IsNullOrWhiteSpace(land.LandImprovementsJson))
             {
                 try
@@ -644,11 +702,11 @@ public class AssessmentService : IAssessmentService
                         new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                     if (items != null && items.Any())
                     {
-                        land.TDNLandImprovements.Clear();
+                        newLandImps = new List<TDNLandImprovement>();
                         int order = 1;
                         foreach (var item in items)
                         {
-                            land.TDNLandImprovements.Add(new TDNLandImprovement
+                            newLandImps.Add(new TDNLandImprovement
                             {
                                 TDNLandId = land.Id,
                                 OrderNo = order++,
@@ -671,6 +729,7 @@ public class AssessmentService : IAssessmentService
             }
 
             // 3. Sync Base Market Value Adjustments lines
+            List<TDNLandBaseMarket>? newBaseMarkets = null;
             if (!string.IsNullOrWhiteSpace(land.LandAdjustmentsJson))
             {
                 try
@@ -680,11 +739,11 @@ public class AssessmentService : IAssessmentService
                         new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                     if (items != null && items.Any())
                     {
-                        land.TDNLandBaseMarkets.Clear();
+                        newBaseMarkets = new List<TDNLandBaseMarket>();
                         int order = 1;
                         foreach (var item in items)
                         {
-                            land.TDNLandBaseMarkets.Add(new TDNLandBaseMarket
+                            newBaseMarkets.Add(new TDNLandBaseMarket
                             {
                                 TDNLandId = land.Id,
                                 OrderNo = order++,
@@ -704,6 +763,7 @@ public class AssessmentService : IAssessmentService
             }
 
             // 4. Sync Property Assessment Roll lines
+            List<TDNLandPropertyAssessment>? newLandPropAssessments = null;
             if (!string.IsNullOrWhiteSpace(land.LandPropertyAssessmentsJson))
             {
                 try
@@ -713,11 +773,11 @@ public class AssessmentService : IAssessmentService
                         new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                     if (items != null && items.Any())
                     {
-                        land.TDNLandPropertyAssessments.Clear();
+                        newLandPropAssessments = new List<TDNLandPropertyAssessment>();
                         int order = 1;
                         foreach (var item in items)
                         {
-                            land.TDNLandPropertyAssessments.Add(new TDNLandPropertyAssessment
+                            newLandPropAssessments.Add(new TDNLandPropertyAssessment
                             {
                                 TDNLandId = land.Id,
                                 OrderNo = order++,
@@ -734,15 +794,28 @@ public class AssessmentService : IAssessmentService
                 catch { }
             }
 
-            var existingLand = _context.TDNLands
-                .Include(l => l.TDNLandDetails)
-                .Include(l => l.TDNLandImprovements)
-                .Include(l => l.TDNLandBaseMarkets)
-                .Include(l => l.TDNLandPropertyAssessments)
-                .FirstOrDefault(l => l.TaxDeclarationId == declaration.Id);
-
             if (existingLand == null)
             {
+                if (newLandDetails != null)
+                {
+                    land.TDNLandDetails.Clear();
+                    foreach (var d in newLandDetails) land.TDNLandDetails.Add(d);
+                }
+                if (newLandImps != null)
+                {
+                    land.TDNLandImprovements.Clear();
+                    foreach (var imp in newLandImps) land.TDNLandImprovements.Add(imp);
+                }
+                if (newBaseMarkets != null)
+                {
+                    land.TDNLandBaseMarkets.Clear();
+                    foreach (var b in newBaseMarkets) land.TDNLandBaseMarkets.Add(b);
+                }
+                if (newLandPropAssessments != null)
+                {
+                    land.TDNLandPropertyAssessments.Clear();
+                    foreach (var p in newLandPropAssessments) land.TDNLandPropertyAssessments.Add(p);
+                }
                 _context.TDNLands.Add(land);
             }
             else
@@ -752,26 +825,46 @@ public class AssessmentService : IAssessmentService
                     _context.Entry(existingLand).CurrentValues.SetValues(land);
                 }
 
-                // Update details
-                if (land.TDNLandDetails.Any())
+                // Update details safely using DbSet RemoveRange + Add to avoid EF Core concurrency exceptions on new Guid keys
+                if (newLandDetails != null)
                 {
+                    if (existingLand.TDNLandDetails.Any()) _context.TDNLandDetails.RemoveRange(existingLand.TDNLandDetails);
                     existingLand.TDNLandDetails.Clear();
-                    foreach (var d in land.TDNLandDetails) existingLand.TDNLandDetails.Add(d);
+                    foreach (var d in newLandDetails)
+                    {
+                        _context.TDNLandDetails.Add(d);
+                        existingLand.TDNLandDetails.Add(d);
+                    }
                 }
-                if (land.TDNLandImprovements.Any())
+                if (newLandImps != null)
                 {
+                    if (existingLand.TDNLandImprovements.Any()) _context.TDNLandImprovements.RemoveRange(existingLand.TDNLandImprovements);
                     existingLand.TDNLandImprovements.Clear();
-                    foreach (var imp in land.TDNLandImprovements) existingLand.TDNLandImprovements.Add(imp);
+                    foreach (var imp in newLandImps)
+                    {
+                        _context.TDNLandImprovements.Add(imp);
+                        existingLand.TDNLandImprovements.Add(imp);
+                    }
                 }
-                if (land.TDNLandBaseMarkets.Any())
+                if (newBaseMarkets != null)
                 {
+                    if (existingLand.TDNLandBaseMarkets.Any()) _context.TDNLandBaseMarkets.RemoveRange(existingLand.TDNLandBaseMarkets);
                     existingLand.TDNLandBaseMarkets.Clear();
-                    foreach (var b in land.TDNLandBaseMarkets) existingLand.TDNLandBaseMarkets.Add(b);
+                    foreach (var b in newBaseMarkets)
+                    {
+                        _context.TDNLandBaseMarkets.Add(b);
+                        existingLand.TDNLandBaseMarkets.Add(b);
+                    }
                 }
-                if (land.TDNLandPropertyAssessments.Any())
+                if (newLandPropAssessments != null)
                 {
+                    if (existingLand.TDNLandPropertyAssessments.Any()) _context.TDNLandPropertyAssessments.RemoveRange(existingLand.TDNLandPropertyAssessments);
                     existingLand.TDNLandPropertyAssessments.Clear();
-                    foreach (var p in land.TDNLandPropertyAssessments) existingLand.TDNLandPropertyAssessments.Add(p);
+                    foreach (var p in newLandPropAssessments)
+                    {
+                        _context.TDNLandPropertyAssessments.Add(p);
+                        existingLand.TDNLandPropertyAssessments.Add(p);
+                    }
                 }
             }
         }
@@ -779,6 +872,16 @@ public class AssessmentService : IAssessmentService
         {
             var mach = declaration.EnsureMachineryDetails();
             mach.TaxDeclarationId = declaration.Id;
+
+            var existingMach = _context.TDNMachineries
+                .Include(m => m.TDNMachineryDetails)
+                .Include(m => m.TDNMachineryPropertyAssessments)
+                .FirstOrDefault(m => m.TaxDeclarationId == declaration.Id);
+
+            if (existingMach != null)
+            {
+                mach.Id = existingMach.Id;
+            }
 
             // Sync Property Registration Details & Building/Land Owner Checkbox
             mach.IsLandOwnerAlsoBuildingOwner = declaration.IsLandOwnerAlsoBuildingOwner;
@@ -808,6 +911,7 @@ public class AssessmentService : IAssessmentService
             if (!string.IsNullOrWhiteSpace(declaration.AdminPossessorEmail)) mach.AdministratorEmail = declaration.AdminPossessorEmail;
 
             // 1. Sync Machinery Appraisal Details lines (16-column CAST schedule)
+            List<TDNMachineryDetail>? newMachDetails = null;
             if (!string.IsNullOrWhiteSpace(mach.MachineryAppraisalDetailsJson))
             {
                 try
@@ -817,7 +921,7 @@ public class AssessmentService : IAssessmentService
                         new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                     if (items != null && items.Any())
                     {
-                        mach.TDNMachineryDetails.Clear();
+                        newMachDetails = new List<TDNMachineryDetail>();
                         int order = 1;
                         decimal totalOrig = 0m;
                         decimal totalInstall = 0m;
@@ -841,7 +945,7 @@ public class AssessmentService : IAssessmentService
                             totalDepVal += rowDepVal;
                             totalMarket += rowMarketLessDep;
 
-                            mach.TDNMachineryDetails.Add(new TDNMachineryDetail
+                            newMachDetails.Add(new TDNMachineryDetail
                             {
                                 TDNMachineryId = mach.Id,
                                 OrderNo = order++,
@@ -896,6 +1000,7 @@ public class AssessmentService : IAssessmentService
             }
 
             // 2. Sync Machinery Property Assessment Roll lines
+            List<TDNMachineryPropertyAssessment>? newMachPropAssessments = null;
             if (!string.IsNullOrWhiteSpace(mach.MachineryPropertyAssessmentsJson))
             {
                 try
@@ -905,11 +1010,11 @@ public class AssessmentService : IAssessmentService
                         new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                     if (items != null && items.Any())
                     {
-                        mach.TDNMachineryPropertyAssessments.Clear();
+                        newMachPropAssessments = new List<TDNMachineryPropertyAssessment>();
                         int order = 1;
                         foreach (var item in items)
                         {
-                            mach.TDNMachineryPropertyAssessments.Add(new TDNMachineryPropertyAssessment
+                            newMachPropAssessments.Add(new TDNMachineryPropertyAssessment
                             {
                                 TDNMachineryId = mach.Id,
                                 OrderNo = order++,
@@ -925,13 +1030,18 @@ public class AssessmentService : IAssessmentService
                 catch { }
             }
 
-            var existingMach = _context.TDNMachineries
-                .Include(m => m.TDNMachineryDetails)
-                .Include(m => m.TDNMachineryPropertyAssessments)
-                .FirstOrDefault(m => m.TaxDeclarationId == declaration.Id);
-
             if (existingMach == null)
             {
+                if (newMachDetails != null)
+                {
+                    mach.TDNMachineryDetails.Clear();
+                    foreach (var d in newMachDetails) mach.TDNMachineryDetails.Add(d);
+                }
+                if (newMachPropAssessments != null)
+                {
+                    mach.TDNMachineryPropertyAssessments.Clear();
+                    foreach (var p in newMachPropAssessments) mach.TDNMachineryPropertyAssessments.Add(p);
+                }
                 _context.TDNMachineries.Add(mach);
             }
             else
@@ -941,15 +1051,25 @@ public class AssessmentService : IAssessmentService
                     _context.Entry(existingMach).CurrentValues.SetValues(mach);
                 }
 
-                if (mach.TDNMachineryDetails.Any())
+                if (newMachDetails != null)
                 {
+                    if (existingMach.TDNMachineryDetails.Any()) _context.TDNMachineryDetails.RemoveRange(existingMach.TDNMachineryDetails);
                     existingMach.TDNMachineryDetails.Clear();
-                    foreach (var d in mach.TDNMachineryDetails) existingMach.TDNMachineryDetails.Add(d);
+                    foreach (var d in newMachDetails)
+                    {
+                        _context.TDNMachineryDetails.Add(d);
+                        existingMach.TDNMachineryDetails.Add(d);
+                    }
                 }
-                if (mach.TDNMachineryPropertyAssessments.Any())
+                if (newMachPropAssessments != null)
                 {
+                    if (existingMach.TDNMachineryPropertyAssessments.Any()) _context.TDNMachineryPropertyAssessments.RemoveRange(existingMach.TDNMachineryPropertyAssessments);
                     existingMach.TDNMachineryPropertyAssessments.Clear();
-                    foreach (var p in mach.TDNMachineryPropertyAssessments) existingMach.TDNMachineryPropertyAssessments.Add(p);
+                    foreach (var p in newMachPropAssessments)
+                    {
+                        _context.TDNMachineryPropertyAssessments.Add(p);
+                        existingMach.TDNMachineryPropertyAssessments.Add(p);
+                    }
                 }
             }
         }

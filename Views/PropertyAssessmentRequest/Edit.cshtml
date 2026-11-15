@@ -1012,7 +1012,7 @@
             const idx = generatedPartitions.length;
             const letter = alphabetLetters[idx % alphabetLetters.length];
             const newOwner = (document.querySelector('input[name="NewOwnerName"]').value || '').trim();
-            const reqKindEl = document.querySelector('select[name="Kind"]');
+            const reqKindEl = document.getElementById('kindSelect') || document.querySelector('[name="Kind"]');
             const effKind = reqKindEl && reqKindEl.value ? reqKindEl.value : "Land";
             const brgyName = "BRGY. ZONE I";
             const arpCombined = formatCastArpNumber(brgyName, '001', `${idx + 1}`);
@@ -1092,7 +1092,7 @@
                 } else if (p.machineryAppraisalDetailsJson) {
                     pKind = 'Machinery';
                 } else {
-                    const reqKind = (document.querySelector('select[name="Kind"]')?.value || '').trim();
+                    const reqKind = ((document.getElementById('kindSelect') || document.querySelector('[name="Kind"]'))?.value || '').trim();
                     pKind = (reqKind === 'Building' || reqKind === 'Machinery') ? reqKind : 'Land';
                 }
                 p.kind = pKind;

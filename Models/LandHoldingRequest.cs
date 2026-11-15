@@ -39,7 +39,6 @@ public class LandHoldingRequest
     [Display(Name = "Contact No.")]
     public string? ContactNo { get; set; }
 
-    [Required(ErrorMessage = "Tax Declaration Number (TDN) is required.")]
     [Display(Name = "TD No.")]
     public string? TaxDeclarationNumber { get; set; }
 
@@ -104,6 +103,9 @@ public class LandHoldingRequest
     // Document To Be Requested Table (JSON & Fee Computation)
     [Display(Name = "Requested Documents JSON")]
     public string? RequestedDocumentsJson { get; set; }
+
+    [Display(Name = "Selected Properties / TDNs JSON")]
+    public string? SelectedPropertiesJson { get; set; }
 
     [Display(Name = "Total Fees Amount (₱)")]
     public decimal TotalFeesAmount { get; set; }

@@ -55,7 +55,24 @@ public static class PartitionJsonHelper
     {
         if (string.IsNullOrWhiteSpace(json)) return new List<AssessmentPartitionItem>();
         var node = Normalize(JsonNode.Parse(json));
-        return node.Deserialize<List<AssessmentPartitionItem>>(_readOptions) ?? new List<AssessmentPartitionItem>();
+        var list = node.Deserialize<List<AssessmentPartitionItem>>(_readOptions) ?? new List<AssessmentPartitionItem>();
+        EnsureUniquePartitionIndexes(list);
+        return list;
+    }
+
+    /// <summary>
+    /// AssessmentPartitionItem.PartitionIndex defaults to "A", so items created/saved without an explicit
+    /// label all collide on "A". If any label is blank or duplicated, relabel by position (A, B, C, ...).
+    /// </summary>
+    public static void EnsureUniquePartitionIndexes(List<AssessmentPartitionItem> list)
+    {
+        if (list.Count < 2) return;
+        var labels = list.Select(p => (p.PartitionIndex ?? string.Empty).Trim()).ToList();
+        bool broken = labels.Any(string.IsNullOrEmpty) ||
+                      labels.Distinct(StringComparer.OrdinalIgnoreCase).Count() != labels.Count;
+        if (!broken) return;
+        for (int i = 0; i < list.Count; i++)
+            list[i].PartitionIndex = i < 26 ? ((char)('A' + i)).ToString() : (i + 1).ToString();
     }
 
     public static AssessmentPartitionItem? ParseItem(string? json)

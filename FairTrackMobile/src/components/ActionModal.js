@@ -16,7 +16,12 @@ export const ActionModal = ({
   icon = 'information-circle-outline',
   iconType = 'primary', // 'primary' | 'success' | 'warning' | 'danger'
   buttons = [], // [{ text, style: 'primary' | 'danger' | 'cancel' | 'outline', icon, onPress }]
-  onClose
+  onClose,
+  onConfirm,
+  onCancel,
+  confirmText,
+  cancelText,
+  singleButton
 }) => {
   const { isDarkMode, colors, shadows } = useTheme();
 
@@ -46,16 +51,58 @@ export const ActionModal = ({
   };
 
   const iconTheme = getIconTheme();
-  const actionButtons = buttons && buttons.length > 0
-    ? buttons
-    : [{ text: 'OK', style: 'primary', onPress: onClose }];
+
+  let actionButtons = Array.isArray(buttons) && buttons.length > 0 ? buttons : [];
+  if (actionButtons.length === 0) {
+    if (singleButton || (!onCancel && !cancelText)) {
+      actionButtons = [
+        {
+          text: confirmText || 'OK',
+          style: 'primary',
+          onPress: () => {
+            if (typeof onConfirm === 'function') onConfirm();
+            else if (typeof onClose === 'function') onClose();
+          }
+        }
+      ];
+    } else {
+      actionButtons = [
+        {
+          text: cancelText || 'Cancel',
+          style: 'cancel',
+          onPress: () => {
+            if (typeof onCancel === 'function') onCancel();
+            else if (typeof onClose === 'function') onClose();
+          }
+        },
+        {
+          text: confirmText || 'Confirm',
+          style: 'primary',
+          onPress: () => {
+            if (typeof onConfirm === 'function') onConfirm();
+            else if (typeof onClose === 'function') onClose();
+          }
+        }
+      ];
+    }
+  }
+
+  const handleModalClose = () => {
+    if (typeof onClose === 'function') {
+      onClose();
+    } else if (typeof onCancel === 'function') {
+      onCancel();
+    } else if (typeof onConfirm === 'function') {
+      onConfirm();
+    }
+  };
 
   return (
     <Modal
       visible={!!visible}
       transparent
       animationType="fade"
-      onRequestClose={onClose}
+      onRequestClose={handleModalClose}
     >
       <View style={[styles.overlay, { backgroundColor: colors.modalOverlay }]}>
         <View
@@ -113,9 +160,12 @@ export const ActionModal = ({
                     borderStyle
                   ]}
                   onPress={() => {
-                    if (onClose) onClose();
                     if (typeof btn.onPress === 'function') {
                       btn.onPress();
+                    } else if (typeof onClose === 'function') {
+                      onClose();
+                    } else if (typeof onConfirm === 'function') {
+                      onConfirm();
                     }
                   }}
                 >

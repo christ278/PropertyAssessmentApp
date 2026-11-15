@@ -1,6 +1,6 @@
 /* Sinsilyo-Architecture Light Mode Enterprise CSS Stylesheet */
 
-body, .font-sans, .font-mono, .font-serif, input, select, textarea, button {
+body, .font-sans, .font-mono, .font-serif, input, select, textarea, button, table, td, th {
     font-family: 'Poppins', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
 }
 

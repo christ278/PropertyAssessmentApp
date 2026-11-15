@@ -1711,6 +1711,9 @@
                         if (draft.purpose && document.querySelector('input[name="Purpose"]')) document.querySelector('input[name="Purpose"]').value = draft.purpose;
                         if (draft.notes && document.querySelector('textarea[name="Notes"]')) document.querySelector('textarea[name="Notes"]').value = draft.notes;
                         if (draft.status && document.querySelector('select[name="Status"]')) document.querySelector('select[name="Status"]').value = draft.status;
+                        if (draft.kind && document.getElementById('kindSelect')) {
+                            document.getElementById('kindSelect').value = draft.kind;
+                        }
 
                         if (draft.selectedPropertyIds && Array.isArray(draft.selectedPropertyIds) && draft.selectedPropertyIds.length > 0) {
                             if (TomSelectRefProperty) {
@@ -1746,6 +1749,9 @@
                                         toastr.success(`Partition ${generatedPartitions[draft.editingIdx].partitionIndex || (draft.editingIdx + 1)} appraisal updated!`);
                                     } catch (err) { }
                                 }
+                            }
+                            if (!draft.kind && generatedPartitions[0]?.kind && document.getElementById('kindSelect')) {
+                                document.getElementById('kindSelect').value = generatedPartitions[0].kind;
                             }
                             renderPartitionsTable();
                         }
@@ -2058,7 +2064,7 @@
             const countInput = document.getElementById('genPartitionCountInput');
             const count = Math.max(1, Math.min(26, parseInt(countInput ? countInput.value : 1) || 1));
             const newOwner = (document.querySelector('input[name="NewOwnerName"]').value || '').trim();
-            const reqKindEl = document.querySelector('select[name="Kind"]');
+            const reqKindEl = document.getElementById('kindSelect') || document.querySelector('[name="Kind"]');
             const reqKind = reqKindEl && reqKindEl.value ? reqKindEl.value : null;
 
             generatedPartitions = [];
@@ -2388,7 +2394,7 @@
             const countLbl = document.getElementById('modalDiscoveryCountLbl');
             if (countLbl) countLbl.textContent = count;
 
-            const reqKindEl = document.querySelector('select[name="Kind"]') || document.getElementById('kindInput');
+            const reqKindEl = document.getElementById('kindSelect') || document.querySelector('[name="Kind"]');
             const curKind = reqKindEl && reqKindEl.value ? reqKindEl.value : 'Land';
             const targetRadio = document.querySelector(`input[name="discoveryTdKindRadio"][value="${curKind}"]`);
             if (targetRadio) {
@@ -2432,7 +2438,7 @@
             const brgyName = brgyEl && brgyEl.value ? brgyEl.value : 'Brgy. Central';
             const brgyCode = resolveCastBrgyCode(brgyName, '0001');
 
-            const reqKindEl = document.querySelector('select[name="Kind"]') || document.getElementById('kindInput');
+            const reqKindEl = document.getElementById('kindSelect') || document.querySelector('[name="Kind"]');
             if (reqKindEl) {
                 reqKindEl.value = chosenKind;
                 reqKindEl.dispatchEvent(new Event('change', { bubbles: true }));
@@ -2507,7 +2513,7 @@
             const idx = generatedPartitions.length;
             const letter = alphabetLetters[idx % alphabetLetters.length];
             const newOwner = (document.querySelector('input[name="NewOwnerName"]') ? document.querySelector('input[name="NewOwnerName"]').value : (document.getElementById('ownerNameInput') ? document.getElementById('ownerNameInput').value : '')).trim();
-            const reqKindEl = document.querySelector('select[name="Kind"]') || document.getElementById('kindInput');
+            const reqKindEl = document.getElementById('kindSelect') || document.querySelector('[name="Kind"]');
             const defaultKind = generatedPartitions.length > 0 ? generatedPartitions[0].kind : (reqKindEl && reqKindEl.value ? reqKindEl.value : 'Land');
             const effKind = baseProp ? (baseProp.kind || defaultKind) : defaultKind;
             const brgyName = baseProp ? baseProp.barangay : (document.querySelector('select[name="DistrictOrBarangay"]')?.value || 'Brgy. Central');
@@ -2595,7 +2601,7 @@
                 } else if (p.machineryAppraisalDetailsJson) {
                     pKind = 'Machinery';
                 } else {
-                    const reqKind = (document.querySelector('select[name="Kind"]')?.value || '').trim();
+                    const reqKind = ((document.getElementById('kindSelect') || document.querySelector('[name="Kind"]'))?.value || '').trim();
                     pKind = (reqKind === 'Building' || reqKind === 'Machinery') ? reqKind : 'Land';
                 }
                 p.kind = pKind;
@@ -2619,6 +2625,7 @@
                 purpose: document.querySelector('input[name="Purpose"]')?.value,
                 notes: document.querySelector('textarea[name="Notes"]')?.value,
                 status: document.querySelector('select[name="Status"]')?.value,
+                kind: document.getElementById('kindSelect')?.value || (generatedPartitions[0]?.kind ?? 'Land'),
                 selectedPropertyIds: selectedPropertyIds,
                 partitions: generatedPartitions,
                 feesJson: document.getElementById('RequestedDocumentsJson')?.value,

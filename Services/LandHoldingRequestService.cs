@@ -101,6 +101,7 @@ public class LandHoldingRequestService : ILandHoldingRequestService
             existing.CertOthersSpecify = request.CertOthersSpecify;
 
             existing.RequestedDocumentsJson = request.RequestedDocumentsJson;
+            existing.SelectedPropertiesJson = request.SelectedPropertiesJson;
             existing.TotalFeesAmount = request.TotalFeesAmount;
 
             if (fileUpload != null && fileUpload.Length > 0)
