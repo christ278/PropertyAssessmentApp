@@ -323,9 +323,12 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
 
                             // CAST Machinery Appraisal & Building/Land Reference
                             IsLandOwnerAlsoBuildingOwner = p.IsLandOwnerAlsoBuildingOwner,
+                            LandTaxDeclarationId = p.LandTaxDeclarationId,
+                            LandReferencesJson = p.LandReferencesJson,
                             LandOwnerName = p.LandOwnerName,
                             LandTdNo = p.LandTdNo,
                             LandPin = p.LandPin,
+                            BuildingTaxDeclarationId = p.BuildingTaxDeclarationId,
                             BuildingReferenceName = p.BuildingReferenceName,
                             BuildingTdNo = p.BuildingTdNo,
                             BuildingPin = p.BuildingPin,

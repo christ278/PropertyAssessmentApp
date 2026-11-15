@@ -34,6 +34,16 @@ public class TDNBuilding
     // -------------------------------------------------------------
     // LAND REFERENCE (WHERE ERECTED)
     // -------------------------------------------------------------
+    [Display(Name = "Linked Land Tax Declaration")]
+    public Guid? LandTaxDeclarationId { get; set; }
+
+    [ForeignKey(nameof(LandTaxDeclarationId))]
+    public TaxDeclaration? LandTaxDeclaration { get; set; }
+
+    public string? LandReferencesJson { get; set; }
+
+    public virtual ICollection<TDNBuildingLandReference> LandReferences { get; set; } = new List<TDNBuildingLandReference>();
+
     [Display(Name = "Landowner Name")]
     public string? LandOwnerName { get; set; }
 

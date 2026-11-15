@@ -2231,9 +2231,11 @@
             updatedPartition.parcelNo = $('#inputMachineryParcelNo').val() || $('#inputMachineryLotNo').val() || '';
 
             updatedPartition.isLandOwnerAlsoBuildingOwner = $('#chkIsLandOwnerAlsoBuildingOwner').is(':checked');
+            updatedPartition.buildingTaxDeclarationId = $('#inputMachineryBldgTaxDeclarationId').val() || null;
             updatedPartition.buildingReferenceName = $('#inputMachineryBldgOwner').val() || '';
             updatedPartition.buildingPin = $('#inputMachineryBldgPin').val() || '';
             updatedPartition.buildingTdNo = $('#inputMachineryBldgTdNo').val() || '';
+            updatedPartition.landTaxDeclarationId = $('#inputMachineryLandTaxDeclarationId').val() || null;
             updatedPartition.landOwnerName = $('#inputMachineryLandOwner').val() || '';
             updatedPartition.landPin = $('#inputMachineryLandPin').val() || '';
             updatedPartition.landTdNo = $('#inputMachineryLandTdNo').val() || '';
@@ -2536,6 +2538,8 @@
         updatedPartition.propertyLocation = $('#inputPropertyLocation').val() || [updatedPartition.streetLocation, updatedPartition.districtOrBarangay, updatedPartition.cityMunicipality, updatedPartition.province].filter(Boolean).join(', ');
         $('#inputPropertyLocation').val(updatedPartition.propertyLocation);
 
+        updatedPartition.landTaxDeclarationId = $('#inputBldgLandTaxDeclarationId').val() || null;
+        updatedPartition.landReferencesJson = $('#inputBldgLandReferencesJson').val() || '';
         updatedPartition.landOwnerName = $('input[name="LandOwnerName"]').val();
         updatedPartition.landTdNo = $('input[name="LandTdNo"]').val();
         updatedPartition.landPin = $('input[name="LandPin"]').val();
@@ -2950,12 +2954,26 @@
             if (p.isLandOwnerAlsoBuildingOwner || p.IsLandOwnerAlsoBuildingOwner) {
                 $('#chkIsLandOwnerAlsoBuildingOwner').prop('checked', true);
             }
+            if (p.buildingTaxDeclarationId) $('#inputMachineryBldgTaxDeclarationId').val(p.buildingTaxDeclarationId);
             if (p.buildingReferenceName) $('#inputMachineryBldgOwner').val(p.buildingReferenceName);
             if (p.buildingPin) $('#inputMachineryBldgPin').val(p.buildingPin);
             if (p.buildingTdNo) $('#inputMachineryBldgTdNo').val(p.buildingTdNo);
+            const $machBldgSel = $('#machineryBldgTdnSelect');
+            if ($machBldgSel.length && p.buildingTaxDeclarationId && p.buildingTdNo) {
+                $machBldgSel.empty();
+                $machBldgSel.append(new Option((p.buildingTdNo || '') + ' — ' + (p.buildingReferenceName || ''), p.buildingTaxDeclarationId, true, true));
+                $machBldgSel.trigger('change');
+            }
+            if (p.landTaxDeclarationId) $('#inputMachineryLandTaxDeclarationId').val(p.landTaxDeclarationId);
             if (p.landOwnerName) $('#inputMachineryLandOwner').val(p.landOwnerName);
             if (p.landPin) $('#inputMachineryLandPin').val(p.landPin);
             if (p.landTdNo) $('#inputMachineryLandTdNo').val(p.landTdNo);
+            const $machLandSel = $('#machineryLandTdnSelect');
+            if ($machLandSel.length && p.landTaxDeclarationId && p.landTdNo) {
+                $machLandSel.empty();
+                $machLandSel.append(new Option((p.landTdNo || '') + ' — ' + (p.landOwnerName || ''), p.landTaxDeclarationId, true, true));
+                $machLandSel.trigger('change');
+            }
             if (p.streetLocation) $('#inputMachineryStreet').val(p.streetLocation);
             if (p.districtOrBarangay) $('#selectMachineryBarangay').val(p.districtOrBarangay);
             const isLocal = !!(p.isLocallyManufactured || p.IsLocallyManufactured);
@@ -3129,5 +3147,265 @@
         }
 
         recalculateValuation();
+
+        // Active Land TDN Multi-Select (Select2 AJAX) & Auto-Fill for Building -> Land Reference (Where Erected)
+        window.syncBldgSelectedLands = function () {
+            const $sel = $('#bldgLandTdnSelect');
+            if (!$sel.length) return;
+
+            const selectedData = $sel.select2('data') || [];
+            const lands = [];
+            selectedData.forEach(function (item) {
+                if (item.land) {
+                    lands.push(item.land);
+                } else if (item.element && item.element.getAttribute('data-land')) {
+                    try {
+                        lands.push(JSON.parse(item.element.getAttribute('data-land')));
+                    } catch (e) { }
+                } else if (item.id) {
+                    const parts = (item.text || '').split('—');
+                    lands.push({
+                        id: item.id,
+                        taxDeclarationNumber: (parts[0] || '').trim(),
+                        ownerName: (parts[1] || '').trim()
+                    });
+                }
+            });
+
+            if (lands.length === 0) {
+                $('#inputBldgLandTaxDeclarationId').val('');
+                $('#inputBldgLandReferencesJson').val('');
+                $('#bldgLandLinkedBadge').addClass('hidden');
+                return;
+            }
+
+            const first = lands[0];
+            $('#inputBldgLandTaxDeclarationId').val(first.id || '');
+            $('#inputBldgLandReferencesJson').val(JSON.stringify(lands));
+
+            const unique = function (arr) {
+                return Array.from(new Set(arr.filter(Boolean)));
+            };
+            const owners = unique(lands.map(l => l.ownerName));
+            const tdns = unique(lands.map(l => l.taxDeclarationNumber));
+            const pins = unique(lands.map(l => l.propertyIndexNumber));
+
+            if (owners.length) $('#inputBldgLandOwnerName').val(owners.join(', '));
+            if (tdns.length) $('#inputBldgLandTdNo').val(tdns.join(', '));
+            if (pins.length) $('#inputBldgLandPin').val(pins.join(', '));
+
+            // Auto-fill Building Location from the primary Land parcel if empty
+            if (first.streetNo && !$('#inputBldgStreet').val()) $('#inputBldgStreet').val(first.streetNo);
+            if (first.districtOrBarangay && $('#selectBldgBarangay').length) {
+                $('#selectBldgBarangay').val(first.districtOrBarangay).trigger('change');
+            }
+            if (first.location && !$('#inputPropertyLocation').val()) {
+                $('#inputPropertyLocation').val(first.location);
+            }
+
+            $('#bldgLandLinkedText').text('Linked to ' + lands.length + ' Land(s): ' + tdns.join(', '));
+            $('#bldgLandLinkedBadge').removeClass('hidden');
+        };
+
+        window.clearBldgLinkedLand = function () {
+            $('#inputBldgLandTaxDeclarationId').val('');
+            $('#inputBldgLandReferencesJson').val('');
+            $('#bldgLandLinkedBadge').addClass('hidden');
+            const $sel = $('#bldgLandTdnSelect');
+            if ($sel.length) {
+                $sel.val(null).trigger('change');
+            }
+        };
+
+        const $bldgLandSelect = $('#bldgLandTdnSelect');
+        if ($bldgLandSelect.length && typeof $.fn.select2 !== 'undefined') {
+            $bldgLandSelect.select2({
+                width: '100%',
+                multiple: true,
+                placeholder: 'Search & select 1 or more active Land TDNs (TDN, PIN, Owner, Lot, Barangay)...',
+                allowClear: true,
+                minimumInputLength: 0,
+                closeOnSelect: false,
+                ajax: {
+                    url: '/Assessment/SearchActiveLandTdns',
+                    dataType: 'json',
+                    delay: 220,
+                    data: function (params) {
+                        return { q: params.term || '' };
+                    },
+                    processResults: function (data) {
+                        return {
+                            results: (data || []).map(function (item) {
+                                return {
+                                    id: item.id,
+                                    text: (item.taxDeclarationNumber || '') + ' — ' + (item.ownerName || ''),
+                                    land: item
+                                };
+                            })
+                        };
+                    },
+                    cache: true
+                },
+                templateResult: function (state) {
+                    if (!state.id || !state.land) return state.text;
+                    const l = state.land;
+                    const $el = $(
+                        '<div class="py-1 flex flex-col gap-0.5 text-inherit">' +
+                            '<div class="flex items-center justify-between gap-2">' +
+                                '<span class="font-mono font-bold text-xs"></span>' +
+                                '<span class="font-mono text-[10px] opacity-80"></span>' +
+                            '</div>' +
+                            '<div class="text-xs font-semibold"></div>' +
+                            '<div class="text-[11px] opacity-80"></div>' +
+                        '</div>'
+                    );
+                    $el.find('span').eq(0).text(l.taxDeclarationNumber || '');
+                    $el.find('span').eq(1).text('PIN: ' + (l.propertyIndexNumber || 'N/A'));
+                    $el.find('div').eq(1).text(l.ownerName || '');
+                    $el.find('div').eq(2).text('Lot ' + (l.lotNo || 'N/A') + (l.location ? ' · ' + l.location : ''));
+                    return $el;
+                }
+            });
+
+            $bldgLandSelect.on('select2:select select2:unselect select2:clear', function () {
+                syncBldgSelectedLands();
+            });
+        }
+
+        const $machBldgSelect = $('#machineryBldgTdnSelect');
+        if ($machBldgSelect.length && $.fn.select2) {
+            $machBldgSelect.select2({
+                placeholder: 'Search active Building TD No., PIN, Owner, or Barangay...',
+                allowClear: true,
+                width: '100%',
+                minimumInputLength: 0,
+                ajax: {
+                    url: '/Assessment/SearchActiveBuildingTdns',
+                    dataType: 'json',
+                    delay: 250,
+                    data: function (params) {
+                        const sameOwner = $('#chkIsLandOwnerAlsoBuildingOwner').is(':checked');
+                        const landOwner = ($('#inputMachineryLandOwner').val() || '').trim();
+                        return {
+                            q: params.term || '',
+                            sameOwnerOnly: sameOwner,
+                            ownerName: sameOwner ? landOwner : ''
+                        };
+                    },
+                    processResults: function (data) {
+                        return {
+                            results: (data || []).map(function (b) {
+                                return {
+                                    id: b.id,
+                                    text: (b.taxDeclarationNumber || '') + ' — ' + (b.ownerName || ''),
+                                    bldgData: b
+                                };
+                            })
+                        };
+                    },
+                    cache: false
+                },
+                templateResult: function (item) {
+                    if (item.loading || !item.bldgData) return item.text;
+                    const b = item.bldgData;
+                    const $el = $(
+                        '<div class="py-1">' +
+                            '<div class="flex items-center justify-between gap-2">' +
+                                '<span class="font-mono font-bold text-xs"></span>' +
+                                '<span class="font-mono text-[10px] opacity-80"></span>' +
+                            '</div>' +
+                            '<div class="text-xs font-semibold"></div>' +
+                            '<div class="text-[11px] opacity-80"></div>' +
+                        '</div>'
+                    );
+                    $el.find('span').eq(0).text(b.taxDeclarationNumber || '');
+                    $el.find('span').eq(1).text('PIN: ' + (b.propertyIndexNumber || 'N/A'));
+                    $el.find('div').eq(1).text(b.ownerName || '');
+                    $el.find('div').eq(2).text(b.location || b.districtOrBarangay || '');
+                    return $el;
+                }
+            });
+
+            $machBldgSelect.on('select2:select', function (e) {
+                const b = e.params.data && e.params.data.bldgData;
+                if (!b) return;
+                $('#inputMachineryBldgTaxDeclarationId').val(b.id || '');
+                $('#inputMachineryBldgOwner').val(b.ownerName || '');
+                $('#inputMachineryBldgPin').val(b.propertyIndexNumber || '');
+                $('#inputMachineryBldgTdNo').val(b.taxDeclarationNumber || '');
+                if (typeof window.syncLandAndBuildingOwnerFields === 'function') {
+                    window.syncLandAndBuildingOwnerFields('bldg');
+                }
+            });
+
+            $machBldgSelect.on('select2:clear', function () {
+                $('#inputMachineryBldgTaxDeclarationId').val('');
+            });
+        }
+
+        const $machLandSelect = $('#machineryLandTdnSelect');
+        if ($machLandSelect.length && $.fn.select2) {
+            $machLandSelect.select2({
+                placeholder: 'Search active Land TD No., PIN, Owner, Lot, or Barangay...',
+                allowClear: true,
+                width: '100%',
+                minimumInputLength: 0,
+                ajax: {
+                    url: '/Assessment/SearchActiveLandTdns',
+                    dataType: 'json',
+                    delay: 250,
+                    data: function (params) {
+                        return { q: params.term || '' };
+                    },
+                    processResults: function (data) {
+                        return {
+                            results: (data || []).map(function (l) {
+                                return {
+                                    id: l.id,
+                                    text: (l.taxDeclarationNumber || '') + ' — ' + (l.ownerName || ''),
+                                    landData: l
+                                };
+                            })
+                        };
+                    },
+                    cache: true
+                },
+                templateResult: function (item) {
+                    if (item.loading || !item.landData) return item.text;
+                    const l = item.landData;
+                    const $el = $(
+                        '<div class="py-1">' +
+                            '<div class="flex items-center justify-between gap-2">' +
+                                '<span class="font-mono font-bold text-xs"></span>' +
+                                '<span class="font-mono text-[10px] opacity-80"></span>' +
+                            '</div>' +
+                            '<div class="text-xs font-semibold"></div>' +
+                            '<div class="text-[11px] opacity-80"></div>' +
+                        '</div>'
+                    );
+                    $el.find('span').eq(0).text(l.taxDeclarationNumber || '');
+                    $el.find('span').eq(1).text('PIN: ' + (l.propertyIndexNumber || 'N/A'));
+                    $el.find('div').eq(1).text(l.ownerName || '');
+                    $el.find('div').eq(2).text('Lot ' + (l.lotNo || 'N/A') + (l.location ? ' · ' + l.location : ''));
+                    return $el;
+                }
+            });
+
+            $machLandSelect.on('select2:select', function (e) {
+                const l = e.params.data && e.params.data.landData;
+                if (!l) return;
+                $('#inputMachineryLandTaxDeclarationId').val(l.id || '');
+                $('#inputMachineryLandOwner').val(l.ownerName || '');
+                $('#inputMachineryLandPin').val(l.propertyIndexNumber || '');
+                $('#inputMachineryLandTdNo').val(l.taxDeclarationNumber || '');
+                if (typeof window.syncLandAndBuildingOwnerFields === 'function') {
+                    window.syncLandAndBuildingOwnerFields('land');
+                }
+            });
+
+            $machLandSelect.on('select2:clear', function () {
+                $('#inputMachineryLandTaxDeclarationId').val('');
+            });
+        }
     });
 </script>

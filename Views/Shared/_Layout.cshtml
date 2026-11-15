@@ -1359,6 +1359,13 @@
             if (targetController.toLowerCase() === "home" || targetController.toLowerCase() === "account" || targetController.toLowerCase() === "location") {
                 return;
             }
+            if (targetController.toLowerCase() === "assessment" &&
+                targetAction.toLowerCase() === "searchactivelandtdns" &&
+                (window.UserPermissions.allowedControllers.indexOf("assessment") !== -1 ||
+                 window.UserPermissions.allowedControllers.indexOf("propertyassessmentrequest") !== -1)) {
+                return;
+            }
+
             if (targetController.toLowerCase() === "landholdingrequest" &&
                 (targetAction.toLowerCase() === "details" || targetAction.toLowerCase() === "downloadattachment" || targetAction.toLowerCase() === "printcertificate" || targetAction.toLowerCase() === "printcertificatepdf" || targetAction.toLowerCase() === "printcertificatehtml") &&
                 window.UserPermissions.allowedControllers.indexOf("workflow") !== -1) {

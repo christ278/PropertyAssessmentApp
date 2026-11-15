@@ -7230,8 +7230,14 @@ namespace PropertyAssessmentApp.Migrations
                     b.Property<string>("LandPin")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("LandReferencesJson")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("LandSurveyNo")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid?>("LandTaxDeclarationId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("LandTdNo")
                         .HasColumnType("nvarchar(max)");
@@ -7292,6 +7298,8 @@ namespace PropertyAssessmentApp.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("BuildingDepreciationScheduleId");
+
+                    b.HasIndex("LandTaxDeclarationId");
 
                     b.HasIndex("TaxDeclarationId")
                         .IsUnique();
@@ -7390,6 +7398,42 @@ namespace PropertyAssessmentApp.Migrations
                     b.HasIndex("TDNBuildingId");
 
                     b.ToTable("TDNBuildingFloors");
+                });
+
+            modelBuilder.Entity("PropertyAssessmentApp.Models.TDNBuildingLandReference", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("LandOwnerName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("LandPin")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("LandTaxDeclarationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("LandTdNo")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Location")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("LotNo")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("TDNBuildingId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LandTaxDeclarationId");
+
+                    b.HasIndex("TDNBuildingId");
+
+                    b.ToTable("TDNBuildingLandReferences");
                 });
 
             modelBuilder.Entity("PropertyAssessmentApp.Models.TDNBuildingStructuralMaterial", b =>
@@ -7948,6 +7992,9 @@ namespace PropertyAssessmentApp.Migrations
                     b.Property<string>("BuildingReferenceName")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<Guid?>("BuildingTaxDeclarationId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("BuildingTdNo")
                         .HasColumnType("nvarchar(max)");
 
@@ -8016,6 +8063,9 @@ namespace PropertyAssessmentApp.Migrations
 
                     b.Property<string>("LandPin")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid?>("LandTaxDeclarationId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("LandTdNo")
                         .HasColumnType("nvarchar(max)");
@@ -8122,6 +8172,10 @@ namespace PropertyAssessmentApp.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("BuildingTaxDeclarationId");
+
+                    b.HasIndex("LandTaxDeclarationId");
 
                     b.HasIndex("TaxDeclarationId")
                         .IsUnique();
@@ -9037,6 +9091,11 @@ namespace PropertyAssessmentApp.Migrations
                         .HasForeignKey("BuildingDepreciationScheduleId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("PropertyAssessmentApp.Models.TaxDeclaration", "LandTaxDeclaration")
+                        .WithMany()
+                        .HasForeignKey("LandTaxDeclarationId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("PropertyAssessmentApp.Models.TaxDeclaration", "TaxDeclaration")
                         .WithOne("BuildingDetails")
                         .HasForeignKey("PropertyAssessmentApp.Models.TDNBuilding", "TaxDeclarationId")
@@ -9044,6 +9103,8 @@ namespace PropertyAssessmentApp.Migrations
                         .IsRequired();
 
                     b.Navigation("DepreciationSchedule");
+
+                    b.Navigation("LandTaxDeclaration");
 
                     b.Navigation("TaxDeclaration");
                 });
@@ -9066,6 +9127,25 @@ namespace PropertyAssessmentApp.Migrations
                         .HasForeignKey("TDNBuildingId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("TDNBuilding");
+                });
+
+            modelBuilder.Entity("PropertyAssessmentApp.Models.TDNBuildingLandReference", b =>
+                {
+                    b.HasOne("PropertyAssessmentApp.Models.TaxDeclaration", "LandTaxDeclaration")
+                        .WithMany()
+                        .HasForeignKey("LandTaxDeclarationId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("PropertyAssessmentApp.Models.TDNBuilding", "TDNBuilding")
+                        .WithMany("LandReferences")
+                        .HasForeignKey("TDNBuildingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("LandTaxDeclaration");
 
                     b.Navigation("TDNBuilding");
                 });
@@ -9138,11 +9218,25 @@ namespace PropertyAssessmentApp.Migrations
 
             modelBuilder.Entity("PropertyAssessmentApp.Models.TDNMachinery", b =>
                 {
+                    b.HasOne("PropertyAssessmentApp.Models.TaxDeclaration", "BuildingTaxDeclaration")
+                        .WithMany()
+                        .HasForeignKey("BuildingTaxDeclarationId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("PropertyAssessmentApp.Models.TaxDeclaration", "LandTaxDeclaration")
+                        .WithMany()
+                        .HasForeignKey("LandTaxDeclarationId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("PropertyAssessmentApp.Models.TaxDeclaration", "TaxDeclaration")
                         .WithOne("MachineryDetails")
                         .HasForeignKey("PropertyAssessmentApp.Models.TDNMachinery", "TaxDeclarationId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("BuildingTaxDeclaration");
+
+                    b.Navigation("LandTaxDeclaration");
 
                     b.Navigation("TaxDeclaration");
                 });
@@ -9226,6 +9320,8 @@ namespace PropertyAssessmentApp.Migrations
                     b.Navigation("AdditionalItems");
 
                     b.Navigation("FloorLevels");
+
+                    b.Navigation("LandReferences");
 
                     b.Navigation("StructuralMaterials");
                 });

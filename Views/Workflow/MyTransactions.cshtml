@@ -379,7 +379,7 @@
                                                 {
                                                     @foreach (var certOpt in item.CertificatePrintOptions)
                                                     {
-                                                        <a href="@Url.Action("PrintCertificate", "LandHoldingRequest", new { id = item.RequestId, reportId = certOpt.ReportId })"
+                                                        <a href="@Url.Action("Index", "RPTReport", new { landHoldingRequestId = item.RequestId, reportId = certOpt.ReportId })"
                                                            target="_blank"
                                                            onclick="closeAllWorkflowActionMenus()"
                                                            class="w-full px-3.5 py-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 flex items-center gap-2.5 transition-colors">

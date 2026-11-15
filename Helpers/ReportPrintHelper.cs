@@ -139,7 +139,7 @@ public static class ReportPrintHelper
         model.Footer.IssueCityProvince = "City of Koronadal, Province of South Cotabato.";
 
         model.Footer.CertFee = certFee ?? (model.IsNoImprovementCertificate ? 10.00m : 1470.00m);
-        model.Footer.ORNumber = string.IsNullOrWhiteSpace(orNumber) ? (model.IsNoImprovementCertificate ? "0009804" : "3677083") : orNumber.Trim();
+        model.Footer.ORNumber = string.IsNullOrWhiteSpace(orNumber) ? string.Empty : orNumber.Trim();
         model.Footer.ORDate = now.ToString("MM/dd/yyyy");
 
         // Standard official Koronadal Assessor signatories
@@ -239,7 +239,7 @@ public static class ReportPrintHelper
                 },
 
                 CertFee = certFee ?? 10.00m,
-                ORNumber = string.IsNullOrWhiteSpace(orNumber) ? "0009804" : orNumber.Trim(),
+                ORNumber = string.IsNullOrWhiteSpace(orNumber) ? string.Empty : orNumber.Trim(),
                 ORDate = now.ToString("MM/dd/yyyy"),
                 DocStampFeeDisplay = "Documentary Stamp Tax Paid Php 30.00",
                 ControlNumber = $"{now:MMddyyyy}00000000",
@@ -328,7 +328,7 @@ public static class ReportPrintHelper
                     Designation = "Tax Mapper III / Acting Records Officer License No. 0014412 08/09/2029"
                 },
 
-                ORNumber = string.IsNullOrWhiteSpace(orNumber) ? "0009804" : orNumber.Trim(),
+                ORNumber = string.IsNullOrWhiteSpace(orNumber) ? string.Empty : orNumber.Trim(),
                 ORDate = now.ToString("MM/dd/yyyy"),
                 Amount = certFee ?? 10.00m,
                 DocStampFeeDisplay = "Documentary Stamp Tax Paid Php 30.00"
@@ -473,7 +473,7 @@ public static class ReportPrintHelper
                 },
 
                 CertFee = certFee ?? 10.00m,
-                ORNumber = string.IsNullOrWhiteSpace(orNumber) ? "0009804" : orNumber.Trim(),
+                ORNumber = string.IsNullOrWhiteSpace(orNumber) ? string.Empty : orNumber.Trim(),
                 ORDate = now.ToString("MM/dd/yyyy"),
                 DocStampFeeDisplay = "Documentary Stamp Tax Paid Php 30.00",
                 ControlNumber = $"{now:MMddyyyy}00000000",
@@ -536,7 +536,7 @@ public static class ReportPrintHelper
                 },
 
                 CertFee = certFee ?? 65.00m,
-                ORNumber = string.IsNullOrWhiteSpace(orNumber) ? "0009804" : orNumber.Trim(),
+                ORNumber = string.IsNullOrWhiteSpace(orNumber) ? string.Empty : orNumber.Trim(),
                 ORDate = now.ToString("MM/dd/yyyy"),
                 DocStampFeeDisplay = "Documentary Stamp Tax Paid Php 30.00",
                 ControlNumber = $"{now:MMddyyyy}00000000",
@@ -674,7 +674,7 @@ public static class ReportPrintHelper
                 },
 
                 CertFee = certFee ?? 65.00m,
-                ORNumber = string.IsNullOrWhiteSpace(orNumber) ? "0009804" : orNumber.Trim(),
+                ORNumber = string.IsNullOrWhiteSpace(orNumber) ? string.Empty : orNumber.Trim(),
                 ORDate = now.ToString("MM/dd/yyyy"),
                 DocStampFeeDisplay = "Documentary Stamp Tax Paid Php 30.00",
                 ControlNumber = $"{now:MMddyyyy}00000000",
@@ -775,7 +775,7 @@ public static class ReportPrintHelper
 
                 ReceiptDate = now.ToString("MM/dd/yy"),
                 Amount = certFee ?? 150.00m,
-                ORNumber = string.IsNullOrWhiteSpace(orNumber) ? "3633033" : orNumber.Trim(),
+                ORNumber = string.IsNullOrWhiteSpace(orNumber) ? string.Empty : orNumber.Trim(),
 
                 BrandTitle = "KORONADAL",
                 BrandPrefix = "LUNGSOD NG",

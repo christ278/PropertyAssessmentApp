@@ -70,9 +70,17 @@ public class TDNMachinery
 
     // References (CAST Building Owner, Building Owner PIN, Land Owner, Land Owner PIN)
     public bool IsLandOwnerAlsoBuildingOwner { get; set; }
+    public Guid? LandTaxDeclarationId { get; set; }
+    [ForeignKey(nameof(LandTaxDeclarationId))]
+    [Microsoft.AspNetCore.Mvc.ModelBinding.Validation.ValidateNever]
+    public virtual TaxDeclaration? LandTaxDeclaration { get; set; }
     public string? LandOwnerName { get; set; }
     public string? LandTdNo { get; set; }
     public string? LandPin { get; set; }
+    public Guid? BuildingTaxDeclarationId { get; set; }
+    [ForeignKey(nameof(BuildingTaxDeclarationId))]
+    [Microsoft.AspNetCore.Mvc.ModelBinding.Validation.ValidateNever]
+    public virtual TaxDeclaration? BuildingTaxDeclaration { get; set; }
     public string? BuildingReferenceName { get; set; }
     public string? BuildingOwnerTin { get; set; }
     public string? BuildingOwnerPhone { get; set; }

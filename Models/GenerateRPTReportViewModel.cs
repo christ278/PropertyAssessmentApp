@@ -11,9 +11,16 @@ namespace PropertyAssessmentApp.Models;
 /// </summary>
 public class GenerateRPTReportViewModel
 {
-    [Required(ErrorMessage = "Tax Declaration Number (TDN) is required.")]
     [Display(Name = "Tax Declaration (TDN) No.")]
-    public string TaxDeclarationNumber { get; set; } = string.Empty;
+    public string? TaxDeclarationNumber { get; set; }
+
+    [Display(Name = "Registered Owner")]
+    public Guid? OwnerId { get; set; }
+
+    [Display(Name = "Owner Name")]
+    public string? OwnerName { get; set; }
+
+    public string? SelectedPropertyIdsJson { get; set; }
 
     [Required(ErrorMessage = "Please select a Report Type.")]
     [Range(1, int.MaxValue, ErrorMessage = "Please select a valid Report Type.")]
@@ -26,6 +33,7 @@ public class GenerateRPTReportViewModel
     [Display(Name = "Requestor / Authorized Representative")]
     public string? RequestedBy { get; set; }
 
+    [Required(ErrorMessage = "Official Receipt (O.R.) No. is required.")]
     [Display(Name = "Official Receipt (O.R.) No.")]
     public string? ORNumber { get; set; }
 

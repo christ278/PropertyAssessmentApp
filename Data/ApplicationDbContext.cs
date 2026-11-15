@@ -46,6 +46,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<TDNBuildingFloor> TDNBuildingFloors { get; set; } = null!;
     public DbSet<TDNBuildingAdditionalItem> TDNBuildingAdditionalItems { get; set; } = null!;
     public DbSet<TDNBuildingStructuralMaterial> TDNBuildingStructuralMaterials { get; set; } = null!;
+    public DbSet<TDNBuildingLandReference> TDNBuildingLandReferences { get; set; } = null!;
     public DbSet<TDNLand> TDNLands { get; set; } = null!;
     public DbSet<TDNLandDetail> TDNLandDetails { get; set; } = null!;
     public DbSet<TDNLandImprovement> TDNLandImprovements { get; set; } = null!;
@@ -247,6 +248,11 @@ public class ApplicationDbContext : DbContext
                   .WithMany(d => d.TDNBuildings)
                   .HasForeignKey(b => b.BuildingDepreciationScheduleId)
                   .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(b => b.LandTaxDeclaration)
+                  .WithMany()
+                  .HasForeignKey(b => b.LandTaxDeclarationId)
+                  .OnDelete(DeleteBehavior.NoAction);
             entity.Property(b => b.DepreciatedMarketValue).HasPrecision(18, 2);
             entity.Property(b => b.TotalAdditionalItemsValue).HasPrecision(18, 2);
             entity.Property(b => b.MarketValue).HasPrecision(18, 2);
@@ -271,6 +277,20 @@ public class ApplicationDbContext : DbContext
                   .WithOne(s => s.TDNBuilding)
                   .HasForeignKey(s => s.TDNBuildingId)
                   .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(b => b.LandReferences)
+                  .WithOne(l => l.TDNBuilding)
+                  .HasForeignKey(l => l.TDNBuildingId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<TDNBuildingLandReference>(entity =>
+        {
+            entity.HasKey(l => l.Id);
+            entity.HasOne(l => l.LandTaxDeclaration)
+                  .WithMany()
+                  .HasForeignKey(l => l.LandTaxDeclarationId)
+                  .OnDelete(DeleteBehavior.NoAction);
         });
 
         modelBuilder.Entity<TDNBuildingFloor>(entity =>
@@ -333,6 +353,16 @@ public class ApplicationDbContext : DbContext
                   .WithOne(p => p.TDNMachinery)
                   .HasForeignKey(p => p.TDNMachineryId)
                   .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(m => m.LandTaxDeclaration)
+                  .WithMany()
+                  .HasForeignKey(m => m.LandTaxDeclarationId)
+                  .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne(m => m.BuildingTaxDeclaration)
+                  .WithMany()
+                  .HasForeignKey(m => m.BuildingTaxDeclarationId)
+                  .OnDelete(DeleteBehavior.NoAction);
         });
 
         modelBuilder.Entity<OrderPayment>()

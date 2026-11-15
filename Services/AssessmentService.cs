@@ -78,6 +78,8 @@ public class AssessmentService : IAssessmentService
                 .ThenInclude(b => b!.AdditionalItems)
             .Include(t => t.BuildingDetails)
                 .ThenInclude(b => b!.StructuralMaterials)
+            .Include(t => t.BuildingDetails)
+                .ThenInclude(b => b!.LandReferences)
             .Include(t => t.LandDetails)
                 .ThenInclude(l => l!.TDNLandDetails)
             .Include(t => t.LandDetails)
@@ -107,6 +109,8 @@ public class AssessmentService : IAssessmentService
                 .ThenInclude(b => b!.AdditionalItems)
             .Include(t => t.BuildingDetails)
                 .ThenInclude(b => b!.StructuralMaterials)
+            .Include(t => t.BuildingDetails)
+                .ThenInclude(b => b!.LandReferences)
             .Include(t => t.LandDetails)
                 .ThenInclude(l => l!.TDNLandDetails)
             .Include(t => t.LandDetails)
@@ -430,6 +434,7 @@ public class AssessmentService : IAssessmentService
                 .Include(b => b.FloorLevels)
                 .Include(b => b.AdditionalItems)
                 .Include(b => b.StructuralMaterials)
+                .Include(b => b.LandReferences)
                 .FirstOrDefault(b => b.TaxDeclarationId == declaration.Id);
 
             if (existingBldg != null)
@@ -571,6 +576,51 @@ public class AssessmentService : IAssessmentService
             // Sync 16 Structural Materials (Local Assessment Manual - Table 3)
             var materials = GetDefaultStructuralMaterials(declaration, bldg.Id);
 
+            var newLandRefs = new List<TDNBuildingLandReference>();
+            if (!string.IsNullOrWhiteSpace(bldg.LandReferencesJson))
+            {
+                try
+                {
+                    using var lDoc = System.Text.Json.JsonDocument.Parse(bldg.LandReferencesJson);
+                    if (lDoc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Array)
+                    {
+                        foreach (var el in lDoc.RootElement.EnumerateArray())
+                        {
+                            Guid landId = Guid.Empty;
+                            if ((el.TryGetProperty("id", out var idEl) || el.TryGetProperty("landTaxDeclarationId", out idEl) || el.TryGetProperty("LandTaxDeclarationId", out idEl)) &&
+                                Guid.TryParse(idEl.GetString(), out var parsedId))
+                            {
+                                landId = parsedId;
+                            }
+                            if (landId == Guid.Empty) continue;
+
+                            newLandRefs.Add(new TDNBuildingLandReference
+                            {
+                                TDNBuildingId = bldg.Id,
+                                LandTaxDeclarationId = landId,
+                                LandTdNo = el.TryGetProperty("taxDeclarationNumber", out var tdnEl) ? tdnEl.GetString() : (el.TryGetProperty("landTdNo", out var tdnEl2) ? tdnEl2.GetString() : null),
+                                LandPin = el.TryGetProperty("propertyIndexNumber", out var pinEl) ? pinEl.GetString() : (el.TryGetProperty("landPin", out var pinEl2) ? pinEl2.GetString() : null),
+                                LandOwnerName = el.TryGetProperty("ownerName", out var ownEl) ? ownEl.GetString() : (el.TryGetProperty("landOwnerName", out var ownEl2) ? ownEl2.GetString() : null),
+                                LotNo = el.TryGetProperty("lotNo", out var lotEl) ? lotEl.GetString() : null,
+                                Location = el.TryGetProperty("location", out var locEl) ? locEl.GetString() : null
+                            });
+                        }
+                    }
+                }
+                catch { }
+            }
+            else if (bldg.LandTaxDeclarationId.HasValue)
+            {
+                newLandRefs.Add(new TDNBuildingLandReference
+                {
+                    TDNBuildingId = bldg.Id,
+                    LandTaxDeclarationId = bldg.LandTaxDeclarationId.Value,
+                    LandTdNo = bldg.LandTdNo,
+                    LandPin = bldg.LandPin,
+                    LandOwnerName = bldg.LandOwnerName
+                });
+            }
+
             if (existingBldg == null)
             {
                 if (newFloors != null)
@@ -585,6 +635,9 @@ public class AssessmentService : IAssessmentService
                 }
                 bldg.StructuralMaterials.Clear();
                 foreach (var sm in materials) bldg.StructuralMaterials.Add(sm);
+
+                bldg.LandReferences.Clear();
+                foreach (var lr in newLandRefs) bldg.LandReferences.Add(lr);
 
                 _context.TDNBuildings.Add(bldg);
             }
@@ -622,6 +675,16 @@ public class AssessmentService : IAssessmentService
                     {
                         _context.TDNBuildingStructuralMaterials.Add(sm);
                         existingBldg.StructuralMaterials.Add(sm);
+                    }
+                }
+                if (bldg.LandReferencesJson != null || newLandRefs.Any())
+                {
+                    if (existingBldg.LandReferences.Any()) _context.TDNBuildingLandReferences.RemoveRange(existingBldg.LandReferences);
+                    existingBldg.LandReferences.Clear();
+                    foreach (var lr in newLandRefs)
+                    {
+                        _context.TDNBuildingLandReferences.Add(lr);
+                        existingBldg.LandReferences.Add(lr);
                     }
                 }
             }

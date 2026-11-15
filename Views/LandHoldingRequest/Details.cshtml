@@ -126,7 +126,7 @@
         </div>
 
         <!-- 2. Properties in the Request -->
-        <div class="space-y-4">
+        <div class="space-y-4 hidden">
             <div class="flex items-center justify-between">
                 <h3 class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
                     <i data-lucide="building-2" class="w-4 h-4"></i>
@@ -257,10 +257,13 @@
                         <i data-lucide="@(Model.CertNoImprovementFromDeath ? "check-circle-2" : "circle")" class="w-4 h-4 @(Model.CertNoImprovementFromDeath ? "text-emerald-600" : "text-slate-300")"></i>
                         <span>CERTIFICATION W/ NO IMPROVEMENT (FROM TIME OF DEATH)</span>
                     </li>
-                    <li class="flex items-center gap-2">
-                        <i data-lucide="@(Model.CertNoLandholdings ? "check-circle-2" : "circle")" class="w-4 h-4 @(Model.CertNoLandholdings ? "text-emerald-600" : "text-slate-300")"></i>
-                        <span>CERTIFICATE OF NO LANDHOLDINGS</span>
-                    </li>
+                    @if (Model.CertNoLandholdings)
+                    {
+                        <li class="flex items-center gap-2">
+                            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600"></i>
+                            <span>CERTIFICATE OF NO LANDHOLDINGS</span>
+                        </li>
+                    }
                     <li class="flex items-center gap-2">
                         <i data-lucide="@(Model.CertPropertyHistory ? "check-circle-2" : "circle")" class="w-4 h-4 @(Model.CertPropertyHistory ? "text-emerald-600" : "text-slate-300")"></i>
                         <span>PROPERTY HISTORY</span>

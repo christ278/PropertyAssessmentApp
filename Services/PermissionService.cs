@@ -216,42 +216,67 @@ public class PermissionService : IPermissionService
         // RPT Reports & Certifications Directory & Individual Reports
         if (controllerName.Equals("RPTReport", StringComparison.OrdinalIgnoreCase))
         {
-            if (string.IsNullOrEmpty(actionName) || actionName.Equals("Index", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(actionName) &&
+                (actionName.Equals("SearchLandTdns", StringComparison.OrdinalIgnoreCase) ||
+                 actionName.Equals("GetLandImprovements", StringComparison.OrdinalIgnoreCase)))
             {
-                var dirMod = _context.SystemModules.FirstOrDefault(m => m.ModuleCode == "REPORT_DIRECTORY" && m.IsActive);
-                if (dirMod != null && HasModuleRecordAccess(roleSetting.Id, dirMod.ModuleId))
+                var lhMod = GetModuleForRequest("LandHoldingRequest", "Create");
+                if (lhMod != null && HasModuleRecordAccess(roleSetting.Id, lhMod.ModuleId))
                 {
                     return true;
                 }
-
-                var reportModIds = _context.SystemModules
-                    .Where(m => m.Category == "Reports & Certifications" && m.IsActive)
-                    .Select(m => m.ModuleId)
-                    .ToList();
-
-                return _context.RoleModulePermissions.Any(p =>
-                    p.RoleId == roleSetting.Id &&
-                    reportModIds.Contains(p.ModuleId) &&
-                    (p.CanView || p.CanCreate || p.CanEdit || p.CanDelete || p.CanApprove));
             }
 
-            var reportMod = _context.SystemModules.FirstOrDefault(m =>
-                m.IsActive &&
-                m.ControllerName != null &&
-                m.ControllerName.ToLower() == "rptreport" &&
-                m.ActionName != null &&
-                m.ActionName.ToLower() == actionName.ToLower());
-
-            if (reportMod != null)
+            if (!string.IsNullOrEmpty(actionName) && !actionName.Equals("Index", StringComparison.OrdinalIgnoreCase))
             {
-                return HasModuleRecordAccess(roleSetting.Id, reportMod.ModuleId);
+                var reportMod = _context.SystemModules.FirstOrDefault(m =>
+                    m.IsActive &&
+                    m.ControllerName != null &&
+                    m.ControllerName.ToLower() == "rptreport" &&
+                    m.ActionName != null &&
+                    m.ActionName.ToLower() == actionName.ToLower());
+
+                if (reportMod != null)
+                {
+                    return HasModuleRecordAccess(roleSetting.Id, reportMod.ModuleId);
+                }
             }
+
+            // For Index and shared helper/generation actions (SearchOwners, GetOwnerProperties,
+            // ValidateTdn, Generate, Print, PrintPdf), allow access if the role has either
+            // REPORT_DIRECTORY or any individual Reports & Certifications module permission.
+            var dirMod = _context.SystemModules.FirstOrDefault(m => m.ModuleCode == "REPORT_DIRECTORY" && m.IsActive);
+            if (dirMod != null && HasModuleRecordAccess(roleSetting.Id, dirMod.ModuleId))
+            {
+                return true;
+            }
+
+            var reportModIds = _context.SystemModules
+                .Where(m => m.Category == "Reports & Certifications" && m.IsActive)
+                .Select(m => m.ModuleId)
+                .ToList();
+
+            return _context.RoleModulePermissions.Any(p =>
+                p.RoleId == roleSetting.Id &&
+                reportModIds.Contains(p.ModuleId) &&
+                (p.CanView || p.CanCreate || p.CanEdit || p.CanDelete || p.CanApprove));
         }
 
         var module = GetModuleForRequest(controllerName, actionName);
         if (module == null)
         {
             return true;
+        }
+
+        // Allow SearchActiveLandTdns on Assessment when user has Assessment or PropertyAssessmentRequest access
+        if (controllerName.Equals("Assessment", StringComparison.OrdinalIgnoreCase) &&
+            actionName != null &&
+            actionName.Equals("SearchActiveLandTdns", StringComparison.OrdinalIgnoreCase))
+        {
+            if (HasModuleAccess(user, "Assessment", null) || HasModuleAccess(user, "PropertyAssessmentRequest", null))
+            {
+                return true;
+            }
         }
 
         // Allow viewing Details / DownloadAttachment / PrintCertificate* on LandHoldingRequest when user has Workflow (Pool / MyTransactions) access

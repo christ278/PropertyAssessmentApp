@@ -293,6 +293,8 @@ public class TaxDeclaration
                 Municipality = _municipality ?? "General Santos City",
                 DistrictOrBarangay = _districtOrBarangay ?? "Brgy. Central",
                 ProvinceCity = _provinceCity ?? "South Cotabato",
+                LandTaxDeclarationId = _landTaxDeclarationId,
+                LandReferencesJson = _landReferencesJson,
                 LandOwnerName = _landOwnerName,
                 LandOwnerTin = _landOwnerTin,
                 LandOwnerPhone = _landOwnerPhone,
@@ -444,7 +446,9 @@ public class TaxDeclaration
                 BuildingReferenceName = _bldgRefName,
                 BuildingPin = _bldgPin,
                 BuildingTdNo = _bldgTdNo,
+                BuildingTaxDeclarationId = _buildingTaxDeclarationId,
                 IsLandOwnerAlsoBuildingOwner = _isLandOwnerAlsoBuildingOwner,
+                LandTaxDeclarationId = _landTaxDeclarationId,
                 LandOwnerName = _landOwnerName,
                 LandPin = _landPin,
                 LandTdNo = _landTdNo,
@@ -725,6 +729,10 @@ public class TaxDeclaration
     public string CompleteAddress => string.Join(", ", new[] { StreetNo, DistrictOrBarangay, Municipality, ProvinceCity }.Where(s => !string.IsNullOrWhiteSpace(s)));
 
     // Land Reference (Where Erected / Situated)
+    [NotMapped] public Guid? LandTaxDeclarationId { get => BuildingDetails?.LandTaxDeclarationId ?? MachineryDetails?.LandTaxDeclarationId ?? _landTaxDeclarationId; set { _landTaxDeclarationId = value; if (BuildingDetails != null) BuildingDetails.LandTaxDeclarationId = value; if (MachineryDetails != null) MachineryDetails.LandTaxDeclarationId = value; } }
+    private Guid? _landTaxDeclarationId;
+    [NotMapped] public string? LandReferencesJson { get => BuildingDetails?.LandReferencesJson ?? _landReferencesJson; set { _landReferencesJson = value; if (BuildingDetails != null) BuildingDetails.LandReferencesJson = value; } }
+    private string? _landReferencesJson;
     [NotMapped] public string? LandOwnerName { get => BuildingDetails?.LandOwnerName ?? MachineryDetails?.LandOwnerName ?? _landOwnerName; set { _landOwnerName = value; if (BuildingDetails != null) BuildingDetails.LandOwnerName = value; if (MachineryDetails != null) MachineryDetails.LandOwnerName = value; } }
     private string? _landOwnerName;
     [NotMapped] public string? LandOwnerTin { get => BuildingDetails?.LandOwnerTin ?? _landOwnerTin; set { _landOwnerTin = value; if (BuildingDetails != null) BuildingDetails.LandOwnerTin = value; } }
@@ -753,6 +761,8 @@ public class TaxDeclaration
     private decimal _landAreaSqm;
 
     // Building Reference (For Machinery)
+    [NotMapped] public Guid? BuildingTaxDeclarationId { get => MachineryDetails?.BuildingTaxDeclarationId ?? _buildingTaxDeclarationId; set { _buildingTaxDeclarationId = value; if (MachineryDetails != null) MachineryDetails.BuildingTaxDeclarationId = value; } }
+    private Guid? _buildingTaxDeclarationId;
     [NotMapped] public string? BuildingReferenceName { get => MachineryDetails?.BuildingReferenceName ?? _bldgRefName; set { _bldgRefName = value; if (MachineryDetails != null) MachineryDetails.BuildingReferenceName = value; } }
     private string? _bldgRefName;
     [NotMapped] public string? BuildingOwnerTin { get => MachineryDetails?.BuildingOwnerTin ?? _bldgOwnerTin; set { _bldgOwnerTin = value; if (MachineryDetails != null) MachineryDetails.BuildingOwnerTin = value; } }

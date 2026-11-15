@@ -93,7 +93,7 @@
                 </div>
 
                 <!-- Owner's Registered Properties Table -->
-                <div class="pt-3 space-y-2">
+                <div class="pt-3 space-y-2 hidden">
                     <div class="flex items-center justify-between">
                         <label class="text-slate-600 dark:text-stone-400 font-bold uppercase flex items-center gap-1.5">
                             <i data-lucide="building-2" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
@@ -234,7 +234,7 @@
                         <span class="font-bold text-slate-800 dark:text-stone-200 uppercase">CERTIFICATION W/ NO IMPROVEMENT (FROM TIME OF DEATH)</span>
                     </label>
 
-                    <label class="flex items-center gap-3 p-3.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 cursor-pointer hover:border-emerald-600 transition-colors">
+                    <label class="hidden flex items-center gap-3 p-3.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 cursor-pointer hover:border-emerald-600 transition-colors">
                         <input type="checkbox" asp-for="CertNoLandholdings" class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 dark:border-stone-700 dark:bg-stone-950" />
                         <span class="font-bold text-slate-800 dark:text-stone-200 uppercase">CERTIFICATE OF NO LANDHOLDINGS</span>
                     </label>
@@ -243,6 +243,23 @@
                         <input type="checkbox" asp-for="CertPropertyHistory" class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 dark:border-stone-700 dark:bg-stone-950" />
                         <span class="font-bold text-slate-800 dark:text-stone-200 uppercase">PROPERTY HISTORY</span>
                     </label>
+                </div>
+
+                <div id="noImprovementLandTdnContainer" class="pt-3 @(Model.CertNoImprovementFromDeath ? "" : "hidden")">
+                    <label for="noImprovementLandTdnSelect" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold uppercase">
+                        LAND TDN FOR CERTIFICATION W/ NO IMPROVEMENT <span class="text-[10px] text-slate-400 font-normal">(Active &amp; Approved Land Only)</span>
+                    </label>
+                    <select id="noImprovementLandTdnSelect" class="w-full">
+                        <option value="">-- Search Active &amp; Approved Land TDN, Lot No., or Owner --</option>
+                        @if (Model.CertNoImprovementFromDeath && !string.IsNullOrWhiteSpace(Model.TaxDeclarationNumber))
+                        {
+                            var firstTdn = Model.TaxDeclarationNumber.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
+                            if (!string.IsNullOrWhiteSpace(firstTdn))
+                            {
+                                <option value="@firstTdn" selected>@firstTdn</option>
+                            }
+                        }
+                    </select>
                 </div>
 
                 <div class="pt-2">
@@ -538,10 +555,115 @@
             const tdnsInput = document.getElementById('selectedTdnsInput');
             const pinsInput = document.getElementById('selectedPinsInput');
             const propsJsonInput = document.getElementById('SelectedPropertiesJson');
+
+            const noImpCheckbox = document.getElementById('CertNoImprovementFromDeath');
+            const noImpSelect = document.getElementById('noImprovementLandTdnSelect');
+            const chosenLandTdn = (noImpCheckbox && noImpCheckbox.checked && noImpSelect) ? (noImpSelect.value || '').trim() : '';
+            const otherHoldingChecked =
+                document.getElementById('CertTotalLandholdings')?.checked ||
+                document.getElementById('CertAggregateAgriLandholdings')?.checked ||
+                document.getElementById('CertTypeTaxDeclaration')?.checked;
+
+            if (chosenLandTdn) {
+                let chosenPin = window._noImpSelectedPin || '';
+                if (!chosenPin) {
+                    rows.forEach(r => {
+                        if ((r.getAttribute('data-tdn') || '').trim().toLowerCase() === chosenLandTdn.toLowerCase()) {
+                            chosenPin = r.getAttribute('data-pin') || '';
+                        }
+                    });
+                }
+
+                if (!otherHoldingChecked) {
+                    if (tdnsInput) tdnsInput.value = chosenLandTdn;
+                    if (pinsInput) pinsInput.value = chosenPin;
+                    if (propsJsonInput) propsJsonInput.value = JSON.stringify(selectedProps);
+                    return;
+                }
+
+                const filtered = tdns.filter(t => t.toLowerCase() !== chosenLandTdn.toLowerCase());
+                tdns.length = 0;
+                tdns.push(chosenLandTdn, ...filtered);
+            }
+
             if (tdnsInput) tdnsInput.value = tdns.join(', ');
             if (pinsInput) pinsInput.value = pins.join(', ');
             if (propsJsonInput) propsJsonInput.value = JSON.stringify(selectedProps);
         }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const noImpCheckbox = document.getElementById('CertNoImprovementFromDeath');
+            const noImpContainer = document.getElementById('noImprovementLandTdnContainer');
+            const noImpSelectEl = document.getElementById('noImprovementLandTdnSelect');
+            if (!noImpCheckbox || !noImpContainer || !noImpSelectEl) return;
+
+            function toggleNoImpLandBox() {
+                noImpContainer.classList.toggle('hidden', !noImpCheckbox.checked);
+                syncOwnerPropertySummary();
+            }
+
+            noImpCheckbox.addEventListener('change', toggleNoImpLandBox);
+
+            if (typeof TomSelect !== 'undefined') {
+                const tomNoImp = new TomSelect('#noImprovementLandTdnSelect', {
+                    valueField: 'tdn',
+                    labelField: 'label',
+                    searchField: ['tdn', 'lotNo', 'location'],
+                    preload: true,
+                    shouldLoad: function () { return true; },
+                    load: function (query, callback) {
+                        const ownerIdVal = (document.getElementById('ownerSelect')?.value || '').trim();
+                        const ownerNameVal = (document.getElementById('ownerNameInput')?.value || '').trim();
+                        if (!ownerIdVal && !ownerNameVal) {
+                            callback([]);
+                            return;
+                        }
+                        const params = new URLSearchParams();
+                        params.set('q', query || '');
+                        if (ownerIdVal) params.set('ownerId', ownerIdVal);
+                        if (ownerNameVal) params.set('ownerName', ownerNameVal);
+
+                        fetch('/RPTReport/SearchLandTdns?' + params.toString())
+                            .then(r => r.json())
+                            .then(list => {
+                                const items = (Array.isArray(list) ? list : []).map(x => {
+                                    const locShort = x.location ? (x.location.length > 60 ? x.location.substring(0, 57) + '...' : x.location) : '';
+                                    return {
+                                        tdn: x.tdn,
+                                        pin: x.pin || '',
+                                        lotNo: x.lotNo || '',
+                                        location: x.location || '',
+                                        label: x.tdn + (x.lotNo ? ' · Lot ' + x.lotNo : '') + (locShort ? ' — ' + locShort : '')
+                                    };
+                                });
+                                callback(items);
+                            })
+                            .catch(() => callback());
+                    },
+                    onChange: function (val) {
+                        const opt = val ? tomNoImp.options[val] : null;
+                        window._noImpSelectedPin = (opt && opt.pin) ? opt.pin : '';
+                        syncOwnerPropertySummary();
+                    }
+                });
+
+                ['CertTotalLandholdings', 'CertAggregateAgriLandholdings', 'CertTypeTaxDeclaration'].forEach(id => {
+                    document.getElementById(id)?.addEventListener('change', syncOwnerPropertySummary);
+                });
+
+                function refreshNoImpLandOptions() {
+                    tomNoImp.clear(true);
+                    tomNoImp.clearOptions();
+                    tomNoImp.load('');
+                    syncOwnerPropertySummary();
+                }
+
+                document.getElementById('ownerSelect')?.addEventListener('change', refreshNoImpLandOptions);
+                document.getElementById('ownerNameInput')?.addEventListener('change', refreshNoImpLandOptions);
+            } else {
+                noImpSelectEl.addEventListener('change', syncOwnerPropertySummary);
+            }
+        });
 
         function addRow(savedItem) {
             const tbody = document.getElementById('feesTableBody');

@@ -385,30 +385,26 @@
         <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-stone-800 pb-2">
             <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
                 <i data-lucide="map-pin" class="w-4 h-4"></i>
-                Property Location &amp; Reference (Building Owner, Building P.I.N, Land Owner, Land Owner P.I.N)
+                Property Location &amp; Reference (Land Owner, Land Owner P.I.N, Building Owner, Building P.I.N)
             </h4>
-            <!-- Checkbox: Land Owner is the Building Owner Also -->
-            <label class="inline-flex items-center gap-2 cursor-pointer text-xs font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50 px-3.5 py-1.5 rounded-xl border border-emerald-200 dark:border-emerald-800 shadow-xs hover:border-emerald-500 transition-colors">
-                <input type="checkbox" asp-for="IsLandOwnerAlsoBuildingOwner" id="chkIsLandOwnerAlsoBuildingOwner" onchange="onLandOwnerAlsoBuildingOwnerToggle(this.checked)" class="rounded border-slate-300 text-emerald-600 shadow-sm focus:ring-emerald-500 w-4 h-4" />
-                <span>LAND OWNER IS ALSO THE BUILDING OWNER</span>
-            </label>
         </div>
+        <input type="hidden" asp-for="LandTaxDeclarationId" id="inputMachineryLandTaxDeclarationId" />
+        <input type="hidden" asp-for="BuildingTaxDeclarationId" id="inputMachineryBldgTaxDeclarationId" />
+
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <!-- Row 1: Building Owner, Building P.I.N, Building TD No. -->
-            <div>
-                <label asp-for="BuildingReferenceName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BUILDING OWNER</label>
-                <input asp-for="BuildingReferenceName" id="inputMachineryBldgOwner" oninput="syncLandAndBuildingOwnerFields('bldg')" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="Enter Building Owner Name" />
-            </div>
-            <div>
-                <label asp-for="BuildingPin" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BUILDING P.I.N</label>
-                <input asp-for="BuildingPin" id="inputMachineryBldgPin" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="187-00-0000-000-000" />
-            </div>
-            <div>
-                <label asp-for="BuildingTdNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BUILDING TD NO.</label>
-                <input asp-for="BuildingTdNo" id="inputMachineryBldgTdNo" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="TD-XXXX-XXXX" />
+            <!-- Search Active Land TDN (Kind: Land, Not Superseded) -->
+            <div class="md:col-span-3">
+                <label for="machineryLandTdnSelect" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs uppercase">SEARCH ACTIVE LAND TDN (KIND: LAND, NOT SUPERSEDED)</label>
+                <select id="machineryLandTdnSelect"
+                        class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs text-slate-900 dark:text-white">
+                    @if (Model.LandTaxDeclarationId.HasValue && !string.IsNullOrWhiteSpace(Model.LandTdNo))
+                    {
+                        <option value="@Model.LandTaxDeclarationId" selected>@Model.LandTdNo — @(Model.LandOwnerName ?? "")</option>
+                    }
+                </select>
             </div>
 
-            <!-- Row 2: Land Owner, Land Owner P.I.N, Land TD No. -->
+            <!-- Row 1: Land Owner, Land Owner P.I.N, Land TD No. -->
             <div>
                 <label asp-for="LandOwnerName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">LAND OWNER</label>
                 <input asp-for="LandOwnerName" id="inputMachineryLandOwner" oninput="syncLandAndBuildingOwnerFields('land')" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="Enter Land Owner Name" />
@@ -420,6 +416,40 @@
             <div>
                 <label asp-for="LandTdNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">LAND TD NO.</label>
                 <input asp-for="LandTdNo" id="inputMachineryLandTdNo" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="TD-XXXX-XXXX" />
+            </div>
+
+            <!-- Checkbox: Land Owner is the Building Owner Also (between Land and Building details) -->
+            <div class="md:col-span-3 pt-2 border-t border-slate-200 dark:border-stone-800">
+                <label class="inline-flex items-center gap-2 cursor-pointer text-xs font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50 px-3.5 py-2 rounded-xl border border-emerald-200 dark:border-emerald-800 shadow-xs hover:border-emerald-500 transition-colors">
+                    <input type="checkbox" asp-for="IsLandOwnerAlsoBuildingOwner" id="chkIsLandOwnerAlsoBuildingOwner" onchange="onLandOwnerAlsoBuildingOwnerToggle(this.checked)" class="rounded border-slate-300 text-emerald-600 shadow-sm focus:ring-emerald-500 w-4 h-4" />
+                    <span>LAND OWNER IS ALSO THE BUILDING OWNER</span>
+                </label>
+            </div>
+
+            <!-- Search Active Building TDN (Kind: Building, Not Superseded) -->
+            <div class="md:col-span-3">
+                <label for="machineryBldgTdnSelect" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs uppercase">SEARCH ACTIVE BUILDING TDN (KIND: BUILDING, NOT SUPERSEDED)</label>
+                <select id="machineryBldgTdnSelect"
+                        class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-xs text-slate-900 dark:text-white">
+                    @if (Model.BuildingTaxDeclarationId.HasValue && !string.IsNullOrWhiteSpace(Model.BuildingTdNo))
+                    {
+                        <option value="@Model.BuildingTaxDeclarationId" selected>@Model.BuildingTdNo — @(Model.BuildingReferenceName ?? "")</option>
+                    }
+                </select>
+            </div>
+
+            <!-- Row 2: Building Owner, Building P.I.N, Building TD No. -->
+            <div>
+                <label asp-for="BuildingReferenceName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BUILDING OWNER</label>
+                <input asp-for="BuildingReferenceName" id="inputMachineryBldgOwner" oninput="syncLandAndBuildingOwnerFields('bldg')" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="Enter Building Owner Name" />
+            </div>
+            <div>
+                <label asp-for="BuildingPin" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BUILDING P.I.N</label>
+                <input asp-for="BuildingPin" id="inputMachineryBldgPin" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="187-00-0000-000-000" />
+            </div>
+            <div>
+                <label asp-for="BuildingTdNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs">BUILDING TD NO.</label>
+                <input asp-for="BuildingTdNo" id="inputMachineryBldgTdNo" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="TD-XXXX-XXXX" />
             </div>
 
             <!-- Row 3: Building No./Street, Barangay, City, Province -->

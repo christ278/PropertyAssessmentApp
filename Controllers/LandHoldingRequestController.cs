@@ -424,6 +424,17 @@ public class LandHoldingRequestController : Controller
         }
         else
         {
+            // When Certificate of Total Landholdings (6) is requested for an owner with no properties,
+            // automatically use the Certificate of No Landholdings (5) template.
+            if (targetReportId == 6)
+            {
+                var noLandReport = _context.RPTReports.FirstOrDefault(r => r.RPTReportId == 5);
+                if (noLandReport != null)
+                {
+                    report = noLandReport;
+                }
+            }
+
             primaryTd = new TaxDeclaration
             {
                 TaxDeclarationNumber = item.TaxDeclarationNumber ?? string.Empty,

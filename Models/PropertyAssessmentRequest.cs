@@ -406,9 +406,12 @@ public class AssessmentPartitionItem
 
     // Reference Land & Building Information (CAST Building & Machinery)
     public bool IsLandOwnerAlsoBuildingOwner { get; set; }
+    public Guid? LandTaxDeclarationId { get; set; }
+    public string? LandReferencesJson { get; set; }
     public string? LandOwnerName { get; set; }
     public string? LandTdNo { get; set; }
     public string? LandPin { get; set; }
+    public Guid? BuildingTaxDeclarationId { get; set; }
     public string? BuildingReferenceName { get; set; }
     public string? BuildingTdNo { get; set; }
     public string? BuildingPin { get; set; }

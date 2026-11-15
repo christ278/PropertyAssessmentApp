@@ -415,10 +415,25 @@ public class AssessmentController : Controller
             LandImprovementsJson = td.LandImprovementsJson,
             LandAdjustmentsJson = td.LandAdjustmentsJson,
             LandPropertyAssessmentsJson = td.LandPropertyAssessmentsJson,
+            LandTaxDeclarationId = td.LandTaxDeclarationId,
+            LandReferencesJson = !string.IsNullOrWhiteSpace(td.LandReferencesJson)
+                ? td.LandReferencesJson
+                : (td.BuildingDetails?.LandReferences != null && td.BuildingDetails.LandReferences.Any()
+                    ? System.Text.Json.JsonSerializer.Serialize(td.BuildingDetails.LandReferences.Select(l => new
+                    {
+                        id = l.LandTaxDeclarationId,
+                        taxDeclarationNumber = l.LandTdNo,
+                        propertyIndexNumber = l.LandPin,
+                        ownerName = l.LandOwnerName,
+                        lotNo = l.LotNo,
+                        location = l.Location
+                    }))
+                    : null),
             LandOwnerName = td.LandOwnerName,
             LandTdNo = td.LandTdNo,
             LandPin = td.LandPin,
             IsLandOwnerAlsoBuildingOwner = td.IsLandOwnerAlsoBuildingOwner,
+            BuildingTaxDeclarationId = td.BuildingTaxDeclarationId,
             BuildingReferenceName = td.BuildingReferenceName,
             BuildingTdNo = td.BuildingTdNo,
             BuildingPin = td.BuildingPin,
@@ -699,12 +714,73 @@ public class AssessmentController : Controller
 
         // Machinery Details & Land/Building Reference
         td.IsLandOwnerAlsoBuildingOwner = p.IsLandOwnerAlsoBuildingOwner;
+        td.LandTaxDeclarationId = p.LandTaxDeclarationId;
+        td.LandReferencesJson = p.LandReferencesJson;
         td.LandOwnerName = p.LandOwnerName;
         td.LandTdNo = p.LandTdNo;
         td.LandPin = p.LandPin;
+        if (td.Kind == PropertyKind.Building && p.LandTaxDeclarationId.HasValue)
+        {
+            var linkedLand = _context.TaxDeclarations
+                .AsNoTracking()
+                .FirstOrDefault(t => t.Id == p.LandTaxDeclarationId.Value);
+            if (linkedLand != null)
+            {
+                var bldg = td.EnsureBuildingDetails();
+                bldg.LandTaxDeclarationId = linkedLand.Id;
+                if (string.IsNullOrWhiteSpace(bldg.LandOwnerName)) bldg.LandOwnerName = linkedLand.OwnerName;
+                if (string.IsNullOrWhiteSpace(bldg.LandTdNo)) bldg.LandTdNo = linkedLand.TaxDeclarationNumber;
+                if (string.IsNullOrWhiteSpace(bldg.LandPin)) bldg.LandPin = linkedLand.PropertyIndexNumber;
+                bldg.LandOwnerTin = linkedLand.OwnerTin;
+                bldg.LandOwnerPhone = linkedLand.OwnerPhone;
+                bldg.LandOwnerEmail = linkedLand.OwnerEmail;
+                bldg.LandOwnerAddress = linkedLand.OwnerAddress;
+                bldg.LandOwnerSex = linkedLand.OwnerSex;
+                if (string.IsNullOrWhiteSpace(bldg.LandTitleNo)) bldg.LandTitleNo = linkedLand.TitleNo;
+                if (string.IsNullOrWhiteSpace(bldg.LandSurveyNo)) bldg.LandSurveyNo = linkedLand.SurveyNo;
+                if (string.IsNullOrWhiteSpace(bldg.LandLotNo)) bldg.LandLotNo = linkedLand.LotNo;
+                if (string.IsNullOrWhiteSpace(bldg.LandBlockNo)) bldg.LandBlockNo = linkedLand.BlockNo;
+                if (bldg.LandAreaSqm <= 0) bldg.LandAreaSqm = linkedLand.AreaSqMeters;
+            }
+        }
+        td.BuildingTaxDeclarationId = p.BuildingTaxDeclarationId;
         td.BuildingReferenceName = p.BuildingReferenceName;
         td.BuildingTdNo = p.BuildingTdNo;
         td.BuildingPin = p.BuildingPin;
+        if (td.Kind == PropertyKind.Machinery)
+        {
+            var mach = td.EnsureMachineryDetails();
+            if (p.LandTaxDeclarationId.HasValue)
+            {
+                var linkedLand = _context.TaxDeclarations
+                    .AsNoTracking()
+                    .FirstOrDefault(t => t.Id == p.LandTaxDeclarationId.Value);
+                if (linkedLand != null)
+                {
+                    mach.LandTaxDeclarationId = linkedLand.Id;
+                    if (string.IsNullOrWhiteSpace(mach.LandOwnerName)) mach.LandOwnerName = linkedLand.OwnerName;
+                    if (string.IsNullOrWhiteSpace(mach.LandTdNo)) mach.LandTdNo = linkedLand.TaxDeclarationNumber;
+                    if (string.IsNullOrWhiteSpace(mach.LandPin)) mach.LandPin = linkedLand.PropertyIndexNumber;
+                }
+            }
+            if (p.BuildingTaxDeclarationId.HasValue)
+            {
+                var linkedBldg = _context.TaxDeclarations
+                    .AsNoTracking()
+                    .FirstOrDefault(t => t.Id == p.BuildingTaxDeclarationId.Value);
+                if (linkedBldg != null)
+                {
+                    mach.BuildingTaxDeclarationId = linkedBldg.Id;
+                    if (string.IsNullOrWhiteSpace(mach.BuildingReferenceName)) mach.BuildingReferenceName = linkedBldg.OwnerName;
+                    if (string.IsNullOrWhiteSpace(mach.BuildingTdNo)) mach.BuildingTdNo = linkedBldg.TaxDeclarationNumber;
+                    if (string.IsNullOrWhiteSpace(mach.BuildingPin)) mach.BuildingPin = linkedBldg.PropertyIndexNumber;
+                    mach.BuildingOwnerTin = linkedBldg.OwnerTin;
+                    mach.BuildingOwnerPhone = linkedBldg.OwnerPhone;
+                    mach.BuildingOwnerAddress = linkedBldg.OwnerAddress;
+                    mach.BuildingOwnerSex = linkedBldg.OwnerSex;
+                }
+            }
+        }
         td.IsLocallyManufactured = p.IsLocallyManufactured;
         td.MachineryRegNo = p.MachineryRegNo ?? string.Empty;
         td.MachineryDateRegistered = p.MachineryDateRegistered;
@@ -720,6 +796,152 @@ public class AssessmentController : Controller
         td.LocalDateIssued = p.LocalDateIssued;
         td.MachineryAppraisalDetailsJson = p.MachineryAppraisalDetailsJson;
         td.MachineryPropertyAssessmentsJson = p.MachineryPropertyAssessmentsJson;
+    }
+
+    [HttpGet]
+    public IActionResult SearchActiveLandTdns(string? q = null)
+    {
+        var query = _context.TaxDeclarations
+            .AsNoTracking()
+            .Where(t => t.Kind == PropertyKind.Land
+                     && !t.IsCancelledAndSuperseded
+                     && t.Status == AssessmentStatus.Active);
+
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var term = q.Trim();
+            query = query.Where(t =>
+                (t.TaxDeclarationNumber != null && t.TaxDeclarationNumber.Contains(term)) ||
+                (t.PropertyIndexNumber != null && t.PropertyIndexNumber.Contains(term)) ||
+                (t.OwnerName != null && t.OwnerName.Contains(term)) ||
+                (t.LandDetails != null && (
+                    (t.LandDetails.LotNo != null && t.LandDetails.LotNo.Contains(term)) ||
+                    (t.LandDetails.DistrictOrBarangay != null && t.LandDetails.DistrictOrBarangay.Contains(term))
+                )));
+        }
+
+        var rows = query
+            .OrderBy(t => t.TaxDeclarationNumber)
+            .Take(25)
+            .Select(t => new
+            {
+                t.Id,
+                t.TaxDeclarationNumber,
+                t.PropertyIndexNumber,
+                t.OwnerName,
+                t.OwnerTin,
+                t.OwnerPhone,
+                t.OwnerEmail,
+                t.OwnerAddress,
+                TitleNo = t.LandDetails != null ? t.LandDetails.TitleNo : null,
+                LotNo = t.LandDetails != null ? t.LandDetails.LotNo : null,
+                BlockNo = t.LandDetails != null ? t.LandDetails.BlockNo : null,
+                SurveyNo = t.LandDetails != null ? t.LandDetails.SurveyNo : null,
+                AreaSqMeters = t.LandDetails != null ? t.LandDetails.AreaSqMeters : 0m,
+                StreetNo = t.LandDetails != null ? t.LandDetails.StreetNo : null,
+                Purok = t.LandDetails != null ? t.LandDetails.Purok : null,
+                DistrictOrBarangay = t.LandDetails != null ? t.LandDetails.DistrictOrBarangay : null,
+                Municipality = t.LandDetails != null ? t.LandDetails.Municipality : null,
+                ProvinceCity = t.LandDetails != null ? t.LandDetails.ProvinceCity : null
+            })
+            .ToList();
+
+        var results = rows.Select(t => new
+        {
+            id = t.Id,
+            taxDeclarationNumber = t.TaxDeclarationNumber,
+            propertyIndexNumber = t.PropertyIndexNumber,
+            ownerName = t.OwnerName,
+            ownerTin = t.OwnerTin,
+            ownerPhone = t.OwnerPhone,
+            ownerEmail = t.OwnerEmail,
+            ownerAddress = t.OwnerAddress,
+            titleNo = t.TitleNo,
+            lotNo = t.LotNo,
+            blockNo = t.BlockNo,
+            surveyNo = t.SurveyNo,
+            areaSqMeters = t.AreaSqMeters,
+            streetNo = t.StreetNo,
+            purok = t.Purok,
+            districtOrBarangay = t.DistrictOrBarangay,
+            municipality = t.Municipality,
+            provinceCity = t.ProvinceCity,
+            location = string.Join(", ", new[] { t.StreetNo, t.DistrictOrBarangay, t.Municipality, t.ProvinceCity }.Where(s => !string.IsNullOrWhiteSpace(s)))
+        }).ToList();
+
+        return Json(results);
+    }
+
+    [HttpGet]
+    public IActionResult SearchActiveBuildingTdns(string? q = null, string? ownerName = null, bool sameOwnerOnly = false)
+    {
+        if (sameOwnerOnly && string.IsNullOrWhiteSpace(ownerName))
+        {
+            return Json(Array.Empty<object>());
+        }
+
+        var query = _context.TaxDeclarations
+            .AsNoTracking()
+            .Where(t => t.Kind == PropertyKind.Building
+                     && !t.IsCancelledAndSuperseded
+                     && t.Status == AssessmentStatus.Active);
+
+        if (sameOwnerOnly && !string.IsNullOrWhiteSpace(ownerName))
+        {
+            var ownerFilter = ownerName.Trim().ToLower();
+            query = query.Where(t => t.OwnerName != null && t.OwnerName.Trim().ToLower() == ownerFilter);
+        }
+
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var term = q.Trim();
+            query = query.Where(t =>
+                (t.TaxDeclarationNumber != null && t.TaxDeclarationNumber.Contains(term)) ||
+                (t.PropertyIndexNumber != null && t.PropertyIndexNumber.Contains(term)) ||
+                (t.OwnerName != null && t.OwnerName.Contains(term)) ||
+                (t.BuildingDetails != null &&
+                    t.BuildingDetails.DistrictOrBarangay != null &&
+                    t.BuildingDetails.DistrictOrBarangay.Contains(term)));
+        }
+
+        var rows = query
+            .OrderBy(t => t.TaxDeclarationNumber)
+            .Take(25)
+            .Select(t => new
+            {
+                t.Id,
+                t.TaxDeclarationNumber,
+                t.PropertyIndexNumber,
+                t.OwnerName,
+                t.OwnerTin,
+                t.OwnerPhone,
+                t.OwnerAddress,
+                t.OwnerSex,
+                StreetNo = t.BuildingDetails != null ? t.BuildingDetails.StreetNo : null,
+                DistrictOrBarangay = t.BuildingDetails != null ? t.BuildingDetails.DistrictOrBarangay : null,
+                Municipality = t.BuildingDetails != null ? t.BuildingDetails.Municipality : null,
+                ProvinceCity = t.BuildingDetails != null ? t.BuildingDetails.ProvinceCity : null
+            })
+            .ToList();
+
+        var results = rows.Select(t => new
+        {
+            id = t.Id,
+            taxDeclarationNumber = t.TaxDeclarationNumber,
+            propertyIndexNumber = t.PropertyIndexNumber,
+            ownerName = t.OwnerName,
+            ownerTin = t.OwnerTin,
+            ownerPhone = t.OwnerPhone,
+            ownerAddress = t.OwnerAddress,
+            ownerSex = t.OwnerSex,
+            streetNo = t.StreetNo,
+            districtOrBarangay = t.DistrictOrBarangay,
+            municipality = t.Municipality,
+            provinceCity = t.ProvinceCity,
+            location = string.Join(", ", new[] { t.StreetNo, t.DistrictOrBarangay, t.Municipality, t.ProvinceCity }.Where(s => !string.IsNullOrWhiteSpace(s)))
+        }).ToList();
+
+        return Json(results);
     }
 
     [HttpGet]
