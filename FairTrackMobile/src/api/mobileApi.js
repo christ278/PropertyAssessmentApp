@@ -70,13 +70,24 @@ export const MobileApi = {
   },
 
   // Advance Workflow
-  forwardWorkflow: async (formWorkflowId, nextStatusId, remarks = '', trackingNo = '') => {
-    const response = await apiClient.post('/api/mobile/workflow/forward', {
-      formWorkflowId,
-      trackingNo,
-      nextStatusId,
-      remarks
-    });
+  forwardWorkflow: async (formWorkflowIdOrOptions, nextStatusId, remarks = '', trackingNo = '') => {
+    let payload;
+    if (typeof formWorkflowIdOrOptions === 'object' && formWorkflowIdOrOptions !== null) {
+      payload = {
+        formWorkflowId: formWorkflowIdOrOptions.formWorkflowId || 0,
+        trackingNo: formWorkflowIdOrOptions.trackingNo || '',
+        nextStatusId: formWorkflowIdOrOptions.nextStatusId || 4,
+        remarks: formWorkflowIdOrOptions.remarks || ''
+      };
+    } else {
+      payload = {
+        formWorkflowId: formWorkflowIdOrOptions || 0,
+        trackingNo: trackingNo || '',
+        nextStatusId: nextStatusId || 4,
+        remarks: remarks || ''
+      };
+    }
+    const response = await apiClient.post('/api/mobile/workflow/forward', payload);
     return response.data;
   }
 };

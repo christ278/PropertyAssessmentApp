@@ -74,12 +74,13 @@ public class MobileApiController : ControllerBase
         _assessmentService = assessmentService;
     }
 
-    // Helper: Generate a deterministic positive 64-bit integer from a Guid
+    // Helper: Generate a deterministic positive 64-bit integer from a Guid (masked to 53 bits for JavaScript float safety)
     private static long GuidToNumericId(Guid guid)
     {
         byte[] bytes = guid.ToByteArray();
         long val = BitConverter.ToInt64(bytes, 0);
-        return Math.Abs(val == 0 ? 1 : val);
+        long absVal = Math.Abs(val == 0 ? 1 : val);
+        return (absVal & 0x001FFFFFFFFFFFFFL);
     }
 
     // Strict check: Only Property Assessment and Field Inspection transactions are allowed on mobile
@@ -1826,12 +1827,17 @@ public class MobileApiController : ControllerBase
         PropertyAssessmentRequest? par = null;
         if (!string.IsNullOrEmpty(cleanTracking))
         {
-            par = await _context.PropertyAssessmentRequests.FirstOrDefaultAsync(p => p.TrackingNumber == cleanTracking);
+            par = await _context.PropertyAssessmentRequests.FirstOrDefaultAsync(p => 
+                p.TrackingNumber == cleanTracking || 
+                p.TrackingNumber.Trim().ToLower() == cleanTracking.ToLower());
         }
         if (par == null && req.FormWorkflowId > 0)
         {
             var allRpas = await _context.PropertyAssessmentRequests.ToListAsync();
-            par = allRpas.FirstOrDefault(p => GuidToNumericId(p.Id) == req.FormWorkflowId);
+            par = allRpas.FirstOrDefault(p => 
+                GuidToNumericId(p.Id) == req.FormWorkflowId || 
+                (GuidToNumericId(p.Id) & 0x001FFFFFFFFFFFFFL) == (req.FormWorkflowId & 0x001FFFFFFFFFFFFFL) ||
+                Math.Abs(GuidToNumericId(p.Id) - req.FormWorkflowId) < 2048);
         }
 
         if (par != null)
@@ -1873,12 +1879,17 @@ public class MobileApiController : ControllerBase
         RequestForInspection? rfi = null;
         if (!string.IsNullOrEmpty(cleanTracking))
         {
-            rfi = await _context.RequestForInspections.FirstOrDefaultAsync(r => r.TrackingNumber == cleanTracking);
+            rfi = await _context.RequestForInspections.FirstOrDefaultAsync(r => 
+                r.TrackingNumber == cleanTracking || 
+                r.TrackingNumber.Trim().ToLower() == cleanTracking.ToLower());
         }
         if (rfi == null && req.FormWorkflowId > 0)
         {
             var allRfis = await _context.RequestForInspections.ToListAsync();
-            rfi = allRfis.FirstOrDefault(r => GuidToNumericId(r.Id) == req.FormWorkflowId);
+            rfi = allRfis.FirstOrDefault(r => 
+                GuidToNumericId(r.Id) == req.FormWorkflowId || 
+                (GuidToNumericId(r.Id) & 0x001FFFFFFFFFFFFFL) == (req.FormWorkflowId & 0x001FFFFFFFFFFFFFL) ||
+                Math.Abs(GuidToNumericId(r.Id) - req.FormWorkflowId) < 2048);
         }
 
         if (rfi != null)
@@ -1916,11 +1927,28 @@ public class MobileApiController : ControllerBase
             });
         }
 
-        // Reject any other transaction type
-        return BadRequest(new
+        // Check if the tracking number belongs to a non-mobile request type for clearer error reporting
+        if (!string.IsNullOrEmpty(cleanTracking))
+        {
+            bool isOtherModule =
+                await _context.TaxMappingRequests.AnyAsync(t => t.RequestNumber == cleanTracking) ||
+                await _context.TaxDeclarationRequests.AnyAsync(t => t.TrackingNumber == cleanTracking) ||
+                await _context.LandHoldingRequests.AnyAsync(t => t.TrackingNumber == cleanTracking);
+
+            if (isOtherModule)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = $"Tracking number '{cleanTracking}' belongs to an office-only service (Tax Mapping or Certificate issuance) which cannot be field-inspected or forwarded via mobile."
+                });
+            }
+        }
+
+        return NotFound(new
         {
             success = false,
-            message = "Only Property Assessment (RPA) and Field Inspection (RFI) transactions can be synced and forwarded from the mobile app."
+            message = $"Transaction '{(string.IsNullOrEmpty(cleanTracking) ? req.FormWorkflowId.ToString() : cleanTracking)}' could not be found in active Property Assessment or Field Inspection records."
         });
     }
 
@@ -1936,13 +1964,17 @@ public class MobileApiController : ControllerBase
     {
         string cleanTracking = (trackingNo ?? "").Trim();
 
-        // 1. Authoritative lookup: By Tracking Number (exact, collision-free indexed query)
+        // 1. Authoritative lookup: By Tracking Number (exact or case-insensitive query)
         if (!string.IsNullOrEmpty(cleanTracking))
         {
-            var rpa = await _context.PropertyAssessmentRequests.FirstOrDefaultAsync(p => p.TrackingNumber == cleanTracking);
+            var rpa = await _context.PropertyAssessmentRequests.FirstOrDefaultAsync(p => 
+                p.TrackingNumber == cleanTracking || 
+                p.TrackingNumber.Trim().ToLower() == cleanTracking.ToLower());
             if (rpa != null) return (rpa, null, false);
 
-            var rfi = await _context.RequestForInspections.FirstOrDefaultAsync(r => r.TrackingNumber == cleanTracking);
+            var rfi = await _context.RequestForInspections.FirstOrDefaultAsync(r => 
+                r.TrackingNumber == cleanTracking || 
+                r.TrackingNumber.Trim().ToLower() == cleanTracking.ToLower());
             if (rfi != null) return (null, rfi, false);
 
             // Check if the tracking number belongs to a non-mobile request type (TaxMapping, TaxDeclarationRequest, LandHoldingRequest)
@@ -1961,11 +1993,17 @@ public class MobileApiController : ControllerBase
         if (formWorkflowId.HasValue && formWorkflowId.Value > 0)
         {
             var allRpas = await _context.PropertyAssessmentRequests.ToListAsync();
-            var rpa = allRpas.FirstOrDefault(p => GuidToNumericId(p.Id) == formWorkflowId.Value);
+            var rpa = allRpas.FirstOrDefault(p => 
+                GuidToNumericId(p.Id) == formWorkflowId.Value || 
+                (GuidToNumericId(p.Id) & 0x001FFFFFFFFFFFFFL) == (formWorkflowId.Value & 0x001FFFFFFFFFFFFFL) ||
+                Math.Abs(GuidToNumericId(p.Id) - formWorkflowId.Value) < 2048);
             if (rpa != null) return (rpa, null, false);
 
             var allRfis = await _context.RequestForInspections.ToListAsync();
-            var rfi = allRfis.FirstOrDefault(r => GuidToNumericId(r.Id) == formWorkflowId.Value);
+            var rfi = allRfis.FirstOrDefault(r => 
+                GuidToNumericId(r.Id) == formWorkflowId.Value || 
+                (GuidToNumericId(r.Id) & 0x001FFFFFFFFFFFFFL) == (formWorkflowId.Value & 0x001FFFFFFFFFFFFFL) ||
+                Math.Abs(GuidToNumericId(r.Id) - formWorkflowId.Value) < 2048);
             if (rfi != null) return (null, rfi, false);
         }
 

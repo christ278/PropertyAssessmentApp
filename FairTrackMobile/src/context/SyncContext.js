@@ -1839,13 +1839,13 @@ export const SyncProvider = ({ children }) => {
         };
       }
 
-      const wfNumericId = parseInt(cleanWf, 10);
-      if (!wfNumericId || isNaN(wfNumericId)) {
+      const wfNumericId = parseInt(cleanWf, 10) || 0;
+      if (!cleanTrack && (!wfNumericId || isNaN(wfNumericId))) {
         setIsSyncing(false);
         return {
           success: false,
           syncedCount: successCount,
-          message: 'Invalid Form Workflow ID for forwarding to supervisor.'
+          message: 'Tracking number or Form Workflow ID is required to forward to supervisor.'
         };
       }
 
@@ -1853,7 +1853,8 @@ export const SyncProvider = ({ children }) => {
         const fwdRes = await MobileApi.forwardWorkflow(
           wfNumericId,
           4, // 4 = Checked / Recommend Approval (Supervisor)
-          remarks || 'Field inspection completed and transferred to supervisor.'
+          remarks || 'Field inspection completed and transferred to supervisor.',
+          trackingNo || ''
         );
 
         if (fwdRes && fwdRes.success) {
