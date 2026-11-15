@@ -72,6 +72,32 @@ export const SHADOWS = {
   }
 };
 
+export const SIZES = {
+  // Input dimensions
+  inputMinHeight: 44,
+  inputRadius: 10,
+  inputPaddingH: 12,
+  inputPaddingV: 10,
+  inputFontSize: 13,
+
+  // Button dimensions
+  buttonHeight: 48,
+  buttonRadius: 12,
+  buttonSmallHeight: 38,
+  buttonSmallRadius: 8,
+
+  // Inline segmented toggles & option pills
+  pillMinHeight: 40,
+  pillRadius: 10,
+  pillPaddingH: 10,
+  pillPaddingV: 8,
+  pillFontSize: 12,
+
+  // Cards & Modals
+  cardRadius: 16,
+  modalRadius: 20
+};
+
 export const getShadows = (isDarkMode) => ({
   card: {
     shadowColor: isDarkMode ? '#000000' : '#000000',

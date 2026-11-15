@@ -23,6 +23,7 @@ import { HeaderBar } from '../components/HeaderBar';
 import { ActionModal } from '../components/ActionModal';
 import { DiscardChangesModal } from '../components/DiscardChangesModal';
 import { AttachmentsSection } from '../components/AttachmentsSection';
+import { FormStepperHeader, FormStepperFooter } from '../components/FormStepper';
 import { savePartitionAttachmentsOffline, loadPartitionAttachmentsOffline, ensurePayloadFilesHaveBase64 } from '../utils/fileStorage';
 import { DatePickerModal } from '../components/DatePickerModal';
 import { BARANGAY_OPTIONS, normalizeBarangay } from '../constants/locationData';
@@ -207,6 +208,26 @@ export const BuildingFormScreen = ({ route, navigation }) => {
   // Active section tab (0: Property Info & Taxpayer (CCT), 1: Structural Specs, 2: Valuation, 3: Back Taxes & Notes)
   const [activeTab, setActiveTab] = useState(0);
   const tabScrollRef = useRef(null);
+  const mainScrollRef = useRef(null);
+
+  const handleSelectTab = (idx) => {
+    setActiveTab(idx);
+    mainScrollRef.current?.scrollTo({ y: 0, animated: true });
+  };
+
+  const handlePrevStep = () => {
+    if (activeTab > 0) {
+      setActiveTab(activeTab - 1);
+      mainScrollRef.current?.scrollTo({ y: 0, animated: true });
+    }
+  };
+
+  const handleNextStep = () => {
+    if (activeTab < TABS.length - 1) {
+      setActiveTab(activeTab + 1);
+      mainScrollRef.current?.scrollTo({ y: 0, animated: true });
+    }
+  };
 
   // Reusable Picker Modal State
   const [pickerModal, setPickerModal] = useState({
@@ -1344,40 +1365,17 @@ export const BuildingFormScreen = ({ route, navigation }) => {
         </TouchableOpacity>
       </View>
 
-      {/* Sticky, Well-Positioned Tab Bar Header */}
-      <View style={styles.topTabsWrapper}>
-        {/* Scrollable Tab Pills */}
-        <ScrollView
-          ref={tabScrollRef}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.sectionTabsScroll}
-          style={styles.sectionTabsContainer}
-        >
-          {TABS.map((tab, idx) => {
-            const isActive = activeTab === idx;
-            return (
-              <TouchableOpacity
-                key={tab.label}
-                style={[styles.sectionTabBtn, isActive && styles.sectionTabBtnActive]}
-                onPress={() => setActiveTab(idx)}
-                activeOpacity={0.7}
-              >
-                <Ionicons
-                  name={tab.icon}
-                  size={15}
-                  color={isActive ? '#ffffff' : (isDarkMode ? colors.textDark : '#475569')}
-                />
-                <Text style={[styles.sectionTabText, isActive && styles.sectionTabTextActive]}>
-                  {tab.label} {idx === 3 && attachments && attachments.length > 0 ? `(${attachments.length})` : ''}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
+      {/* Interactive Step Progress Header */}
+      <FormStepperHeader
+        tabs={TABS}
+        activeTab={activeTab}
+        onSelectTab={handleSelectTab}
+        attachmentCount={attachments ? attachments.length : 0}
+        attachmentTabIndex={3}
+      />
 
       <ScrollView
+        ref={mainScrollRef}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
@@ -2395,33 +2393,20 @@ export const BuildingFormScreen = ({ route, navigation }) => {
                 <View style={[styles.card, shadows.card]}>
                   <Text style={styles.cardHeaderTitle}>Effectivity of Assessment, Taxability & Back Taxes</Text>
 
-                  <View style={styles.rowInputs}>
-                    <View style={[styles.inputGroup, { flex: 1.5 }]}>
-                      <Text style={styles.inputLabel}>EFFECTIVITY QUARTER</Text>
-                      <View style={styles.optionPillRow}>
-                        {['1', '2', '3', '4'].map((q) => (
-                          <TouchableOpacity
-                            key={q}
-                            style={[styles.optionPill, quarterEffectivity === q && styles.optionPillActive]}
-                            onPress={() => setQuarterEffectivity(q)}
-                          >
-                            <Text style={[styles.optionPillText, quarterEffectivity === q && styles.optionPillTextActive]}>
-                              {q === '1' ? '1st' : q === '2' ? '2nd' : q === '3' ? '3rd' : '4th'}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    </View>
-                    <View style={[styles.inputGroup, { flex: 1 }]}>
-                      <Text style={styles.inputLabel}>EFFECTIVITY YEAR</Text>
-                      <TextInput
-                        style={styles.input}
-                        value={yearEffectivity}
-                        onChangeText={setYearEffectivity}
-                        keyboardType="numeric"
-                        placeholder="2026"
-                        placeholderTextColor={colors.placeholder}
-                      />
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>EFFECTIVITY QUARTER</Text>
+                    <View style={styles.optionPillRow}>
+                      {['1', '2', '3', '4'].map((q) => (
+                        <TouchableOpacity
+                          key={q}
+                          style={[styles.optionPill, quarterEffectivity === q && styles.optionPillActive]}
+                          onPress={() => setQuarterEffectivity(q)}
+                        >
+                          <Text style={[styles.optionPillText, quarterEffectivity === q && styles.optionPillTextActive]}>
+                            {q === '1' ? '1st' : q === '2' ? '2nd' : q === '3' ? '3rd' : '4th'}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
                     </View>
                   </View>
 
@@ -2449,15 +2434,28 @@ export const BuildingFormScreen = ({ route, navigation }) => {
                     </View>
                   </View>
 
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>BASIS OF ASSESSMENT</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={assessmentBasis}
-                      onChangeText={setAssessmentBasis}
-                      placeholder="Sec. 217 RA 7160"
-                      placeholderTextColor={colors.placeholder}
-                    />
+                  <View style={styles.rowInputs}>
+                    <View style={[styles.inputGroup, { flex: 1 }]}>
+                      <Text style={styles.inputLabel}>EFFECTIVITY YEAR</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={yearEffectivity}
+                        onChangeText={setYearEffectivity}
+                        keyboardType="numeric"
+                        placeholder="2026"
+                        placeholderTextColor={colors.placeholder}
+                      />
+                    </View>
+                    <View style={[styles.inputGroup, { flex: 1.2 }]}>
+                      <Text style={styles.inputLabel}>BASIS OF ASSESSMENT</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={assessmentBasis}
+                        onChangeText={setAssessmentBasis}
+                        placeholder="Sec. 217 RA 7160"
+                        placeholderTextColor={colors.placeholder}
+                      />
+                    </View>
                   </View>
 
                   <View style={styles.rowInputs}>
@@ -2530,6 +2528,18 @@ export const BuildingFormScreen = ({ route, navigation }) => {
                   showAttachments={true}
                 />
               </View>
+            )}
+
+            {/* Step Navigation Thumb Bar */}
+            {!fromHistory && (
+              <FormStepperFooter
+                activeTab={activeTab}
+                totalTabs={TABS.length}
+                onPrev={handlePrevStep}
+                onNext={handleNextStep}
+                prevLabel="Previous Step"
+                nextLabel={activeTab < TABS.length - 1 ? `Next: Step ${activeTab + 2}` : 'Next Step'}
+              />
             )}
 
             {/* Action Buttons */}
@@ -3230,11 +3240,11 @@ const getStyles = (colors, isDarkMode, isLargeScreen = false) => StyleSheet.crea
     borderColor: colors.inputBorder,
     borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 9,
+    paddingVertical: 10,
     fontSize: 13,
     color: colors.inputText,
     backgroundColor: isDarkMode ? colors.inputBg : '#f8fafc',
-    minHeight: 40
+    minHeight: 44
   },
   selectBtn: {
     flexDirection: 'row',
@@ -3244,9 +3254,9 @@ const getStyles = (colors, isDarkMode, isLargeScreen = false) => StyleSheet.crea
     borderColor: colors.inputBorder,
     borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 9,
+    paddingVertical: 10,
     backgroundColor: isDarkMode ? colors.inputBg : '#f8fafc',
-    minHeight: 40
+    minHeight: 44
   },
   selectBtnText: {
     fontSize: 13,
@@ -3549,9 +3559,11 @@ const getStyles = (colors, isDarkMode, isLargeScreen = false) => StyleSheet.crea
   },
   segmentedBtn: {
     flex: 1,
+    minHeight: 40,
     paddingVertical: 8,
-    borderRadius: 8,
+    borderRadius: 10,
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: isDarkMode ? colors.surfaceSecondary : '#f1f5f9',
     borderWidth: 1,
     borderColor: isDarkMode ? colors.border : '#e2e8f0'
@@ -3818,28 +3830,29 @@ const getStyles = (colors, isDarkMode, isLargeScreen = false) => StyleSheet.crea
   optionPillRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 2
+    gap: 8,
+    marginTop: 4
   },
   optionPill: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 9,
-    borderRadius: 8,
+    minHeight: 40,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
     backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc',
     borderWidth: 1,
     borderColor: isDarkMode ? colors.border : '#e2e8f0',
-    gap: 4
+    gap: 6
   },
   optionPillActive: {
     backgroundColor: colors.primary,
     borderColor: colors.primary
   },
   optionPillText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     color: colors.textMuted
   },

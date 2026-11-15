@@ -687,6 +687,8 @@ export const SyncProvider = ({ children }) => {
         }
       }
       if (tdn?.DisplayName) itemRecord.owner = tdn.DisplayName;
+      itemRecord.isSyncedDraft = true;
+      itemRecord.lastSyncedAt = new Date().toISOString();
 
       const newDownloads = { ...downloadedForms, [dKey]: itemRecord };
       await saveDownloadedForms(newDownloads);
@@ -934,6 +936,60 @@ export const SyncProvider = ({ children }) => {
       if (wfId && itemWfId && wfId === itemWfId) return true;
       return false;
     });
+  };
+
+  // Check if a specific partition of a transaction has pending offline edits
+  const hasPartitionPendingEdits = (trackingNo, formWorkflowId, partitionIndex) => {
+    if (!syncQueue || syncQueue.length === 0) return false;
+    const tNo = (trackingNo || '').toString().trim().toLowerCase();
+    const wfId = (formWorkflowId || '').toString().trim();
+    const targetIdx = parseInt(partitionIndex, 10);
+
+    return syncQueue.some(item => {
+      const p = item.payload;
+      const tdn = p?.TDN || p?.tdn;
+      const itemTracking = (tdn?.TrackingNo || tdn?.trackingNo || p?.TrackingNo || p?.trackingNo || '').toString().trim().toLowerCase();
+      const itemWfId = (tdn?.FormWorkflowId || tdn?.formWorkflowId || p?.FormWorkflowId || p?.formWorkflowId || item.workflowForwardPayload?.FormWorkflowId || item.workflowForwardPayload?.formWorkflowId || '').toString().trim();
+      const itemIdx = tdn?.PartitionItemIndex != null ? parseInt(tdn.PartitionItemIndex, 10) : (p?.PartitionItemIndex != null ? parseInt(p.PartitionItemIndex, 10) : null);
+
+      const trackMatch = tNo && itemTracking && tNo === itemTracking;
+      const wfMatch = wfId && itemWfId && wfId === itemWfId;
+      if (trackMatch || wfMatch) {
+        if (targetIdx == null || isNaN(targetIdx)) return true;
+        return itemIdx === targetIdx;
+      }
+      return false;
+    });
+  };
+
+  // Check if a transaction has already been edited and synced as draft to the Office Web Portal
+  const isTransactionSyncedDraft = (trackingNo, formWorkflowId) => {
+    if (hasPendingEdits(trackingNo, formWorkflowId)) return false;
+    const cleanTrack = (trackingNo || '').toString().trim().toLowerCase();
+    const cleanWf = formWorkflowId != null ? formWorkflowId.toString().trim() : '';
+
+    if (downloadedForms) {
+      for (const [k, item] of Object.entries(downloadedForms)) {
+        const itemTNo = (item?.transItem?.TrackingNo || item?.trackingNo || k || '').toString().trim().toLowerCase();
+        const itemWfId = (item?.transItem?.FormworkflowId || item?.formWorkflowId || '').toString().trim();
+        if ((cleanTrack && itemTNo === cleanTrack) || (cleanWf && itemWfId === cleanWf)) {
+          if (item?.isSyncedDraft === true) return true;
+        }
+      }
+    }
+
+    if (historyRecords && historyRecords.length > 0) {
+      const match = historyRecords.find(h => {
+        const hTrack = (h.trackingNo || h.TrackingNo || '').toString().trim().toLowerCase();
+        const hWf = (h.formWorkflowId || h.FormWorkflowId || '').toString().trim();
+        const trackMatches = cleanTrack && hTrack && cleanTrack === hTrack;
+        const wfMatches = cleanWf && hWf && cleanWf === hWf;
+        return (trackMatches || wfMatches) && h.actionType === 'SYNCED';
+      });
+      if (match) return true;
+    }
+
+    return false;
   };
 
   // Batch download multiple transactions (strictly Property Assessment & Field Inspection)
@@ -1505,6 +1561,7 @@ export const SyncProvider = ({ children }) => {
         itemRecord.formData = withPascalCaseKeys(payload);
         if (tdn?.DisplayName) itemRecord.owner = tdn.DisplayName;
       }
+      itemRecord.isSyncedDraft = false;
       const newDownloads = { ...downloadedForms, [dKey]: itemRecord };
       await saveDownloadedForms(newDownloads);
     }
@@ -1881,6 +1938,8 @@ export const SyncProvider = ({ children }) => {
         markTransactionSynced,
         isTransactionDownloaded,
         hasPendingEdits,
+        hasPartitionPendingEdits,
+        isTransactionSyncedDraft,
         getDownloadedFormData,
         updatePartitionAttachmentsLocally,
         updateDownloadedFormWithPayload,

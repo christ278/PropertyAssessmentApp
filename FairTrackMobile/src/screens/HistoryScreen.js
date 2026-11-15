@@ -50,6 +50,8 @@ export const HistoryScreen = ({ navigation }) => {
   const [activeFilter, setActiveFilter] = useState('ALL');
   const [refreshing, setRefreshing] = useState(false);
   const [selectedSnapshot, setSelectedSnapshot] = useState(null);
+  const [selectedRecordForMenu, setSelectedRecordForMenu] = useState(null);
+  const [threeDotsModalVisible, setThreeDotsModalVisible] = useState(false);
   const [actionModal, setActionModal] = useState({
     visible: false,
     title: '',
@@ -242,38 +244,44 @@ export const HistoryScreen = ({ navigation }) => {
     // Kind Badge Theme
     let kindColor = colors.primary;
     let kindIcon = 'business-outline';
-    let kindLabel = 'BUILDING FAAS';
+    let kindLabel = 'Building FAAS';
 
     if (pKind === 'Land') {
       kindColor = colors.accentGold;
       kindIcon = 'leaf-outline';
-      kindLabel = 'LAND APPRAISAL';
+      kindLabel = 'Land Appraisal';
     } else if (pKind === 'Machinery') {
       kindColor = '#6366f1';
       kindIcon = 'construct-outline';
-      kindLabel = 'MACHINERY FAAS';
+      kindLabel = 'Machinery FAAS';
     }
 
     // Status Badge Theme
     let statusBg = isDarkMode ? '#064e3b' : '#dcfce7';
     let statusColor = isDarkMode ? '#34d399' : '#15803d';
     let statusIcon = 'checkmark-done-circle';
-    let statusText = item.statusLabel || 'Transferred to Review';
+    let statusText = 'Transferred';
 
     if (isDraft) {
       statusBg = isDarkMode ? '#78350f' : '#fef3c7';
       statusColor = isDarkMode ? '#fbbf24' : '#b45309';
       statusIcon = 'cloud-offline';
-      statusText = item.statusLabel || 'Saved Offline Draft';
+      statusText = 'Saved Draft';
     } else if (!isTransferred) {
       statusBg = isDarkMode ? '#0f766e' : '#ccfbf1';
       statusColor = isDarkMode ? '#2dd4bf' : '#0f766e';
       statusIcon = 'cloud-done';
-      statusText = item.statusLabel || 'Synced to Office';
+      statusText = 'Synced';
     }
 
+    const fullLocation = [
+      item.streetLocation,
+      item.barangay,
+      item.cityMunicipality || 'Koronadal City'
+    ].filter(Boolean).join(', ');
+
     return (
-      <View
+      <TouchableOpacity
         style={[
           styles.card,
           {
@@ -282,135 +290,146 @@ export const HistoryScreen = ({ navigation }) => {
           },
           shadows.card
         ]}
+        activeOpacity={0.85}
+        onPress={() => handleOpenForm(item)}
       >
-        {/* Top Badges Row */}
-        <View style={styles.cardHeaderRow}>
-          <View style={styles.badgesLeft}>
-            <View style={[styles.kindBadge, { backgroundColor: kindColor + '18' }]}>
-              <Ionicons name={kindIcon} size={13} color={kindColor} />
-              <Text style={[styles.kindBadgeText, { color: kindColor }]}>
-                {kindLabel}
+        {/* Card Header: Tracking No, Badges & 3-Dots */}
+        <View style={styles.cardHeader}>
+          <View style={{ flex: 1, paddingRight: 8 }}>
+            <View style={styles.trackingHeaderRow}>
+              <Text style={[styles.trackingNoText, { color: colors.textDark }]} numberOfLines={1}>
+                {item.trackingNo || 'Unassigned Tracking'}
+              </Text>
+              <View style={[styles.partitionBadge, { backgroundColor: isDarkMode ? '#1e293b' : '#f1f5f9' }]}>
+                <Text style={[styles.partitionBadgeText, { color: colors.textDark }]}>
+                  Part {item.partitionLetter || 'A'}
+                </Text>
+              </View>
+              <View style={[styles.kindBadge, { backgroundColor: kindColor + '18' }]}>
+                <Ionicons name={kindIcon} size={11} color={kindColor} />
+                <Text style={[styles.kindBadgeText, { color: kindColor }]}>
+                  {kindLabel.toUpperCase()}
+                </Text>
+              </View>
+            </View>
+            <Text style={[styles.typeBadgeText, { color: colors.textMuted }]}>
+              {kindLabel} • History Archive
+            </Text>
+          </View>
+
+          <View style={styles.headerRightActions}>
+            <View style={[styles.statusBadge, { backgroundColor: statusBg }]}>
+              <Ionicons name={statusIcon} size={11} color={statusColor} />
+              <Text style={[styles.statusBadgeText, { color: statusColor }]}>
+                {statusText}
               </Text>
             </View>
 
-            <View style={[styles.partitionBadge, { backgroundColor: isDarkMode ? '#1e293b' : '#f1f5f9' }]}>
-              <Text style={[styles.partitionBadgeText, { color: colors.textDark }]}>
-                Part {item.partitionLetter || 'A'}
+            <TouchableOpacity
+              style={[
+                styles.threeDotsBtn,
+                {
+                  backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc',
+                  borderColor: colors.border
+                }
+              ]}
+              onPress={(e) => {
+                e.stopPropagation();
+                setSelectedRecordForMenu(item);
+                setThreeDotsModalVisible(true);
+              }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="ellipsis-vertical" size={17} color={colors.textDark} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Card Body: Structured Rows */}
+        <View style={styles.cardBody}>
+          {/* Row 1: Owner / Declarant */}
+          <View style={styles.infoRow}>
+            <Ionicons name="person-circle-outline" size={15} color={colors.textDark} />
+            <Text style={[styles.ownerText, { color: colors.textDark }]} numberOfLines={1}>
+              Owner / Declarant: {item.ownerName || 'Unknown Owner'}
+            </Text>
+          </View>
+
+          {/* Row 2: Location */}
+          <View style={styles.infoRow}>
+            <Ionicons name="location-outline" size={14} color={colors.textMuted} />
+            <Text style={[styles.infoText, { color: colors.textMuted }]} numberOfLines={1}>
+              {fullLocation || 'No location specified'}
+            </Text>
+          </View>
+
+          {/* Row 3: Reference (ARP / PIN / TDN) */}
+          <View style={styles.infoRow}>
+            <Ionicons name="pricetag-outline" size={14} color={colors.textMuted} />
+            <Text style={[styles.infoText, { color: colors.textMuted }]}>
+              ARP: {item.arpNo || 'N/A'} • PIN: {item.pin || 'N/A'}
+              {item.declarationNo && item.declarationNo !== 'N/A' ? ` • TDN: ${item.declarationNo}` : ''}
+            </Text>
+          </View>
+
+          {/* Row 4: Valuation Box */}
+          <View
+            style={[
+              styles.valuationContainer,
+              {
+                backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+                borderColor: colors.border
+              }
+            ]}
+          >
+            <View style={styles.valCol}>
+              <Text style={[styles.valLabel, { color: colors.textMuted }]}>MARKET VALUE</Text>
+              <Text style={[styles.valValue, { color: colors.textDark }]} numberOfLines={1}>
+                {formatCurrency(item.marketValue)}
+              </Text>
+            </View>
+            <View style={[styles.valDivider, { backgroundColor: isDarkMode ? '#334155' : '#cbd5e1' }]} />
+            <View style={styles.valCol}>
+              <Text style={[styles.valLabel, { color: colors.textMuted }]}>ASSESSED VALUE</Text>
+              <Text style={[styles.valValue, { color: colors.accentGreen }]} numberOfLines={1}>
+                {formatCurrency(item.assessedValue)}
               </Text>
             </View>
           </View>
-
-          <View style={[styles.statusBadge, { backgroundColor: statusBg }]}>
-            <Ionicons name={statusIcon} size={13} color={statusColor} />
-            <Text style={[styles.statusBadgeText, { color: statusColor }]}>
-              {statusText}
-            </Text>
-          </View>
         </View>
 
-        {/* Tracking No & Owner Name */}
-        <View style={styles.cardMain}>
-          <Text style={[styles.trackingNoText, { color: colors.primary }]}>
-            {item.trackingNo || 'NO-TRACKING'}
-          </Text>
-          <Text style={[styles.ownerNameText, { color: colors.textDark }]} numberOfLines={1}>
-            {item.ownerName || 'Unknown Owner'}
-          </Text>
-        </View>
-
-        {/* Location Row */}
-        <View style={styles.metaRow}>
-          <Ionicons name="location-outline" size={14} color={colors.textMuted} />
-          <Text style={[styles.metaText, { color: colors.textMuted }]} numberOfLines={1}>
-            {item.streetLocation ? `${item.streetLocation}, ` : ''}
-            {item.barangay ? `${item.barangay}, ` : ''}
-            {item.cityMunicipality || 'Koronadal City'}
-          </Text>
-        </View>
-
-        {/* Cadastral / Title Row */}
-        <View style={styles.refRow}>
-          <View style={styles.refItem}>
-            <Text style={[styles.refLabel, { color: colors.textMuted }]}>ARP NO:</Text>
-            <Text style={[styles.refValue, { color: colors.textDark }]}>{item.arpNo || 'N/A'}</Text>
-          </View>
-          <View style={styles.refDivider} />
-          <View style={styles.refItem}>
-            <Text style={[styles.refLabel, { color: colors.textMuted }]}>PIN:</Text>
-            <Text style={[styles.refValue, { color: colors.textDark }]}>{item.pin || 'N/A'}</Text>
-          </View>
-        </View>
-
-        {/* Valuation Box */}
-        <View
-          style={[
-            styles.valuationContainer,
-            { backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc', borderColor: colors.border }
-          ]}
-        >
-          <View style={styles.valCol}>
-            <Text style={[styles.valLabel, { color: colors.textMuted }]}>MARKET VALUE</Text>
-            <Text style={[styles.valValue, { color: colors.textDark }]}>
-              {formatCurrency(item.marketValue)}
-            </Text>
-          </View>
-          <View style={styles.valDivider} />
-          <View style={styles.valCol}>
-            <Text style={[styles.valLabel, { color: colors.textMuted }]}>ASSESSED VALUE</Text>
-            <Text style={[styles.valValue, { color: colors.accentGreen }]}>
-              {formatCurrency(item.assessedValue)}
-            </Text>
-          </View>
-        </View>
-
-        {/* Footer: Timestamp, Photos & Actions */}
-        <View style={styles.cardFooter}>
+        {/* Card Footer: Timestamp, Photos & Quick View Action */}
+        <View style={[styles.cardFooter, { borderTopColor: isDarkMode ? '#1e293b' : '#f1f5f9' }]}>
           <View style={styles.footerInfo}>
             <View style={styles.timeRow}>
               <Ionicons name="time-outline" size={13} color={colors.textMuted} />
-              <Text style={[styles.timeText, { color: colors.textMuted }]}>
-                {formatFriendlyDate(item.savedAt)}
+              <Text style={[styles.timeText, { color: colors.textMuted }]} numberOfLines={1}>
+                Recorded {formatFriendlyDate(item.savedAt)}
               </Text>
             </View>
-            {item.attachmentsCount > 0 && (
+            {item.attachmentsCount > 0 ? (
               <View style={styles.photoCountRow}>
-                <Ionicons name="images-outline" size={13} color={colors.accentGold} />
+                <Ionicons name="images-outline" size={12} color={colors.accentGold} />
                 <Text style={[styles.photoCountText, { color: colors.accentGold }]}>
                   {item.attachmentsCount} photo{item.attachmentsCount > 1 ? 's' : ''}
                 </Text>
               </View>
-            )}
+            ) : null}
           </View>
 
-          <View style={styles.actionButtonsRow}>
-            <TouchableOpacity
-              style={[styles.actionBtn, styles.actionBtnOutline, { borderColor: colors.border }]}
-              onPress={() => setSelectedSnapshot(item)}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="eye-outline" size={14} color={colors.textDark} />
-              <Text style={[styles.actionBtnText, { color: colors.textDark }]}>Snapshot</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.actionBtn, styles.actionBtnPrimary, { backgroundColor: colors.primary }]}
-              onPress={() => handleOpenForm(item)}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="document-text-outline" size={14} color="#ffffff" />
-              <Text style={[styles.actionBtnText, { color: '#ffffff' }]}>View Form</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.iconBtn, { backgroundColor: isDarkMode ? '#450a0a' : '#fee2e2' }]}
-              onPress={() => handlePromptDelete(item)}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="trash-outline" size={15} color={colors.accentRed} />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            style={[styles.openFormBtn, { backgroundColor: colors.primary }]}
+            onPress={(e) => {
+              e.stopPropagation();
+              handleOpenForm(item);
+            }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="document-text-outline" size={13} color="#ffffff" />
+            <Text style={styles.openFormBtnText}>View Form</Text>
+          </TouchableOpacity>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -739,6 +758,147 @@ export const HistoryScreen = ({ navigation }) => {
         </View>
       </Modal>
 
+      {/* 3-Dots Action Menu Modal */}
+      <Modal
+        visible={threeDotsModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setThreeDotsModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={[styles.menuModalOverlay, { backgroundColor: colors.modalOverlay || 'rgba(0, 0, 0, 0.55)' }]}
+          activeOpacity={1}
+          onPress={() => setThreeDotsModalVisible(false)}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={[
+              styles.actionMenuCard,
+              {
+                backgroundColor: colors.cardBg,
+                borderColor: colors.border
+              },
+              shadows.hover
+            ]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={[styles.actionMenuHeader, { borderBottomColor: isDarkMode ? '#334155' : '#f1f5f9' }]}>
+              <View style={{ flex: 1, marginRight: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={[styles.actionMenuTracking, { color: colors.textDark }]} numberOfLines={1}>
+                    {selectedRecordForMenu?.trackingNo || 'History Record'}
+                  </Text>
+                  <View style={[styles.partitionBadge, { backgroundColor: isDarkMode ? '#1e293b' : '#f1f5f9' }]}>
+                    <Text style={[styles.partitionBadgeText, { color: colors.textDark }]}>
+                      Part {selectedRecordForMenu?.partitionLetter || 'A'}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={[styles.actionMenuOwner, { color: colors.textMuted }]} numberOfLines={1}>
+                  {selectedRecordForMenu?.ownerName || 'Unknown Owner'} • {selectedRecordForMenu?.propertyKind || 'Property'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setThreeDotsModalVisible(false)}
+                style={styles.actionMenuCloseBtn}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="close" size={20} color={colors.textDark} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.actionMenuList}>
+              {/* Option 1: View Assessment Form */}
+              <TouchableOpacity
+                style={[
+                  styles.menuActionItem,
+                  {
+                    backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+                    borderColor: colors.border
+                  }
+                ]}
+                onPress={() => {
+                  const item = selectedRecordForMenu;
+                  setThreeDotsModalVisible(false);
+                  if (item) handleOpenForm(item);
+                }}
+              >
+                <View style={[styles.menuActionIconBox, { backgroundColor: isDarkMode ? '#0369a133' : '#e0f2fe' }]}>
+                  <Ionicons name="document-text" size={18} color={isDarkMode ? '#38bdf8' : '#0284c7'} />
+                </View>
+                <View style={styles.menuActionTextCol}>
+                  <Text style={[styles.menuActionTitle, { color: colors.textDark }]}>
+                    View Assessment Form
+                  </Text>
+                  <Text style={[styles.menuActionSubtitle, { color: colors.textMuted }]}>
+                    Open full appraisal details & partition data in view mode
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+              </TouchableOpacity>
+
+              {/* Option 2: Quick Snapshot Breakdown */}
+              <TouchableOpacity
+                style={[
+                  styles.menuActionItem,
+                  {
+                    backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+                    borderColor: colors.border
+                  }
+                ]}
+                onPress={() => {
+                  const item = selectedRecordForMenu;
+                  setThreeDotsModalVisible(false);
+                  if (item) setSelectedSnapshot(item);
+                }}
+              >
+                <View style={[styles.menuActionIconBox, { backgroundColor: isDarkMode ? '#064e3b33' : '#dcfce7' }]}>
+                  <Ionicons name="eye" size={18} color={isDarkMode ? '#34d399' : '#059669'} />
+                </View>
+                <View style={styles.menuActionTextCol}>
+                  <Text style={[styles.menuActionTitle, { color: colors.textDark }]}>
+                    Quick Snapshot Breakdown
+                  </Text>
+                  <Text style={[styles.menuActionSubtitle, { color: colors.textMuted }]}>
+                    Inspect property valuations, cadastral info, and specs
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+              </TouchableOpacity>
+
+              {/* Option 3: Delete Record */}
+              <TouchableOpacity
+                style={[
+                  styles.menuActionItem,
+                  {
+                    backgroundColor: isDarkMode ? '#450a0a22' : '#fef2f2',
+                    borderColor: isDarkMode ? '#7f1d1d' : '#fecaca'
+                  }
+                ]}
+                onPress={() => {
+                  const item = selectedRecordForMenu;
+                  setThreeDotsModalVisible(false);
+                  if (item) handlePromptDelete(item);
+                }}
+              >
+                <View style={[styles.menuActionIconBox, { backgroundColor: isDarkMode ? '#7f1d1d' : '#fee2e2' }]}>
+                  <Ionicons name="trash-outline" size={18} color={colors.accentRed} />
+                </View>
+                <View style={styles.menuActionTextCol}>
+                  <Text style={[styles.menuActionTitle, { color: colors.accentRed }]}>
+                    Delete Record
+                  </Text>
+                  <Text style={[styles.menuActionSubtitle, { color: isDarkMode ? '#fca5a5' : '#b91c1c' }]}>
+                    Permanently delete this local snapshot from device
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={colors.accentRed} />
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
       {/* Confirmation Modal */}
       <ActionModal
         visible={actionModal.visible}
@@ -818,43 +978,59 @@ const styles = StyleSheet.create({
     paddingBottom: 40
   },
   card: {
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
     padding: 14,
     marginBottom: 12
   },
-  cardHeaderRow: {
+  cardHeader: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 10
   },
-  badgesLeft: {
+  trackingHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6
+    gap: 6,
+    flexWrap: 'wrap'
+  },
+  trackingNoText: {
+    fontSize: 14,
+    fontFamily: 'monospace',
+    fontWeight: '800'
+  },
+  typeBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2
   },
   kindBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    gap: 4
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 5,
+    gap: 3
   },
   kindBadgeText: {
-    fontSize: 11,
+    fontSize: 9,
     fontWeight: '800',
     letterSpacing: 0.3
   },
   partitionBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 5
   },
   partitionBadgeText: {
-    fontSize: 11,
-    fontWeight: '700'
+    fontSize: 9,
+    fontWeight: '800'
+  },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6
   },
   statusBadge: {
     flexDirection: 'row',
@@ -865,55 +1041,35 @@ const styles = StyleSheet.create({
     gap: 4
   },
   statusBadgeText: {
-    fontSize: 11,
-    fontWeight: '700'
-  },
-  cardMain: {
-    marginBottom: 6
-  },
-  trackingNoText: {
-    fontSize: 12,
-    fontFamily: 'monospace',
-    fontWeight: '800',
-    marginBottom: 2
-  },
-  ownerNameText: {
-    fontSize: 16,
-    fontWeight: '800'
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    marginBottom: 8
-  },
-  metaText: {
-    fontSize: 12,
-    fontWeight: '500'
-  },
-  refRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10
-  },
-  refItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4
-  },
-  refLabel: {
     fontSize: 10,
     fontWeight: '700'
   },
-  refValue: {
-    fontSize: 11,
-    fontWeight: '600'
+  threeDotsBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1
   },
-  refDivider: {
-    width: 1,
-    height: 10,
-    backgroundColor: '#94a3b8',
-    marginHorizontal: 8
+  cardBody: {
+    gap: 6,
+    marginBottom: 8
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6
+  },
+  ownerText: {
+    fontSize: 13,
+    fontWeight: '800',
+    flex: 1
+  },
+  infoText: {
+    fontSize: 12,
+    fontWeight: '600',
+    flex: 1
   },
   valuationContainer: {
     flexDirection: 'row',
@@ -921,7 +1077,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    marginBottom: 12
+    marginTop: 4
   },
   valCol: {
     flex: 1
@@ -938,19 +1094,20 @@ const styles = StyleSheet.create({
   },
   valDivider: {
     width: 1,
-    backgroundColor: '#cbd5e1',
     marginHorizontal: 12
   },
   cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginTop: 4,
+    paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#e2e8f018',
-    paddingTop: 10
+    borderTopColor: '#e2e8f018'
   },
   footerInfo: {
-    flex: 1
+    flex: 1,
+    marginRight: 8
   },
   timeRow: {
     flexDirection: 'row',
@@ -959,7 +1116,8 @@ const styles = StyleSheet.create({
   },
   timeText: {
     fontSize: 11,
-    fontWeight: '500'
+    fontWeight: '500',
+    flexShrink: 1
   },
   photoCountRow: {
     flexDirection: 'row',
@@ -971,12 +1129,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700'
   },
-  actionButtonsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6
-  },
-  actionBtn: {
+  openFormBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 10,
@@ -984,17 +1137,74 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     gap: 4
   },
-  actionBtnOutline: {
+  openFormBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#ffffff'
+  },
+  menuModalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20
+  },
+  actionMenuCard: {
+    width: '100%',
+    maxWidth: 420,
+    borderRadius: 20,
+    padding: 20,
     borderWidth: 1
   },
-  actionBtnPrimary: {},
-  actionBtnText: {
-    fontSize: 11,
-    fontWeight: '700'
+  actionMenuHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    paddingBottom: 14,
+    marginBottom: 14,
+    borderBottomWidth: 1
   },
-  iconBtn: {
-    padding: 6,
-    borderRadius: 6
+  actionMenuTracking: {
+    fontSize: 16,
+    fontWeight: '800'
+  },
+  actionMenuOwner: {
+    fontSize: 12,
+    marginTop: 2,
+    fontWeight: '500'
+  },
+  actionMenuCloseBtn: {
+    padding: 4
+  },
+  actionMenuList: {
+    gap: 8
+  },
+  menuActionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 12
+  },
+  menuActionIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  menuActionTextCol: {
+    flex: 1
+  },
+  menuActionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 2
+  },
+  menuActionSubtitle: {
+    fontSize: 11,
+    lineHeight: 15
   },
   emptyContainer: {
     alignItems: 'center',

@@ -23,6 +23,7 @@ import { HeaderBar } from '../components/HeaderBar';
 import { ActionModal } from '../components/ActionModal';
 import { DiscardChangesModal } from '../components/DiscardChangesModal';
 import { AttachmentsSection } from '../components/AttachmentsSection';
+import { FormStepperHeader, FormStepperFooter } from '../components/FormStepper';
 import { savePartitionAttachmentsOffline, loadPartitionAttachmentsOffline, ensurePayloadFilesHaveBase64 } from '../utils/fileStorage';
 import { DatePickerModal } from '../components/DatePickerModal';
 import { BARANGAY_OPTIONS, normalizeBarangay } from '../constants/locationData';
@@ -89,7 +90,27 @@ export const MachineryFormScreen = ({ route, navigation }) => {
   };
 
   const tabScrollRef = useRef(null);
+  const mainScrollRef = useRef(null);
   const [activeTab, setActiveTab] = useState(0);
+
+  const handleSelectTab = (idx) => {
+    setActiveTab(idx);
+    mainScrollRef.current?.scrollTo({ y: 0, animated: true });
+  };
+
+  const handlePrevStep = () => {
+    if (activeTab > 0) {
+      setActiveTab(activeTab - 1);
+      mainScrollRef.current?.scrollTo({ y: 0, animated: true });
+    }
+  };
+
+  const handleNextStep = () => {
+    if (activeTab < TABS.length - 1) {
+      setActiveTab(activeTab + 1);
+      mainScrollRef.current?.scrollTo({ y: 0, animated: true });
+    }
+  };
 
   // Picker modal state (generic bottom sheet selector)
   const [pickerModal, setPickerModal] = useState({
@@ -279,6 +300,11 @@ export const MachineryFormScreen = ({ route, navigation }) => {
 
   // Table 2: Property Assessment Roll (Actual Use & Assessment Level)
   const [machineryPropertyAssessments, setMachineryPropertyAssessments] = useState([]);
+  const [assessmentModalVisible, setAssessmentModalVisible] = useState(false);
+  const [editingAssessmentIndex, setEditingAssessmentIndex] = useState(null);
+  const [aActualUse, setAActualUse] = useState('INDUSTRIAL');
+  const [aMarketValue, setAMarketValue] = useState('0.00');
+  const [aAssessmentLevel, setAAssessmentLevel] = useState('80');
 
   // =========================================================================
   // TAB 3: MEMORANDA, EFFECTIVITY & BACK TAXES
@@ -773,43 +799,77 @@ export const MachineryFormScreen = ({ route, navigation }) => {
     ]);
   };
 
-  const addMachineryAssessmentRollRow = () => {
-    const primaryClass = 'INDUSTRIAL';
-    const defaultLevel = 80;
-    setMachineryPropertyAssessments(prev => [
-      ...prev,
+  const handleActualUseSelect = (use) => {
+    setAActualUse(use);
+    if (use === 'RESIDENTIAL') setAAssessmentLevel('50');
+    else if (use === 'AGRICULTURAL') setAAssessmentLevel('40');
+    else setAAssessmentLevel('80');
+  };
+
+  const openAddAssessmentModal = () => {
+    const primaryClass = machineryDetailsList[0]?.Classification || 'INDUSTRIAL';
+    setAActualUse(primaryClass);
+    if (primaryClass === 'RESIDENTIAL') setAAssessmentLevel('50');
+    else if (primaryClass === 'AGRICULTURAL') setAAssessmentLevel('40');
+    else setAAssessmentLevel('80');
+
+    if (machineryPropertyAssessments.length === 0 && totalsTable1.totalDepreciatedValue > 0) {
+      setAMarketValue(totalsTable1.totalDepreciatedValue.toString());
+    } else {
+      setAMarketValue('0.00');
+    }
+    setEditingAssessmentIndex(null);
+    setAssessmentModalVisible(true);
+  };
+
+  const openEditAssessmentModal = (index) => {
+    const item = machineryPropertyAssessments[index];
+    if (!item) return;
+    setAActualUse(item.ActualUseName || 'INDUSTRIAL');
+    setAMarketValue((item.MarketValue || 0).toString());
+    setAAssessmentLevel((item.AssessmentLevelPercent || 80).toString());
+    setEditingAssessmentIndex(index);
+    setAssessmentModalVisible(true);
+  };
+
+  const saveAssessmentModal = () => {
+    const mv = parseFloat(aMarketValue) || 0;
+    const lvl = parseFloat(aAssessmentLevel) || 0;
+    const av = Math.round((mv * (lvl / 100)) * 100) / 100;
+
+    const newRow = {
+      id: editingAssessmentIndex !== null && machineryPropertyAssessments[editingAssessmentIndex]?.id
+        ? machineryPropertyAssessments[editingAssessmentIndex].id
+        : 'roll_' + Date.now(),
+      ActualUseName: aActualUse,
+      MarketValue: mv,
+      AssessmentLevelPercent: lvl,
+      AssessmentValue: av
+    };
+
+    if (editingAssessmentIndex !== null) {
+      setMachineryPropertyAssessments(prev => {
+        const copy = [...prev];
+        copy[editingAssessmentIndex] = newRow;
+        return copy;
+      });
+    } else {
+      setMachineryPropertyAssessments(prev => [...prev, newRow]);
+    }
+    setAssessmentModalVisible(false);
+  };
+
+  const removeAssessmentRow = (index) => {
+    Alert.alert('Confirm Delete', 'Remove this row from the assessment roll?', [
+      { text: 'Cancel', style: 'cancel' },
       {
-        id: 'roll_' + Date.now(),
-        ActualUseName: primaryClass,
-        MarketValue: 0,
-        AssessmentLevelPercent: defaultLevel,
-        AssessmentValue: 0
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          setMachineryPropertyAssessments(prev => prev.filter((_, idx) => idx !== index));
+        }
       }
     ]);
-  };
-
-  const updateRollRow = (index, field, val) => {
-    setMachineryPropertyAssessments(prev => {
-      const copy = [...prev];
-      const row = { ...copy[index] };
-      if (field === 'ActualUseName') {
-        row.ActualUseName = val;
-        if (val === 'RESIDENTIAL') row.AssessmentLevelPercent = 50;
-        else if (val === 'AGRICULTURAL') row.AssessmentLevelPercent = 40;
-        else row.AssessmentLevelPercent = 80;
-      } else if (field === 'MarketValue') {
-        row.MarketValue = parseFloat(val) || 0;
-      } else if (field === 'AssessmentLevelPercent') {
-        row.AssessmentLevelPercent = parseFloat(val) || 0;
-      }
-      row.AssessmentValue = Math.round((row.MarketValue * (row.AssessmentLevelPercent / 100)) * 100) / 100;
-      copy[index] = row;
-      return copy;
-    });
-  };
-
-  const removeRollRow = (index) => {
-    setMachineryPropertyAssessments(prev => prev.filter((_, idx) => idx !== index));
   };
 
   // =========================================================================
@@ -1036,39 +1096,17 @@ export const MachineryFormScreen = ({ route, navigation }) => {
         </TouchableOpacity>
       </View>
 
-      {/* Sticky Top Tabs Bar (Exactly 3 Tabs) */}
-      <View style={styles.topTabsWrapper}>
-        <ScrollView
-          ref={tabScrollRef}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.sectionTabsScroll}
-          style={styles.sectionTabsContainer}
-        >
-          {TABS.map((tab, idx) => {
-            const isActive = activeTab === idx;
-            return (
-              <TouchableOpacity
-                key={tab.label}
-                style={[styles.sectionTabBtn, isActive && styles.sectionTabBtnActive]}
-                onPress={() => setActiveTab(idx)}
-                activeOpacity={0.7}
-              >
-                <Ionicons
-                  name={tab.icon}
-                  size={15}
-                  color={isActive ? '#ffffff' : (isDarkMode ? colors.textDark : '#475569')}
-                />
-                <Text style={[styles.sectionTabText, isActive && styles.sectionTabTextActive]}>
-                  {tab.label} {idx === 2 && attachments && attachments.length > 0 ? `(${attachments.length})` : ''}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
+      {/* Interactive Step Progress Header */}
+      <FormStepperHeader
+        tabs={TABS}
+        activeTab={activeTab}
+        onSelectTab={handleSelectTab}
+        attachmentCount={attachments ? attachments.length : 0}
+        attachmentTabIndex={2}
+      />
 
       <ScrollView
+        ref={mainScrollRef}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
@@ -1886,9 +1924,9 @@ export const MachineryFormScreen = ({ route, navigation }) => {
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.addBtn}
-                        onPress={addMachineryAssessmentRollRow}
+                        onPress={openAddAssessmentModal}
                       >
-                        <Ionicons name="add" size={16} color="#ffffff" />
+                        <Ionicons name="add-circle" size={16} color="#ffffff" />
                         <Text style={styles.addBtnText}>Add Row</Text>
                       </TouchableOpacity>
                     </View>
@@ -1896,56 +1934,64 @@ export const MachineryFormScreen = ({ route, navigation }) => {
 
                   {machineryPropertyAssessments.length === 0 ? (
                     <View style={styles.emptyTableBox}>
-                      <Text style={styles.emptyTableText}>Assessment roll is empty. Tap "Sync MV" to populate.</Text>
-                      <TouchableOpacity style={styles.emptyAddBtn} onPress={syncMachineryAssessmentRollFromAppraisal}>
-                        <Text style={styles.emptyAddBtnText}>Sync from Table 1 Market Value</Text>
-                      </TouchableOpacity>
+                      <Ionicons name="calculator-outline" size={32} color={colors.textMuted} />
+                      <Text style={styles.emptyTableText}>Assessment roll is empty. Tap "Sync MV" or add manually.</Text>
+                      <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                        <TouchableOpacity style={styles.emptyAddBtn} onPress={syncMachineryAssessmentRollFromAppraisal}>
+                          <Text style={styles.emptyAddBtnText}>Sync from Table 1 MV</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.emptyAddBtn, { backgroundColor: colors.primary }]} onPress={openAddAssessmentModal}>
+                          <Text style={[styles.emptyAddBtnText, { color: '#ffffff' }]}>+ Add Assessment Row</Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
                   ) : (
                     <View style={{ gap: 10 }}>
                       {machineryPropertyAssessments.map((row, idx) => (
-                        <View key={row.id || idx} style={styles.rollRowCard}>
-                          <View style={styles.rollRowTop}>
-                            <TouchableOpacity
-                              style={[styles.selectBtn, { flex: 1, paddingVertical: 8 }]}
-                              onPress={() => openPicker('Actual Use', MACHINERY_CLASSIFICATIONS, row.ActualUseName, (val) => updateRollRow(idx, 'ActualUseName', val))}
-                            >
-                              <Text style={styles.selectBtnText}>{row.ActualUseName || 'INDUSTRIAL'}</Text>
-                              <Ionicons name="chevron-down" size={14} color={colors.textMuted} />
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                              style={styles.deleteRollBtn}
-                              onPress={() => removeRollRow(idx)}
-                            >
-                              <Ionicons name="trash-outline" size={16} color="#ef4444" />
-                            </TouchableOpacity>
-                          </View>
-
-                          <View style={styles.rowInputs}>
-                            <View style={[styles.inputGroup, { flex: 1.2 }]}>
-                              <Text style={styles.inputLabel}>MARKET VALUE (₱)</Text>
-                              <TextInput
-                                style={styles.input}
-                                value={(row.MarketValue || 0).toString()}
-                                onChangeText={(val) => updateRollRow(idx, 'MarketValue', val)}
-                                keyboardType="numeric"
-                              />
+                        <View key={row.id || idx} style={styles.itemCard}>
+                          <View style={styles.itemCardHeader}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.itemCardTitle}>
+                                #{idx + 1}. {row.ActualUseName || 'INDUSTRIAL'}
+                              </Text>
+                              <Text style={styles.itemCardSubtitle}>
+                                Actual Use Classification
+                              </Text>
                             </View>
-                            <View style={[styles.inputGroup, { flex: 0.8 }]}>
-                              <Text style={styles.inputLabel}>ASSESS LEVEL (%)</Text>
-                              <TextInput
-                                style={styles.input}
-                                value={(row.AssessmentLevelPercent || 80).toString()}
-                                onChangeText={(val) => updateRollRow(idx, 'AssessmentLevelPercent', val)}
-                                keyboardType="numeric"
-                              />
+                            <View style={styles.itemActionRow}>
+                              <TouchableOpacity
+                                style={styles.actionIconBtn}
+                                onPress={() => openEditAssessmentModal(idx)}
+                              >
+                                <Ionicons name="pencil" size={16} color={colors.primary} />
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={styles.actionIconBtn}
+                                onPress={() => removeAssessmentRow(idx)}
+                              >
+                                <Ionicons name="trash-outline" size={16} color="#ef4444" />
+                              </TouchableOpacity>
                             </View>
                           </View>
 
-                          <View style={styles.rollRowBottom}>
-                            <Text style={styles.rollRowAvLabel}>ASSESSMENT VALUE (₱):</Text>
-                            <Text style={styles.rollRowAvValue}>
+                          <View style={styles.itemSpecsGrid}>
+                            <View style={styles.specItem}>
+                              <Text style={styles.specLabel}>Market Value</Text>
+                              <Text style={styles.specValue}>
+                                ₱{(parseFloat(row.MarketValue) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                              </Text>
+                            </View>
+                            <View style={styles.specItem}>
+                              <Text style={styles.specLabel}>Assessment Level</Text>
+                              <Text style={[styles.specValue, { color: colors.primary }]}>
+                                {row.AssessmentLevelPercent || 80}%
+                              </Text>
+                            </View>
+                          </View>
+
+                          <View style={styles.itemFooterRow}>
+                            <Text style={styles.itemFooterLabel}>Assessed Value (₱):</Text>
+                            <Text style={styles.itemFooterValue}>
                               ₱{(parseFloat(row.AssessmentValue) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                             </Text>
                           </View>
@@ -2006,33 +2052,20 @@ export const MachineryFormScreen = ({ route, navigation }) => {
                 <View style={[styles.card, shadows.card]}>
                   <Text style={styles.cardHeaderTitle}>Effectivity, Taxability & Assessment Basis (CAST Standard)</Text>
 
-                  <View style={styles.rowInputs}>
-                    <View style={[styles.inputGroup, { flex: 1.5 }]}>
-                      <Text style={styles.inputLabel}>EFFECTIVITY QUARTER</Text>
-                      <View style={styles.optionPillRow}>
-                        {['1st Quarter', '2nd Quarter', '3rd Quarter', '4th Quarter'].map((q) => (
-                          <TouchableOpacity
-                            key={q}
-                            style={[styles.optionPill, quarterEffectivity === q && styles.optionPillActive]}
-                            onPress={() => setQuarterEffectivity(q)}
-                          >
-                            <Text style={[styles.optionPillText, quarterEffectivity === q && styles.optionPillTextActive]}>
-                              {q.replace(' Quarter', '')}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    </View>
-                    <View style={[styles.inputGroup, { flex: 1 }]}>
-                      <Text style={styles.inputLabel}>EFFECTIVITY YEAR (YR.)</Text>
-                      <TextInput
-                        style={styles.input}
-                        value={yearEffectivity}
-                        onChangeText={setYearEffectivity}
-                        keyboardType="numeric"
-                        placeholder="YYYY"
-                        placeholderTextColor={colors.placeholder}
-                      />
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>EFFECTIVITY QUARTER</Text>
+                    <View style={styles.optionPillRow}>
+                      {['1st Quarter', '2nd Quarter', '3rd Quarter', '4th Quarter'].map((q) => (
+                        <TouchableOpacity
+                          key={q}
+                          style={[styles.optionPill, quarterEffectivity === q && styles.optionPillActive]}
+                          onPress={() => setQuarterEffectivity(q)}
+                        >
+                          <Text style={[styles.optionPillText, quarterEffectivity === q && styles.optionPillTextActive]}>
+                            {q.replace(' Quarter', '')}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
                     </View>
                   </View>
 
@@ -2060,15 +2093,28 @@ export const MachineryFormScreen = ({ route, navigation }) => {
                     </View>
                   </View>
 
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>BASIS OF ASSESSMENT</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={assessmentBasis}
-                      onChangeText={setAssessmentBasis}
-                      placeholder="Sec. 224-225 RA 7160"
-                      placeholderTextColor={colors.placeholder}
-                    />
+                  <View style={styles.rowInputs}>
+                    <View style={[styles.inputGroup, { flex: 1 }]}>
+                      <Text style={styles.inputLabel}>EFFECTIVITY YEAR (YR.)</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={yearEffectivity}
+                        onChangeText={setYearEffectivity}
+                        keyboardType="numeric"
+                        placeholder="YYYY"
+                        placeholderTextColor={colors.placeholder}
+                      />
+                    </View>
+                    <View style={[styles.inputGroup, { flex: 1.2 }]}>
+                      <Text style={styles.inputLabel}>BASIS OF ASSESSMENT</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={assessmentBasis}
+                        onChangeText={setAssessmentBasis}
+                        placeholder="Sec. 224-225 RA 7160"
+                        placeholderTextColor={colors.placeholder}
+                      />
+                    </View>
                   </View>
 
                   <View style={styles.rowInputs}>
@@ -2147,6 +2193,18 @@ export const MachineryFormScreen = ({ route, navigation }) => {
               </View>
             )}
           </>
+        )}
+
+        {/* Step Navigation Thumb Bar */}
+        {!loading && !notDownloadedError && !fromHistory && (
+          <FormStepperFooter
+            activeTab={activeTab}
+            totalTabs={TABS.length}
+            onPrev={handlePrevStep}
+            onNext={handleNextStep}
+            prevLabel="Previous Step"
+            nextLabel={activeTab < TABS.length - 1 ? `Next: Step ${activeTab + 2}` : 'Next Step'}
+          />
         )}
 
         {/* Action Buttons */}
@@ -2529,9 +2587,166 @@ export const MachineryFormScreen = ({ route, navigation }) => {
       </Modal>
 
       {/* ========================================================================= */}
+      {/* MODAL: ADD / EDIT PROPERTY ASSESSMENT ROLL (Table 2)                       */}
+      {/* ========================================================================= */}
+      <Modal
+        visible={assessmentModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setAssessmentModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ flex: 1 }}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setAssessmentModalVisible(false)}
+          >
+            <TouchableOpacity
+              activeOpacity={1}
+              style={[styles.modalContent, { maxHeight: '90%' }]}
+              onPress={(e) => e.stopPropagation()}
+            >
+              <View style={styles.modalHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.modalTitle}>
+                    {editingAssessmentIndex !== null
+                      ? `Edit Assessment Roll Item #${editingAssessmentIndex + 1}`
+                      : 'Add Property Assessment Roll Item'}
+                  </Text>
+                  <Text style={styles.cardHeaderSubtitle}>Actual Use &amp; Assessment Level (%)</Text>
+                </View>
+                <TouchableOpacity onPress={() => setAssessmentModalVisible(false)}>
+                  <Ionicons name="close" size={24} color={colors.textMuted} />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingVertical: 4 }}>
+                {/* 1. Actual Use Selection */}
+                <View style={styles.modalSectionBox}>
+                  <Text style={styles.modalSectionTitle}>1. Actual Use Classification</Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                    {MACHINERY_CLASSIFICATIONS.map((cls) => {
+                      const isSel = aActualUse === cls;
+                      return (
+                        <TouchableOpacity
+                          key={cls}
+                          style={[
+                            styles.optionPill,
+                            isSel && styles.optionPillSelected
+                          ]}
+                          onPress={() => handleActualUseSelect(cls)}
+                        >
+                          <Text style={[styles.optionPillText, isSel && styles.optionPillTextSelected]}>
+                            {cls}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                {/* 2. Valuation & Assessment Level */}
+                <View style={styles.modalSectionBox}>
+                  <Text style={styles.modalSectionTitle}>2. Valuation &amp; Assessment Level</Text>
+
+                  <View style={styles.inputGroup}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <Text style={styles.inputLabel}>MARKET VALUE (₱) *</Text>
+                      {totalsTable1.totalDepreciatedValue > 0 && (
+                        <TouchableOpacity
+                          onPress={() => setAMarketValue(totalsTable1.totalDepreciatedValue.toString())}
+                          style={{ paddingHorizontal: 6, paddingVertical: 2 }}
+                        >
+                          <Text style={{ fontSize: 11, color: colors.primary, fontWeight: '700' }}>
+                            Use Table 1 MV
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                    <TextInput
+                      style={styles.input}
+                      value={aMarketValue}
+                      onChangeText={setAMarketValue}
+                      keyboardType="numeric"
+                      placeholder="0.00"
+                      placeholderTextColor={colors.placeholder}
+                    />
+                  </View>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>ASSESSMENT LEVEL (%) *</Text>
+                    <View style={{ flexDirection: 'row', gap: 6, marginBottom: 6 }}>
+                      {['80', '50', '40'].map((rate) => {
+                        const isSel = aAssessmentLevel === rate;
+                        return (
+                          <TouchableOpacity
+                            key={rate}
+                            style={[
+                              styles.optionPill,
+                              { flex: 1, minHeight: 36 },
+                              isSel && styles.optionPillSelected
+                            ]}
+                            onPress={() => setAAssessmentLevel(rate)}
+                          >
+                            <Text style={[styles.optionPillText, isSel && styles.optionPillTextSelected]}>
+                              {rate}%
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                    <TextInput
+                      style={styles.input}
+                      value={aAssessmentLevel}
+                      onChangeText={setAAssessmentLevel}
+                      keyboardType="numeric"
+                      placeholder="80"
+                      placeholderTextColor={colors.placeholder}
+                    />
+                  </View>
+
+                  {/* Calculated Box matching Table 1 */}
+                  <View style={[styles.calculatedBox, { backgroundColor: isDarkMode ? '#064e3b' : '#ecfdf5', borderColor: '#10b981', marginTop: 4 }]}>
+                    <Text style={[styles.calculatedLabel, { color: isDarkMode ? '#34d399' : '#047857' }]}>
+                      ASSESSMENT VALUE (₱):
+                    </Text>
+                    <Text style={[styles.calculatedValue, { color: isDarkMode ? '#34d399' : '#047857' }]}>
+                      ₱{(Math.round(((parseFloat(aMarketValue) || 0) * ((parseFloat(aAssessmentLevel) || 0) / 100)) * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Modal Buttons */}
+                <View style={styles.modalFooterBtnRow}>
+                  <TouchableOpacity
+                    style={styles.modalCancelBtn}
+                    onPress={() => setAssessmentModalVisible(false)}
+                  >
+                    <Text style={styles.modalCancelBtnText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.modalSaveBtn}
+                    onPress={saveAssessmentModal}
+                  >
+                    <Ionicons name="checkmark-circle-outline" size={18} color="#ffffff" />
+                    <Text style={styles.modalSaveBtnText}>
+                      {editingAssessmentIndex !== null ? 'Update Assessment' : 'Save Assessment'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ========================================================================= */}
       {/* MODAL: SELECTION PICKER (Root - for Main Screen Tabs)                     */}
       {/* ========================================================================= */}
-      {!detailModalVisible && (
+      {!detailModalVisible && !assessmentModalVisible && (
         <Modal
           visible={pickerModal.visible}
           transparent={true}
@@ -2943,11 +3158,11 @@ const getStyles = (colors, isDarkMode, isLargeScreen = false) => StyleSheet.crea
     borderColor: colors.inputBorder,
     borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 9,
+    paddingVertical: 10,
     fontSize: 13,
     color: colors.inputText,
     backgroundColor: isDarkMode ? colors.inputBg : '#f8fafc',
-    minHeight: 40
+    minHeight: 44
   },
   inputDisabled: {
     backgroundColor: isDarkMode ? '#1e293b' : '#f1f5f9',
@@ -3016,9 +3231,9 @@ const getStyles = (colors, isDarkMode, isLargeScreen = false) => StyleSheet.crea
     borderColor: colors.inputBorder,
     borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 9,
+    paddingVertical: 10,
     backgroundColor: isDarkMode ? colors.inputBg : '#f8fafc',
-    minHeight: 40
+    minHeight: 44
   },
   selectBtnText: {
     fontSize: 13,
@@ -3033,8 +3248,9 @@ const getStyles = (colors, isDarkMode, isLargeScreen = false) => StyleSheet.crea
     borderColor: colors.inputBorder,
     borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: isDarkMode ? colors.inputBg : '#f8fafc'
+    paddingVertical: 10,
+    backgroundColor: isDarkMode ? colors.inputBg : '#f8fafc',
+    minHeight: 44
   },
   datePickerBtnText: {
     fontSize: 13,
@@ -3538,28 +3754,29 @@ const getStyles = (colors, isDarkMode, isLargeScreen = false) => StyleSheet.crea
   optionPillRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 2
+    gap: 8,
+    marginTop: 4
   },
   optionPill: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 9,
-    borderRadius: 8,
+    minHeight: 40,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
     backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc',
     borderWidth: 1,
     borderColor: isDarkMode ? colors.border : '#e2e8f0',
-    gap: 4
+    gap: 6
   },
   optionPillActive: {
     backgroundColor: colors.primary,
     borderColor: colors.primary
   },
   optionPillText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     color: colors.textMuted
   },

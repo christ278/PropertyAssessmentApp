@@ -41,6 +41,8 @@ export const TransactionsScreen = ({ navigation }) => {
     downloadAllTransactions,
     isTransactionDownloaded,
     hasPendingEdits,
+    hasPartitionPendingEdits,
+    isTransactionSyncedDraft,
     getOfflineTransactions,
     downloadedForms,
     downloadedCount,
@@ -72,6 +74,12 @@ export const TransactionsScreen = ({ navigation }) => {
     selectedTransactionForMenu &&
     typeof hasPendingEdits === 'function' &&
     hasPendingEdits(selectedTransactionForMenu.TrackingNo, selectedTransactionForMenu.FormworkflowId)
+  );
+
+  const menuIsSyncedDraft = Boolean(
+    selectedTransactionForMenu &&
+    typeof isTransactionSyncedDraft === 'function' &&
+    isTransactionSyncedDraft(selectedTransactionForMenu.TrackingNo, selectedTransactionForMenu.FormworkflowId)
   );
 
   const showModal = (config) => setActionModal({ visible: true, icon: 'information-circle-outline', iconType: 'primary', buttons: [], ...config });
@@ -483,6 +491,7 @@ export const TransactionsScreen = ({ navigation }) => {
     const item = normalizeTransactionItem(rawItem);
     const isDownloaded = isTransactionDownloaded(item.TrackingNo, item.FormworkflowId);
     const hasPending = typeof hasPendingEdits === 'function' && hasPendingEdits(item.TrackingNo, item.FormworkflowId);
+    const isSyncedDraft = typeof isTransactionSyncedDraft === 'function' && isTransactionSyncedDraft(item.TrackingNo, item.FormworkflowId);
     const isThisDownloading = downloadingId === item.FormworkflowId;
 
     const kindLabel = item.TransactionTypeId === 2 ? 'Building FAAS' :
@@ -528,6 +537,11 @@ export const TransactionsScreen = ({ navigation }) => {
                 <View style={styles.pendingEditsBadge}>
                   <Ionicons name="cloud-upload" size={10} color="#b45309" />
                   <Text style={styles.pendingEditsBadgeText}>UNSYNCED EDITS</Text>
+                </View>
+              ) : isSyncedDraft ? (
+                <View style={[styles.syncedDraftBadge, isDarkMode && { backgroundColor: '#064e3b33', borderColor: '#065f46' }]}>
+                  <Ionicons name="checkmark-done" size={10} color={isDarkMode ? '#34d399' : '#059669'} />
+                  <Text style={[styles.syncedDraftBadgeText, isDarkMode && { color: '#34d399' }]}>SYNCED DRAFT</Text>
                 </View>
               ) : null}
             </View>
@@ -927,6 +941,11 @@ export const TransactionsScreen = ({ navigation }) => {
                 const kindColor = isLand ? '#0d9488' : isMach ? '#d97706' : '#2563eb';
                 const kindBg = isLand ? '#ccfbf1' : isMach ? '#fef3c7' : '#dbeafe';
 
+                const partHasPending = selectedTransactionForPartition && typeof hasPartitionPendingEdits === 'function' &&
+                  hasPartitionPendingEdits(selectedTransactionForPartition.TrackingNo, selectedTransactionForPartition.FormworkflowId, pIndex);
+                const transIsSynced = selectedTransactionForPartition && typeof isTransactionSyncedDraft === 'function' &&
+                  isTransactionSyncedDraft(selectedTransactionForPartition.TrackingNo, selectedTransactionForPartition.FormworkflowId);
+
                 return (
                   <TouchableOpacity
                     key={`part_${pIndex}_${pLetter}`}
@@ -946,6 +965,15 @@ export const TransactionsScreen = ({ navigation }) => {
                           <View style={[styles.partitionKindBadge, { backgroundColor: kindBg }]}>
                             <Text style={[styles.partitionKindText, { color: kindColor }]}>{pKind}</Text>
                           </View>
+                          {partHasPending ? (
+                            <View style={styles.pendingEditsBadge}>
+                              <Text style={styles.pendingEditsBadgeText}>UNSYNCED</Text>
+                            </View>
+                          ) : transIsSynced ? (
+                            <View style={[styles.syncedDraftBadge, isDarkMode && { backgroundColor: '#064e3b33', borderColor: '#065f46' }]}>
+                              <Text style={[styles.syncedDraftBadgeText, isDarkMode && { color: '#34d399' }]}>SYNCED</Text>
+                            </View>
+                          ) : null}
                         </View>
                         <Text style={[styles.partitionSubtext, { color: colors.textMuted }]}>
                           TDN/PIN: {pTdn}
@@ -1014,9 +1042,13 @@ export const TransactionsScreen = ({ navigation }) => {
                   <Text style={[styles.actionMenuTracking, { color: colors.textDark }]}>
                     {selectedTransactionForMenu?.TrackingNo || 'Transaction'}
                   </Text>
-                  {selectedTransactionForMenu && hasPendingEdits(selectedTransactionForMenu.TrackingNo, selectedTransactionForMenu.FormworkflowId) ? (
+                  {menuHasPending ? (
                     <View style={styles.menuPendingBadge}>
                       <Text style={styles.menuPendingBadgeText}>UNSYNCED EDITS</Text>
+                    </View>
+                  ) : menuIsSyncedDraft ? (
+                    <View style={[styles.menuSyncedBadge, isDarkMode && { backgroundColor: '#064e3b33', borderColor: '#065f46' }]}>
+                      <Text style={[styles.menuSyncedBadgeText, isDarkMode && { color: '#34d399' }]}>SYNCED DRAFT</Text>
                     </View>
                   ) : null}
                 </View>
@@ -1115,7 +1147,7 @@ export const TransactionsScreen = ({ navigation }) => {
                   <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
                 </TouchableOpacity>
 
-                {/* Options 3 & 4: Only visible when there are pending offline edits */}
+                {/* Options 3 & 4: Forwarding / Syncing */}
                 {menuHasPending ? (
                   <>
                     {/* Option 3: Sync to Web (Draft) */}
@@ -1168,7 +1200,34 @@ export const TransactionsScreen = ({ navigation }) => {
                       <Ionicons name="chevron-forward" size={16} color="#059669" />
                     </TouchableOpacity>
                   </>
-                ) : null}
+                ) : (
+                  /* Option 3: Forward to Supervisor (when already synced as draft or inspected) */
+                  <TouchableOpacity
+                    style={[
+                      styles.menuActionItem,
+                      {
+                        backgroundColor: isDarkMode ? '#064e3b22' : '#f0fdf4',
+                        borderColor: isDarkMode ? '#065f46' : '#bbf7d0'
+                      }
+                    ]}
+                    onPress={handlePromptForwardSupervisor}
+                  >
+                    <View style={[styles.menuActionIconBox, { backgroundColor: isDarkMode ? '#065f46' : '#dcfce7' }]}>
+                      <Ionicons name="send" size={18} color="#059669" />
+                    </View>
+                    <View style={styles.menuActionTextCol}>
+                      <Text style={[styles.menuActionTitle, { color: isDarkMode ? '#34d399' : '#047857' }]}>
+                        Forward to Supervisor
+                      </Text>
+                      <Text style={[styles.menuActionSubtitle, { color: isDarkMode ? '#a7f3d0' : '#15803d' }]}>
+                        {menuIsSyncedDraft
+                          ? 'Partition edits are already synced. Transfer workflow to Supervisor'
+                          : 'Transfer field inspection workflow to Supervisor for review'}
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={16} color="#059669" />
+                  </TouchableOpacity>
+                )}
               </View>
             )}
 
@@ -1233,11 +1292,13 @@ export const TransactionsScreen = ({ navigation }) => {
                   </View>
 
                   <Text style={[styles.forwardModalTitle, { color: colors.textDark }]}>
-                    Forward to Supervisor?
+                    {menuHasPending ? 'Sync & Forward to Supervisor?' : 'Forward to Supervisor?'}
                   </Text>
 
                   <Text style={[styles.forwardModalDescription, { color: colors.textMuted }]}>
-                    This will synchronize all offline partition changes for {selectedTransactionForMenu?.TrackingNo} to the Web Portal and advance the workflow to Recommend Approval (Supervisor Review).
+                    {menuHasPending
+                      ? `This will synchronize all offline partition changes for ${selectedTransactionForMenu?.TrackingNo} to the Web Portal and advance the workflow to Recommend Approval (Supervisor Review).`
+                      : `Partition details for ${selectedTransactionForMenu?.TrackingNo} are already synchronized on the Office Web Portal. This will advance the workflow to Recommend Approval (Supervisor Review).`}
                   </Text>
 
                   <Text style={[styles.inputLabel, { color: colors.textDark, alignSelf: 'flex-start', marginBottom: 4 }]}>
@@ -1274,7 +1335,9 @@ export const TransactionsScreen = ({ navigation }) => {
                       disabled={actionLoading}
                     >
                       <Ionicons name="send" size={16} color="#ffffff" />
-                      <Text style={styles.confirmForwardBtnText}>Sync & Forward</Text>
+                      <Text style={styles.confirmForwardBtnText}>
+                        {menuHasPending ? 'Sync & Forward' : 'Forward to Supervisor'}
+                      </Text>
                     </TouchableOpacity>
                   </View>
                 </>
@@ -1555,6 +1618,22 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#b45309'
   },
+  syncedDraftBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    gap: 3
+  },
+  syncedDraftBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#059669'
+  },
   redownloadIconBtn: {
     paddingHorizontal: 7,
     paddingVertical: 5,
@@ -1797,6 +1876,19 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '800',
     color: '#b45309'
+  },
+  menuSyncedBadge: {
+    backgroundColor: '#ecfdf5',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#a7f3d0'
+  },
+  menuSyncedBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#059669'
   },
   menuLoadingContainer: {
     paddingVertical: 36,

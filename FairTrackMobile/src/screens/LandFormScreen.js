@@ -24,6 +24,7 @@ import { ActionModal } from '../components/ActionModal';
 import { DiscardChangesModal } from '../components/DiscardChangesModal';
 import { DatePickerModal } from '../components/DatePickerModal';
 import { AttachmentsSection } from '../components/AttachmentsSection';
+import { FormStepperHeader, FormStepperFooter } from '../components/FormStepper';
 import { savePartitionAttachmentsOffline, loadPartitionAttachmentsOffline, ensurePayloadFilesHaveBase64 } from '../utils/fileStorage';
 import { COLORS, SHADOWS } from '../constants/theme';
 import { BARANGAY_OPTIONS, normalizeBarangay } from '../constants/locationData';
@@ -69,6 +70,26 @@ export const LandFormScreen = ({ route, navigation }) => {
   const isLargeScreen = width >= 600;
   const styles = React.useMemo(() => getStyles(colors, isDarkMode, isLargeScreen), [colors, isDarkMode, isLargeScreen]);
   const tabScrollRef = useRef(null);
+  const mainScrollRef = useRef(null);
+
+  const handleSelectTab = (idx) => {
+    setActiveTab(idx);
+    mainScrollRef.current?.scrollTo({ y: 0, animated: true });
+  };
+
+  const handlePrevStep = () => {
+    if (activeTab > 0) {
+      setActiveTab(activeTab - 1);
+      mainScrollRef.current?.scrollTo({ y: 0, animated: true });
+    }
+  };
+
+  const handleNextStep = () => {
+    if (activeTab < TABS.length - 1) {
+      setActiveTab(activeTab + 1);
+      mainScrollRef.current?.scrollTo({ y: 0, animated: true });
+    }
+  };
 
   const trackingNoParam = route?.params?.trackingNo || '';
   const formWorkflowIdParam = route?.params?.formWorkflowId || null;
@@ -1428,40 +1449,17 @@ export const LandFormScreen = ({ route, navigation }) => {
         </TouchableOpacity>
       </View>
 
-      {/* Sticky, Well-Positioned Tab Bar Header */}
-      <View style={styles.topTabsWrapper}>
-        {/* Scrollable Tab Pills */}
-        <ScrollView
-          ref={tabScrollRef}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.sectionTabsScroll}
-          style={styles.sectionTabsContainer}
-        >
-          {TABS.map((tab, idx) => {
-            const isActive = activeTab === idx;
-            return (
-              <TouchableOpacity
-                key={tab.label}
-                style={[styles.sectionTabBtn, isActive && styles.sectionTabBtnActive]}
-                onPress={() => setActiveTab(idx)}
-                activeOpacity={0.7}
-              >
-                <Ionicons
-                  name={tab.icon}
-                  size={15}
-                  color={isActive ? '#ffffff' : (isDarkMode ? colors.textDark : '#475569')}
-                />
-                <Text style={[styles.sectionTabText, isActive && styles.sectionTabTextActive]}>
-                  {tab.label} {idx === 4 && attachments && attachments.length > 0 ? `(${attachments.length})` : ''}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
+      {/* Interactive Step Progress Header */}
+      <FormStepperHeader
+        tabs={TABS}
+        activeTab={activeTab}
+        onSelectTab={handleSelectTab}
+        attachmentCount={attachments ? attachments.length : 0}
+        attachmentTabIndex={4}
+      />
 
       <ScrollView
+        ref={mainScrollRef}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
@@ -1532,46 +1530,45 @@ export const LandFormScreen = ({ route, navigation }) => {
                   <Text style={styles.cardHeaderTitle}>Cadastral Details &amp; Title Registration (CAST Reference)</Text>
 
                   {/* Registration Status & Title Type Selectors */}
-                  <View style={styles.rowInputs}>
-                    <View style={[styles.inputGroup, { flex: 1 }]}>
-                      <Text style={styles.inputLabel}>REGISTRATION STATUS</Text>
-                      <View style={styles.optionPillRow}>
-                        {['Titled', 'Untitled'].map((status) => {
-                          const isMatch = registrationStatus.toLowerCase() === status.toLowerCase();
-                          return (
-                            <TouchableOpacity
-                              key={status}
-                              style={[styles.optionPill, isMatch && styles.optionPillActive]}
-                              onPress={() => setRegistrationStatus(status)}
-                            >
-                              {isMatch && <Ionicons name="checkmark-circle" size={13} color="#ffffff" style={{ marginRight: 3 }} />}
-                              <Text style={[styles.optionPillText, isMatch && styles.optionPillTextActive]}>
-                                {status === 'Titled' ? 'Titled Land' : 'Untitled'}
-                              </Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>REGISTRATION STATUS</Text>
+                    <View style={styles.optionPillRow}>
+                      {['Titled', 'Untitled'].map((status) => {
+                        const isMatch = registrationStatus.toLowerCase() === status.toLowerCase();
+                        return (
+                          <TouchableOpacity
+                            key={status}
+                            style={[styles.optionPill, isMatch && styles.optionPillActive]}
+                            onPress={() => setRegistrationStatus(status)}
+                          >
+                            {isMatch && <Ionicons name="checkmark-circle" size={13} color="#ffffff" style={{ marginRight: 3 }} />}
+                            <Text style={[styles.optionPillText, isMatch && styles.optionPillTextActive]}>
+                              {status === 'Titled' ? 'Titled Land' : 'Untitled'}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
                     </View>
-                    <View style={[styles.inputGroup, { flex: 1 }]}>
-                      <Text style={styles.inputLabel}>TITLE TYPE</Text>
-                      <View style={styles.optionPillRow}>
-                        {['OCT', 'TCT', 'CLOA', 'Patent'].map((tType) => {
-                          const isMatch = titleType.toUpperCase() === tType.toUpperCase();
-                          return (
-                            <TouchableOpacity
-                              key={tType}
-                              style={[styles.optionPill, isMatch && styles.optionPillActive]}
-                              onPress={() => setTitleType(tType)}
-                            >
-                              {isMatch && <Ionicons name="checkmark-circle" size={13} color="#ffffff" style={{ marginRight: 3 }} />}
-                              <Text style={[styles.optionPillText, isMatch && styles.optionPillTextActive]}>
-                                {tType}
-                              </Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
+                  </View>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>TITLE TYPE</Text>
+                    <View style={styles.optionPillRow}>
+                      {['OCT', 'TCT', 'CLOA', 'Patent'].map((tType) => {
+                        const isMatch = titleType.toUpperCase() === tType.toUpperCase();
+                        return (
+                          <TouchableOpacity
+                            key={tType}
+                            style={[styles.optionPill, isMatch && styles.optionPillActive]}
+                            onPress={() => setTitleType(tType)}
+                          >
+                            {isMatch && <Ionicons name="checkmark-circle" size={13} color="#ffffff" style={{ marginRight: 3 }} />}
+                            <Text style={[styles.optionPillText, isMatch && styles.optionPillTextActive]}>
+                              {tType}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
                     </View>
                   </View>
 
@@ -2592,32 +2589,20 @@ export const LandFormScreen = ({ route, navigation }) => {
                 <View style={[styles.card, shadows.card]}>
                   <Text style={styles.cardHeaderTitle}>Effectivity, Taxability & Assessment Basis (CAST Standard)</Text>
 
-                  <View style={styles.rowInputs}>
-                    <View style={[styles.inputGroup, { flex: 1 }]}>
-                      <Text style={styles.inputLabel}>EFFECTIVITY QUARTER</Text>
-                      <View style={styles.optionPillRow}>
-                        {['1st Quarter', '2nd Quarter', '3rd Quarter', '4th Quarter'].map((q) => (
-                          <TouchableOpacity
-                            key={q}
-                            style={[styles.optionPill, quarterEffectivity === q && styles.optionPillActive]}
-                            onPress={() => setQuarterEffectivity(q)}
-                          >
-                            <Text style={[styles.optionPillText, quarterEffectivity === q && styles.optionPillTextActive]}>
-                              {q.replace(' Quarter', '')}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    </View>
-                    <View style={[styles.inputGroup, { flex: 1 }]}>
-                      <Text style={styles.inputLabel}>EFFECTIVITY YEAR</Text>
-                      <TextInput
-                        placeholderTextColor={colors.placeholder}
-                        style={styles.input}
-                        value={yearEffectivity}
-                        onChangeText={setYearEffectivity}
-                        keyboardType="numeric"
-                      />
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>EFFECTIVITY QUARTER</Text>
+                    <View style={styles.optionPillRow}>
+                      {['1st Quarter', '2nd Quarter', '3rd Quarter', '4th Quarter'].map((q) => (
+                        <TouchableOpacity
+                          key={q}
+                          style={[styles.optionPill, quarterEffectivity === q && styles.optionPillActive]}
+                          onPress={() => setQuarterEffectivity(q)}
+                        >
+                          <Text style={[styles.optionPillText, quarterEffectivity === q && styles.optionPillTextActive]}>
+                            {q.replace(' Quarter', '')}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
                     </View>
                   </View>
 
@@ -2645,15 +2630,27 @@ export const LandFormScreen = ({ route, navigation }) => {
                     </View>
                   </View>
 
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>BASIS OF ASSESSMENT</Text>
-                    <TextInput
-                      placeholderTextColor={colors.placeholder}
-                      style={styles.input}
-                      value={assessmentBasis}
-                      onChangeText={setAssessmentBasis}
-                      placeholder="Sec. 217 RA 7160"
-                    />
+                  <View style={styles.rowInputs}>
+                    <View style={[styles.inputGroup, { flex: 1 }]}>
+                      <Text style={styles.inputLabel}>EFFECTIVITY YEAR</Text>
+                      <TextInput
+                        placeholderTextColor={colors.placeholder}
+                        style={styles.input}
+                        value={yearEffectivity}
+                        onChangeText={setYearEffectivity}
+                        keyboardType="numeric"
+                      />
+                    </View>
+                    <View style={[styles.inputGroup, { flex: 1.2 }]}>
+                      <Text style={styles.inputLabel}>BASIS OF ASSESSMENT</Text>
+                      <TextInput
+                        placeholderTextColor={colors.placeholder}
+                        style={styles.input}
+                        value={assessmentBasis}
+                        onChangeText={setAssessmentBasis}
+                        placeholder="Sec. 217 RA 7160"
+                      />
+                    </View>
                   </View>
 
                   <View style={styles.rowInputs}>
@@ -2730,6 +2727,18 @@ export const LandFormScreen = ({ route, navigation }) => {
                   showAttachments={true}
                 />
               </View>
+            )}
+
+            {/* Step Navigation Thumb Bar */}
+            {!fromHistory && (
+              <FormStepperFooter
+                activeTab={activeTab}
+                totalTabs={TABS.length}
+                onPrev={handlePrevStep}
+                onNext={handleNextStep}
+                prevLabel="Previous Step"
+                nextLabel={activeTab < TABS.length - 1 ? `Next: Step ${activeTab + 2}` : 'Next Step'}
+              />
             )}
 
             {/* Action Buttons */}
@@ -4101,11 +4110,11 @@ const getStyles = (colors, isDarkMode, isLargeScreen = false) => StyleSheet.crea
     borderColor: colors.inputBorder,
     borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 9,
+    paddingVertical: 10,
     fontSize: 13,
     color: colors.inputText,
     backgroundColor: isDarkMode ? colors.inputBg : '#f8fafc',
-    minHeight: 40
+    minHeight: 44
   },
   inputDisabled: {
     backgroundColor: isDarkMode ? '#1e293b66' : '#f1f5f9',
@@ -4127,7 +4136,7 @@ const getStyles = (colors, isDarkMode, isLargeScreen = false) => StyleSheet.crea
   },
   datePickerTriggerBtn: {
     backgroundColor: colors.primary,
-    width: 38,
+    width: 44,
     alignItems: 'center',
     justifyContent: 'center',
     borderTopRightRadius: 10,
@@ -4180,25 +4189,29 @@ const getStyles = (colors, isDarkMode, isLargeScreen = false) => StyleSheet.crea
   optionPillRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 2
+    gap: 8,
+    marginTop: 4
   },
   optionPill: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 40,
     paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingVertical: 8,
+    borderRadius: 10,
     backgroundColor: isDarkMode ? colors.surfaceSecondary : '#f1f5f9',
     borderWidth: 1,
-    borderColor: isDarkMode ? colors.border : '#e2e8f0'
+    borderColor: isDarkMode ? colors.border : '#e2e8f0',
+    gap: 6
   },
   optionPillActive: {
     backgroundColor: colors.primary,
     borderColor: colors.primary
   },
   optionPillText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     color: colors.textMuted
   },
