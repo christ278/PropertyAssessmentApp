@@ -34,7 +34,7 @@ const TABS = [
   { label: '3. Memoranda, Effectivity & Back Taxes', icon: 'document-text-outline' },
 ];
 
-const GENDER_OPTIONS = ['Male', 'Female', 'Corporate / Entity'];
+const GENDER_OPTIONS = ['Male', 'Female'];
 const MACHINERY_CLASSIFICATIONS = ['INDUSTRIAL', 'COMMERCIAL', 'RESIDENTIAL', 'AGRICULTURAL', 'SPECIAL'];
 const MACHINERY_CONDITIONS = ['NEW', 'SECOND HAND'];
 const EFFECTIVITY_QUARTERS = ['1st Quarter', '2nd Quarter', '3rd Quarter', '4th Quarter'];
@@ -1165,26 +1165,80 @@ export const MachineryFormScreen = ({ route, navigation }) => {
 
                 {/* Card 2: Owner & Declarant Demographics (CAST) */}
                 <View style={[styles.card, shadows.card]}>
-                  <View style={styles.cardHeaderRow}>
-                    <Text style={styles.cardHeaderTitle}>Owner & Declarant Demographics (CAST)</Text>
-                    <View style={styles.rolePillGroup}>
+                  <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 10, marginBottom: 12 }}>
+                    <Text style={[styles.cardHeaderTitle, { borderBottomWidth: 0, paddingBottom: 0, marginBottom: 8 }]}>
+                      Owner & Declarant Demographics (CAST)
+                    </Text>
+
+                    {/* 3 Options: Administrator, Beneficial User, Possessor (Check only one) */}
+                    <View style={styles.rolePillsRow}>
                       <TouchableOpacity
                         style={[styles.rolePill, isAdministrator && styles.rolePillActive]}
-                        onPress={() => setIsAdministrator(!isAdministrator)}
+                        onPress={() => {
+                          if (isAdministrator) {
+                            setIsAdministrator(false);
+                          } else {
+                            setIsAdministrator(true);
+                            setIsBeneficialUser(false);
+                            setIsPossessor(false);
+                          }
+                        }}
+                        activeOpacity={0.7}
                       >
-                        <Text style={[styles.rolePillText, isAdministrator && styles.rolePillTextActive]}>ADMINISTRATOR</Text>
+                        <Ionicons
+                          name={isAdministrator ? "checkbox" : "square-outline"}
+                          size={16}
+                          color={isAdministrator ? colors.primary : colors.textMuted}
+                        />
+                        <Text style={[styles.rolePillText, isAdministrator && styles.rolePillTextActive]}>
+                          ADMINISTRATOR
+                        </Text>
                       </TouchableOpacity>
+
                       <TouchableOpacity
                         style={[styles.rolePill, isBeneficialUser && styles.rolePillActive]}
-                        onPress={() => setIsBeneficialUser(!isBeneficialUser)}
+                        onPress={() => {
+                          if (isBeneficialUser) {
+                            setIsBeneficialUser(false);
+                          } else {
+                            setIsBeneficialUser(true);
+                            setIsAdministrator(false);
+                            setIsPossessor(false);
+                          }
+                        }}
+                        activeOpacity={0.7}
                       >
-                        <Text style={[styles.rolePillText, isBeneficialUser && styles.rolePillTextActive]}>BENEFICIAL USER</Text>
+                        <Ionicons
+                          name={isBeneficialUser ? "checkbox" : "square-outline"}
+                          size={16}
+                          color={isBeneficialUser ? colors.primary : colors.textMuted}
+                        />
+                        <Text style={[styles.rolePillText, isBeneficialUser && styles.rolePillTextActive]}>
+                          BENEFICIAL USER
+                        </Text>
                       </TouchableOpacity>
+
                       <TouchableOpacity
                         style={[styles.rolePill, isPossessor && styles.rolePillActive]}
-                        onPress={() => setIsPossessor(!isPossessor)}
+                        onPress={() => {
+                          if (isPossessor) {
+                            setIsPossessor(false);
+                          } else {
+                            setIsPossessor(true);
+                            setIsAdministrator(false);
+                            setIsBeneficialUser(false);
+                          }
+                        }}
+                        activeOpacity={0.7}
                       >
-                        <Text style={[styles.rolePillText, isPossessor && styles.rolePillTextActive]}>POSSESSOR</Text>
+                        <Ionicons
+                          name={isPossessor ? "checkbox" : "square-outline"}
+                          size={16}
+                          color={isPossessor ? colors.primary : colors.textMuted}
+                        />
+                        <Text style={[styles.rolePillText, isPossessor && styles.rolePillTextActive]}>
+                          POSSESSOR
+                        </Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -1265,19 +1319,23 @@ export const MachineryFormScreen = ({ route, navigation }) => {
 
                   {/* Administrator / Beneficial User / Possessor Section (Toggled) */}
                   {(isAdministrator || isBeneficialUser || isPossessor) && (
-                    <View style={styles.subCard}>
-                      <Text style={styles.subCardTitle}>
-                        <Ionicons name="shield-alert-outline" size={14} color="#d97706" />
-                        {' '}Administrator / Beneficial User / Possessor Details
-                      </Text>
+                    <View style={{ marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.border }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+                        <Ionicons name="shield-checkmark-outline" size={16} color={colors.primary} />
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary, textTransform: 'uppercase' }}>
+                          {isAdministrator ? 'Administrator Details' : isBeneficialUser ? 'Beneficial User Details' : 'Possessor Details'}
+                        </Text>
+                      </View>
 
                       <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>NAMES (ADMINISTRATOR / BENEFICIAL USER / POSSESSOR)</Text>
+                        <Text style={styles.inputLabel}>
+                          NAME ({isAdministrator ? 'ADMINISTRATOR' : isBeneficialUser ? 'BENEFICIAL USER' : 'POSSESSOR'})
+                        </Text>
                         <TextInput
                           style={styles.input}
                           value={adminName}
                           onChangeText={setAdminName}
-                          placeholder="Full name of administrator / beneficial user / possessor"
+                          placeholder="Full name of administrator / representative"
                           placeholderTextColor={colors.placeholder}
                         />
                       </View>
@@ -2206,18 +2264,52 @@ export const MachineryFormScreen = ({ route, navigation }) => {
                   <Text style={styles.modalSectionTitle}>2. Condition, Acquisition & Economic Life</Text>
 
                   <View style={styles.rowInputs}>
-                    <View style={{ flex: 1 }}>
-                      {renderSelectField('CONDITION', mCondition, MACHINERY_CONDITIONS, setMCondition)}
+                    <View style={[styles.inputGroup, { flex: 1.2 }]}>
+                      <Text style={styles.inputLabel}>CONDITION WHEN ACQUIRED</Text>
+                      <View style={styles.originToggleRow}>
+                        <TouchableOpacity
+                          style={[styles.originToggleBtn, mCondition === 'NEW' && styles.originToggleBtnActive]}
+                          onPress={() => setMCondition('NEW')}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons
+                            name="sparkles-outline"
+                            size={14}
+                            color={mCondition === 'NEW' ? '#ffffff' : colors.textDark}
+                          />
+                          <Text style={[styles.originToggleText, mCondition === 'NEW' && styles.originToggleTextActive]}>
+                            NEW
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[styles.originToggleBtn, mCondition === 'SECOND HAND' && styles.originToggleBtnActive]}
+                          onPress={() => setMCondition('SECOND HAND')}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons
+                            name="refresh-outline"
+                            size={14}
+                            color={mCondition === 'SECOND HAND' ? '#ffffff' : colors.textDark}
+                          />
+                          <Text style={[styles.originToggleText, mCondition === 'SECOND HAND' && styles.originToggleTextActive]}>
+                            SECOND HAND
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
                     <View style={[styles.inputGroup, { flex: 1 }]}>
                       <Text style={styles.inputLabel}>DATE ACQUIRED</Text>
-                      <TextInput
-                        style={styles.input}
-                        value={mAcquiredDate}
-                        onChangeText={setMAcquiredDate}
-                        placeholder="YYYY-MM-DD"
-                        placeholderTextColor={colors.placeholder}
-                      />
+                      <TouchableOpacity
+                        style={styles.datePickerBtn}
+                        onPress={() => openDatePicker('Select Date Acquired', 'mAcquiredDate', mAcquiredDate)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.datePickerBtnText, !mAcquiredDate && { color: colors.placeholder }]}>
+                          {mAcquiredDate || 'YYYY-MM-DD'}
+                        </Text>
+                        <Ionicons name="calendar-outline" size={16} color={colors.textMuted} />
+                      </TouchableOpacity>
                     </View>
                   </View>
 
@@ -2680,7 +2772,7 @@ const getStyles = (colors, isDarkMode, isLargeScreen = false) => StyleSheet.crea
     padding: 16,
     borderWidth: 1,
     borderColor: colors.border,
-    gap: 12
+    gap: 14
   },
   cardHeaderRow: {
     flexDirection: 'row',
@@ -2702,26 +2794,29 @@ const getStyles = (colors, isDarkMode, isLargeScreen = false) => StyleSheet.crea
     fontSize: 11,
     color: colors.textMuted
   },
-  rolePillGroup: {
+  rolePillsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     flexWrap: 'wrap',
-    gap: 6
+    gap: 8,
+    paddingBottom: 4
   },
   rolePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: isDarkMode ? colors.surfaceSecondary : '#f8fafc',
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc'
+    borderColor: colors.border
   },
   rolePillActive: {
-    backgroundColor: isDarkMode ? '#064e3b' : '#ecfdf5',
-    borderColor: '#10b981'
+    backgroundColor: isDarkMode ? '#064e3b33' : '#ecfdf5',
+    borderColor: colors.primary
   },
   rolePillText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
     color: colors.textMuted
   },
@@ -2835,22 +2930,24 @@ const getStyles = (colors, isDarkMode, isLargeScreen = false) => StyleSheet.crea
     textTransform: 'uppercase'
   },
   inputGroup: {
-    gap: 4
+    gap: 6
   },
   inputLabel: {
     fontSize: 11,
     fontWeight: '700',
-    color: colors.textDark
+    color: colors.textDark,
+    letterSpacing: 0.3
   },
   input: {
     borderWidth: 1,
     borderColor: colors.inputBorder,
     borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 9,
     fontSize: 13,
     color: colors.inputText,
-    backgroundColor: isDarkMode ? colors.inputBg : '#f8fafc'
+    backgroundColor: isDarkMode ? colors.inputBg : '#f8fafc',
+    minHeight: 40
   },
   inputDisabled: {
     backgroundColor: isDarkMode ? '#1e293b' : '#f1f5f9',
@@ -2876,7 +2973,7 @@ const getStyles = (colors, isDarkMode, isLargeScreen = false) => StyleSheet.crea
   },
   rowInputs: {
     flexDirection: isLargeScreen ? 'row' : 'column',
-    gap: isLargeScreen ? 10 : 12
+    gap: isLargeScreen ? 10 : 14
   },
   formScreenHeader: {
     paddingHorizontal: 16,
@@ -2919,8 +3016,9 @@ const getStyles = (colors, isDarkMode, isLargeScreen = false) => StyleSheet.crea
     borderColor: colors.inputBorder,
     borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: isDarkMode ? colors.inputBg : '#f8fafc'
+    paddingVertical: 9,
+    backgroundColor: isDarkMode ? colors.inputBg : '#f8fafc',
+    minHeight: 40
   },
   selectBtnText: {
     fontSize: 13,

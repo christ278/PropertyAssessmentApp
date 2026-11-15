@@ -4059,7 +4059,7 @@ const getStyles = (colors, isDarkMode, isLargeScreen = false) => StyleSheet.crea
     padding: 16,
     borderWidth: 1,
     borderColor: colors.border,
-    gap: 12
+    gap: 14
   },
   cardHeaderTitle: {
     fontSize: 13,
@@ -4079,7 +4079,7 @@ const getStyles = (colors, isDarkMode, isLargeScreen = false) => StyleSheet.crea
     backgroundColor: colors.surfaceSecondary,
     padding: 10,
     borderRadius: 10,
-    gap: 4
+    gap: 6
   },
   boundaryTitle: {
     fontSize: 11,
@@ -4088,7 +4088,7 @@ const getStyles = (colors, isDarkMode, isLargeScreen = false) => StyleSheet.crea
     letterSpacing: 0.5
   },
   inputGroup: {
-    gap: 4
+    gap: 6
   },
   inputLabel: {
     fontSize: 11,
@@ -4101,10 +4101,11 @@ const getStyles = (colors, isDarkMode, isLargeScreen = false) => StyleSheet.crea
     borderColor: colors.inputBorder,
     borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 9,
     fontSize: 13,
     color: colors.inputText,
-    backgroundColor: isDarkMode ? colors.inputBg : '#f8fafc'
+    backgroundColor: isDarkMode ? colors.inputBg : '#f8fafc',
+    minHeight: 40
   },
   inputDisabled: {
     backgroundColor: isDarkMode ? '#1e293b66' : '#f1f5f9',
@@ -4141,7 +4142,7 @@ const getStyles = (colors, isDarkMode, isLargeScreen = false) => StyleSheet.crea
   },
   rowInputs: {
     flexDirection: isLargeScreen ? 'row' : 'column',
-    gap: isLargeScreen ? 10 : 12
+    gap: isLargeScreen ? 10 : 14
   },
   formScreenHeader: {
     paddingHorizontal: 16,
@@ -4430,8 +4431,9 @@ const getStyles = (colors, isDarkMode, isLargeScreen = false) => StyleSheet.crea
     borderColor: colors.inputBorder,
     borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: isDarkMode ? colors.inputBg : '#f8fafc'
+    paddingVertical: 9,
+    backgroundColor: isDarkMode ? colors.inputBg : '#f8fafc',
+    minHeight: 40
   },
   selectBtnText: {
     fontSize: 13,

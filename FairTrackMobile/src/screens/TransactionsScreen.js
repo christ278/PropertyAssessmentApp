@@ -68,6 +68,12 @@ export const TransactionsScreen = ({ navigation }) => {
   const [syncingTrackingNo, setSyncingTrackingNo] = useState(null);
   const [actionModal, setActionModal] = useState({ visible: false, title: '', message: '', icon: 'information-circle-outline', iconType: 'primary', buttons: [] });
 
+  const menuHasPending = Boolean(
+    selectedTransactionForMenu &&
+    typeof hasPendingEdits === 'function' &&
+    hasPendingEdits(selectedTransactionForMenu.TrackingNo, selectedTransactionForMenu.FormworkflowId)
+  );
+
   const showModal = (config) => setActionModal({ visible: true, icon: 'information-circle-outline', iconType: 'primary', buttons: [], ...config });
   const closeModal = () => setActionModal(prev => ({ ...prev, visible: false }));
 
@@ -492,7 +498,7 @@ export const TransactionsScreen = ({ navigation }) => {
     const showReferenceNo = item.ARPNo && item.ARPNo !== item.TrackingNo;
 
     return (
-      <TouchableOpacity
+      <View
         style={[
           styles.transCard,
           {
@@ -501,7 +507,6 @@ export const TransactionsScreen = ({ navigation }) => {
           },
           shadows.card
         ]}
-        onPress={() => handleTransactionPress(item)}
       >
         <View style={styles.cardHeader}>
           <View style={{ flex: 1, paddingRight: 6 }}>
@@ -599,99 +604,33 @@ export const TransactionsScreen = ({ navigation }) => {
           ) : null}
         </View>
 
-        {/* Download Indicator & Actions */}
-        <View style={styles.cardFooter}>
-          {item.HasPartition ? (
-            hasPending ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <TouchableOpacity
-                  style={[styles.pendingFooterBadge, syncingTrackingNo === item.TrackingNo && { opacity: 0.85 }]}
-                  activeOpacity={0.8}
-                  onPress={() => handleOpenThreeDots(item)}
-                  disabled={syncingTrackingNo === item.TrackingNo}
-                >
-                  {syncingTrackingNo === item.TrackingNo ? (
-                    <>
-                      <ActivityIndicator size="small" color="#d97706" style={{ marginRight: 2 }} />
-                      <Text style={styles.pendingFooterBadgeText}>Syncing to Web...</Text>
-                    </>
-                  ) : (
-                    <>
-                      <Ionicons name="cloud-upload" size={14} color="#d97706" />
-                      <Text style={styles.pendingFooterBadgeText}>Unsynced (Sync)</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.redownloadIconBtn, isDarkMode && { backgroundColor: '#1e293b', borderColor: '#334155' }]}
-                  onPress={() => handleDownloadSingle(item)}
-                  disabled={isThisDownloading}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  {isThisDownloading ? (
-                    <ActivityIndicator size="small" color="#d97706" />
-                  ) : (
-                    <Ionicons name="sync-outline" size={13} color="#d97706" />
-                  )}
-                </TouchableOpacity>
+        {/* Card Footer: Status Indicator & Open Hint */}
+        <View style={[styles.cardFooter, { borderTopColor: isDarkMode ? '#1e293b' : '#f1f5f9' }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+            {hasPending ? (
+              <View style={styles.pendingFooterBadge}>
+                <Ionicons name="cloud-upload" size={12} color="#b45309" />
+                <Text style={styles.pendingFooterBadgeText}>Unsynced Edits</Text>
               </View>
             ) : isDownloaded ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <View style={styles.downloadedBadge}>
-                  <Ionicons name="checkmark-circle" size={14} color="#16a34a" />
-                  <Text style={styles.downloadedBadgeText}>Downloaded</Text>
-                </View>
-                <TouchableOpacity
-                  style={[styles.redownloadIconBtn, isDarkMode && { backgroundColor: '#1e293b', borderColor: '#334155' }]}
-                  onPress={() => handleDownloadSingle(item)}
-                  disabled={isThisDownloading}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  {isThisDownloading ? (
-                    <ActivityIndicator size="small" color={colors.primary} />
-                  ) : (
-                    <Ionicons name="sync-outline" size={13} color={colors.primary} />
-                  )}
-                </TouchableOpacity>
+              <View style={styles.downloadedBadge}>
+                <Ionicons name="checkmark-circle" size={12} color="#16a34a" />
+                <Text style={styles.downloadedBadgeText}>Downloaded</Text>
+              </View>
+            ) : item.HasPartition ? (
+              <View style={[styles.downloadedBadge, { backgroundColor: isDarkMode ? '#1e293b' : '#f1f5f9' }]}>
+                <Ionicons name="cloud-outline" size={12} color={colors.textMuted} />
+                <Text style={[styles.downloadedBadgeText, { color: colors.textMuted }]}>Available Online</Text>
               </View>
             ) : (
-              <TouchableOpacity
-                style={[
-                  styles.downloadBtn,
-                  isDarkMode && { backgroundColor: '#134e4a', borderColor: '#0d9488' }
-                ]}
-                onPress={() => handleDownloadSingle(item)}
-                disabled={isThisDownloading}
-              >
-                {isThisDownloading ? (
-                  <ActivityIndicator size="small" color={colors.primary} />
-                ) : (
-                  <>
-                    <Ionicons name="cloud-download-outline" size={14} color={colors.primary} />
-                    <Text style={[styles.downloadBtnText, { color: colors.primary }]}>Download to Device</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            )
-          ) : (
-            <View style={styles.lockedBadge}>
-              <Ionicons name="lock-closed" size={12} color="#b91c1c" />
-              <Text style={styles.lockedBadgeText}>Pending Office Partition</Text>
-            </View>
-          )}
-
-          <View style={styles.openActionWrapper}>
-            <Text style={[styles.tapActionText, { color: item.HasPartition ? colors.primary : colors.textMuted }]}>
-              {item.HasPartition ? (isDownloaded ? 'Open Offline' : 'Inspect Form') : 'Cannot Edit'}
-            </Text>
-            <Ionicons
-              name={item.HasPartition ? 'arrow-forward-circle' : 'lock-closed'}
-              size={18}
-              color={item.HasPartition ? colors.primary : colors.textMuted}
-            />
+              <View style={styles.lockedBadge}>
+                <Ionicons name="lock-closed" size={11} color="#b91c1c" />
+                <Text style={styles.lockedBadgeText}>Pending Office Partition</Text>
+              </View>
+            )}
           </View>
         </View>
-      </TouchableOpacity>
+      </View>
     );
   };
 
@@ -722,16 +661,6 @@ export const TransactionsScreen = ({ navigation }) => {
           </View>
         </View>
       </View>
-
-      {/* Offline Status Alert */}
-      {isOffline ? (
-        <View style={styles.offlineNoticeBar}>
-          <Ionicons name="cloud-offline" size={16} color="#b45309" />
-          <Text style={styles.offlineNoticeText}>
-            Offline Mode • Showing {transactions.length} downloaded form(s) stored on device
-          </Text>
-        </View>
-      ) : null}
 
       {/* Batch Download Bar */}
       <View
@@ -1118,57 +1047,7 @@ export const TransactionsScreen = ({ navigation }) => {
               </View>
             ) : (
               <View style={styles.actionMenuList}>
-                {/* Option 1: Sync to Web (Draft) */}
-                <TouchableOpacity
-                  style={[
-                    styles.menuActionItem,
-                    {
-                      backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
-                      borderColor: colors.border
-                    }
-                  ]}
-                  onPress={handleSyncDraftFromMenu}
-                >
-                  <View style={[styles.menuActionIconBox, { backgroundColor: isDarkMode ? '#0369a133' : '#e0f2fe' }]}>
-                    <Ionicons name="cloud-upload-outline" size={20} color="#0284c7" />
-                  </View>
-                  <View style={styles.menuActionTextCol}>
-                    <Text style={[styles.menuActionTitle, { color: colors.textDark }]}>
-                      Sync to Web (Draft)
-                    </Text>
-                    <Text style={[styles.menuActionSubtitle, { color: colors.textMuted }]}>
-                      Upload offline partition edits without advancing workflow
-                    </Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-                </TouchableOpacity>
-
-                {/* Option 2: Sync & Forward to Supervisor */}
-                <TouchableOpacity
-                  style={[
-                    styles.menuActionItem,
-                    {
-                      backgroundColor: isDarkMode ? '#064e3b22' : '#f0fdf4',
-                      borderColor: isDarkMode ? '#065f46' : '#bbf7d0'
-                    }
-                  ]}
-                  onPress={handlePromptForwardSupervisor}
-                >
-                  <View style={[styles.menuActionIconBox, { backgroundColor: isDarkMode ? '#065f46' : '#dcfce7' }]}>
-                    <Ionicons name="send" size={18} color="#059669" />
-                  </View>
-                  <View style={styles.menuActionTextCol}>
-                    <Text style={[styles.menuActionTitle, { color: isDarkMode ? '#34d399' : '#047857' }]}>
-                      Sync & Forward to Supervisor
-                    </Text>
-                    <Text style={[styles.menuActionSubtitle, { color: isDarkMode ? '#a7f3d0' : '#15803d' }]}>
-                      Sync all partition changes and transfer to Supervisor
-                    </Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color="#059669" />
-                </TouchableOpacity>
-
-                {/* Option 3: Open / Inspect Partitions */}
+                {/* Option 1: Open / Select Partitions */}
                 <TouchableOpacity
                   style={[
                     styles.menuActionItem,
@@ -1185,20 +1064,26 @@ export const TransactionsScreen = ({ navigation }) => {
                   }}
                 >
                   <View style={[styles.menuActionIconBox, { backgroundColor: isDarkMode ? '#334155' : '#f1f5f9' }]}>
-                    <Ionicons name="folder-open-outline" size={20} color={colors.primary} />
+                    <Ionicons
+                      name={selectedTransactionForMenu?.PartitionCount > 1 ? "layers-outline" : "folder-open-outline"}
+                      size={20}
+                      color={colors.primary}
+                    />
                   </View>
                   <View style={styles.menuActionTextCol}>
                     <Text style={[styles.menuActionTitle, { color: colors.textDark }]}>
-                      Open & Edit Partitions
+                      {selectedTransactionForMenu?.PartitionCount > 1 ? 'Select Partition to Edit' : 'Open & Edit Partition'}
                     </Text>
                     <Text style={[styles.menuActionSubtitle, { color: colors.textMuted }]}>
-                      Field appraisal & partition inspection forms
+                      {selectedTransactionForMenu?.PartitionCount > 1
+                        ? `Choose from ${selectedTransactionForMenu.PartitionCount} segregated lots`
+                        : 'Field appraisal & inspection form'}
                     </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
                 </TouchableOpacity>
 
-                {/* Option 4: Download / Re-download */}
+                {/* Option 2: Download / Re-download */}
                 <TouchableOpacity
                   style={[
                     styles.menuActionItem,
@@ -1229,6 +1114,61 @@ export const TransactionsScreen = ({ navigation }) => {
                   </View>
                   <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
                 </TouchableOpacity>
+
+                {/* Options 3 & 4: Only visible when there are pending offline edits */}
+                {menuHasPending ? (
+                  <>
+                    {/* Option 3: Sync to Web (Draft) */}
+                    <TouchableOpacity
+                      style={[
+                        styles.menuActionItem,
+                        {
+                          backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+                          borderColor: colors.border
+                        }
+                      ]}
+                      onPress={handleSyncDraftFromMenu}
+                    >
+                      <View style={[styles.menuActionIconBox, { backgroundColor: isDarkMode ? '#0369a133' : '#e0f2fe' }]}>
+                        <Ionicons name="cloud-upload-outline" size={20} color="#0284c7" />
+                      </View>
+                      <View style={styles.menuActionTextCol}>
+                        <Text style={[styles.menuActionTitle, { color: colors.textDark }]}>
+                          Sync to Web (Draft)
+                        </Text>
+                        <Text style={[styles.menuActionSubtitle, { color: colors.textMuted }]}>
+                          Upload offline partition edits without advancing workflow
+                        </Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                    </TouchableOpacity>
+
+                    {/* Option 4: Sync & Forward to Supervisor */}
+                    <TouchableOpacity
+                      style={[
+                        styles.menuActionItem,
+                        {
+                          backgroundColor: isDarkMode ? '#064e3b22' : '#f0fdf4',
+                          borderColor: isDarkMode ? '#065f46' : '#bbf7d0'
+                        }
+                      ]}
+                      onPress={handlePromptForwardSupervisor}
+                    >
+                      <View style={[styles.menuActionIconBox, { backgroundColor: isDarkMode ? '#065f46' : '#dcfce7' }]}>
+                        <Ionicons name="send" size={18} color="#059669" />
+                      </View>
+                      <View style={styles.menuActionTextCol}>
+                        <Text style={[styles.menuActionTitle, { color: isDarkMode ? '#34d399' : '#047857' }]}>
+                          Sync & Forward to Supervisor
+                        </Text>
+                        <Text style={[styles.menuActionSubtitle, { color: isDarkMode ? '#a7f3d0' : '#15803d' }]}>
+                          Sync all partition changes and transfer to Supervisor
+                        </Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={16} color="#059669" />
+                    </TouchableOpacity>
+                  </>
+                ) : null}
               </View>
             )}
 
@@ -1585,6 +1525,19 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#b45309'
+  },
+  openMenuFooterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    borderWidth: 1,
+    gap: 4
+  },
+  openMenuFooterText: {
+    fontSize: 11,
+    fontWeight: '700'
   },
   pendingEditsBadge: {
     flexDirection: 'row',

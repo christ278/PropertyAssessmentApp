@@ -1814,16 +1814,21 @@ export const BuildingFormScreen = ({ route, navigation }) => {
                 </View>
 
                 <View style={[styles.card, shadows.card]}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 8 }}>
-                    <Text style={[styles.cardHeaderTitle, { borderBottomWidth: 0, paddingBottom: 0 }]}>Condominium Title (CCT)</Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={[styles.inputLabel, { fontSize: 11 }]}>CONDOMINIUM UNIT (CCT)</Text>
-                      <Switch
-                        value={isCct}
-                        onValueChange={setIsCct}
-                        trackColor={{ false: colors.borderDark, true: colors.primary }}
-                      />
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 10, gap: 10 }}>
+                    <View style={{ flex: 1, paddingRight: 6 }}>
+                      <Text style={[styles.cardHeaderTitle, { borderBottomWidth: 0, paddingBottom: 0, marginBottom: 2 }]}>
+                        Condominium Title (CCT)
+                      </Text>
+                      <Text style={{ fontSize: 11, color: colors.textMuted }}>
+                        Enable if this unit holds a Condominium Certificate of Title
+                      </Text>
                     </View>
+                    <Switch
+                      value={isCct}
+                      onValueChange={setIsCct}
+                      trackColor={{ false: isDarkMode ? '#475569' : '#cbd5e1', true: colors.primary }}
+                      thumbColor={isCct ? '#ffffff' : '#f8fafc'}
+                    />
                   </View>
 
                   {isCct && (
@@ -1842,13 +1847,22 @@ export const BuildingFormScreen = ({ route, navigation }) => {
                       <View style={styles.rowInputs}>
                         <View style={[styles.inputGroup, { flex: 1 }]}>
                           <Text style={styles.inputLabel}>DATE REGISTERED</Text>
-                          <TextInput
-                            style={styles.input}
-                            value={cctDateRegistered}
-                            onChangeText={setCctDateRegistered}
-                            placeholder="YYYY-MM-DD"
-                            placeholderTextColor={colors.placeholder}
-                          />
+                          <View style={styles.dateInputWrapper}>
+                            <TextInput
+                              style={[styles.input, styles.dateInputControl]}
+                              value={cctDateRegistered}
+                              onChangeText={setCctDateRegistered}
+                              placeholder="YYYY-MM-DD"
+                              placeholderTextColor={colors.placeholder}
+                            />
+                            <TouchableOpacity
+                              style={styles.datePickerTriggerBtn}
+                              onPress={() => setActiveDatePicker('cctDate')}
+                              activeOpacity={0.7}
+                            >
+                              <Ionicons name="calendar-outline" size={17} color="#ffffff" />
+                            </TouchableOpacity>
+                          </View>
                         </View>
                         <View style={[styles.inputGroup, { flex: 1 }]}>
                           <Text style={styles.inputLabel}>OWNER REFLECTED IN CCT</Text>
@@ -1968,24 +1982,18 @@ export const BuildingFormScreen = ({ route, navigation }) => {
                   <View style={styles.rowInputs}>
                     <View style={[styles.inputGroup, { flex: 1 }]}>
                       <Text style={styles.inputLabel}>DATE CONSTRUCTED / STARTED</Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'stretch', width: '100%' }}>
+                      <View style={styles.dateInputWrapper}>
                         <TextInput
-                          style={[styles.input, { flex: 1, borderTopRightRadius: 0, borderBottomRightRadius: 0, borderRightWidth: 0 }]}
+                          style={[styles.input, styles.dateInputControl]}
                           value={dateConstructed}
                           onChangeText={setDateConstructed}
                           placeholder="YYYY-MM-DD"
                           placeholderTextColor={colors.placeholder}
                         />
                         <TouchableOpacity
-                          style={{
-                            backgroundColor: colors.primary,
-                            width: 38,
-                            borderTopRightRadius: 8,
-                            borderBottomRightRadius: 8,
-                            justifyContent: 'center',
-                            alignItems: 'center'
-                          }}
+                          style={styles.datePickerTriggerBtn}
                           onPress={() => setActiveDatePicker('constructed')}
+                          activeOpacity={0.7}
                         >
                           <Ionicons name="calendar-outline" size={17} color="#ffffff" />
                         </TouchableOpacity>
@@ -1993,24 +2001,18 @@ export const BuildingFormScreen = ({ route, navigation }) => {
                     </View>
                     <View style={[styles.inputGroup, { flex: 1 }]}>
                       <Text style={styles.inputLabel}>DATE COMPLETED</Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'stretch', width: '100%' }}>
+                      <View style={styles.dateInputWrapper}>
                         <TextInput
-                          style={[styles.input, { flex: 1, borderTopRightRadius: 0, borderBottomRightRadius: 0, borderRightWidth: 0 }]}
+                          style={[styles.input, styles.dateInputControl]}
                           value={dateCompleted}
                           onChangeText={setDateCompleted}
                           placeholder="YYYY-MM-DD"
                           placeholderTextColor={colors.placeholder}
                         />
                         <TouchableOpacity
-                          style={{
-                            backgroundColor: colors.primary,
-                            width: 38,
-                            borderTopRightRadius: 8,
-                            borderBottomRightRadius: 8,
-                            justifyContent: 'center',
-                            alignItems: 'center'
-                          }}
+                          style={styles.datePickerTriggerBtn}
                           onPress={() => setActiveDatePicker('completed')}
+                          activeOpacity={0.7}
                         >
                           <Ionicons name="calendar-outline" size={17} color="#ffffff" />
                         </TouchableOpacity>
@@ -2020,24 +2022,18 @@ export const BuildingFormScreen = ({ route, navigation }) => {
 
                   <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>DATE OCCUPIED</Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'stretch', width: '100%' }}>
+                    <View style={styles.dateInputWrapper}>
                       <TextInput
-                        style={[styles.input, { flex: 1, borderTopRightRadius: 0, borderBottomRightRadius: 0, borderRightWidth: 0 }]}
+                        style={[styles.input, styles.dateInputControl]}
                         value={dateOccupied}
                         onChangeText={setDateOccupied}
                         placeholder="YYYY-MM-DD"
                         placeholderTextColor={colors.placeholder}
                       />
                       <TouchableOpacity
-                        style={{
-                          backgroundColor: colors.primary,
-                          width: 38,
-                          borderTopRightRadius: 8,
-                          borderBottomRightRadius: 8,
-                          justifyContent: 'center',
-                          alignItems: 'center'
-                        }}
+                        style={styles.datePickerTriggerBtn}
                         onPress={() => setActiveDatePicker('occupied')}
+                        activeOpacity={0.7}
                       >
                         <Ionicons name="calendar-outline" size={17} color="#ffffff" />
                       </TouchableOpacity>
@@ -2629,17 +2625,20 @@ export const BuildingFormScreen = ({ route, navigation }) => {
         value={
           activeDatePicker === 'constructed' ? dateConstructed :
           activeDatePicker === 'completed' ? dateCompleted :
-          activeDatePicker === 'occupied' ? dateOccupied : ''
+          activeDatePicker === 'occupied' ? dateOccupied :
+          activeDatePicker === 'cctDate' ? cctDateRegistered : ''
         }
         onSelectDate={(newDate) => {
           if (activeDatePicker === 'constructed') setDateConstructed(newDate);
           else if (activeDatePicker === 'completed') setDateCompleted(newDate);
           else if (activeDatePicker === 'occupied') setDateOccupied(newDate);
+          else if (activeDatePicker === 'cctDate') setCctDateRegistered(newDate);
         }}
         title={
           activeDatePicker === 'constructed' ? 'Date Constructed / Started' :
           activeDatePicker === 'completed' ? 'Date Completed' :
-          activeDatePicker === 'occupied' ? 'Date Occupied' : 'Select Date'
+          activeDatePicker === 'occupied' ? 'Date Occupied' :
+          activeDatePicker === 'cctDate' ? 'Date Registered (CCT)' : 'Select Date'
         }
       />
 
@@ -3177,7 +3176,7 @@ const getStyles = (colors, isDarkMode, isLargeScreen = false) => StyleSheet.crea
     padding: 16,
     borderWidth: 1,
     borderColor: colors.border,
-    gap: 12
+    gap: 14
   },
   cardHeaderTitle: {
     fontSize: 14,
@@ -3218,22 +3217,24 @@ const getStyles = (colors, isDarkMode, isLargeScreen = false) => StyleSheet.crea
     fontWeight: '800'
   },
   inputGroup: {
-    gap: 4
+    gap: 6
   },
   inputLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
-    color: colors.textDark
+    color: colors.textDark,
+    letterSpacing: 0.3
   },
   input: {
     borderWidth: 1,
     borderColor: colors.inputBorder,
     borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 9,
     fontSize: 13,
     color: colors.inputText,
-    backgroundColor: isDarkMode ? colors.inputBg : '#f8fafc'
+    backgroundColor: isDarkMode ? colors.inputBg : '#f8fafc',
+    minHeight: 40
   },
   selectBtn: {
     flexDirection: 'row',
@@ -3243,8 +3244,9 @@ const getStyles = (colors, isDarkMode, isLargeScreen = false) => StyleSheet.crea
     borderColor: colors.inputBorder,
     borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: isDarkMode ? colors.inputBg : '#f8fafc'
+    paddingVertical: 9,
+    backgroundColor: isDarkMode ? colors.inputBg : '#f8fafc',
+    minHeight: 40
   },
   selectBtnText: {
     fontSize: 13,
@@ -3258,7 +3260,28 @@ const getStyles = (colors, isDarkMode, isLargeScreen = false) => StyleSheet.crea
   },
   rowInputs: {
     flexDirection: isLargeScreen ? 'row' : 'column',
-    gap: isLargeScreen ? 10 : 12
+    gap: isLargeScreen ? 10 : 14
+  },
+  dateInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    width: '100%'
+  },
+  dateInputControl: {
+    flex: 1,
+    borderTopRightRadius: 0,
+    borderBottomRightRadius: 0,
+    borderRightWidth: 0
+  },
+  datePickerTriggerBtn: {
+    backgroundColor: colors.primary,
+    width: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderTopRightRadius: 10,
+    borderBottomRightRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.primary
   },
   formScreenHeader: {
     paddingHorizontal: 16,

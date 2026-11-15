@@ -292,6 +292,35 @@ export const SyncQueueScreen = ({ navigation }) => {
     });
   };
 
+  const handleOpenFormFromMenu = (trans) => {
+    setThreeDotsModalVisible(false);
+    if (!trans) return;
+    const targetItem = trans.transItem || {
+      TrackingNo: trans.trackingNo,
+      FormworkflowId: trans.formWorkflowId,
+      TransactionTypeId: trans.transactionTypeId,
+      Kind: trans.kind
+    };
+    const pKind = trans.kind || targetItem.Kind || 'Building';
+    const pTypeId = trans.transactionTypeId || (pKind === 'Land' ? 1 : pKind === 'Machinery' ? 3 : 2);
+    const firstPart = trans.partitions && trans.partitions[0];
+    const navParams = {
+      trackingNo: trans.trackingNo,
+      formWorkflowId: trans.formWorkflowId,
+      partitionIndex: firstPart ? firstPart.index : 0,
+      partitionLetter: firstPart ? firstPart.letter : 'A',
+      transactionTypeId: pTypeId,
+      partitionKind: pKind
+    };
+    if (pTypeId === 1 || pKind === 'Land') {
+      navigation.navigate('LandForm', navParams);
+    } else if (pTypeId === 3 || pKind === 'Machinery') {
+      navigation.navigate('MachineryForm', navParams);
+    } else {
+      navigation.navigate('BuildingForm', navParams);
+    }
+  };
+
   const renderTransactionCard = ({ item }) => {
     const isThisSyncing = syncingKey === item.key;
     const typeColor = item.type === 'UPDATE_BUILDING' ? COLORS.accentGold :
@@ -392,44 +421,25 @@ export const SyncQueueScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Card Footer: Sync Draft, Sync & Forward, Discard */}
-        <View style={styles.cardFooter}>
-          <TouchableOpacity
-            style={[styles.actionBtnDraft, isThisSyncing && { opacity: 0.7 }]}
-            onPress={() => handleSyncTransaction(item)}
-            disabled={isThisSyncing}
-          >
-            {isThisSyncing ? (
-              <>
-                <ActivityIndicator size="small" color="#0284c7" />
-                <Text style={styles.actionBtnDraftText}>Syncing...</Text>
-              </>
-            ) : (
-              <>
-                <Ionicons name="cloud-upload-outline" size={14} color="#0284c7" />
-                <Text style={styles.actionBtnDraftText}>Sync to Web</Text>
-              </>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.actionBtnForward, isThisSyncing && { opacity: 0.7 }]}
-            onPress={() => handlePromptForwardSupervisor(item)}
-            disabled={isThisSyncing}
-          >
-            <Ionicons name="send" size={13} color="#059669" />
-            <Text style={styles.actionBtnForwardText}>Sync & Forward</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.actionBtnDiscard}
-            onPress={() => handleDiscardTransaction(item)}
-            disabled={isThisSyncing}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Ionicons name="trash-outline" size={15} color={COLORS.accentRed} />
-            <Text style={styles.actionBtnDiscardText}>Discard</Text>
-          </TouchableOpacity>
+        {/* Card Footer: Status Pill */}
+        <View style={[styles.cardFooter, { borderTopColor: isDarkMode ? '#1e293b' : '#f1f5f9' }]}>
+          {isThisSyncing ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+              <ActivityIndicator size="small" color="#0284c7" />
+              <Text style={{ fontSize: 12, fontWeight: '700', color: '#0284c7' }}>
+                Syncing edits to web portal...
+              </Text>
+            </View>
+          ) : (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+              <View style={styles.pendingEditsFooterBadge}>
+                <Ionicons name="cloud-upload" size={12} color="#b45309" />
+                <Text style={styles.pendingEditsFooterBadgeText}>
+                  {item.partitions.length} {item.partitions.length === 1 ? 'Partition Edit' : 'Partition Edits'} Queued
+                </Text>
+              </View>
+            </View>
+          )}
         </View>
       </View>
     );
@@ -471,15 +481,6 @@ export const SyncQueueScreen = ({ navigation }) => {
             </View>
           </View>
         </View>
-
-        {!isOnline && (
-          <View style={styles.offlineNoticeBanner}>
-            <Ionicons name="cloud-offline-outline" size={18} color="#b45309" />
-            <Text style={styles.offlineNoticeText}>
-              Device is offline. Office sync will be available when connected to the local office network.
-            </Text>
-          </View>
-        )}
 
         {/* Sync Summary Hero Card */}
         <View
@@ -628,6 +629,31 @@ export const SyncQueueScreen = ({ navigation }) => {
               </View>
             ) : (
               <View style={styles.actionMenuList}>
+                {/* Option 0: Open & Inspect Partitions */}
+                <TouchableOpacity
+                  style={[
+                    styles.menuActionItem,
+                    {
+                      backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+                      borderColor: colors.border
+                    }
+                  ]}
+                  onPress={() => selectedTransactionForMenu && handleOpenFormFromMenu(selectedTransactionForMenu)}
+                >
+                  <View style={[styles.menuActionIconBox, { backgroundColor: isDarkMode ? '#334155' : '#f1f5f9' }]}>
+                    <Ionicons name="folder-open-outline" size={20} color={colors.primary} />
+                  </View>
+                  <View style={styles.menuActionTextCol}>
+                    <Text style={[styles.menuActionTitle, { color: colors.textDark }]}>
+                      Open & Inspect Partitions
+                    </Text>
+                    <Text style={[styles.menuActionSubtitle, { color: colors.textMuted }]}>
+                      Review field appraisal edits before syncing
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                </TouchableOpacity>
+
                 {/* Option 1: Sync to Web (Draft) */}
                 <TouchableOpacity
                   style={[
@@ -1071,11 +1097,41 @@ const styles = StyleSheet.create({
   cardFooter: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 8,
     marginTop: 12,
     paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: '#f8fafc'
+  },
+  pendingEditsFooterBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef3c7',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 4
+  },
+  pendingEditsFooterBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#b45309'
+  },
+  openMenuFooterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    borderWidth: 1,
+    gap: 4
+  },
+  openMenuFooterText: {
+    fontSize: 11,
+    fontWeight: '700'
   },
   actionBtnDraft: {
     flex: 1,
