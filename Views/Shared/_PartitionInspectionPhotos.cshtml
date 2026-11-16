@@ -171,6 +171,17 @@
         }
 
         setTimeout(function () {
+            if (!Array.isArray(window.partitionInspectionPhotos) || window.partitionInspectionPhotos.length === 0) {
+                try {
+                    const rawAtts = (document.getElementById('AttachmentsJson')?.value) || (document.getElementById('PropertyImagesJson')?.value);
+                    if (rawAtts && rawAtts.trim().startsWith('[')) {
+                        const parsed = JSON.parse(rawAtts);
+                        if (Array.isArray(parsed) && parsed.length > 0) {
+                            window.partitionInspectionPhotos = parsed;
+                        }
+                    }
+                } catch (e) { }
+            }
             if (typeof window.renderInspectionPhotosGallery === 'function') {
                 window.renderInspectionPhotosGallery();
             }

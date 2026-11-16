@@ -227,6 +227,17 @@ public class PermissionService : IPermissionService
                 }
             }
 
+            if (!string.IsNullOrEmpty(actionName) &&
+                actionName.Equals("SearchOwners", StringComparison.OrdinalIgnoreCase))
+            {
+                if (HasModuleAccess(user, "PropertyAssessmentRequest", null) ||
+                    HasModuleAccess(user, "Assessment", null) ||
+                    HasModuleAccess(user, "RequestForInspection", null))
+                {
+                    return true;
+                }
+            }
+
             if (!string.IsNullOrEmpty(actionName) && !actionName.Equals("Index", StringComparison.OrdinalIgnoreCase))
             {
                 var reportMod = _context.SystemModules.FirstOrDefault(m =>
@@ -268,12 +279,16 @@ public class PermissionService : IPermissionService
             return true;
         }
 
-        // Allow SearchActiveLandTdns on Assessment when user has Assessment or PropertyAssessmentRequest access
+        // Allow SearchActiveLandTdns, SearchActiveBuildingTdns & SearchSupersededProperties on Assessment when user has Assessment, PropertyAssessmentRequest, or RequestForInspection access
         if (controllerName.Equals("Assessment", StringComparison.OrdinalIgnoreCase) &&
             actionName != null &&
-            actionName.Equals("SearchActiveLandTdns", StringComparison.OrdinalIgnoreCase))
+            (actionName.Equals("SearchActiveLandTdns", StringComparison.OrdinalIgnoreCase) ||
+             actionName.Equals("SearchActiveBuildingTdns", StringComparison.OrdinalIgnoreCase) ||
+             actionName.Equals("SearchSupersededProperties", StringComparison.OrdinalIgnoreCase)))
         {
-            if (HasModuleAccess(user, "Assessment", null) || HasModuleAccess(user, "PropertyAssessmentRequest", null))
+            if (HasModuleAccess(user, "Assessment", null) ||
+                HasModuleAccess(user, "PropertyAssessmentRequest", null) ||
+                HasModuleAccess(user, "RequestForInspection", null))
             {
                 return true;
             }

@@ -8,6 +8,8 @@
     var registeredOwners = ViewBag.RegisteredOwners as IEnumerable<Owner> ?? new List<Owner>();
 }
 
+<partial name="_Select2Style" />
+
 <div class="space-y-8 font-mono text-xs">
     
     <!-- Header -->
@@ -197,7 +199,19 @@
                     </div>
                     <div>
                         <label asp-for="PrevOwner" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">PREVIOUS OWNER</label>
-                        <input asp-for="PrevOwner" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white" />
+                        <input asp-for="PrevOwner" id="prevOwnerInput" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" placeholder="Auto-filled from selected Reference TD (or type)" />
+                    </div>
+                    <div>
+                        <label asp-for="PrevMarketValue" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">PREVIOUS MARKET VALUE (₱)</label>
+                        <input asp-for="PrevMarketValue" type="number" step="0.01" min="0" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-right" />
+                    </div>
+                    <div>
+                        <label asp-for="PrevAssessedValue" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">PREVIOUS ASSESSED VALUE (₱)</label>
+                        <input asp-for="PrevAssessedValue" type="number" step="0.01" min="0" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-right" />
+                    </div>
+                    <div>
+                        <label asp-for="PrevEffectivity" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">PREVIOUS EFFECTIVITY OF ASSESSMENT</label>
+                        <input asp-for="PrevEffectivity" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono" placeholder="e.g. 1st Quarter 2024" />
                     </div>
                 </div>
 

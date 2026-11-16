@@ -675,7 +675,8 @@
             // Overview Badges & Numbers
             document.getElementById('resDisplayType').textContent = t.displayType || t.requestType || 'Property Assessment Transaction';
             document.getElementById('resTransactionNo').textContent = t.transactionNo || t.trackingNumber || '--';
-            document.getElementById('resTrackingNumber').textContent = t.trackingNumber || '--';
+            const trackingEl = document.getElementById('resTrackingNumber');
+            if (trackingEl) trackingEl.textContent = t.trackingNumber || '--';
             document.getElementById('resOwner').textContent = t.ownerOrApplicant || 'N/A';
             document.getElementById('resPropertyRef').textContent = t.propertyReference || 'Pending PIN/TDN Assignment';
             

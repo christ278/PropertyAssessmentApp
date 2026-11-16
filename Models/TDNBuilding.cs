@@ -240,6 +240,14 @@ public class TDNBuilding
     [Display(Name = "BACK TAXES TO YEAR")]
     public int? BackTaxesYearTo { get; set; }
 
+    // Superseded Assessment
+    public string? PreviousTdNo { get; set; }
+    public string? PreviousPin { get; set; }
+    public string? PreviousOwner { get; set; }
+    public decimal PreviousMarketValue { get; set; }
+    public decimal PreviousAssessedValue { get; set; }
+    public string? PreviousEffectivity { get; set; }
+
     // JSON snapshots for fast offline rendering / backwards compatibility
     public string? FloorBreakdownJson { get; set; }
     public string? AdditionalItemsJson { get; set; }

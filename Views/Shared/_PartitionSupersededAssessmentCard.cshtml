@@ -1,0 +1,144 @@
+@model PropertyAssessmentApp.Models.AssessmentPartitionItem
+
+@if (ViewBag.IsStandaloneFaas == true)
+{
+<!-- Records of Superseded Assessment -->
+<div class="superseded-assessment-card p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-4">
+    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
+        <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+            <i data-lucide="history" class="w-4 h-4"></i>
+            Records of Superseded Assessment
+        </h4>
+        <span class="text-[11px] font-mono text-slate-400 dark:text-stone-500">Search Property Register to auto-fill, or enter manually</span>
+    </div>
+
+    <!-- Search Property Register -->
+    <div>
+        <label class="block text-slate-600 dark:text-stone-400 mb-1 font-bold text-xs uppercase">SEARCH PROPERTY REGISTER (TDN / PIN / OWNER)</label>
+        <select class="superseded-prop-search w-full"></select>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+        <div>
+            <label asp-for="PreviousTdNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">TD NO.</label>
+            <input asp-for="PreviousTdNo" class="superseded-tdn w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="Previous TD No." />
+        </div>
+        <div>
+            <label asp-for="PreviousPin" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">PIN</label>
+            <input asp-for="PreviousPin" class="superseded-pin w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="Previous PIN" />
+        </div>
+        <div>
+            <label asp-for="PreviousEffectivity" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">EFFECTIVITY OF ASSESSMENT</label>
+            <input asp-for="PreviousEffectivity" class="superseded-eff w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="e.g. 1st Quarter 2024" />
+        </div>
+
+        <div class="md:col-span-3">
+            <label asp-for="PreviousOwner" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">PREVIOUS OWNER (SEARCH REGISTERED OWNER)</label>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <select class="superseded-owner-search w-full"></select>
+                <input asp-for="PreviousOwner" class="superseded-owner w-full h-[42px] px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="Previous Owner Name (auto-filled or type manually)" />
+            </div>
+        </div>
+
+        <div>
+            <label asp-for="PreviousMarketValue" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">MARKET VALUE (₱)</label>
+            <input asp-for="PreviousMarketValue" type="number" step="0.01" min="0" class="superseded-mv w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-right text-xs" placeholder="0.00" />
+        </div>
+        <div>
+            <label asp-for="PreviousAssessedValue" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">ASSESSED VALUE (₱)</label>
+            <input asp-for="PreviousAssessedValue" type="number" step="0.01" min="0" class="superseded-av w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-right text-xs" placeholder="0.00" />
+        </div>
+    </div>
+</div>
+
+<script>
+    (function () {
+        function initSupersededCards() {
+            if (!window.jQuery || !$.fn.select2) return;
+            $('.superseded-assessment-card').each(function () {
+                const $card = $(this);
+                if ($card.data('supersededInit')) return;
+                $card.data('supersededInit', true);
+
+                const $propSel = $card.find('.superseded-prop-search');
+                $propSel.select2({
+                    placeholder: 'Search Property Register by TDN, PIN, or Owner...',
+                    allowClear: true,
+                    width: '100%',
+                    minimumInputLength: 0,
+                    ajax: {
+                        url: '/Assessment/SearchSupersededProperties',
+                        dataType: 'json',
+                        delay: 250,
+                        data: function (params) { return { q: params.term || '' }; },
+                        processResults: function (data) {
+                            const list = Array.isArray(data) ? data : [];
+                            return {
+                                results: list.map(function (p) {
+                                    return {
+                                        id: p.id,
+                                        text: (p.tdn || 'No TDN') + (p.ownerName ? ' — ' + p.ownerName : '') + (p.pin ? ' (PIN: ' + p.pin + ')' : ''),
+                                        propData: p
+                                    };
+                                })
+                            };
+                        },
+                        cache: false
+                    }
+                });
+
+                $propSel.on('select2:select', function (e) {
+                    const p = e.params.data && e.params.data.propData;
+                    if (!p) return;
+                    $card.find('.superseded-tdn').val(p.tdn || '');
+                    $card.find('.superseded-pin').val(p.pin || '');
+                    $card.find('.superseded-owner').val(p.ownerName || '');
+                    $card.find('.superseded-mv').val(Number(p.marketValue || 0).toFixed(2));
+                    $card.find('.superseded-av').val(Number(p.assessedValue || 0).toFixed(2));
+                    $card.find('.superseded-eff').val(p.effectivity || '');
+                });
+
+                const $ownerSel = $card.find('.superseded-owner-search');
+                $ownerSel.select2({
+                    placeholder: 'Search Registered Owner...',
+                    allowClear: true,
+                    width: '100%',
+                    minimumInputLength: 0,
+                    ajax: {
+                        url: '/RPTReport/SearchOwners',
+                        dataType: 'json',
+                        delay: 250,
+                        data: function (params) { return { q: params.term || '' }; },
+                        processResults: function (data) {
+                            const list = Array.isArray(data) ? data : [];
+                            return {
+                                results: list.map(function (o) {
+                                    return {
+                                        id: o.id,
+                                        text: o.ownerName + (o.tin ? ' (TIN: ' + o.tin + ')' : ''),
+                                        ownerData: o
+                                    };
+                                })
+                            };
+                        },
+                        cache: false
+                    }
+                });
+
+                $ownerSel.on('select2:select', function (e) {
+                    const o = e.params.data && e.params.data.ownerData;
+                    if (o && o.ownerName) {
+                        $card.find('.superseded-owner').val(o.ownerName);
+                    }
+                });
+            });
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initSupersededCards);
+        } else {
+            initSupersededCards();
+        }
+    })();
+</script>
+}

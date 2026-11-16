@@ -328,6 +328,13 @@ public class PropertyAssessmentRequestController : Controller
     {
         var item = _rpaService.GetById(id);
         if (item == null) return NotFound();
+
+        ViewBag.WorkflowLogs = _context.DocumentForwardingLogs
+            .AsNoTracking()
+            .Where(l => l.RequestId == id || (!string.IsNullOrEmpty(item.TrackingNumber) && l.TrackingNumber == item.TrackingNumber))
+            .OrderBy(l => l.Timestamp)
+            .ToList();
+
         return View(item);
     }
 
@@ -521,6 +528,43 @@ public class PropertyAssessmentRequestController : Controller
             if (req != null)
             {
                 isRequestApproved = req.Status >= PropertyAssessmentStatus.Approved && req.Status != PropertyAssessmentStatus.Deferred;
+                ViewBag.TransactionTypeCode = req.TransactionTypeCode;
+                ViewBag.ParentTdNo = req.PrevTDN;
+                ViewBag.ParentPin = req.PrevPIN;
+                ViewBag.PreviousOwner = req.PrevOwner;
+                ViewBag.TotalChildLots = req.Partitions > 0 ? req.Partitions.ToString() : "";
+
+                var refIds = new List<Guid>();
+                if (!string.IsNullOrWhiteSpace(req.SelectedRefPropertyIdsJson))
+                {
+                    try { refIds = System.Text.Json.JsonSerializer.Deserialize<List<Guid>>(req.SelectedRefPropertyIdsJson) ?? new(); } catch { }
+                }
+                if (req.RefTaxDeclarationId.HasValue && !refIds.Contains(req.RefTaxDeclarationId.Value))
+                {
+                    refIds.Add(req.RefTaxDeclarationId.Value);
+                }
+                if (refIds.Count > 0)
+                {
+                    var refProps = _context.TaxDeclarations.AsNoTracking()
+                        .Include(t => t.LandDetails)
+                        .Where(t => refIds.Contains(t.Id))
+                        .ToList();
+                    var tdList = refProps.Select(t => t.TaxDeclarationNumber).Where(s => !string.IsNullOrWhiteSpace(s)).Distinct().ToList();
+                    if (tdList.Count > 0)
+                    {
+                        ViewBag.CancelledTdList = string.Join(", ", tdList);
+                        if (string.IsNullOrWhiteSpace(req.PrevTDN))
+                            ViewBag.ParentTdNo = ViewBag.CancelledTdList;
+                    }
+                    var lotDescs = refProps.Select(t =>
+                        !string.IsNullOrWhiteSpace(t.LandDetails?.LotNo)
+                            ? $"LOT {t.LandDetails.LotNo} (TD {t.TaxDeclarationNumber})"
+                            : $"TD {t.TaxDeclarationNumber}").ToList();
+                    if (lotDescs.Count > 0)
+                    {
+                        ViewBag.SourceLotsDescription = string.Join(", ", lotDescs);
+                    }
+                }
             }
             else
             {
@@ -528,6 +572,8 @@ public class PropertyAssessmentRequestController : Controller
                 if (rfi != null)
                 {
                     isRequestApproved = rfi.Status == RequestForInspectionStatus.Approval || rfi.Status == RequestForInspectionStatus.Printing || rfi.Status == RequestForInspectionStatus.Releasing;
+                    ViewBag.TransactionTypeCode = rfi.TransactionCode;
+                    ViewBag.IsCancellationRequest = rfi.IsCancelled;
                 }
             }
             var partitionsJson = req?.GeneratedPartitionsJson;
@@ -542,6 +588,11 @@ public class PropertyAssessmentRequestController : Controller
                 try
                 {
                     var list = ParsePartitionList(partitionsJson);
+                    if (list.Count > 0)
+                    {
+                        ViewBag.TotalChildLots = list.Count.ToString();
+                        ViewBag.ChildTdList = string.Join(", ", list.Select(x => x.SystemGeneratedTDN).Where(s => !string.IsNullOrWhiteSpace(s)));
+                    }
                     if (index >= 0 && index < list.Count)
                     {
                         partition = list[index];
@@ -1223,6 +1274,7 @@ public class PropertyAssessmentRequestController : Controller
                 marketVal = t.MarketValue,
                 assessLevel = t.AssessmentLevelPercent,
                 assessedVal = t.AssessedValue,
+                effectivity = string.Join(" ", new[] { t.EffectivityQuarter, t.EffectivityYear > 0 ? t.EffectivityYear.ToString() : "" }.Where(s => !string.IsNullOrWhiteSpace(s))),
                 barangay = t.DistrictOrBarangay,
                 display = $"{t.TaxDeclarationNumber} - {t.OwnerName} ({t.PropertyIndexNumber}) [{t.Kind} • {t.Classification} • {t.AreaSqMeters:N0} sqm]",
                 text = $"{t.TaxDeclarationNumber} - {t.OwnerName} ({t.PropertyIndexNumber}) [{t.Kind} • {t.Classification} • {t.AreaSqMeters:N0} sqm]"

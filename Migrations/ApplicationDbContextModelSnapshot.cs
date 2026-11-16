@@ -6613,6 +6613,17 @@ namespace PropertyAssessmentApp.Migrations
                     b.Property<string>("PhysicalStoragePath")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<decimal>("PrevAssessedValue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("PrevEffectivity")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("PrevMarketValue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<string>("PrevOwner")
                         .HasColumnType("nvarchar(max)");
 
@@ -7264,6 +7275,26 @@ namespace PropertyAssessmentApp.Migrations
                     b.Property<string>("OwnerNameReflectedInCct")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<decimal>("PreviousAssessedValue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("PreviousEffectivity")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("PreviousMarketValue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("PreviousOwner")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PreviousPin")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PreviousTdNo")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("ProvinceCity")
                         .HasColumnType("nvarchar(max)");
 
@@ -7630,6 +7661,9 @@ namespace PropertyAssessmentApp.Migrations
                     b.Property<decimal>("PreviousAssessedValue")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("PreviousEffectivity")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<decimal>("PreviousMarketValue")
                         .HasPrecision(18, 2)
@@ -8111,6 +8145,9 @@ namespace PropertyAssessmentApp.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<string>("PreviousEffectivity")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<decimal>("PreviousMarketValue")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
@@ -8388,15 +8425,12 @@ namespace PropertyAssessmentApp.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("AppraisedByName")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ApprovedByName")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("AssessedByName")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("CancellationReason")
@@ -8424,18 +8458,15 @@ namespace PropertyAssessmentApp.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("EncodedByName")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("EntryInRollDate")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("EntryInRollName")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("EntryInRollPosition")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("FloorPlanSketchPath")
@@ -8494,7 +8525,6 @@ namespace PropertyAssessmentApp.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("RecommendingApprovalName")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("Status")

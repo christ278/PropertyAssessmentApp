@@ -60,4 +60,13 @@ This application (`PropertyAssessmentApp`) is an ASP.NET Core 9 MVC web applicat
        - The mother/reference property (`RefTaxDeclarationId` or `SelectedRefPropertyIdsJson`) is marked `Status = AssessmentStatus.Cancelled` and `IsCancelledAndSuperseded = true`.
        - Its cancellation memo is updated with the newly generated partition TD numbers (e.g., *"Cancelled and superseded by Subdivision into Segregated Lot TDs: 2026-00-0012-00045, 2026-00-0012-00046"*).
 
+## Encode Real Property Tax Declaration vs. Property Assessment Requests Flow
+- **Encode Real Property Tax Declaration (`Assessment/Create` & `Assessment/Edit`, `ViewBag.IsStandaloneFaas = true`)**:
+  - Used to encode **existing, already-approved** Tax Declarations directly into `TaxDeclarations` and child tables (`TDNLands`, `TDNBuildings`, `TDNMachineries`, `TDNPropertyImages`) **without passing through the workflow**.
+  - Shows the **Records of Superseded Assessment** card (`Views/Shared/_PartitionSupersededAssessmentCard.cshtml`) and **Signatories & Assessment Roll Approval** card (`Views/Shared/_PartitionSignatoriesCard.cshtml`) so the encoder can search the Property Register / Registered Owners and record the superseded details and historical signatories manually across all kinds (Land, Building, Machinery).
+- **Property Assessment Requests — Generated Partitions (`PropertyAssessmentRequest/Create`, `Edit`, `EditPartition`)**:
+  - Used for **new transactions** going through the full workflow from **Receiving** up to **Approval**.
+  - Does **not** show the manual **Records of Superseded Assessment** card or **Signatories & Assessment Roll Approval** card in generated partitions (across all kinds: Land, Building, Machinery) because the request already tags the superseded mother/reference property (`RefTaxDeclarationId` / `SelectedRefPropertyIdsJson` / `PrevTDN`) and signatories come from the workflow/approval stage.
+
+
 

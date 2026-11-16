@@ -509,10 +509,57 @@ public class AssessmentController : Controller
             BackTaxesYearFrom = td.BackTaxesYearFrom,
             BackTaxesYearTo = td.BackTaxesYearTo,
             Memoranda = td.Memoranda ?? string.Empty,
-            PropertyImagesJson = td.PropertyImagesJson
+            PropertyImagesJson = td.PropertyImagesJson,
+
+            PreviousTdNo = td.PreviousTdNo,
+            PreviousPin = td.PreviousPin,
+            PreviousOwner = td.PreviousOwner,
+            PreviousMarketValue = td.PreviousMarketValue,
+            PreviousAssessedValue = td.PreviousAssessedValue,
+            PreviousEffectivity = td.PreviousEffectivity,
+
+            AppraisedByName = SplitNameAndPosition(td.AppraisedByName).Name,
+            AppraisedByPosition = SplitNameAndPosition(td.AppraisedByName).Position,
+            DateAppraised = td.DateAppraised,
+            AssessedByName = SplitNameAndPosition(td.AssessedByName).Name,
+            AssessedByPosition = SplitNameAndPosition(td.AssessedByName).Position,
+            DateAssessed = td.DateAssessed,
+            RecommendingApprovalName = SplitNameAndPosition(td.RecommendingApprovalName).Name,
+            RecommendingApprovalPosition = SplitNameAndPosition(td.RecommendingApprovalName).Position,
+            DateRecommended = td.DateRecommended,
+            ApprovedByName = td.ApprovedByName,
+            DateApproved = td.DateApproved,
+            EntryInRollName = td.EntryInRollName,
+            EntryInRollPosition = td.EntryInRollPosition,
+            EntryInRollDate = td.EntryInRollDate,
+            EncodedByName = SplitNameAndPosition(td.EncodedByName).Name,
+            EncodedByPosition = SplitNameAndPosition(td.EncodedByName).Position,
+            DateEncoded = td.DateEncoded
         };
 
         return item;
+    }
+
+    private static (string Name, string Position) SplitNameAndPosition(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return (string.Empty, string.Empty);
+        var trimmed = raw.Trim();
+        var openIdx = trimmed.LastIndexOf('(');
+        if (openIdx > 0 && trimmed.EndsWith(')'))
+        {
+            var name = trimmed[..openIdx].Trim();
+            var pos = trimmed[(openIdx + 1)..^1].Trim();
+            return (name, pos);
+        }
+        return (trimmed, string.Empty);
+    }
+
+    private static string? CombineNameAndPosition(string? name, string? position)
+    {
+        var n = (name ?? string.Empty).Trim();
+        var pos = (position ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(n)) return null;
+        return string.IsNullOrEmpty(pos) ? n : $"{n} ({pos})";
     }
 
     private void ApplyPartitionItemToTaxDeclaration(TaxDeclaration td, AssessmentPartitionItem p, IFormFile? sketchFile)
@@ -796,6 +843,29 @@ public class AssessmentController : Controller
         td.LocalDateIssued = p.LocalDateIssued;
         td.MachineryAppraisalDetailsJson = p.MachineryAppraisalDetailsJson;
         td.MachineryPropertyAssessmentsJson = p.MachineryPropertyAssessmentsJson;
+
+        // Records of Superseded Assessment
+        td.PreviousTdNo = p.PreviousTdNo;
+        td.PreviousPin = p.PreviousPin;
+        td.PreviousOwner = p.PreviousOwner;
+        td.PreviousMarketValue = p.PreviousMarketValue;
+        td.PreviousAssessedValue = p.PreviousAssessedValue;
+        td.PreviousEffectivity = p.PreviousEffectivity;
+
+        // Signatories & Assessment Roll Approval
+        td.AppraisedByName = CombineNameAndPosition(p.AppraisedByName, p.AppraisedByPosition);
+        td.DateAppraised = p.DateAppraised;
+        td.AssessedByName = CombineNameAndPosition(p.AssessedByName, p.AssessedByPosition);
+        if (p.DateAssessed.HasValue) td.DateAssessed = p.DateAssessed.Value;
+        td.RecommendingApprovalName = CombineNameAndPosition(p.RecommendingApprovalName, p.RecommendingApprovalPosition);
+        td.DateRecommended = p.DateRecommended;
+        td.ApprovedByName = string.IsNullOrWhiteSpace(p.ApprovedByName) ? null : p.ApprovedByName.Trim();
+        td.DateApproved = p.DateApproved;
+        td.EntryInRollName = string.IsNullOrWhiteSpace(p.EntryInRollName) ? null : p.EntryInRollName.Trim();
+        td.EntryInRollPosition = string.IsNullOrWhiteSpace(p.EntryInRollPosition) ? null : p.EntryInRollPosition.Trim();
+        td.EntryInRollDate = p.EntryInRollDate;
+        td.EncodedByName = CombineNameAndPosition(p.EncodedByName, p.EncodedByPosition);
+        td.DateEncoded = p.DateEncoded;
     }
 
     [HttpGet]
@@ -867,6 +937,45 @@ public class AssessmentController : Controller
             municipality = t.Municipality,
             provinceCity = t.ProvinceCity,
             location = string.Join(", ", new[] { t.StreetNo, t.DistrictOrBarangay, t.Municipality, t.ProvinceCity }.Where(s => !string.IsNullOrWhiteSpace(s)))
+        }).ToList();
+
+        return Json(results);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> SearchSupersededProperties(string? q = null)
+    {
+        var all = await _context.TaxDeclarations
+            .AsNoTracking()
+            .Include(t => t.LandDetails)
+            .Include(t => t.BuildingDetails)
+            .Include(t => t.MachineryDetails)
+            .OrderByDescending(t => t.Status == AssessmentStatus.Active)
+            .ThenBy(t => t.TaxDeclarationNumber)
+            .ToListAsync();
+
+        var filtered = all.AsEnumerable();
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var tokens = q.Trim().ToLower().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            filtered = filtered.Where(t =>
+            {
+                var hay = $"{t.TaxDeclarationNumber} {t.PropertyIndexNumber} {t.OwnerName} {t.Kind} {t.DistrictOrBarangay}".ToLower();
+                return tokens.All(tok => hay.Contains(tok));
+            });
+        }
+
+        var results = filtered.Take(30).Select(t => new
+        {
+            id = t.Id,
+            tdn = t.TaxDeclarationNumber,
+            pin = t.PropertyIndexNumber,
+            ownerName = t.OwnerName,
+            kind = t.Kind.ToString(),
+            marketValue = t.MarketValue,
+            assessedValue = t.AssessedValue,
+            effectivity = t.EffectivityYear > 0 ? $"{t.EffectivityQuarter} {t.EffectivityYear}".Trim() : string.Empty,
+            status = t.Status.ToString()
         }).ToList();
 
         return Json(results);

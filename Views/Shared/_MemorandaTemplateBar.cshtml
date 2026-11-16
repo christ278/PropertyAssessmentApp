@@ -1,0 +1,201 @@
+@{
+    var txCode = ViewBag.TransactionTypeCode?.ToString() ?? "";
+    var parentTdNo = ViewBag.ParentTdNo?.ToString() ?? "";
+    var parentPin = ViewBag.ParentPin?.ToString() ?? "";
+    var prevOwner = ViewBag.PreviousOwner?.ToString() ?? "";
+    var totalChildLots = ViewBag.TotalChildLots?.ToString() ?? "";
+    var childTdList = ViewBag.ChildTdList?.ToString() ?? "";
+    var cancelledTdList = ViewBag.CancelledTdList?.ToString() ?? "";
+    var sourceLotsDesc = ViewBag.SourceLotsDescription?.ToString() ?? "";
+    var requestedBy = ViewBag.RequestedBy?.ToString() ?? "";
+    var isCancellationReq = (ViewBag.IsCancellationRequest as bool?) == true;
+    var isStandaloneFaas = (ViewBag.IsStandaloneFaas as bool?) == true;
+}
+
+<script>
+    if (!window.__blgfMemorandaInitialized) {
+        window.__blgfMemorandaInitialized = true;
+
+        window.__blgfRequestContext = {
+            txCode: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(txCode)),
+            parentTdNo: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(parentTdNo)),
+            parentPin: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(parentPin)),
+            prevOwner: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(prevOwner)),
+            totalChildLots: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(totalChildLots)),
+            childTdList: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(childTdList)),
+            cancelledTdList: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(cancelledTdList)),
+            sourceLotsDesc: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(sourceLotsDesc)),
+            requestedBy: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(requestedBy)),
+            isCancellationReq: @(isCancellationReq ? "true" : "false"),
+            isStandaloneFaas: @(isStandaloneFaas ? "true" : "false")
+        };
+
+        window.getMergedBlgfContext = function () {
+            const ctx = Object.assign({}, window.__blgfRequestContext || {});
+            try {
+                const rawDraft = sessionStorage.getItem('propertyAssessmentRequest_draft');
+                if (rawDraft) {
+                    const draft = JSON.parse(rawDraft);
+                    if (draft) {
+                        if (!ctx.txCode && draft.txCode) ctx.txCode = draft.txCode;
+                        if (!ctx.requestedBy && draft.requestor) ctx.requestedBy = draft.requestor;
+                        if (Array.isArray(draft.partitions) && draft.partitions.length > 0) {
+                            if (!ctx.totalChildLots) ctx.totalChildLots = String(draft.partitions.length);
+                            if (!ctx.childTdList) {
+                                ctx.childTdList = draft.partitions
+                                    .map(x => x.systemGeneratedTDN || x.tdn)
+                                    .filter(Boolean)
+                                    .join(', ');
+                            }
+                        }
+                    }
+                }
+            } catch (e) { }
+            return ctx;
+        };
+
+        window.blgfVal = function (val) {
+            if (val === undefined || val === null) return '[___]';
+            const s = String(val).trim();
+            return s ? s.toUpperCase() : '[___]';
+        };
+
+        window.inferTitleType = function (titleNo, isCct) {
+            const s = String(titleNo || '').trim().toUpperCase();
+            if (s.startsWith('OCT')) return 'OCT';
+            if (s.startsWith('TCT')) return 'TCT';
+            if (s.startsWith('CCT') || isCct) return 'CCT';
+            return '';
+        };
+
+        window.getDefaultBlgfMemorandaKey = function (targetSelector) {
+            const ctx = window.getMergedBlgfContext();
+            if (ctx.isCancellationReq) return 'CANCELLATION';
+            const tx = String(ctx.txCode || '').trim().toUpperCase();
+            if (['SD', 'CS', 'DC', 'PC', 'RA', 'DT', 'TR', 'RC', 'GR', 'SP', 'DEP'].includes(tx)) {
+                return tx;
+            }
+            if (tx === 'CN' || tx === 'CANCELLATION') return 'CANCELLATION';
+            return 'DC';
+        };
+
+        window.buildBlgfMemorandaText = function (templateKey, targetSelector) {
+            const V = window.blgfVal;
+            const ctx = window.getMergedBlgfContext();
+            const isBldg = targetSelector === '#textareaMemoranda';
+            const isMach = targetSelector === '#textareaMachineryMemoranda';
+
+            const $tab = isBldg ? $('#tab-memoranda') : (isMach ? $('#machinery-tab-memoranda') : $('#textareaLandMemoranda').closest('.space-y-6'));
+            const $supCard = $tab.find('.superseded-assessment-card').first();
+
+            const prevTdNo = ($supCard.find('.superseded-tdn').val() || ctx.parentTdNo || '').trim();
+            const prevPin = ($supCard.find('.superseded-pin').val() || ctx.parentPin || '').trim();
+            const prevOwner = ($supCard.find('.superseded-owner').val() || ctx.prevOwner || '').trim();
+            const cancelledTdList = (ctx.cancelledTdList || prevTdNo || '').trim();
+            const sourceLotsDesc = (ctx.sourceLotsDesc || '').trim();
+
+            const newOwner = isBldg
+                ? ($('#inputOwnerName').val() || '')
+                : (isMach ? ($('#inputMachineryOwnerName').val() || '') : ($('#inputLandOwnerName').val() || ''));
+
+            const isCct = isBldg && $('#isCctSwitch').is(':checked');
+            const titleNo = isBldg
+                ? ($('#inputTitleNo').val() || $('input[name="CctTitleNo"]').val() || '')
+                : (isMach ? '' : ($('#inputLandTitleNo').val() || ''));
+            const titleType = window.inferTitleType(titleNo, isCct);
+
+            const surveyPlanNo = isBldg
+                ? ($('#inputSurveyNumber').val() || '')
+                : (isMach ? '' : ($('#inputLandSurveyNo').val() || $('#inputLandCadSurveyNo').val() || ''));
+
+            const effYear = isBldg
+                ? ($('#tab-memoranda input[name="EffectivityYear"]').val() || '')
+                : (isMach ? ($('#inputMachineryEffYear').val() || '') : ($('#inputLandEffYear').val() || ''));
+
+            const landOwnerName = isBldg
+                ? ($('#inputBldgLandOwnerName').val() || '')
+                : (isMach ? ($('#inputMachineryLandOwner').val() || '') : '');
+            const landTdNo = isBldg
+                ? ($('#inputBldgLandTdNo').val() || '')
+                : (isMach ? ($('#inputMachineryLandTdNo').val() || '') : '');
+            const landPin = isBldg
+                ? ($('#inputBldgLandPin').val() || '')
+                : (isMach ? ($('#inputMachineryLandPin').val() || '') : '');
+
+            const buildingPermitNo = isBldg ? ($('input[name="BuildingPermitNo"]').val() || '') : '';
+            const improvementKind = isBldg
+                ? ($('#selectBuildingClassification').val() ? ($('#selectBuildingClassification').val() + ' BUILDING') : 'BUILDING')
+                : (isMach ? 'MACHINERY' : 'IMPROVEMENT');
+
+            const newClassification = isBldg
+                ? ($('#selectBuildingClassification').val() || $('select[name="Classification"]').val() || '')
+                : (isMach ? 'MACHINERY' : ($('#selectLandClassification').val() || ''));
+
+            const deprRate = isBldg ? ($('#inputDeprPercent').val() || '') : '';
+            const effectiveAge = isBldg ? ($('#inputBuildingAge').val() || '') : '';
+            const requestedBy = ctx.requestedBy || newOwner;
+            const optionalCancelClause = prevTdNo ? `SUPERSEDES TD NO. ${V(prevTdNo)} / PIN ${V(prevPin)}.` : '';
+
+            switch (templateKey) {
+                case 'SD':
+                    return `SUBDIVIDED INTO ${V(ctx.totalChildLots)} LOTS AS PER APPROVED SUBDIVISION PLAN ${V(surveyPlanNo)} APPROVED ON ${V('')}, COVERED BY ${V(titleType)} NO. ${V(titleNo)}. CANCELS MOTHER TD NO. ${V(prevTdNo)} / PIN ${V(prevPin)}. (SEE CHILD TDs: ${V(ctx.childTdList)}).`;
+                case 'CS':
+                    return `CONSOLIDATED FROM ${V(sourceLotsDesc)} AS PER APPROVED CONSOLIDATION PLAN ${V(surveyPlanNo)} APPROVED ON ${V('')}, COVERED BY ${V(titleType)} NO. ${V(titleNo)}. CANCELS TD NOS. ${V(cancelledTdList)}.`;
+                case 'DC':
+                    if (isBldg || isMach) {
+                        return `NEWLY DECLARED ${V(improvementKind)} ERECTED ON LAND OWNED BY ${V(landOwnerName)} UNDER LAND TD NO. ${V(landTdNo)} / PIN ${V(landPin)}, PER BUILDING PERMIT NO. ${V(buildingPermitNo)} AND OCULAR INSPECTION DATED ${V('')}.`;
+                    }
+                    return `NEWLY DECLARED FOR TAXATION PURPOSES ONLY PURSUANT TO SEC. 202/204 OF R.A. 7160, SUPPORTED BY ${V('')} AND DENR/CENRO CERTIFICATION THAT LAND IS ALIENABLE & DISPOSABLE. DOES NOT CONFER OWNERSHIP.`;
+                case 'PC':
+                    return `REASSESSED DUE TO PHYSICAL CHANGE (${V('')}) PER BUILDING PERMIT / SURVEY PLAN NO. ${V(buildingPermitNo || surveyPlanNo)} AND OCULAR INSPECTION CONDUCTED ON ${V('')}. SUPERSEDES TD NO. ${V(prevTdNo)} / PIN ${V(prevPin)}.`;
+                case 'RA':
+                    return `REASSESSED PURSUANT TO ${V('')} DATED ${V('')}. SUPERSEDES TD NO. ${V(prevTdNo)} / PIN ${V(prevPin)}.`;
+                case 'DT':
+                    return `REASSESSED DUE TO PARTIAL DESTRUCTION CAUSED BY ${V('')} AS VERIFIED DURING OCULAR INSPECTION CONDUCTED ON ${V('')} PER REQUEST OF ${V(requestedBy)}. SUPERSEDES TD NO. ${V(prevTdNo)} / PIN ${V(prevPin)}.`;
+                case 'TR':
+                    return `TRANSFERRED BY VIRTUE OF A ${V('')} EXECUTED BY ${V(prevOwner)} IN FAVOR OF ${V(newOwner)}, NOTARIZED BY ATTY. ${V('')} UNDER DOC. NO. ${V('')}, PAGE NO. ${V('')}, BOOK NO. ${V('')}, SERIES OF ${V('')}, PER ${V(titleType)} NO. ${V(titleNo)} ISSUED ON ${V('')}, BIR eCAR NO. ${V('')}, AND REAL PROPERTY TAX CLEARANCE NO. ${V('')}. CANCELS TD NO. ${V(prevTdNo)} / PIN ${V(prevPin)}.`;
+                case 'RC':
+                    return `RECLASSIFIED FROM ${V('')} TO ${V(newClassification)} BASED ON ACTUAL USE AND OCULAR INSPECTION CONDUCTED ON ${V('')}, SUPPORTED BY ${V('')}. SUPERSEDES TD NO. ${V(prevTdNo)} / PIN ${V(prevPin)}.`;
+                case 'GR':
+                    return `GENERAL REVISION OF REAL PROPERTY ASSESSMENT FOR CY ${V(effYear || new Date().getFullYear())} PURSUANT TO ${V('')} NO. ${V('')}, SERIES OF ${V('')}. SUPERSEDES TD NO. ${V(prevTdNo)} / PIN ${V(prevPin)}.`;
+                case 'SP':
+                    return `ASSESSED UNDER SPECIAL PROJECT (${V('')}) COVERED BY ${V(titleNo)} DATED ${V('')}. ${optionalCancelClause}`.trim();
+                case 'DEP':
+                    return `REASSESSED DUE TO DEPRECIATION (${V(deprRate)}% / EFFECTIVE AGE ${V(effectiveAge)} YRS.) AS VERIFIED DURING OCULAR INSPECTION CONDUCTED ON ${V('')}. SUPERSEDES TD NO. ${V(prevTdNo)} / PIN ${V(prevPin)}.`;
+                case 'CANCELLATION':
+                    return `CANCELLED DUE TO ${V('')} AS VERIFIED DURING OCULAR INSPECTION CONDUCTED ON ${V('')} PER REQUEST OF ${V(requestedBy)}.`;
+                default:
+                    return '';
+            }
+        };
+
+        window.applyBlgfMemorandaTemplate = function (targetSelector, templateKey, forceOverwrite) {
+            const $ta = $(targetSelector);
+            if (!$ta.length) return;
+            const current = ($ta.val() || '').trim();
+            if (!forceOverwrite && current !== '') return;
+
+            const key = templateKey || window.getDefaultBlgfMemorandaKey(targetSelector);
+            const text = window.buildBlgfMemorandaText(key, targetSelector);
+            if (text) {
+                $ta.val(text.toUpperCase());
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', function () {
+            setTimeout(function () {
+                if (typeof window.jQuery === 'undefined') return;
+                const ctx = window.getMergedBlgfContext();
+                if (ctx.isStandaloneFaas) return;
+                ['#textareaLandMemoranda', '#textareaMemoranda', '#textareaMachineryMemoranda'].forEach(function (sel) {
+                    const $ta = $(sel);
+                    if (!$ta.length) return;
+                    if (!($ta.val() || '').trim()) {
+                        const defaultKey = window.getDefaultBlgfMemorandaKey(sel);
+                        window.applyBlgfMemorandaTemplate(sel, defaultKey, false);
+                    }
+                });
+            }, 250);
+        });
+    }
+</script>

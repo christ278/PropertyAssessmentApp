@@ -1,0 +1,106 @@
+@model PropertyAssessmentApp.Models.AssessmentPartitionItem
+
+@if (ViewBag.IsStandaloneFaas == true)
+{
+    <!-- Signatories & Assessment Roll Approval (Only in Encode Real Property Tax Declaration) -->
+    <div class="signatories-card p-6 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-5">
+        <h4 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
+            <i data-lucide="pen-tool" class="w-4 h-4"></i>
+            Signatories &amp; Assessment Roll Approval
+        </h4>
+
+        <div class="space-y-4 text-xs">
+            <!-- 1. Appraised By -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label asp-for="AppraisedByName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">APPRAISED BY (NAME)</label>
+                    <input asp-for="AppraisedByName" class="sig-appraised-name w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="Full Name" />
+                </div>
+                <div>
+                    <label asp-for="AppraisedByPosition" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">APPRAISED BY (POSITION)</label>
+                    <input asp-for="AppraisedByPosition" class="sig-appraised-pos w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="e.g. Property Appraiser" />
+                </div>
+                <div>
+                    <label asp-for="DateAppraised" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">DATE APPRAISED</label>
+                    <input asp-for="DateAppraised" type="date" class="sig-appraised-date w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" />
+                </div>
+            </div>
+
+            <!-- 2. Assessed By -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label asp-for="AssessedByName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">ASSESSED BY (NAME)</label>
+                    <input asp-for="AssessedByName" class="sig-assessed-name w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="Full Name" />
+                </div>
+                <div>
+                    <label asp-for="AssessedByPosition" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">ASSESSED BY (POSITION)</label>
+                    <input asp-for="AssessedByPosition" class="sig-assessed-pos w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="e.g. Assessment Officer" />
+                </div>
+                <div>
+                    <label asp-for="DateAssessed" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">DATE ASSESSED</label>
+                    <input asp-for="DateAssessed" type="date" class="sig-assessed-date w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" />
+                </div>
+            </div>
+
+            <!-- 3. Recommending Approval -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label asp-for="RecommendingApprovalName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">RECOMMENDING APPROVAL (NAME)</label>
+                    <input asp-for="RecommendingApprovalName" class="sig-rec-name w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="Full Name" />
+                </div>
+                <div>
+                    <label asp-for="RecommendingApprovalPosition" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">RECOMMENDING APPROVAL (POSITION)</label>
+                    <input asp-for="RecommendingApprovalPosition" class="sig-rec-pos w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="e.g. Assistant City Assessor" />
+                </div>
+                <div>
+                    <label asp-for="DateRecommended" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">DATE RECOMMENDED</label>
+                    <input asp-for="DateRecommended" type="date" class="sig-rec-date w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" />
+                </div>
+            </div>
+
+            <!-- 4. Approved By -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="md:col-span-2">
+                    <label asp-for="ApprovedByName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">APPROVED BY (NAME)</label>
+                    <input asp-for="ApprovedByName" class="sig-approved-name w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="City Assessor Full Name" />
+                </div>
+                <div>
+                    <label asp-for="DateApproved" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">DATE APPROVED</label>
+                    <input asp-for="DateApproved" type="date" class="sig-approved-date w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" />
+                </div>
+            </div>
+
+            <!-- 5. Entry in the Assessment Roll By -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label asp-for="EntryInRollName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">ENTRY IN ASSESSMENT ROLL BY (NAME)</label>
+                    <input asp-for="EntryInRollName" class="sig-roll-name w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="Full Name" />
+                </div>
+                <div>
+                    <label asp-for="EntryInRollPosition" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">ENTRY IN ASSESSMENT ROLL (POSITION)</label>
+                    <input asp-for="EntryInRollPosition" class="sig-roll-pos w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="e.g. Assessment Roll Clerk" />
+                </div>
+                <div>
+                    <label asp-for="EntryInRollDate" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">ENTRY IN ASSESSMENT ROLL (DATE)</label>
+                    <input asp-for="EntryInRollDate" type="date" class="sig-roll-date w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" />
+                </div>
+            </div>
+
+            <!-- 6. Encoded By -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label asp-for="EncodedByName" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">ENCODED BY (NAME)</label>
+                    <input asp-for="EncodedByName" class="sig-encoded-name w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="Full Name" />
+                </div>
+                <div>
+                    <label asp-for="EncodedByPosition" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">ENCODED BY (POSITION)</label>
+                    <input asp-for="EncodedByPosition" class="sig-encoded-pos w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" placeholder="e.g. Assessment Clerk" />
+                </div>
+                <div>
+                    <label asp-for="DateEncoded" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">DATE ENCODED</label>
+                    <input asp-for="DateEncoded" type="date" class="sig-encoded-date w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-mono text-xs" />
+                </div>
+            </div>
+        </div>
+    </div>
+}

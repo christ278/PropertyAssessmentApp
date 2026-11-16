@@ -100,6 +100,7 @@ public class TDNLand
     public string? PreviousOwner { get; set; }
     public decimal PreviousMarketValue { get; set; }
     public decimal PreviousAssessedValue { get; set; }
+    public string? PreviousEffectivity { get; set; }
 
     // Serialized JSON for dynamic multi-line breakdown in UI
     public string? LandAppraisalDetailsJson { get; set; }

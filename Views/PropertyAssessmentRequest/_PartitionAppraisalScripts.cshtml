@@ -1677,14 +1677,14 @@
 
         closeAddFloorModal();
         renderFloors();
-        recalculateValuation();
+        recalculateValuation(true);
         if (window.toastr) toastr.success(`${level} (${bldgClass}) added to BUCC schedule.`);
     }
 
     function removeFloor(idx) {
         buildingFloors.splice(idx, 1);
         renderFloors();
-        recalculateValuation();
+        recalculateValuation(true);
     }
 
     function updateExistingFloorsUnitCost(newStruct) {
@@ -1709,7 +1709,7 @@
                         pendingUpdates--;
                         if (pendingUpdates <= 0) {
                             renderFloors();
-                            recalculateValuation();
+                            recalculateValuation(true);
                         }
                     }
                 });
@@ -1717,7 +1717,7 @@
                 pendingUpdates--;
                 if (pendingUpdates <= 0) {
                     renderFloors();
-                    recalculateValuation();
+                    recalculateValuation(true);
                 }
             }
         });
@@ -1833,7 +1833,7 @@
 
         closeAddAdditionModal();
         renderAdditions();
-        recalculateValuation();
+        recalculateValuation(true);
         if (window.toastr) toastr.success(`${itemDesc} added to additional items schedule.`);
     }
 
@@ -1844,7 +1844,7 @@
     function removeAddition(idx) {
         buildingAdditions.splice(idx, 1);
         renderAdditions();
-        recalculateValuation();
+        recalculateValuation(true);
     }
 
     function renderAdditions() {
@@ -1973,7 +1973,8 @@
         $('#buildingDepreciatedMarketValue').val(depreciatedCore.toFixed(2));
         $('#inputMarketValue').val(finalMarketVal.toFixed(2));
 
-        const assessLevel = parseFloat($('#inputAssessLevel').val()) || 20;
+        const rawAssessLvl = parseFloat($('#inputAssessLevel').val());
+        const assessLevel = isNaN(rawAssessLvl) ? 20 : rawAssessLvl;
         updateAssessedValueAndTaxes(finalMarketVal, assessLevel);
 
         $('#kpiBaseRcn').text('₱' + baseRcn.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
@@ -2303,6 +2304,29 @@
             updatedPartition.actualUse = firstActual;
             updatedPartition.classification = firstActual;
 
+            (function() {
+                const $sig = $('#machinery-tab-memoranda .signatories-card');
+                if ($sig.length) {
+                    updatedPartition.appraisedByName = $sig.find('.sig-appraised-name').val() || '';
+                    updatedPartition.appraisedByPosition = $sig.find('.sig-appraised-pos').val() || '';
+                    updatedPartition.dateAppraised = $sig.find('.sig-appraised-date').val() || null;
+                    updatedPartition.assessedByName = $sig.find('.sig-assessed-name').val() || '';
+                    updatedPartition.assessedByPosition = $sig.find('.sig-assessed-pos').val() || '';
+                    updatedPartition.dateAssessed = $sig.find('.sig-assessed-date').val() || null;
+                    updatedPartition.recommendingApprovalName = $sig.find('.sig-rec-name').val() || '';
+                    updatedPartition.recommendingApprovalPosition = $sig.find('.sig-rec-pos').val() || '';
+                    updatedPartition.dateRecommended = $sig.find('.sig-rec-date').val() || null;
+                    updatedPartition.approvedByName = $sig.find('.sig-approved-name').val() || '';
+                    updatedPartition.dateApproved = $sig.find('.sig-approved-date').val() || null;
+                    updatedPartition.entryInRollName = $sig.find('.sig-roll-name').val() || '';
+                    updatedPartition.entryInRollPosition = $sig.find('.sig-roll-pos').val() || '';
+                    updatedPartition.entryInRollDate = $sig.find('.sig-roll-date').val() || null;
+                    updatedPartition.encodedByName = $sig.find('.sig-encoded-name').val() || '';
+                    updatedPartition.encodedByPosition = $sig.find('.sig-encoded-pos').val() || '';
+                    updatedPartition.dateEncoded = $sig.find('.sig-encoded-date').val() || null;
+                }
+            })();
+
             updatedPartition.taxability = $('#selectMachineryTaxability').val() || 'Taxable';
             updatedPartition.effectivityQuarter = $('#selectMachineryEffQuarter').val() || '1st Quarter';
             updatedPartition.effectivityYear = parseInt($('#inputMachineryEffYear').val()) || new Date().getFullYear();
@@ -2310,7 +2334,42 @@
             updatedPartition.backTaxesYearFrom = parseInt($('#inputMachineryBackTaxesFrom').val()) || null;
             updatedPartition.backTaxesYearTo = parseInt($('#inputMachineryBackTaxesTo').val()) || null;
             updatedPartition.memoranda = $('#textareaMachineryMemoranda').val() || '';
-            updatedPartition.propertyImagesJson = JSON.stringify(window.propertyImagesList || []);
+            (function() {
+                const $sc = $('#machinery-tab-memoranda .superseded-assessment-card');
+                updatedPartition.previousTdNo = $sc.find('.superseded-tdn').val() || '';
+                updatedPartition.previousPin = $sc.find('.superseded-pin').val() || '';
+                updatedPartition.previousOwner = $sc.find('.superseded-owner').val() || '';
+                updatedPartition.previousMarketValue = parseFloat($sc.find('.superseded-mv').val()) || 0;
+                updatedPartition.previousAssessedValue = parseFloat($sc.find('.superseded-av').val()) || 0;
+                updatedPartition.previousEffectivity = $sc.find('.superseded-eff').val() || '';
+            })();
+            (function() {
+                const $sig = $('#textareaLandMemoranda').closest('.space-y-6, form, div').parent().find('.signatories-card').first();
+                if ($sig.length) {
+                    updatedPartition.appraisedByName = $sig.find('.sig-appraised-name').val() || '';
+                    updatedPartition.appraisedByPosition = $sig.find('.sig-appraised-pos').val() || '';
+                    updatedPartition.dateAppraised = $sig.find('.sig-appraised-date').val() || null;
+                    updatedPartition.assessedByName = $sig.find('.sig-assessed-name').val() || '';
+                    updatedPartition.assessedByPosition = $sig.find('.sig-assessed-pos').val() || '';
+                    updatedPartition.dateAssessed = $sig.find('.sig-assessed-date').val() || null;
+                    updatedPartition.recommendingApprovalName = $sig.find('.sig-rec-name').val() || '';
+                    updatedPartition.recommendingApprovalPosition = $sig.find('.sig-rec-pos').val() || '';
+                    updatedPartition.dateRecommended = $sig.find('.sig-rec-date').val() || null;
+                    updatedPartition.approvedByName = $sig.find('.sig-approved-name').val() || '';
+                    updatedPartition.dateApproved = $sig.find('.sig-approved-date').val() || null;
+                    updatedPartition.entryInRollName = $sig.find('.sig-roll-name').val() || '';
+                    updatedPartition.entryInRollPosition = $sig.find('.sig-roll-pos').val() || '';
+                    updatedPartition.entryInRollDate = $sig.find('.sig-roll-date').val() || null;
+                    updatedPartition.encodedByName = $sig.find('.sig-encoded-name').val() || '';
+                    updatedPartition.encodedByPosition = $sig.find('.sig-encoded-pos').val() || '';
+                    updatedPartition.dateEncoded = $sig.find('.sig-encoded-date').val() || null;
+                }
+            })();
+            updatedPartition.propertyImagesJson = JSON.stringify(
+                (Array.isArray(window.partitionInspectionPhotos) && window.partitionInspectionPhotos.length > 0)
+                    ? window.partitionInspectionPhotos
+                    : (window.propertyImagesList || [])
+            );
 
             if (!isStandaloneFaas) {
                 try {
@@ -2441,7 +2500,42 @@
             updatedPartition.backTaxesYearFrom = parseInt($('#inputLandBackTaxesFrom').val()) || null;
             updatedPartition.backTaxesYearTo = parseInt($('#inputLandBackTaxesTo').val()) || null;
             updatedPartition.memoranda = $('#textareaLandMemoranda').val() || '';
-            updatedPartition.propertyImagesJson = JSON.stringify(window.propertyImagesList || []);
+            (function() {
+                const $sc = $('#textareaLandMemoranda').closest('.space-y-6, form, div').parent().find('.superseded-assessment-card').first();
+                updatedPartition.previousTdNo = $sc.find('.superseded-tdn').val() || '';
+                updatedPartition.previousPin = $sc.find('.superseded-pin').val() || '';
+                updatedPartition.previousOwner = $sc.find('.superseded-owner').val() || '';
+                updatedPartition.previousMarketValue = parseFloat($sc.find('.superseded-mv').val()) || 0;
+                updatedPartition.previousAssessedValue = parseFloat($sc.find('.superseded-av').val()) || 0;
+                updatedPartition.previousEffectivity = $sc.find('.superseded-eff').val() || '';
+            })();
+            (function() {
+                const $sig = $('#textareaLandMemoranda').closest('.space-y-6, form, div').parent().find('.signatories-card').first();
+                if ($sig.length) {
+                    updatedPartition.appraisedByName = $sig.find('.sig-appraised-name').val() || '';
+                    updatedPartition.appraisedByPosition = $sig.find('.sig-appraised-pos').val() || '';
+                    updatedPartition.dateAppraised = $sig.find('.sig-appraised-date').val() || null;
+                    updatedPartition.assessedByName = $sig.find('.sig-assessed-name').val() || '';
+                    updatedPartition.assessedByPosition = $sig.find('.sig-assessed-pos').val() || '';
+                    updatedPartition.dateAssessed = $sig.find('.sig-assessed-date').val() || null;
+                    updatedPartition.recommendingApprovalName = $sig.find('.sig-rec-name').val() || '';
+                    updatedPartition.recommendingApprovalPosition = $sig.find('.sig-rec-pos').val() || '';
+                    updatedPartition.dateRecommended = $sig.find('.sig-rec-date').val() || null;
+                    updatedPartition.approvedByName = $sig.find('.sig-approved-name').val() || '';
+                    updatedPartition.dateApproved = $sig.find('.sig-approved-date').val() || null;
+                    updatedPartition.entryInRollName = $sig.find('.sig-roll-name').val() || '';
+                    updatedPartition.entryInRollPosition = $sig.find('.sig-roll-pos').val() || '';
+                    updatedPartition.entryInRollDate = $sig.find('.sig-roll-date').val() || null;
+                    updatedPartition.encodedByName = $sig.find('.sig-encoded-name').val() || '';
+                    updatedPartition.encodedByPosition = $sig.find('.sig-encoded-pos').val() || '';
+                    updatedPartition.dateEncoded = $sig.find('.sig-encoded-date').val() || null;
+                }
+            })();
+            updatedPartition.propertyImagesJson = JSON.stringify(
+                (Array.isArray(window.partitionInspectionPhotos) && window.partitionInspectionPhotos.length > 0)
+                    ? window.partitionInspectionPhotos
+                    : (window.propertyImagesList || [])
+            );
             updatedPartition.buildingFloorPlanSketchPath = $('#LandSketchPath').val() || $('#BuildingFloorPlanSketchPath').val() || '';
             updatedPartition.buildingFloorPlanSketchBase64 = null;
 
@@ -2475,7 +2569,7 @@
         $('#container-machinery-appraisal :input').prop('disabled', true);
         $('#container-building-appraisal :input').prop('disabled', false);
         $('#inputKindHidden').val('Building');
-        recalculateValuation();
+        recalculateValuation(true);
 
         const totalAreaVal = parseFloat($('#inputAssessedArea').val()) || 0;
         $('#inputTotalBuildingAreaSqm').val(totalAreaVal);
@@ -2500,7 +2594,7 @@
         updatedPartition.pin = $('#inputPin').val();
         updatedPartition.lotNumber = $('input[name="LotNumber"]').val();
         updatedPartition.blockNumber = $('input[name="BlockNumber"]').val();
-        updatedPartition.surveyNumber = $('input[name="SurveyNumber"]').val();
+        updatedPartition.surveyNumber = $('#inputSurveyNumber').val() || '';
         updatedPartition.propertyTypeAccordUse = $('#selectPropertyTypeAccordUse').val();
         updatedPartition.otherPropertyTypeAccordUse = $('#inputOtherPropertyType').val();
         updatedPartition.titleNo = $('#inputTitleNo').val();
@@ -2512,8 +2606,10 @@
         updatedPartition.totalBuildingAreaSqm = totalAreaVal;
         updatedPartition.unitValue = parseFloat($('#inputUnitValue').val()) || 0;
         updatedPartition.marketValue = parseFloat($('#inputMarketValue').val()) || 0;
-        updatedPartition.assessmentLevelPercent = parseFloat($('#inputAssessLevel').val()) || 20;
-        updatedPartition.assessmentLevel = parseFloat($('#inputAssessLevel').val()) || 20;
+        const bldgAssessVal = parseFloat($('#inputAssessLevel').val());
+        const bldgAssessLevel = isNaN(bldgAssessVal) ? 20 : bldgAssessVal;
+        updatedPartition.assessmentLevelPercent = bldgAssessLevel;
+        updatedPartition.assessmentLevel = bldgAssessLevel;
         updatedPartition.assessedValue = parseFloat($('#inputAssessedValue').val()) || 0;
 
         // Declarant / Owner Demographics (mirrors Land form)
@@ -2564,7 +2660,7 @@
         updatedPartition.buildingFloorPlanSketchBase64 = null;
 
         updatedPartition.structuralType = $('select[name="StructuralType"]').val();
-        updatedPartition.buildingClassification = $('select[name="BuildingClassification"]').val() || $('input[name="BuildingClassification"]').val();
+        updatedPartition.buildingClassification = $('#selectBuildingClassification').val() || $('select[name="BuildingClassification"]').val() || $('input[name="BuildingClassification"]').val();
         updatedPartition.noOfStoreys = parseInt($('#inputNoOfStoreys').val()) || 1;
         updatedPartition.buildingPermitNo = $('input[name="BuildingPermitNo"]').val() || '';
         updatedPartition.occupancyPermitNo = $('input[name="OccupancyPermitNo"]').val() || $('#inputOccupancyPermitNo').val() || '';
@@ -2599,7 +2695,42 @@
         updatedPartition.backTaxesYearFrom = parseInt($('input[name="BackTaxesYearFrom"]').val() || $('#inputBackTaxesYearFrom').val()) || null;
         updatedPartition.backTaxesYearTo = parseInt($('input[name="BackTaxesYearTo"]').val() || $('#inputBackTaxesYearTo').val()) || null;
         updatedPartition.memoranda = $('textarea[name="Memoranda"]').val() || $('#textareaMemoranda').val() || '';
-        updatedPartition.propertyImagesJson = JSON.stringify(window.propertyImagesList || []);
+        (function() {
+            const $sc = $('#tab-memoranda .superseded-assessment-card');
+            updatedPartition.previousTdNo = $sc.find('.superseded-tdn').val() || '';
+            updatedPartition.previousPin = $sc.find('.superseded-pin').val() || '';
+            updatedPartition.previousOwner = $sc.find('.superseded-owner').val() || '';
+            updatedPartition.previousMarketValue = parseFloat($sc.find('.superseded-mv').val()) || 0;
+            updatedPartition.previousAssessedValue = parseFloat($sc.find('.superseded-av').val()) || 0;
+            updatedPartition.previousEffectivity = $sc.find('.superseded-eff').val() || '';
+        })();
+        (function() {
+            const $sig = $('#tab-memoranda .signatories-card');
+            if ($sig.length) {
+                updatedPartition.appraisedByName = $sig.find('.sig-appraised-name').val() || '';
+                updatedPartition.appraisedByPosition = $sig.find('.sig-appraised-pos').val() || '';
+                updatedPartition.dateAppraised = $sig.find('.sig-appraised-date').val() || null;
+                updatedPartition.assessedByName = $sig.find('.sig-assessed-name').val() || '';
+                updatedPartition.assessedByPosition = $sig.find('.sig-assessed-pos').val() || '';
+                updatedPartition.dateAssessed = $sig.find('.sig-assessed-date').val() || null;
+                updatedPartition.recommendingApprovalName = $sig.find('.sig-rec-name').val() || '';
+                updatedPartition.recommendingApprovalPosition = $sig.find('.sig-rec-pos').val() || '';
+                updatedPartition.dateRecommended = $sig.find('.sig-rec-date').val() || null;
+                updatedPartition.approvedByName = $sig.find('.sig-approved-name').val() || '';
+                updatedPartition.dateApproved = $sig.find('.sig-approved-date').val() || null;
+                updatedPartition.entryInRollName = $sig.find('.sig-roll-name').val() || '';
+                updatedPartition.entryInRollPosition = $sig.find('.sig-roll-pos').val() || '';
+                updatedPartition.entryInRollDate = $sig.find('.sig-roll-date').val() || null;
+                updatedPartition.encodedByName = $sig.find('.sig-encoded-name').val() || '';
+                updatedPartition.encodedByPosition = $sig.find('.sig-encoded-pos').val() || '';
+                updatedPartition.dateEncoded = $sig.find('.sig-encoded-date').val() || null;
+            }
+        })();
+        updatedPartition.propertyImagesJson = JSON.stringify(
+            (Array.isArray(window.partitionInspectionPhotos) && window.partitionInspectionPhotos.length > 0)
+                ? window.partitionInspectionPhotos
+                : (window.propertyImagesList || [])
+        );
 
         if (!isStandaloneFaas) {
             try {
@@ -2864,14 +2995,10 @@
         });
 
         $('#isMachineryAdminSwitch, #isMachineryBeneficialSwitch, #isMachineryPossessorSwitch').on('change', function() {
-            const anyRoleChecked = $('#isMachineryAdminSwitch').is(':checked') ||
-                                   $('#isMachineryBeneficialSwitch').is(':checked') ||
-                                   $('#isMachineryPossessorSwitch').is(':checked');
-            if (anyRoleChecked) {
-                $('#divMachineryAdminSection').removeClass('hidden');
-            } else {
-                $('#divMachineryAdminSection').addClass('hidden');
+            if ($(this).is(':checked')) {
+                $('#isMachineryAdminSwitch, #isMachineryBeneficialSwitch, #isMachineryPossessorSwitch').not(this).prop('checked', false);
             }
+            $('#divMachineryAdminSection').addClass('hidden');
         });
 
         const p = loadedPartition;
@@ -2932,6 +3059,15 @@
             if (p.backTaxesYearFrom) $('#inputLandBackTaxesFrom').val(p.backTaxesYearFrom);
             if (p.backTaxesYearTo) $('#inputLandBackTaxesTo').val(p.backTaxesYearTo);
             if (p.memoranda) $('#textareaLandMemoranda').val(p.memoranda);
+            (function() {
+                const $sc = $('#textareaLandMemoranda').closest('.space-y-6, form, div').parent().find('.superseded-assessment-card').first();
+                if (p.previousTdNo) $sc.find('.superseded-tdn').val(p.previousTdNo);
+                if (p.previousPin) $sc.find('.superseded-pin').val(p.previousPin);
+                if (p.previousOwner) $sc.find('.superseded-owner').val(p.previousOwner);
+                if (p.previousMarketValue) $sc.find('.superseded-mv').val(Number(p.previousMarketValue).toFixed(2));
+                if (p.previousAssessedValue) $sc.find('.superseded-av').val(Number(p.previousAssessedValue).toFixed(2));
+                if (p.previousEffectivity) $sc.find('.superseded-eff').val(p.previousEffectivity);
+            })();
             const existingLandSketchPath = p.buildingFloorPlanSketchPath || p.BuildingFloorPlanSketchPath || '';
             const existingLandSketchBase64 = p.buildingFloorPlanSketchBase64 || p.BuildingFloorPlanSketchBase64 || '';
             if (existingLandSketchPath || existingLandSketchBase64) {
@@ -2997,8 +3133,8 @@
                 $('#inputMachineryImportedAcqCost').val(acqVal);
                 $('#inputMachineryLocalAcqCost').val(acqVal);
             }
-            if (p.orNo) $('#inputMachineryOrNo').val(p.orNo);
-            if (p.orDate) $('#inputMachineryOrDate').val(formatIsoDate(p.orDate));
+            if (p.orNo) { $('#inputMachineryOrNo').val(p.orNo); if (typeof window.syncMachineryRegOrNo === 'function') window.syncMachineryRegOrNo(p.orNo); }
+            if (p.orDate) { var dOr = formatIsoDate(p.orDate); $('#inputMachineryOrDate').val(dOr); if (typeof window.syncMachineryRegOrDate === 'function') window.syncMachineryRegOrDate(dOr); }
             if (p.orNoAndDate) $('#inputMachineryOrNoAndDate').val(p.orNoAndDate);
             if (p.localDateIssued) $('#inputMachineryLocalDateIssued').val(formatIsoDate(p.localDateIssued));
             if (p.newOwnerName || p.declarantName) $('#inputMachineryOwnerName').val(p.newOwnerName || p.declarantName);
@@ -3008,11 +3144,9 @@
             if (p.ownerEmail) $('#inputMachineryOwnerEmail').val(p.ownerEmail);
             if (p.ownerGender) $('#selectMachineryOwnerGender').val(p.ownerGender);
             if (p.isAdministrator) $('#isMachineryAdminSwitch').prop('checked', true);
-            if (p.isBeneficialUser) $('#isMachineryBeneficialSwitch').prop('checked', true);
-            if (p.isPossessor) $('#isMachineryPossessorSwitch').prop('checked', true);
-            if (p.isAdministrator || p.isBeneficialUser || p.isPossessor || p.administratorName) {
-                $('#divMachineryAdminSection').removeClass('hidden');
-            }
+            else if (p.isBeneficialUser) $('#isMachineryBeneficialSwitch').prop('checked', true);
+            else if (p.isPossessor) $('#isMachineryPossessorSwitch').prop('checked', true);
+            $('#divMachineryAdminSection').addClass('hidden');
             if (p.administratorName) $('#inputMachineryAdminName').val(p.administratorName);
             if (p.administratorGender) $('#selectMachineryAdminGender').val(p.administratorGender);
             if (p.administratorTin) $('#inputMachineryAdminTin').val(p.administratorTin);
@@ -3026,6 +3160,33 @@
             if (p.backTaxesYearFrom) $('#inputMachineryBackTaxesFrom').val(p.backTaxesYearFrom);
             if (p.backTaxesYearTo) $('#inputMachineryBackTaxesTo').val(p.backTaxesYearTo);
             if (p.memoranda) $('#textareaMachineryMemoranda').val(p.memoranda);
+            (function() {
+                const $sc = $('#machinery-tab-memoranda .superseded-assessment-card');
+                if (p.previousTdNo) $sc.find('.superseded-tdn').val(p.previousTdNo);
+                if (p.previousPin) $sc.find('.superseded-pin').val(p.previousPin);
+                if (p.previousOwner) $sc.find('.superseded-owner').val(p.previousOwner);
+                if (p.previousMarketValue) $sc.find('.superseded-mv').val(Number(p.previousMarketValue).toFixed(2));
+                if (p.previousAssessedValue) $sc.find('.superseded-av').val(Number(p.previousAssessedValue).toFixed(2));
+                if (p.previousEffectivity) $sc.find('.superseded-eff').val(p.previousEffectivity);
+            })();
+
+            if (p.appraisedByName) $('#inputMachineryAppraisedByName').val(p.appraisedByName);
+            if (p.appraisedByPosition) $('#inputMachineryAppraisedByPosition').val(p.appraisedByPosition);
+            if (p.dateAppraised) $('#inputMachineryDateAppraised').val(formatIsoDate(p.dateAppraised));
+            if (p.assessedByName) $('#inputMachineryAssessedByName').val(p.assessedByName);
+            if (p.assessedByPosition) $('#inputMachineryAssessedByPosition').val(p.assessedByPosition);
+            if (p.dateAssessed) $('#inputMachineryDateAssessed').val(formatIsoDate(p.dateAssessed));
+            if (p.recommendingApprovalName) $('#inputMachineryRecommendingName').val(p.recommendingApprovalName);
+            if (p.recommendingApprovalPosition) $('#inputMachineryRecommendingPosition').val(p.recommendingApprovalPosition);
+            if (p.dateRecommended) $('#inputMachineryDateRecommended').val(formatIsoDate(p.dateRecommended));
+            if (p.approvedByName) $('#inputMachineryApprovedByName').val(p.approvedByName);
+            if (p.dateApproved) $('#inputMachineryDateApproved').val(formatIsoDate(p.dateApproved));
+            if (p.entryInRollName) $('#inputMachineryEntryInRollName').val(p.entryInRollName);
+            if (p.entryInRollPosition) $('#inputMachineryEntryInRollPosition').val(p.entryInRollPosition);
+            if (p.entryInRollDate) $('#inputMachineryEntryInRollDate').val(formatIsoDate(p.entryInRollDate));
+            if (p.encodedByName) $('#inputMachineryEncodedByName').val(p.encodedByName);
+            if (p.encodedByPosition) $('#inputMachineryEncodedByPosition').val(p.encodedByPosition);
+            if (p.dateEncoded) $('#inputMachineryDateEncoded').val(formatIsoDate(p.dateEncoded));
 
             // Populate Building Administrator & Demographics fields (mirrors Land form)
             if (p.isAdministrator) {
@@ -3049,12 +3210,59 @@
             if (p.administratorEmail) $('#inputBldgAdminEmail').val(p.administratorEmail);
             if (p.administratorAddress) $('#inputBldgAdminAddress').val(p.administratorAddress);
 
-            const rawPropImgs = p.propertyImagesJson || p.PropertyImagesJson || $('.property-images-json-input').first().val() || '';
+            if (p.buildingClassification) {
+                const $bldgClassSel = $('#selectBuildingClassification');
+                if ($bldgClassSel.length) {
+                    const targetClass = String(p.buildingClassification).trim();
+                    let matchedVal = '';
+                    $bldgClassSel.find('option').each(function () {
+                        const v = ($(this).val() || '').trim();
+                        const t = ($(this).text() || '').trim();
+                        if (v.toLowerCase() === targetClass.toLowerCase() || t.toLowerCase() === targetClass.toLowerCase() || t.toLowerCase().startsWith(targetClass.toLowerCase() + ' ')) {
+                            matchedVal = v;
+                            return false;
+                        }
+                    });
+                    if (!matchedVal && targetClass) {
+                        $bldgClassSel.append(new Option(targetClass, targetClass, true, true));
+                        matchedVal = targetClass;
+                    }
+                    $bldgClassSel.val(matchedVal);
+                }
+            }
+
+            if (p.surveyNumber || p.SurveyNumber) {
+                $('#inputSurveyNumber').val(p.surveyNumber || p.SurveyNumber);
+            }
+            const loadedBldgAssessLvl = (p.assessmentLevelPercent !== undefined && p.assessmentLevelPercent !== null && p.assessmentLevelPercent !== '')
+                ? p.assessmentLevelPercent
+                : (p.assessmentLevel !== undefined && p.assessmentLevel !== null && p.assessmentLevel !== '' ? p.assessmentLevel : null);
+            if (loadedBldgAssessLvl !== null) {
+                $('#inputAssessLevel').val(loadedBldgAssessLvl);
+            }
+
+            (function() {
+                const $sc = $('#tab-memoranda .superseded-assessment-card');
+                if (p.previousTdNo) $sc.find('.superseded-tdn').val(p.previousTdNo);
+                if (p.previousPin) $sc.find('.superseded-pin').val(p.previousPin);
+                if (p.previousOwner) $sc.find('.superseded-owner').val(p.previousOwner);
+                if (p.previousMarketValue) $sc.find('.superseded-mv').val(Number(p.previousMarketValue).toFixed(2));
+                if (p.previousAssessedValue) $sc.find('.superseded-av').val(Number(p.previousAssessedValue).toFixed(2));
+                if (p.previousEffectivity) $sc.find('.superseded-eff').val(p.previousEffectivity);
+            })();
+
+            const rawPropImgs = p.propertyImagesJson || p.PropertyImagesJson || $('#PropertyImagesJson').val() || $('#AttachmentsJson').val() || $('.property-images-json-input').first().val() || '';
             if (rawPropImgs && rawPropImgs.trim().startsWith('[')) {
                 try {
                     window.propertyImagesList = JSON.parse(rawPropImgs) || [];
                 } catch (e) {
                     window.propertyImagesList = [];
+                }
+            }
+            if (Array.isArray(window.propertyImagesList) && window.propertyImagesList.length > 0) {
+                window.partitionInspectionPhotos = window.propertyImagesList;
+                if (typeof window.renderInspectionPhotosGallery === 'function') {
+                    window.renderInspectionPhotosGallery();
                 }
             }
             renderPropertyImagesGallery();
@@ -3146,7 +3354,7 @@
             syncCastArpAndTdnLive();
         }
 
-        recalculateValuation();
+        recalculateValuation(true);
 
         // Active Land TDN Multi-Select (Select2 AJAX) & Auto-Fill for Building -> Land Reference (Where Erected)
         window.syncBldgSelectedLands = function () {
@@ -3235,7 +3443,7 @@
                     },
                     processResults: function (data) {
                         return {
-                            results: (data || []).map(function (item) {
+                            results: (Array.isArray(data) ? data : []).map(function (item) {
                                 return {
                                     id: item.id,
                                     text: (item.taxDeclarationNumber || '') + ' — ' + (item.ownerName || ''),
@@ -3294,7 +3502,7 @@
                     },
                     processResults: function (data) {
                         return {
-                            results: (data || []).map(function (b) {
+                            results: (Array.isArray(data) ? data : []).map(function (b) {
                                 return {
                                     id: b.id,
                                     text: (b.taxDeclarationNumber || '') + ' — ' + (b.ownerName || ''),
@@ -3359,7 +3567,7 @@
                     },
                     processResults: function (data) {
                         return {
-                            results: (data || []).map(function (l) {
+                            results: (Array.isArray(data) ? data : []).map(function (l) {
                                 return {
                                     id: l.id,
                                     text: (l.taxDeclarationNumber || '') + ' — ' + (l.ownerName || ''),

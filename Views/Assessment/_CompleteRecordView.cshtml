@@ -1,0 +1,695 @@
+@model PropertyAssessmentApp.Models.TaxDeclaration
+@using System.Text.Json
+@using PropertyAssessmentApp.Models
+@inject PropertyAssessmentApp.Services.IPermissionService PermissionService
+
+@{
+    bool canPrintTaxDec = PermissionService.CanAccess(User, "Assessment", "PrintTaxDeclaration");
+    var pdfUrl = Url.Action(canPrintTaxDec ? "PrintTaxDeclaration" : "PrintPdf", "Assessment", new { id = Model.Id });
+    var faasPdfUrl = Url.Action("PrintPdf", "Assessment", new { id = Model.Id });
+    var tdPdfUrl = Url.Action("PrintTaxDeclaration", "Assessment", new { id = Model.Id });
+    var downloadPdfUrl = Url.Action(canPrintTaxDec ? "PrintTaxDeclaration" : "PrintPdf", "Assessment", new { id = Model.Id, download = true });
+
+    string Dash(string? v) => string.IsNullOrWhiteSpace(v) ? "—" : v.Trim();
+    string DateFmt(DateTime? d) => d.HasValue ? d.Value.ToString("MMM dd, yyyy") : "—";
+    string Money(decimal v) => $"₱{v:N2}";
+
+    JsonElement? ParseArray(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return null;
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                return doc.RootElement.Clone();
+        }
+        catch { }
+        return null;
+    }
+
+    string PropStr(JsonElement el, params string[] keys)
+    {
+        foreach (var k in keys)
+        {
+            if (el.TryGetProperty(k, out var val))
+            {
+                if (val.ValueKind == JsonValueKind.String) return val.GetString() ?? "";
+                if (val.ValueKind == JsonValueKind.Number) return val.ToString();
+            }
+        }
+        return "";
+    }
+
+    decimal PropDec(JsonElement el, params string[] keys)
+    {
+        foreach (var k in keys)
+        {
+            if (el.TryGetProperty(k, out var val))
+            {
+                if (val.ValueKind == JsonValueKind.Number && val.TryGetDecimal(out var d)) return d;
+                if (val.ValueKind == JsonValueKind.String && decimal.TryParse(val.GetString(), out var d2)) return d2;
+            }
+        }
+        return 0m;
+    }
+
+    var roleBadge = Model.IsAdministrator ? "Administrator"
+        : Model.IsBeneficialUser ? "Beneficial User"
+        : Model.IsPossessor ? "Possessor"
+        : "Owner";
+}
+
+<div class="space-y-6 font-mono text-xs pb-10">
+
+    <!-- Action Header Bar -->
+    <div class="flex flex-wrap items-center justify-between gap-3 no-print">
+        <a asp-action="Index" class="px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 hover:bg-slate-50 dark:hover:bg-stone-800 text-slate-700 dark:text-stone-200 font-bold text-xs border border-slate-200 dark:border-stone-800 shadow-sm flex items-center gap-2">
+            <i data-lucide="arrow-left" class="w-4 h-4"></i>
+            Back to Assessment Records
+        </a>
+        <div class="flex flex-wrap items-center gap-2.5">
+            @if (canPrintTaxDec)
+            {
+                <a href="@tdPdfUrl" target="_blank" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-2 shadow-md shadow-emerald-600/20">
+                    <i data-lucide="file-check-2" class="w-4 h-4"></i>
+                    Print Tax Declaration
+                </a>
+            }
+            <a href="@faasPdfUrl" target="_blank" class="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs flex items-center gap-2 shadow-sm">
+                <i data-lucide="printer" class="w-4 h-4"></i>
+                Print Tax FAAS
+            </a>
+            <a href="@downloadPdfUrl" class="px-4 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-2 shadow-sm">
+                <i data-lucide="download" class="w-4 h-4"></i>
+                Download PDF
+            </a>
+            <a asp-action="Edit" asp-route-id="@Model.Id" class="px-4 py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/50 text-amber-800 dark:text-amber-300 font-bold text-xs border border-amber-300 dark:border-amber-800 flex items-center gap-2">
+                <i data-lucide="file-pen-line" class="w-4 h-4"></i>
+                Edit / Re-assess
+            </a>
+        </div>
+    </div>
+
+    <!-- Summary Banner -->
+    <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div class="space-y-1.5">
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="px-2.5 py-0.5 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 font-bold uppercase">@Model.Kind</span>
+                <span class="px-2.5 py-0.5 rounded-lg bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold uppercase">@Model.Status</span>
+                @if (!string.IsNullOrWhiteSpace(Model.TransactionCode))
+                {
+                    <span class="px-2.5 py-0.5 rounded-lg bg-sky-100 dark:bg-sky-950/50 text-sky-800 dark:text-sky-300 font-bold uppercase">@Model.TransactionCode</span>
+                }
+            </div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                TDN: @(string.IsNullOrWhiteSpace(Model.TaxDeclarationNumber) ? "Pending" : Model.TaxDeclarationNumber)
+            </h1>
+            <p class="text-slate-500 dark:text-stone-400">
+                PIN: <strong class="text-slate-800 dark:text-stone-200">@Dash(Model.PropertyIndexNumber)</strong>
+                &bull; Owner: <strong class="text-slate-800 dark:text-stone-200">@Dash(Model.OwnerName)</strong>
+            </p>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3 shrink-0">
+            <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-right">
+                <div class="text-[10px] text-slate-500 uppercase font-bold">Market Value</div>
+                <div class="text-sm font-black text-slate-900 dark:text-white">@Money(Model.MarketValue)</div>
+            </div>
+            <div class="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-right">
+                <div class="text-[10px] text-emerald-700 dark:text-emerald-400 uppercase font-bold">Assessed Value</div>
+                <div class="text-sm font-black text-emerald-700 dark:text-emerald-300">@Money(Model.AssessedValue)</div>
+            </div>
+            <div class="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-right">
+                <div class="text-[10px] text-amber-700 dark:text-amber-400 uppercase font-bold">Annual Tax Due</div>
+                <div class="text-sm font-black text-amber-700 dark:text-amber-300">@Money(Model.AnnualTaxDue)</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Mode Switcher -->
+    <div class="flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-3 no-print">
+        <button type="button" id="btnViewEncodedDetails" onclick="switchDetailsTab('encoded')" class="px-4 py-2.5 rounded-xl bg-emerald-600 text-white font-bold flex items-center gap-2 shadow-sm">
+            <i data-lucide="clipboard-list" class="w-4 h-4"></i>
+            Full Encoded Details
+        </button>
+        <button type="button" id="btnViewPdfPreview" onclick="switchDetailsTab('pdf')" class="px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-700 dark:text-stone-300 font-bold flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-stone-800">
+            <i data-lucide="file-text" class="w-4 h-4"></i>
+            Official PDF Preview
+        </button>
+    </div>
+
+    <!-- TAB 1: FULL ENCODED DETAILS -->
+    <div id="tabEncodedDetails" class="space-y-6">
+
+        <!-- 1. Property Identification & Location -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-4">
+                <h2 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
+                    <i data-lucide="hash" class="w-4 h-4"></i> Property Identification &amp; Title Reference
+                </h2>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><span class="text-[10px] text-slate-400 block">TDN NO.</span><strong class="text-slate-900 dark:text-white">@Dash(Model.TaxDeclarationNumber)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">PROPERTY INDEX NO. (PIN)</span><strong class="text-slate-900 dark:text-white">@Dash(Model.PropertyIndexNumber)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">ARP NO.</span><strong class="text-slate-900 dark:text-white">@Dash(Model.ARPNo)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">CLASSIFICATION / ACTUAL USE</span><strong class="text-slate-900 dark:text-white">@Model.Classification / @Dash(Model.ActualUse)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">TITLE / OCT / TCT NO.</span><strong class="text-slate-900 dark:text-white">@Dash(Model.TitleNo)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">DATE REGISTERED</span><strong class="text-slate-900 dark:text-white">@DateFmt(Model.DateRegistered)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">SURVEY NO. / CADASTRAL</span><strong class="text-slate-900 dark:text-white">@Dash(Model.SurveyNo) / @Dash(Model.CadastralSurveyNo)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">LOT NO. / BLOCK NO.</span><strong class="text-slate-900 dark:text-white">@Dash(Model.LotNo) / @Dash(Model.BlockNo)</strong></div>
+                </div>
+            </div>
+
+            <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-4">
+                <h2 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
+                    <i data-lucide="map-pin" class="w-4 h-4"></i> Owner &amp; Property Location
+                </h2>
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="col-span-2"><span class="text-[10px] text-slate-400 block">REGISTERED OWNER / DECLARANT (@roleBadge.ToUpper())</span><strong class="text-slate-900 dark:text-white text-sm">@Dash(Model.OwnerName)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">OWNER TIN</span><strong class="text-slate-900 dark:text-white">@Dash(Model.OwnerTin)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">CONTACT / EMAIL</span><strong class="text-slate-900 dark:text-white">@Dash(Model.OwnerPhone) / @Dash(Model.OwnerEmail)</strong></div>
+                    <div class="col-span-2"><span class="text-[10px] text-slate-400 block">OWNER MAILING ADDRESS</span><strong class="text-slate-900 dark:text-white">@Dash(Model.OwnerAddress)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">NO. / STREET</span><strong class="text-slate-900 dark:text-white">@Dash(Model.StreetNo)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">BARANGAY</span><strong class="text-slate-900 dark:text-white">@Dash(Model.DistrictOrBarangay)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">MUNICIPALITY / CITY</span><strong class="text-slate-900 dark:text-white">@Dash(Model.Municipality)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">PROVINCE</span><strong class="text-slate-900 dark:text-white">@Dash(Model.ProvinceCity)</strong></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Kind-Specific Encoded Details -->
+        @if (Model.Kind == PropertyKind.Land)
+        {
+            var landRows = ParseArray(Model.LandAppraisalDetailsJson);
+            var impRows = ParseArray(Model.LandImprovementsJson);
+            <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-5">
+                <h2 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
+                    <i data-lucide="map" class="w-4 h-4"></i> Land Appraisal, Improvements &amp; Boundaries
+                </h2>
+
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div><span class="text-[10px] text-slate-400 block">NORTH BOUNDARY</span><strong class="text-slate-900 dark:text-white">@Dash(Model.BoundaryNorth)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">EAST BOUNDARY</span><strong class="text-slate-900 dark:text-white">@Dash(Model.BoundaryEast)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">SOUTH BOUNDARY</span><strong class="text-slate-900 dark:text-white">@Dash(Model.BoundarySouth)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">WEST BOUNDARY</span><strong class="text-slate-900 dark:text-white">@Dash(Model.BoundaryWest)</strong></div>
+                </div>
+
+                @if (landRows.HasValue && landRows.Value.GetArrayLength() > 0)
+                {
+                    <div class="overflow-x-auto rounded-2xl border border-slate-200 dark:border-stone-800">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 dark:bg-stone-950 border-b border-slate-200 dark:border-stone-800 text-[10px] uppercase text-slate-500">
+                                    <th class="px-3 py-2">Classification</th>
+                                    <th class="px-3 py-2">Sub-Class</th>
+                                    <th class="px-3 py-2 text-right">Area (sqm)</th>
+                                    <th class="px-3 py-2 text-right">Unit Value</th>
+                                    <th class="px-3 py-2 text-right">Base Market Value</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200 dark:divide-stone-800">
+                                @foreach (var row in landRows.Value.EnumerateArray())
+                                {
+                                    <tr>
+                                        <td class="px-3 py-2 font-bold">@Dash(PropStr(row, "classification", "Classification"))</td>
+                                        <td class="px-3 py-2">@Dash(PropStr(row, "subClass", "SubClass"))</td>
+                                        <td class="px-3 py-2 text-right">@PropDec(row, "area", "Area").ToString("N2")</td>
+                                        <td class="px-3 py-2 text-right">@Money(PropDec(row, "unitValue", "UnitValue"))</td>
+                                        <td class="px-3 py-2 text-right font-bold">@Money(PropDec(row, "baseMarketValue", "BaseMarketValue", "marketValue"))</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+
+                @if (impRows.HasValue && impRows.Value.GetArrayLength() > 0)
+                {
+                    <div class="overflow-x-auto rounded-2xl border border-slate-200 dark:border-stone-800">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 dark:bg-stone-950 border-b border-slate-200 dark:border-stone-800 text-[10px] uppercase text-slate-500">
+                                    <th class="px-3 py-2">Improvement / Kind</th>
+                                    <th class="px-3 py-2 text-right">Quantity</th>
+                                    <th class="px-3 py-2 text-right">Unit Value</th>
+                                    <th class="px-3 py-2 text-right">Market Value</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200 dark:divide-stone-800">
+                                @foreach (var row in impRows.Value.EnumerateArray())
+                                {
+                                    <tr>
+                                        <td class="px-3 py-2 font-bold">@Dash(PropStr(row, "kind", "Kind", "productClass", "ProductClass"))</td>
+                                        <td class="px-3 py-2 text-right">@PropDec(row, "qty", "Qty", "quantity", "Quantity").ToString("N0")</td>
+                                        <td class="px-3 py-2 text-right">@Money(PropDec(row, "unitValue", "UnitValue"))</td>
+                                        <td class="px-3 py-2 text-right font-bold">@Money(PropDec(row, "baseMarketValue", "BaseMarketValue", "marketValue", "MarketValue"))</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        }
+        else if (Model.Kind == PropertyKind.Building)
+        {
+            var floorRows = ParseArray(Model.BuildingFloorBreakdownJson);
+            var addlRows = ParseArray(Model.BuildingAdditionalItemsJson);
+            var bldg = Model.BuildingDetails;
+            var totalRcn = bldg != null && bldg.ReplacementCostNew > 0 ? bldg.ReplacementCostNew : (Model.BaseRcnValue + Model.BuildingTotalAdditionsValue);
+            <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-6">
+                <h2 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
+                    <i data-lucide="building-2" class="w-4 h-4"></i> Building Specifications, Land Reference &amp; 17 Structural Materials
+                </h2>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div><span class="text-[10px] text-slate-400 block">PROPERTY TYPE (ACCORDING TO USE)</span><strong class="text-slate-900 dark:text-white">@Dash(bldg?.BuildingUseType) @(!string.IsNullOrWhiteSpace(bldg?.OtherBuildingUseType) ? $"({bldg.OtherBuildingUseType})" : "")</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">BUILDING CLASSIFICATION</span><strong class="text-slate-900 dark:text-white">@Dash(Model.BuildingClassification)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">STRUCTURAL TYPE</span><strong class="text-slate-900 dark:text-white">@Dash(Model.StructuralType)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">STOREYS / TOTAL FLOOR AREA</span><strong class="text-slate-900 dark:text-white">@Model.NoOfStoreys storey(s) / @Model.TotalBuildingAreaSqm.ToString("N2") sqm</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">BUILDING PERMIT NO.</span><strong class="text-slate-900 dark:text-white">@Dash(Model.BuildingPermitNo)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">OCCUPANCY PERMIT NO.</span><strong class="text-slate-900 dark:text-white">@Dash(Model.OccupancyPermitNo)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">BUILDING AGE</span><strong class="text-slate-900 dark:text-white">@Model.BuildingAgeYears yr(s)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">DATE CONSTRUCTED / COMPLETED / OCCUPIED</span><strong class="text-slate-900 dark:text-white">@DateFmt(Model.DateConstructed) / @DateFmt(Model.DateCompleted) / @DateFmt(Model.DateOccupied)</strong></div>
+                    @if (Model.IsCct)
+                    {
+                        <div><span class="text-[10px] text-slate-400 block">CCT TITLE NO.</span><strong class="text-slate-900 dark:text-white">@Dash(Model.CctTitleNo)</strong></div>
+                        <div><span class="text-[10px] text-slate-400 block">CCT DATE REGISTERED</span><strong class="text-slate-900 dark:text-white">@DateFmt(Model.CctDateRegistered)</strong></div>
+                        <div class="col-span-2"><span class="text-[10px] text-slate-400 block">OWNER REFLECTED IN CCT</span><strong class="text-slate-900 dark:text-white">@Dash(Model.OwnerNameReflectedInCct)</strong></div>
+                    }
+                    <div><span class="text-[10px] text-slate-400 block">LAND OWNER REFERENCE</span><strong class="text-slate-900 dark:text-white">@Dash(Model.LandOwnerName)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">LAND TDN / PIN</span><strong class="text-slate-900 dark:text-white">@Dash(Model.LandTdNo) / @Dash(Model.LandPin)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">LAND TITLE / SURVEY NO.</span><strong class="text-slate-900 dark:text-white">@Dash(bldg?.LandTitleNo) / @Dash(bldg?.LandSurveyNo)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">LAND LOT / BLOCK / AREA</span><strong class="text-slate-900 dark:text-white">@Dash(bldg?.LandLotNo) / @Dash(bldg?.LandBlockNo) / @(bldg?.LandAreaSqm > 0 ? $"{bldg.LandAreaSqm:N2} sqm" : "—")</strong></div>
+                </div>
+
+                <!-- 17 Structural Materials -->
+                <div class="p-4 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-3">
+                    <div class="text-[11px] font-bold uppercase text-emerald-700 dark:text-emerald-400">17 Structural Materials</div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div><span class="text-[10px] text-slate-400 block">FOUNDATION</span><strong class="text-slate-900 dark:text-white">@Dash(Model.StructuralFoundation)</strong></div>
+                        <div><span class="text-[10px] text-slate-400 block">COLUMNS</span><strong class="text-slate-900 dark:text-white">@Dash(Model.StructuralColumns)</strong></div>
+                        <div><span class="text-[10px] text-slate-400 block">BEAMS</span><strong class="text-slate-900 dark:text-white">@Dash(Model.StructuralBeams)</strong></div>
+                        <div><span class="text-[10px] text-slate-400 block">TRUSS ROOF</span><strong class="text-slate-900 dark:text-white">@Dash(Model.StructuralTrussRoof)</strong></div>
+                        <div><span class="text-[10px] text-slate-400 block">ROOF</span><strong class="text-slate-900 dark:text-white">@Dash(Model.StructuralRoof)</strong></div>
+                        <div><span class="text-[10px] text-slate-400 block">EXTERIOR WALLS</span><strong class="text-slate-900 dark:text-white">@Dash(Model.StructuralExteriorWalls)</strong></div>
+                        <div><span class="text-[10px] text-slate-400 block">FLOORING</span><strong class="text-slate-900 dark:text-white">@Dash(Model.StructuralFlooring)</strong></div>
+                        <div><span class="text-[10px] text-slate-400 block">MAIN DOOR</span><strong class="text-slate-900 dark:text-white">@Dash(Model.DoorMain)</strong></div>
+                        <div><span class="text-[10px] text-slate-400 block">CEILING</span><strong class="text-slate-900 dark:text-white">@Dash(Model.Ceiling)</strong></div>
+                        <div><span class="text-[10px] text-slate-400 block">WINDOWS</span><strong class="text-slate-900 dark:text-white">@Dash(Model.StructuralWindows)</strong></div>
+                        <div><span class="text-[10px] text-slate-400 block">STAIRS</span><strong class="text-slate-900 dark:text-white">@Dash(Model.StructuralStairs)</strong></div>
+                        <div><span class="text-[10px] text-slate-400 block">PARTITION WALLS</span><strong class="text-slate-900 dark:text-white">@Dash(Model.StructuralPartitionWalls)</strong></div>
+                        <div><span class="text-[10px] text-slate-400 block">FLOOR FINISH</span><strong class="text-slate-900 dark:text-white">@Dash(Model.StructuralFloorFinish)</strong></div>
+                        <div><span class="text-[10px] text-slate-400 block">FINISH FRONT</span><strong class="text-slate-900 dark:text-white">@Dash(Model.StructuralFinishFront)</strong></div>
+                        <div><span class="text-[10px] text-slate-400 block">ELECTRICAL SYSTEM</span><strong class="text-slate-900 dark:text-white">@Dash(Model.ElectricalSystem)</strong></div>
+                        <div><span class="text-[10px] text-slate-400 block">TOILET &amp; BATHROOM</span><strong class="text-slate-900 dark:text-white">@Dash(Model.ToiletAndBathroom)</strong></div>
+                        <div><span class="text-[10px] text-slate-400 block">PLUMBING &amp; SEWER</span><strong class="text-slate-900 dark:text-white">@Dash(Model.PlumbingSewer)</strong></div>
+                    </div>
+                </div>
+
+                <!-- Floor Levels & BUCC Rate Schedule -->
+                <div class="space-y-2">
+                    <div class="text-[11px] font-bold uppercase text-emerald-700 dark:text-emerald-400">Floor Levels &amp; BUCC Rate Schedule</div>
+                    @if (floorRows.HasValue && floorRows.Value.GetArrayLength() > 0)
+                    {
+                        <div class="overflow-x-auto rounded-2xl border border-slate-200 dark:border-stone-800">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-50 dark:bg-stone-950 border-b border-slate-200 dark:border-stone-800 text-[10px] uppercase text-slate-500">
+                                        <th class="px-3 py-2">Floor Level</th>
+                                        <th class="px-3 py-2">Classification / Description</th>
+                                        <th class="px-3 py-2 text-right">Area (sqm)</th>
+                                        <th class="px-3 py-2 text-right">BUCC Unit Value</th>
+                                        <th class="px-3 py-2 text-right">Base RCN / Market Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-200 dark:divide-stone-800">
+                                    @foreach (var row in floorRows.Value.EnumerateArray())
+                                    {
+                                        var flClass = PropStr(row, "buildingClassification", "BuildingClassification");
+                                        var flDesc = PropStr(row, "description", "Description");
+                                        <tr>
+                                            <td class="px-3 py-2 font-bold">@Dash(PropStr(row, "floorNumber", "FloorNumber", "floorName", "FloorName", "level", "Level"))</td>
+                                            <td class="px-3 py-2">@Dash(string.Join(" — ", new[] { flClass, flDesc }.Where(s => !string.IsNullOrWhiteSpace(s))))</td>
+                                            <td class="px-3 py-2 text-right">@PropDec(row, "floorAreaSqm", "FloorAreaSqm", "area", "Area", "floorArea", "FloorArea").ToString("N2")</td>
+                                            <td class="px-3 py-2 text-right">@Money(PropDec(row, "baseUnitCost", "BaseUnitCost", "unitValue", "UnitValue", "baseUnitValue"))</td>
+                                            <td class="px-3 py-2 text-right font-bold text-emerald-700 dark:text-emerald-400">@Money(PropDec(row, "marketValue", "MarketValue", "rcn", "Rcn", "baseRcn"))</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else if (bldg?.FloorLevels != null && bldg.FloorLevels.Any())
+                    {
+                        <div class="overflow-x-auto rounded-2xl border border-slate-200 dark:border-stone-800">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-50 dark:bg-stone-950 border-b border-slate-200 dark:border-stone-800 text-[10px] uppercase text-slate-500">
+                                        <th class="px-3 py-2">Floor Level</th>
+                                        <th class="px-3 py-2">Description</th>
+                                        <th class="px-3 py-2 text-right">Area (sqm)</th>
+                                        <th class="px-3 py-2 text-right">BUCC Unit Value</th>
+                                        <th class="px-3 py-2 text-right">Base RCN</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-200 dark:divide-stone-800">
+                                    @foreach (var fl in bldg.FloorLevels.OrderBy(f => f.Id))
+                                    {
+                                        <tr>
+                                            <td class="px-3 py-2 font-bold">@Dash(fl.FloorNumber)</td>
+                                            <td class="px-3 py-2">@Dash(fl.Description)</td>
+                                            <td class="px-3 py-2 text-right">@fl.FloorAreaSqm.ToString("N2")</td>
+                                            <td class="px-3 py-2 text-right">@Money(fl.BaseUnitCost)</td>
+                                            <td class="px-3 py-2 text-right font-bold text-emerald-700 dark:text-emerald-400">@Money(fl.MarketValue)</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-slate-400 italic">No floor levels recorded.</p>
+                    }
+                </div>
+
+                <!-- Additional Items & Improvements -->
+                <div class="space-y-2">
+                    <div class="text-[11px] font-bold uppercase text-emerald-700 dark:text-emerald-400">Additional Items &amp; Improvements</div>
+                    @if (addlRows.HasValue && addlRows.Value.GetArrayLength() > 0)
+                    {
+                        <div class="overflow-x-auto rounded-2xl border border-slate-200 dark:border-stone-800">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-50 dark:bg-stone-950 border-b border-slate-200 dark:border-stone-800 text-[10px] uppercase text-slate-500">
+                                        <th class="px-3 py-2">Item Description</th>
+                                        <th class="px-3 py-2 text-right">Area / Qty</th>
+                                        <th class="px-3 py-2 text-right">Unit Rate</th>
+                                        <th class="px-3 py-2 text-right">Multiplier</th>
+                                        <th class="px-3 py-2 text-right">Total Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-200 dark:divide-stone-800">
+                                    @foreach (var row in addlRows.Value.EnumerateArray())
+                                    {
+                                        var mult = PropDec(row, "multiplier", "Multiplier");
+                                        <tr>
+                                            <td class="px-3 py-2 font-bold">@Dash(PropStr(row, "description", "Description", "itemDescription", "ItemDescription", "name", "Name"))</td>
+                                            <td class="px-3 py-2 text-right">@PropDec(row, "quantity", "Quantity", "area", "Area", "qty", "Qty").ToString("N2")</td>
+                                            <td class="px-3 py-2 text-right">@Money(PropDec(row, "unitRate", "UnitRate", "unitCost", "UnitCost", "unitValue"))</td>
+                                            <td class="px-3 py-2 text-right">@(mult > 0 ? $"{mult:0.##}%" : "100%")</td>
+                                            <td class="px-3 py-2 text-right font-bold text-emerald-700 dark:text-emerald-400">@Money(PropDec(row, "totalValue", "TotalValue", "totalCost", "TotalCost", "amount"))</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else if (bldg?.AdditionalItems != null && bldg.AdditionalItems.Any())
+                    {
+                        <div class="overflow-x-auto rounded-2xl border border-slate-200 dark:border-stone-800">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-50 dark:bg-stone-950 border-b border-slate-200 dark:border-stone-800 text-[10px] uppercase text-slate-500">
+                                        <th class="px-3 py-2">Item Description</th>
+                                        <th class="px-3 py-2 text-right">Area / Qty</th>
+                                        <th class="px-3 py-2 text-right">Unit Rate</th>
+                                        <th class="px-3 py-2 text-right">Total Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-200 dark:divide-stone-800">
+                                    @foreach (var ai in bldg.AdditionalItems)
+                                    {
+                                        <tr>
+                                            <td class="px-3 py-2 font-bold">@Dash(ai.ItemDescription)</td>
+                                            <td class="px-3 py-2 text-right">@ai.Quantity.ToString("N2")</td>
+                                            <td class="px-3 py-2 text-right">@Money(ai.UnitRate)</td>
+                                            <td class="px-3 py-2 text-right font-bold text-emerald-700 dark:text-emerald-400">@Money(ai.TotalValue)</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-slate-400 italic">No additional items or improvements recorded.</p>
+                    }
+                </div>
+
+                <!-- Depreciation & Final Assessed Value Roll -->
+                <div class="p-4 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-3">
+                    <div class="text-[11px] font-bold uppercase text-emerald-700 dark:text-emerald-400">Depreciation &amp; Final Assessed Value Roll</div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div><span class="text-[10px] text-slate-400 block">BASE RCN</span><strong class="text-slate-900 dark:text-white">@Money(Model.BaseRcnValue)</strong></div>
+                        <div><span class="text-[10px] text-slate-400 block">TOTAL ADDITIONAL ITEMS</span><strong class="text-slate-900 dark:text-white">@Money(Model.BuildingTotalAdditionsValue)</strong></div>
+                        <div><span class="text-[10px] text-slate-400 block">TOTAL RCN (BASE + ADDITIONS)</span><strong class="text-slate-900 dark:text-white">@Money(totalRcn)</strong></div>
+                        <div><span class="text-[10px] text-slate-400 block">DEPRECIATION RATE (%)</span><strong class="text-rose-600 dark:text-rose-400">@Model.BuildingDepreciationPercent.ToString("0.##")%</strong></div>
+                        <div><span class="text-[10px] text-slate-400 block">ACCUMULATED DEPRECIATION</span><strong class="text-rose-600 dark:text-rose-400">@Money(Model.BuildingDepreciationAccumulated)</strong></div>
+                        <div><span class="text-[10px] text-slate-400 block">DEPRECIATED MARKET VALUE</span><strong class="text-slate-900 dark:text-white">@Money(Model.BuildingDepreciatedMarketValue > 0 ? Model.BuildingDepreciatedMarketValue : Model.MarketValue)</strong></div>
+                        <div><span class="text-[10px] text-slate-400 block">ASSESSMENT LEVEL (%)</span><strong class="text-slate-900 dark:text-white">@Model.AssessmentLevelPercent.ToString("0.##")%</strong></div>
+                        <div><span class="text-[10px] text-slate-400 block">FINAL ASSESSED VALUE</span><strong class="text-emerald-700 dark:text-emerald-400">@Money(Model.AssessedValue)</strong></div>
+                    </div>
+                </div>
+            </div>
+        }
+        else if (Model.Kind == PropertyKind.Machinery)
+        {
+            var machRows = ParseArray(Model.MachineryAppraisalDetailsJson);
+            var machRollRows = ParseArray(Model.MachineryPropertyAssessmentsJson);
+            <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-5">
+                <h2 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
+                    <i data-lucide="cpu" class="w-4 h-4"></i> Machinery Registration, Land/Building Reference &amp; Appraisal Schedule
+                </h2>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div><span class="text-[10px] text-slate-400 block">MANUFACTURING ORIGIN</span><strong class="text-slate-900 dark:text-white">@(Model.IsLocallyManufactured ? "Local Manufacturer" : "Outside the Philippines (Imported)")</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">REGISTRATION NO. / DATE</span><strong class="text-slate-900 dark:text-white">@Dash(Model.MachineryRegNo) / @DateFmt(Model.MachineryDateRegistered ?? Model.DateRegistered)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">IMPORTATION PERMIT / DATE</span><strong class="text-slate-900 dark:text-white">@Dash(Model.ImportationPermitNo) / @DateFmt(Model.ImportationDateIssued)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">COUNTRY OF ORIGIN</span><strong class="text-slate-900 dark:text-white">@Dash(Model.CountryOfOrigin)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">OR NO. / OR DATE</span><strong class="text-slate-900 dark:text-white">@Dash(Model.OrNo) / @DateFmt(Model.OrDate)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">ACQUISITION COST</span><strong class="text-slate-900 dark:text-white">@Money(Model.AcquisitionCost)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">SUPPLIER / SELLER</span><strong class="text-slate-900 dark:text-white">@Dash(Model.SupplierSeller)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">SUPPLIER ADDRESS</span><strong class="text-slate-900 dark:text-white">@Dash(Model.SupplierAddress)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">LAND OWNER / TD NO. / PIN</span><strong class="text-slate-900 dark:text-white">@Dash(Model.LandOwnerName) (@Dash(Model.LandTdNo) / @Dash(Model.LandPin))</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">BUILDING OWNER / TD NO. / PIN</span><strong class="text-slate-900 dark:text-white">@Dash(Model.BuildingReferenceName) (@Dash(Model.BuildingTdNo) / @Dash(Model.BuildingPin))</strong></div>
+                </div>
+
+                @if (machRows.HasValue && machRows.Value.GetArrayLength() > 0)
+                {
+                    <div class="overflow-x-auto rounded-2xl border border-slate-200 dark:border-stone-800">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 dark:bg-stone-950 border-b border-slate-200 dark:border-stone-800 text-[10px] uppercase text-slate-500">
+                                    <th class="px-3 py-2">Kind / Description &amp; Brand</th>
+                                    <th class="px-3 py-2">Condition / Capacity</th>
+                                    <th class="px-3 py-2 text-right">Original Cost</th>
+                                    <th class="px-3 py-2 text-right">Dep. (%)</th>
+                                    <th class="px-3 py-2 text-right">Depreciated Value</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200 dark:divide-stone-800">
+                                @foreach (var row in machRows.Value.EnumerateArray())
+                                {
+                                    <tr>
+                                        <td class="px-3 py-2 font-bold">@Dash(PropStr(row, "KindOfMachinery", "kindOfMachinery", "kindMachinery", "KindMachinery", "BrandModel", "brandModel", "descriptionBrand", "DescriptionBrand"))</td>
+                                        <td class="px-3 py-2">@Dash(PropStr(row, "ConditionWhenAcquired", "conditionWhenAcquired", "condition", "Condition", "RatedCapacity", "ratedCapacity", "capacity", "Capacity"))</td>
+                                        <td class="px-3 py-2 text-right">@Money(PropDec(row, "originalCost", "OriginalCost", "totalCost", "TotalCost"))</td>
+                                        <td class="px-3 py-2 text-right">@PropDec(row, "DepreciationTotalPercentage", "depreciationTotalPercentage", "depPercentage", "DepPercentage", "depreciationRatePercent").ToString("0.##")%</td>
+                                        <td class="px-3 py-2 text-right font-bold text-emerald-700 dark:text-emerald-400">@Money(PropDec(row, "depreciatedValue", "DepreciatedValue", "marketValue", "MarketValue"))</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+
+                @if (machRollRows.HasValue && machRollRows.Value.GetArrayLength() > 0)
+                {
+                    <div class="overflow-x-auto rounded-2xl border border-slate-200 dark:border-stone-800">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 dark:bg-stone-950 border-b border-slate-200 dark:border-stone-800 text-[10px] uppercase text-slate-500">
+                                    <th class="px-3 py-2">Actual Use</th>
+                                    <th class="px-3 py-2 text-right">Market Value</th>
+                                    <th class="px-3 py-2 text-right">Assessment Level</th>
+                                    <th class="px-3 py-2 text-right">Assessed Value</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200 dark:divide-stone-800">
+                                @foreach (var row in machRollRows.Value.EnumerateArray())
+                                {
+                                    <tr>
+                                        <td class="px-3 py-2 font-bold">@Dash(PropStr(row, "ActualUseName", "actualUseName", "actualUse", "ActualUse"))</td>
+                                        <td class="px-3 py-2 text-right">@Money(PropDec(row, "MarketValue", "marketValue"))</td>
+                                        <td class="px-3 py-2 text-right">@PropDec(row, "AssessmentLevelPercent", "assessmentLevelPercent", "assessmentLevel", "AssessmentLevel").ToString("0.##")%</td>
+                                        <td class="px-3 py-2 text-right font-bold text-emerald-700 dark:text-emerald-400">@Money(PropDec(row, "AssessmentValue", "assessmentValue", "assessedValue", "AssessedValue"))</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        }
+
+        <!-- 3. Valuation, Effectivity & Records of Superseded Assessment -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-4">
+                <h2 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
+                    <i data-lucide="calculator" class="w-4 h-4"></i> Valuation, Taxability &amp; Effectivity
+                </h2>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><span class="text-[10px] text-slate-400 block">MARKET VALUE</span><strong class="text-slate-900 dark:text-white">@Money(Model.MarketValue)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">ADJUSTED MARKET VALUE</span><strong class="text-slate-900 dark:text-white">@Money(Model.AdjustedMarketValue)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">ASSESSMENT LEVEL</span><strong class="text-slate-900 dark:text-white">@Model.AssessmentLevelPercent.ToString("0.##")%</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">ASSESSED VALUE</span><strong class="text-emerald-700 dark:text-emerald-400">@Money(Model.AssessedValue)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">TAXABILITY / BASIS</span><strong class="text-slate-900 dark:text-white">@Dash(Model.Taxability) / @Dash(Model.AssessmentBasis)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">EFFECTIVITY OF ASSESSMENT</span><strong class="text-slate-900 dark:text-white">@Dash(Model.EffectivityQuarter) @Model.EffectivityYear</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">BACK TAXES (FROM - TO)</span><strong class="text-slate-900 dark:text-white">@(Model.BackTaxesYearFrom?.ToString() ?? "—") - @(Model.BackTaxesYearTo?.ToString() ?? "—")</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">ANNUAL TAX DUE (BASIC + SEF)</span><strong class="text-amber-700 dark:text-amber-400">@Money(Model.AnnualTaxDue)</strong></div>
+                </div>
+            </div>
+
+            <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-4">
+                <h2 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
+                    <i data-lucide="history" class="w-4 h-4"></i> Records of Superseded Assessment
+                </h2>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><span class="text-[10px] text-slate-400 block">PREVIOUS TD NO.</span><strong class="text-slate-900 dark:text-white">@Dash(Model.PreviousTdNo)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">PREVIOUS PIN</span><strong class="text-slate-900 dark:text-white">@Dash(Model.PreviousPin)</strong></div>
+                    <div class="col-span-2"><span class="text-[10px] text-slate-400 block">PREVIOUS OWNER</span><strong class="text-slate-900 dark:text-white">@Dash(Model.PreviousOwner)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">PREVIOUS MARKET VALUE</span><strong class="text-slate-900 dark:text-white">@Money(Model.PreviousMarketValue)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">PREVIOUS ASSESSED VALUE</span><strong class="text-slate-900 dark:text-white">@Money(Model.PreviousAssessedValue)</strong></div>
+                    <div class="col-span-2"><span class="text-[10px] text-slate-400 block">EFFECTIVITY OF ASSESSMENT</span><strong class="text-slate-900 dark:text-white">@Dash(Model.PreviousEffectivity)</strong></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. Memoranda & Signatories -->
+        <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-5">
+            <h2 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
+                <i data-lucide="pen-tool" class="w-4 h-4"></i> Memoranda &amp; Signatories
+            </h2>
+
+            <div class="p-4 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
+                <span class="text-[10px] text-slate-400 block mb-1">MEMORANDA</span>
+                <p class="text-slate-800 dark:text-stone-200 whitespace-pre-wrap">@Dash(Model.Memoranda)</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
+                    <span class="text-[10px] text-slate-400 block">APPRAISED BY</span>
+                    <strong class="text-slate-900 dark:text-white block">@Dash(Model.AppraisedByName)</strong>
+                    <span class="text-[11px] text-slate-500">Date: @DateFmt(Model.DateAppraised)</span>
+                </div>
+                <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
+                    <span class="text-[10px] text-slate-400 block">ASSESSED BY</span>
+                    <strong class="text-slate-900 dark:text-white block">@Dash(Model.AssessedByName)</strong>
+                    <span class="text-[11px] text-slate-500">Date: @DateFmt(Model.DateAssessed)</span>
+                </div>
+                <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
+                    <span class="text-[10px] text-slate-400 block">RECOMMENDING APPROVAL</span>
+                    <strong class="text-slate-900 dark:text-white block">@Dash(Model.RecommendingApprovalName)</strong>
+                    <span class="text-[11px] text-slate-500">Date: @DateFmt(Model.DateRecommended)</span>
+                </div>
+                <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
+                    <span class="text-[10px] text-slate-400 block">APPROVED BY</span>
+                    <strong class="text-slate-900 dark:text-white block">@Dash(Model.ApprovedByName)</strong>
+                    <span class="text-[11px] text-slate-500">Date: @DateFmt(Model.DateApproved)</span>
+                </div>
+                <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
+                    <span class="text-[10px] text-slate-400 block">ENTRY IN ASSESSMENT ROLL BY</span>
+                    <strong class="text-slate-900 dark:text-white block">@Dash(Model.EntryInRollName) @(!string.IsNullOrWhiteSpace(Model.EntryInRollPosition) ? $"({Model.EntryInRollPosition})" : "")</strong>
+                    <span class="text-[11px] text-slate-500">Date: @DateFmt(Model.EntryInRollDate)</span>
+                </div>
+                <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
+                    <span class="text-[10px] text-slate-400 block">ENCODED BY</span>
+                    <strong class="text-slate-900 dark:text-white block">@Dash(Model.EncodedByName)</strong>
+                    <span class="text-[11px] text-slate-500">Date: @DateFmt(Model.DateEncoded)</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 5. Field Inspection Photo Attachments -->
+        <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-4">
+            <h2 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
+                <i data-lucide="camera" class="w-4 h-4"></i> Field Inspection Photo Attachments
+            </h2>
+            @{
+                var photoJsonArr = ParseArray(Model.PropertyImagesJson);
+                var dbImages = Model.PropertyImages?.OrderBy(i => i.SortOrder).ToList() ?? new List<TDNPropertyImage>();
+            }
+            @if (dbImages.Any())
+            {
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                    @foreach (var img in dbImages)
+                    {
+                        <a href="@img.ImagePath" target="_blank" class="group relative aspect-square rounded-xl overflow-hidden border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-950 hover:border-emerald-600 transition-all">
+                            <img src="@img.ImagePath" alt="@img.OriginalFileName" class="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                            <div class="absolute inset-x-0 bottom-0 p-1.5 bg-slate-900/80 text-[10px] text-white truncate">@Dash(img.OriginalFileName)</div>
+                        </a>
+                    }
+                </div>
+            }
+            else if (photoJsonArr.HasValue && photoJsonArr.Value.GetArrayLength() > 0)
+            {
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                    @foreach (var img in photoJsonArr.Value.EnumerateArray())
+                    {
+                        var url = PropStr(img, "fileUrl", "FileUrl", "imagePath", "ImagePath", "url");
+                        var name = PropStr(img, "fileName", "FileName", "originalFileName", "OriginalFileName");
+                        if (!string.IsNullOrWhiteSpace(url))
+                        {
+                            <a href="@url" target="_blank" class="group relative aspect-square rounded-xl overflow-hidden border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-950 hover:border-emerald-600 transition-all">
+                                <img src="@url" alt="@name" class="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                <div class="absolute inset-x-0 bottom-0 p-1.5 bg-slate-900/80 text-[10px] text-white truncate">@Dash(name)</div>
+                            </a>
+                        }
+                    }
+                </div>
+            }
+            else
+            {
+                <p class="text-slate-400 italic">No inspection photos uploaded.</p>
+            }
+        </div>
+    </div>
+
+    <!-- TAB 2: EMBEDDED QUESTPDF DOCUMENT VIEWER -->
+    <div id="tabPdfPreview" class="hidden rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm overflow-hidden">
+        <div class="px-5 py-3.5 border-b border-slate-200 dark:border-stone-800 flex items-center justify-between bg-slate-50 dark:bg-stone-950 font-mono text-xs">
+            <div class="flex items-center gap-2 font-bold text-slate-700 dark:text-stone-200">
+                <i data-lucide="file-check-2" class="w-4 h-4 text-emerald-600"></i>
+                <span>Official Tax Declaration PDF Preview — @Model.TaxDeclarationNumber</span>
+            </div>
+            <span class="px-2.5 py-0.5 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 text-[10px] font-bold">
+                Generated via QuestPDF
+            </span>
+        </div>
+        <iframe src="@pdfUrl"
+                class="w-full h-[820px] bg-slate-100 dark:bg-stone-950"
+                title="Tax Declaration @Model.TaxDeclarationNumber PDF">
+        </iframe>
+    </div>
+</div>
+
+<script>
+    function switchDetailsTab(mode) {
+        const encoded = document.getElementById('tabEncodedDetails');
+        const pdf = document.getElementById('tabPdfPreview');
+        const btnEnc = document.getElementById('btnViewEncodedDetails');
+        const btnPdf = document.getElementById('btnViewPdfPreview');
+        if (!encoded || !pdf || !btnEnc || !btnPdf) return;
+
+        if (mode === 'pdf') {
+            encoded.classList.add('hidden');
+            pdf.classList.remove('hidden');
+            btnPdf.className = 'px-4 py-2.5 rounded-xl bg-emerald-600 text-white font-bold flex items-center gap-2 shadow-sm';
+            btnEnc.className = 'px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-700 dark:text-stone-300 font-bold flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-stone-800';
+        } else {
+            pdf.classList.add('hidden');
+            encoded.classList.remove('hidden');
+            btnEnc.className = 'px-4 py-2.5 rounded-xl bg-emerald-600 text-white font-bold flex items-center gap-2 shadow-sm';
+            btnPdf.className = 'px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-700 dark:text-stone-300 font-bold flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-stone-800';
+        }
+    }
+</script>

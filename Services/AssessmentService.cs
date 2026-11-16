@@ -444,7 +444,10 @@ public class AssessmentService : IAssessmentService
 
             // Resolve Building Depreciation Schedule entry from SQL table (with static schedule fallback)
             var normalizedClassCode = BuildingDepreciationSchedule.NormalizeClassificationCode(bldg.BuildingClassification, bldg.StructuralType);
-            bldg.BuildingClassification = normalizedClassCode;
+            if (string.IsNullOrWhiteSpace(bldg.BuildingClassification))
+            {
+                bldg.BuildingClassification = normalizedClassCode;
+            }
             var staticLookup = BuildingDepreciationSchedule.Lookup(normalizedClassCode, bldg.BuildingAgeYears, bldg.StructuralType);
 
             BuildingDepreciationScheduleItem? dbScheduleItem = null;
@@ -1183,11 +1186,14 @@ public class AssessmentService : IAssessmentService
                         {
                             if (elem.TryGetProperty("imagePath", out var ip)) imagePath = ip.GetString() ?? string.Empty;
                             else if (elem.TryGetProperty("ImagePath", out var ip2)) imagePath = ip2.GetString() ?? string.Empty;
+                            else if (elem.TryGetProperty("fileUrl", out var fu)) imagePath = fu.GetString() ?? string.Empty;
+                            else if (elem.TryGetProperty("FileUrl", out var fu2)) imagePath = fu2.GetString() ?? string.Empty;
                             else if (elem.TryGetProperty("url", out var u)) imagePath = u.GetString() ?? string.Empty;
 
                             if (elem.TryGetProperty("originalFileName", out var fn)) originalFileName = fn.GetString();
                             else if (elem.TryGetProperty("OriginalFileName", out var fn2)) originalFileName = fn2.GetString();
                             else if (elem.TryGetProperty("fileName", out var fn3)) originalFileName = fn3.GetString();
+                            else if (elem.TryGetProperty("FileName", out var fn4)) originalFileName = fn4.GetString();
 
                             if (elem.TryGetProperty("caption", out var cap)) caption = cap.GetString();
                             else if (elem.TryGetProperty("Caption", out var cap2)) caption = cap2.GetString();

@@ -203,11 +203,12 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                             Taxability = !string.IsNullOrWhiteSpace(p.Taxability) ? p.Taxability : "Taxable",
                             EffectivityYear = p.EffectivityYear ?? baseYear,
                             EffectivityQuarter = !string.IsNullOrWhiteSpace(p.EffectivityQuarter) ? p.EffectivityQuarter : "1st Quarter",
-                            PreviousTdNo = !string.IsNullOrWhiteSpace(p.BaseTDN) ? p.BaseTDN : (!string.IsNullOrWhiteSpace(request.PrevTDN) ? request.PrevTDN : (refTd != null ? (string.Equals(request.TransactionTypeCode, "DC", StringComparison.OrdinalIgnoreCase) ? $"Underlying Land TD #{refTd.TaxDeclarationNumber}" : refTd.TaxDeclarationNumber) : (string.Equals(request.TransactionTypeCode, "DC", StringComparison.OrdinalIgnoreCase) ? "None (Original Assessment)" : "N/A"))),
-                            PreviousPin = !string.IsNullOrWhiteSpace(request.PrevPIN) ? request.PrevPIN : (refTd != null ? refTd.PropertyIndexNumber : (string.Equals(request.TransactionTypeCode, "DC", StringComparison.OrdinalIgnoreCase) ? "None (Original Assessment)" : "N/A")),
-                            PreviousOwner = !string.IsNullOrWhiteSpace(request.PrevOwner) ? request.PrevOwner : (refTd != null ? refTd.OwnerName : (string.Equals(request.TransactionTypeCode, "DC", StringComparison.OrdinalIgnoreCase) ? "None (Original Assessment)" : "N/A")),
-                            PreviousMarketValue = refTd?.MarketValue ?? 0m,
-                            PreviousAssessedValue = refTd?.AssessedValue ?? 0m,
+                            PreviousTdNo = !string.IsNullOrWhiteSpace(p.PreviousTdNo) ? p.PreviousTdNo : (!string.IsNullOrWhiteSpace(p.BaseTDN) ? p.BaseTDN : (!string.IsNullOrWhiteSpace(request.PrevTDN) ? request.PrevTDN : (refTd != null ? (string.Equals(request.TransactionTypeCode, "DC", StringComparison.OrdinalIgnoreCase) ? $"Underlying Land TD #{refTd.TaxDeclarationNumber}" : refTd.TaxDeclarationNumber) : (string.Equals(request.TransactionTypeCode, "DC", StringComparison.OrdinalIgnoreCase) ? "None (Original Assessment)" : "N/A")))),
+                            PreviousPin = !string.IsNullOrWhiteSpace(p.PreviousPin) ? p.PreviousPin : (!string.IsNullOrWhiteSpace(request.PrevPIN) ? request.PrevPIN : (refTd != null ? refTd.PropertyIndexNumber : (string.Equals(request.TransactionTypeCode, "DC", StringComparison.OrdinalIgnoreCase) ? "None (Original Assessment)" : "N/A"))),
+                            PreviousOwner = !string.IsNullOrWhiteSpace(p.PreviousOwner) ? p.PreviousOwner : (!string.IsNullOrWhiteSpace(request.PrevOwner) ? request.PrevOwner : (refTd != null ? refTd.OwnerName : (string.Equals(request.TransactionTypeCode, "DC", StringComparison.OrdinalIgnoreCase) ? "None (Original Assessment)" : "N/A"))),
+                            PreviousMarketValue = p.PreviousMarketValue > 0 ? p.PreviousMarketValue : (refTd != null ? refTd.MarketValue : request.PrevMarketValue),
+                            PreviousAssessedValue = p.PreviousAssessedValue > 0 ? p.PreviousAssessedValue : (refTd != null ? refTd.AssessedValue : request.PrevAssessedValue),
+                            PreviousEffectivity = !string.IsNullOrWhiteSpace(p.PreviousEffectivity) ? p.PreviousEffectivity : (!string.IsNullOrWhiteSpace(request.PrevEffectivity) ? request.PrevEffectivity : (refTd != null && refTd.EffectivityYear > 0 ? $"{refTd.EffectivityQuarter} {refTd.EffectivityYear}".Trim() : null)),
                             Memoranda = !string.IsNullOrWhiteSpace(p.Memoranda) 
                                 ? p.Memoranda 
                                 : (string.Equals(request.TransactionTypeCode, "SD", StringComparison.OrdinalIgnoreCase)
@@ -220,8 +221,19 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                                                 ? $"Reassessed due to Physical Change (PC) Â· Renovation / Expansion under Assessment Request #{request.TrackingNumber}. Supersedes prior TD #{refTd?.TaxDeclarationNumber ?? request.PrevTDN} (PIN: #{refTd?.PropertyIndexNumber ?? request.PrevPIN}) with upward adjustment in Fair Market Value and Assessed Value following structural renovation/expansion."
                                                 : $"Created from Assessment Partition Request {request.TrackingNumber} (Partition {p.PartitionIndex}, Duplicated from {p.BaseTDN}).")))),
                             Status = (request.Status >= PropertyAssessmentStatus.Approved && request.Status != PropertyAssessmentStatus.Deferred) ? AssessmentStatus.Active : AssessmentStatus.Pending,
-                            DateEncoded = DateTime.Now,
-                            EncodedByName = request.Requestor ?? "System Appraiser",
+                            AppraisedByName = !string.IsNullOrWhiteSpace(p.AppraisedByName) ? (string.IsNullOrWhiteSpace(p.AppraisedByPosition) ? p.AppraisedByName : $"{p.AppraisedByName} ({p.AppraisedByPosition})") : "Elena G. Reyes (Property Appraiser)",
+                            DateAppraised = p.DateAppraised ?? DateTime.Now,
+                            AssessedByName = !string.IsNullOrWhiteSpace(p.AssessedByName) ? (string.IsNullOrWhiteSpace(p.AssessedByPosition) ? p.AssessedByName : $"{p.AssessedByName} ({p.AssessedByPosition})") : "Marcus Aurelius Santos (Assessment Officer)",
+                            DateAssessed = p.DateAssessed ?? DateTime.Now,
+                            RecommendingApprovalName = !string.IsNullOrWhiteSpace(p.RecommendingApprovalName) ? (string.IsNullOrWhiteSpace(p.RecommendingApprovalPosition) ? p.RecommendingApprovalName : $"{p.RecommendingApprovalName} ({p.RecommendingApprovalPosition})") : "Engr. Roberto M. Dela Rosa (Assistant Assessor)",
+                            DateRecommended = p.DateRecommended ?? DateTime.Now,
+                            ApprovedByName = !string.IsNullOrWhiteSpace(p.ApprovedByName) ? p.ApprovedByName : "Atty. Clarissa V. Mendoza (City Assessor)",
+                            DateApproved = p.DateApproved ?? DateTime.Now,
+                            EntryInRollName = !string.IsNullOrWhiteSpace(p.EntryInRollName) ? p.EntryInRollName : "Patricia Ann Villanueva",
+                            EntryInRollPosition = !string.IsNullOrWhiteSpace(p.EntryInRollPosition) ? p.EntryInRollPosition : "Assessment Roll Clerk",
+                            EntryInRollDate = p.EntryInRollDate ?? DateTime.Now,
+                            DateEncoded = p.DateEncoded ?? DateTime.Now,
+                            EncodedByName = !string.IsNullOrWhiteSpace(p.EncodedByName) ? (string.IsNullOrWhiteSpace(p.EncodedByPosition) ? p.EncodedByName : $"{p.EncodedByName} ({p.EncodedByPosition})") : (request.Requestor ?? "System Appraiser"),
 
                             // CAST Building & Structural characteristics
                             BuildingClassification = p.BuildingClassification,
@@ -934,6 +946,8 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                         td.PreviousMarketValue = isConsolidation ? motherTds.Sum(m => m.MarketValue) : primaryMother.MarketValue;
                     if (td.PreviousAssessedValue <= 0) 
                         td.PreviousAssessedValue = isConsolidation ? motherTds.Sum(m => m.AssessedValue) : primaryMother.AssessedValue;
+                    if (string.IsNullOrWhiteSpace(td.PreviousEffectivity) && primaryMother.EffectivityYear > 0)
+                        td.PreviousEffectivity = $"{primaryMother.EffectivityQuarter} {primaryMother.EffectivityYear}".Trim();
 
                     if (isTransfer)
                     {
@@ -1101,8 +1115,9 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                 PreviousTdNo = refTd?.TaxDeclarationNumber ?? conf?.BaseTDN ?? (!string.IsNullOrWhiteSpace(request.PrevTDN) ? request.PrevTDN : (string.Equals(request.TransactionTypeCode, "DC", StringComparison.OrdinalIgnoreCase) ? "None (Original Assessment)" : "N/A")),
                 PreviousPin = refTd?.PropertyIndexNumber ?? (!string.IsNullOrWhiteSpace(request.PrevPIN) ? request.PrevPIN : (string.Equals(request.TransactionTypeCode, "DC", StringComparison.OrdinalIgnoreCase) ? "None (Original Assessment)" : "N/A")),
                 PreviousOwner = refTd?.OwnerName ?? (!string.IsNullOrWhiteSpace(request.PrevOwner) ? request.PrevOwner : (string.Equals(request.TransactionTypeCode, "DC", StringComparison.OrdinalIgnoreCase) ? "None (Original Assessment)" : "N/A")),
-                PreviousMarketValue = refTd?.MarketValue ?? 0m,
-                PreviousAssessedValue = refTd?.AssessedValue ?? 0m,
+                PreviousMarketValue = refTd != null ? refTd.MarketValue : request.PrevMarketValue,
+                PreviousAssessedValue = refTd != null ? refTd.AssessedValue : request.PrevAssessedValue,
+                PreviousEffectivity = !string.IsNullOrWhiteSpace(request.PrevEffectivity) ? request.PrevEffectivity : (refTd != null && refTd.EffectivityYear > 0 ? $"{refTd.EffectivityQuarter} {refTd.EffectivityYear}".Trim() : null),
                 Memoranda = !string.IsNullOrWhiteSpace(conf?.Memoranda) 
                     ? conf.Memoranda 
                     : (string.Equals(request.TransactionTypeCode, "SD", StringComparison.OrdinalIgnoreCase)
@@ -1120,8 +1135,19 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                                             : $"Created from Partition Request {request.TrackingNumber} (Partition {letterSuffix} of {partitionCount}). Previous TD: {request.PrevTDN}")))))),
                 TransactionCode = request.TransactionTypeCode,
                 Status = (request.Status >= PropertyAssessmentStatus.Approved && request.Status != PropertyAssessmentStatus.Deferred) ? AssessmentStatus.Active : AssessmentStatus.Pending,
-                DateEncoded = DateTime.Now,
-                EncodedByName = request.Requestor ?? "System Appraiser",
+                AppraisedByName = !string.IsNullOrWhiteSpace(conf?.AppraisedByName) ? (string.IsNullOrWhiteSpace(conf.AppraisedByPosition) ? conf.AppraisedByName : $"{conf.AppraisedByName} ({conf.AppraisedByPosition})") : "Elena G. Reyes (Property Appraiser)",
+                DateAppraised = conf?.DateAppraised ?? DateTime.Now,
+                AssessedByName = !string.IsNullOrWhiteSpace(conf?.AssessedByName) ? (string.IsNullOrWhiteSpace(conf.AssessedByPosition) ? conf.AssessedByName : $"{conf.AssessedByName} ({conf.AssessedByPosition})") : "Marcus Aurelius Santos (Assessment Officer)",
+                DateAssessed = conf?.DateAssessed ?? DateTime.Now,
+                RecommendingApprovalName = !string.IsNullOrWhiteSpace(conf?.RecommendingApprovalName) ? (string.IsNullOrWhiteSpace(conf.RecommendingApprovalPosition) ? conf.RecommendingApprovalName : $"{conf.RecommendingApprovalName} ({conf.RecommendingApprovalPosition})") : "Engr. Roberto M. Dela Rosa (Assistant Assessor)",
+                DateRecommended = conf?.DateRecommended ?? DateTime.Now,
+                ApprovedByName = !string.IsNullOrWhiteSpace(conf?.ApprovedByName) ? conf.ApprovedByName : "Atty. Clarissa V. Mendoza (City Assessor)",
+                DateApproved = conf?.DateApproved ?? DateTime.Now,
+                EntryInRollName = !string.IsNullOrWhiteSpace(conf?.EntryInRollName) ? conf.EntryInRollName : "Patricia Ann Villanueva",
+                EntryInRollPosition = !string.IsNullOrWhiteSpace(conf?.EntryInRollPosition) ? conf.EntryInRollPosition : "Assessment Roll Clerk",
+                EntryInRollDate = conf?.EntryInRollDate ?? DateTime.Now,
+                DateEncoded = conf?.DateEncoded ?? DateTime.Now,
+                EncodedByName = !string.IsNullOrWhiteSpace(conf?.EncodedByName) ? (string.IsNullOrWhiteSpace(conf.EncodedByPosition) ? conf.EncodedByName : $"{conf.EncodedByName} ({conf.EncodedByPosition})") : (request.Requestor ?? "System Appraiser"),
 
                 // Building Specs
                 OccupancyPermitNo = conf?.OccupancyPermitNo ?? string.Empty,

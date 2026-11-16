@@ -108,6 +108,15 @@ public class PropertyAssessmentRequest
     [Display(Name = "Previous Owner / Declared Owner")]
     public string? PrevOwner { get; set; }
 
+    [Display(Name = "Previous Market Value")]
+    public decimal PrevMarketValue { get; set; }
+
+    [Display(Name = "Previous Assessed Value")]
+    public decimal PrevAssessedValue { get; set; }
+
+    [Display(Name = "Previous Effectivity of Assessment")]
+    public string? PrevEffectivity { get; set; }
+
     [Display(Name = "Lot No. / Survey No.")]
     public string? LotNo { get; set; } = "N/A";
 
@@ -452,4 +461,31 @@ public class AssessmentPartitionItem
     public int? BackTaxesYearTo { get; set; }
     public string? Memoranda { get; set; }
     public string? PropertyImagesJson { get; set; }
+
+    // Signatories & Assessment Roll Approval
+    public string? AppraisedByName { get; set; }
+    public string? AppraisedByPosition { get; set; }
+    public DateTime? DateAppraised { get; set; }
+    public string? AssessedByName { get; set; }
+    public string? AssessedByPosition { get; set; }
+    public DateTime? DateAssessed { get; set; }
+    public string? RecommendingApprovalName { get; set; }
+    public string? RecommendingApprovalPosition { get; set; }
+    public DateTime? DateRecommended { get; set; }
+    public string? ApprovedByName { get; set; }
+    public DateTime? DateApproved { get; set; }
+    public string? EntryInRollName { get; set; }
+    public string? EntryInRollPosition { get; set; }
+    public DateTime? EntryInRollDate { get; set; }
+    public string? EncodedByName { get; set; }
+    public string? EncodedByPosition { get; set; }
+    public DateTime? DateEncoded { get; set; }
+
+    // Records of Superseded Assessment
+    public string? PreviousTdNo { get; set; }
+    public string? PreviousPin { get; set; }
+    public string? PreviousOwner { get; set; }
+    public decimal PreviousMarketValue { get; set; }
+    public decimal PreviousAssessedValue { get; set; }
+    public string? PreviousEffectivity { get; set; }
 }

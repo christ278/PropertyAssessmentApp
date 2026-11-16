@@ -203,40 +203,40 @@ public class TaxDeclaration
 
     // Signatories (from Creation to Approval)
     [Display(Name = "Appraised By Name")]
-    public string AppraisedByName { get; set; } = "Elena G. Reyes (Property Appraiser)";
+    public string? AppraisedByName { get; set; } = "Elena G. Reyes (Property Appraiser)";
 
     [Display(Name = "Date Appraised")]
     public DateTime? DateAppraised { get; set; } = DateTime.Now;
 
     [Display(Name = "Assessed By Name")]
-    public string AssessedByName { get; set; } = "Marcus Aurelius Santos (Assessment Officer)";
+    public string? AssessedByName { get; set; } = "Marcus Aurelius Santos (Assessment Officer)";
 
     [Display(Name = "Date Assessed")]
     public DateTime DateAssessed { get; set; } = DateTime.Now;
 
     [Display(Name = "Recommending Approval Name")]
-    public string RecommendingApprovalName { get; set; } = "Engr. Roberto M. Dela Rosa (Assistant Assessor)";
+    public string? RecommendingApprovalName { get; set; } = "Engr. Roberto M. Dela Rosa (Assistant Assessor)";
 
     [Display(Name = "Date Recommended for Approval")]
     public DateTime? DateRecommended { get; set; } = DateTime.Now;
 
     [Display(Name = "Approved By Name")]
-    public string ApprovedByName { get; set; } = "Atty. Clarissa V. Mendoza (City Assessor)";
+    public string? ApprovedByName { get; set; } = "Atty. Clarissa V. Mendoza (City Assessor)";
 
     [Display(Name = "Date Approved")]
     public DateTime? DateApproved { get; set; } = DateTime.Now;
 
     [Display(Name = "Entry in Roll by Name")]
-    public string EntryInRollName { get; set; } = "Patricia Ann Villanueva";
+    public string? EntryInRollName { get; set; } = "Patricia Ann Villanueva";
 
     [Display(Name = "Entry in Roll Position")]
-    public string EntryInRollPosition { get; set; } = "Assessment Roll Clerk";
+    public string? EntryInRollPosition { get; set; } = "Assessment Roll Clerk";
 
     [Display(Name = "Entry in Roll Date")]
     public DateTime? EntryInRollDate { get; set; } = DateTime.Now;
 
     [Display(Name = "Encoded By Name")]
-    public string EncodedByName { get; set; } = "Patricia Ann Villanueva";
+    public string? EncodedByName { get; set; } = "Patricia Ann Villanueva";
 
     [Display(Name = "Date Encoded")]
     public DateTime? DateEncoded { get; set; } = DateTime.Now;
@@ -355,7 +355,13 @@ public class TaxDeclaration
                 BackTaxesYearFrom = _backTaxesFrom,
                 BackTaxesYearTo = _backTaxesTo,
                 FloorBreakdownJson = _bldgFloorJson,
-                AdditionalItemsJson = _bldgAddlJson
+                AdditionalItemsJson = _bldgAddlJson,
+                PreviousTdNo = _prevTdNo,
+                PreviousPin = _prevPin,
+                PreviousOwner = _prevOwner,
+                PreviousMarketValue = _prevMv,
+                PreviousAssessedValue = _prevAv,
+                PreviousEffectivity = _prevEff
             };
         }
         return BuildingDetails;
@@ -413,7 +419,8 @@ public class TaxDeclaration
                 PreviousPin = _prevPin,
                 PreviousOwner = _prevOwner,
                 PreviousMarketValue = _prevMv,
-                PreviousAssessedValue = _prevAv
+                PreviousAssessedValue = _prevAv,
+                PreviousEffectivity = _prevEff
             };
         }
         return LandDetails;
@@ -475,7 +482,8 @@ public class TaxDeclaration
                 PreviousPin = _prevPin,
                 PreviousOwner = _prevOwner,
                 PreviousMarketValue = _prevMv,
-                PreviousAssessedValue = _prevAv
+                PreviousAssessedValue = _prevAv,
+                PreviousEffectivity = _prevEff
             };
         }
         return MachineryDetails;
@@ -1135,17 +1143,18 @@ public class TaxDeclaration
     [NotMapped] public int TaxPeriodToYear { get; set; } = DateTime.Now.Year + 3;
 
     // Superseded Assessment
-    [NotMapped] public string? PreviousTdNo { get => LandDetails?.PreviousTdNo ?? MachineryDetails?.PreviousTdNo ?? _prevTdNo; set { _prevTdNo = value; if (LandDetails != null) LandDetails.PreviousTdNo = value; if (MachineryDetails != null) MachineryDetails.PreviousTdNo = value; } }
+    [NotMapped] public string? PreviousTdNo { get => BuildingDetails?.PreviousTdNo ?? LandDetails?.PreviousTdNo ?? MachineryDetails?.PreviousTdNo ?? _prevTdNo; set { _prevTdNo = value; if (BuildingDetails != null) BuildingDetails.PreviousTdNo = value; if (LandDetails != null) LandDetails.PreviousTdNo = value; if (MachineryDetails != null) MachineryDetails.PreviousTdNo = value; } }
     private string? _prevTdNo;
-    [NotMapped] public decimal PreviousMarketValue { get => LandDetails?.PreviousMarketValue ?? MachineryDetails?.PreviousMarketValue ?? _prevMv; set { _prevMv = value; if (LandDetails != null) LandDetails.PreviousMarketValue = value; if (MachineryDetails != null) MachineryDetails.PreviousMarketValue = value; } }
+    [NotMapped] public decimal PreviousMarketValue { get => BuildingDetails?.PreviousMarketValue ?? LandDetails?.PreviousMarketValue ?? MachineryDetails?.PreviousMarketValue ?? _prevMv; set { _prevMv = value; if (BuildingDetails != null) BuildingDetails.PreviousMarketValue = value; if (LandDetails != null) LandDetails.PreviousMarketValue = value; if (MachineryDetails != null) MachineryDetails.PreviousMarketValue = value; } }
     private decimal _prevMv;
-    [NotMapped] public string? PreviousOwner { get => LandDetails?.PreviousOwner ?? MachineryDetails?.PreviousOwner ?? _prevOwner; set { _prevOwner = value; if (LandDetails != null) LandDetails.PreviousOwner = value; if (MachineryDetails != null) MachineryDetails.PreviousOwner = value; } }
+    [NotMapped] public string? PreviousOwner { get => BuildingDetails?.PreviousOwner ?? LandDetails?.PreviousOwner ?? MachineryDetails?.PreviousOwner ?? _prevOwner; set { _prevOwner = value; if (BuildingDetails != null) BuildingDetails.PreviousOwner = value; if (LandDetails != null) LandDetails.PreviousOwner = value; if (MachineryDetails != null) MachineryDetails.PreviousOwner = value; } }
     private string? _prevOwner;
-    [NotMapped] public string? PreviousPin { get => LandDetails?.PreviousPin ?? MachineryDetails?.PreviousPin ?? _prevPin; set { _prevPin = value; if (LandDetails != null) LandDetails.PreviousPin = value; if (MachineryDetails != null) MachineryDetails.PreviousPin = value; } }
+    [NotMapped] public string? PreviousPin { get => BuildingDetails?.PreviousPin ?? LandDetails?.PreviousPin ?? MachineryDetails?.PreviousPin ?? _prevPin; set { _prevPin = value; if (BuildingDetails != null) BuildingDetails.PreviousPin = value; if (LandDetails != null) LandDetails.PreviousPin = value; if (MachineryDetails != null) MachineryDetails.PreviousPin = value; } }
     private string? _prevPin;
-    [NotMapped] public decimal PreviousAssessedValue { get => LandDetails?.PreviousAssessedValue ?? MachineryDetails?.PreviousAssessedValue ?? _prevAv; set { _prevAv = value; if (LandDetails != null) LandDetails.PreviousAssessedValue = value; if (MachineryDetails != null) MachineryDetails.PreviousAssessedValue = value; } }
+    [NotMapped] public decimal PreviousAssessedValue { get => BuildingDetails?.PreviousAssessedValue ?? LandDetails?.PreviousAssessedValue ?? MachineryDetails?.PreviousAssessedValue ?? _prevAv; set { _prevAv = value; if (BuildingDetails != null) BuildingDetails.PreviousAssessedValue = value; if (LandDetails != null) LandDetails.PreviousAssessedValue = value; if (MachineryDetails != null) MachineryDetails.PreviousAssessedValue = value; } }
     private decimal _prevAv;
-    [NotMapped] public string? PreviousEffectivity { get; set; }
+    [NotMapped] public string? PreviousEffectivity { get => BuildingDetails?.PreviousEffectivity ?? LandDetails?.PreviousEffectivity ?? MachineryDetails?.PreviousEffectivity ?? _prevEff; set { _prevEff = value; if (BuildingDetails != null) BuildingDetails.PreviousEffectivity = value; if (LandDetails != null) LandDetails.PreviousEffectivity = value; if (MachineryDetails != null) MachineryDetails.PreviousEffectivity = value; } }
+    private string? _prevEff;
 }
 
 public class AssessmentCalculatorViewModel
