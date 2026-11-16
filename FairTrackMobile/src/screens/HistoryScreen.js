@@ -241,33 +241,36 @@ export const HistoryScreen = ({ navigation }) => {
     const isTransferred = (item.actionType || '').toUpperCase() === 'TRANSFERRED';
     const isDraft = ['DRAFT', 'DRAFT_TRANSFER'].includes((item.actionType || '').toUpperCase());
 
-    // Kind Badge Theme
-    let kindColor = colors.primary;
-    let kindIcon = 'business-outline';
-    let kindLabel = 'Building FAAS';
+    const isLand = pKind === 'Land';
+    const isMach = pKind === 'Machinery';
+    const kindLabel = isLand ? 'Land' : isMach ? 'Machinery' : 'Building';
+    const kindColor = isLand ? (isDarkMode ? '#2dd4bf' : '#0f766e') :
+                      isMach ? (isDarkMode ? '#818cf8' : '#4f46e5') :
+                      (isDarkMode ? '#fbbf24' : '#d97706');
+    const kindBg = isLand ? (isDarkMode ? '#134e4a44' : '#ccfbf1') :
+                   isMach ? (isDarkMode ? '#312e8144' : '#e0e7ff') :
+                   (isDarkMode ? '#78350f44' : '#fef3c7');
+    const kindIcon = isLand ? 'leaf-outline' : isMach ? 'construct-outline' : 'business-outline';
 
-    if (pKind === 'Land') {
-      kindColor = colors.accentGold;
-      kindIcon = 'leaf-outline';
-      kindLabel = 'Land Appraisal';
-    } else if (pKind === 'Machinery') {
-      kindColor = '#6366f1';
-      kindIcon = 'construct-outline';
-      kindLabel = 'Machinery FAAS';
-    }
+    const isInspection = (item.trackingNo || '').toUpperCase().startsWith('RFI-') ||
+                         (item.requestType && item.requestType.toLowerCase().includes('inspection'));
+    const moduleLabel = isInspection ? 'Inspection Request' : 'Property Assessment';
+    const moduleIcon = isInspection ? 'search-circle-outline' : 'document-text-outline';
+    const moduleColor = isInspection ? (isDarkMode ? '#60a5fa' : '#2563eb') : (isDarkMode ? '#a78bfa' : '#7c3aed');
+    const moduleBg = isInspection ? (isDarkMode ? '#1e3a8a33' : '#eff6ff') : (isDarkMode ? '#4c1d9533' : '#f5f3ff');
 
-    // Status Badge Theme
-    let statusBg = isDarkMode ? '#064e3b' : '#dcfce7';
-    let statusColor = isDarkMode ? '#34d399' : '#15803d';
-    let statusIcon = 'checkmark-done-circle';
-    let statusText = 'Transferred';
+    // Status Badge Theme (Only shown for Transferred or Synced)
+    let statusBg = null;
+    let statusColor = null;
+    let statusIcon = null;
+    let statusText = null;
 
-    if (isDraft) {
-      statusBg = isDarkMode ? '#78350f' : '#fef3c7';
-      statusColor = isDarkMode ? '#fbbf24' : '#b45309';
-      statusIcon = 'cloud-offline';
-      statusText = 'Saved Draft';
-    } else if (!isTransferred) {
+    if (isTransferred) {
+      statusBg = isDarkMode ? '#064e3b' : '#dcfce7';
+      statusColor = isDarkMode ? '#34d399' : '#15803d';
+      statusIcon = 'checkmark-done-circle';
+      statusText = 'Transferred';
+    } else if (!isDraft) {
       statusBg = isDarkMode ? '#0f766e' : '#ccfbf1';
       statusColor = isDarkMode ? '#2dd4bf' : '#0f766e';
       statusIcon = 'cloud-done';
@@ -281,7 +284,7 @@ export const HistoryScreen = ({ navigation }) => {
     ].filter(Boolean).join(', ');
 
     return (
-      <TouchableOpacity
+      <View
         style={[
           styles.card,
           {
@@ -290,40 +293,22 @@ export const HistoryScreen = ({ navigation }) => {
           },
           shadows.card
         ]}
-        activeOpacity={0.85}
-        onPress={() => handleOpenForm(item)}
       >
-        {/* Card Header: Tracking No, Badges & 3-Dots */}
+        {/* Card Header: Tracking No + Status & 3-Dots */}
         <View style={styles.cardHeader}>
-          <View style={{ flex: 1, paddingRight: 8 }}>
-            <View style={styles.trackingHeaderRow}>
-              <Text style={[styles.trackingNoText, { color: colors.textDark }]} numberOfLines={1}>
-                {item.trackingNo || 'Unassigned Tracking'}
-              </Text>
-              <View style={[styles.partitionBadge, { backgroundColor: isDarkMode ? '#1e293b' : '#f1f5f9' }]}>
-                <Text style={[styles.partitionBadgeText, { color: colors.textDark }]}>
-                  Part {item.partitionLetter || 'A'}
-                </Text>
-              </View>
-              <View style={[styles.kindBadge, { backgroundColor: kindColor + '18' }]}>
-                <Ionicons name={kindIcon} size={11} color={kindColor} />
-                <Text style={[styles.kindBadgeText, { color: kindColor }]}>
-                  {kindLabel.toUpperCase()}
-                </Text>
-              </View>
-            </View>
-            <Text style={[styles.typeBadgeText, { color: colors.textMuted }]}>
-              {kindLabel} • History Archive
-            </Text>
-          </View>
+          <Text style={[styles.trackingNoText, { color: colors.textDark }]} numberOfLines={1}>
+            {item.trackingNo || 'Unassigned'}
+          </Text>
 
           <View style={styles.headerRightActions}>
-            <View style={[styles.statusBadge, { backgroundColor: statusBg }]}>
-              <Ionicons name={statusIcon} size={11} color={statusColor} />
-              <Text style={[styles.statusBadgeText, { color: statusColor }]}>
-                {statusText}
-              </Text>
-            </View>
+            {statusText ? (
+              <View style={[styles.statusBadge, { backgroundColor: statusBg }]}>
+                <Ionicons name={statusIcon} size={11} color={statusColor} />
+                <Text style={[styles.statusBadgeText, { color: statusColor }]}>
+                  {statusText}
+                </Text>
+              </View>
+            ) : null}
 
             <TouchableOpacity
               style={[
@@ -345,91 +330,109 @@ export const HistoryScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Card Body: Structured Rows */}
+        {/* Workflow & Property Hierarchy Indicators: [Inspection Request / Property Assessment] > [Land / Building / Machinery] */}
+        <View style={styles.categoryBadgeRow}>
+          <View style={[styles.modulePill, { backgroundColor: moduleBg }]}>
+            <Ionicons name={moduleIcon} size={12} color={moduleColor} />
+            <Text style={[styles.modulePillText, { color: moduleColor }]}>{moduleLabel}</Text>
+          </View>
+
+          <Ionicons name="chevron-forward" size={11} color={colors.textMuted} />
+
+          <View style={[styles.kindPill, { backgroundColor: kindBg }]}>
+            <Ionicons name={kindIcon} size={11} color={kindColor} />
+            <Text style={[styles.kindPillText, { color: kindColor }]}>{kindLabel}</Text>
+          </View>
+
+          <View style={[styles.partitionBadge, { backgroundColor: isDarkMode ? '#1e293b' : '#f1f5f9' }]}>
+            <Text style={[styles.partitionBadgeText, { color: colors.textMuted }]}>
+              PART {item.partitionLetter || 'A'}
+            </Text>
+          </View>
+        </View>
+
+        {/* Card Body: Owner & Clean Secondary Metadata */}
         <View style={styles.cardBody}>
-          {/* Row 1: Owner / Declarant */}
-          <View style={styles.infoRow}>
-            <Ionicons name="person-circle-outline" size={15} color={colors.textDark} />
-            <Text style={[styles.ownerText, { color: colors.textDark }]} numberOfLines={1}>
-              Owner / Declarant: {item.ownerName || 'Unknown Owner'}
-            </Text>
-          </View>
+          <Text style={[styles.ownerText, { color: colors.textDark }]} numberOfLines={1}>
+            {item.ownerName || 'Unknown Owner'}
+          </Text>
 
-          {/* Row 2: Location */}
-          <View style={styles.infoRow}>
-            <Ionicons name="location-outline" size={14} color={colors.textMuted} />
-            <Text style={[styles.infoText, { color: colors.textMuted }]} numberOfLines={1}>
-              {fullLocation || 'No location specified'}
-            </Text>
-          </View>
+          {fullLocation ? (
+            <View style={styles.metaRow}>
+              <Ionicons name="location-outline" size={12} color={colors.textMuted} />
+              <Text style={[styles.metaText, { color: colors.textMuted }]} numberOfLines={1}>
+                {fullLocation}
+              </Text>
+            </View>
+          ) : null}
 
-          {/* Row 3: Reference (ARP / PIN / TDN) */}
-          <View style={styles.infoRow}>
-            <Ionicons name="pricetag-outline" size={14} color={colors.textMuted} />
-            <Text style={[styles.infoText, { color: colors.textMuted }]}>
-              ARP: {item.arpNo || 'N/A'} • PIN: {item.pin || 'N/A'}
-              {item.declarationNo && item.declarationNo !== 'N/A' ? ` • TDN: ${item.declarationNo}` : ''}
-            </Text>
-          </View>
+          {(item.arpNo || item.pin || item.declarationNo) ? (
+            <View style={styles.metaRow}>
+              <Ionicons name="pricetag-outline" size={12} color={colors.textMuted} />
+              <Text style={[styles.metaText, { color: colors.textMuted }]} numberOfLines={1}>
+                {[
+                  item.arpNo ? `ARP: ${item.arpNo}` : null,
+                  item.pin ? `PIN: ${item.pin}` : null,
+                  item.declarationNo && item.declarationNo !== 'N/A' ? `TDN: ${item.declarationNo}` : null
+                ].filter(Boolean).join(' • ')}
+              </Text>
+            </View>
+          ) : null}
 
-          {/* Row 4: Valuation Box */}
-          <View
-            style={[
-              styles.valuationContainer,
-              {
-                backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
-                borderColor: colors.border
-              }
-            ]}
-          >
-            <View style={styles.valCol}>
-              <Text style={[styles.valLabel, { color: colors.textMuted }]}>MARKET VALUE</Text>
-              <Text style={[styles.valValue, { color: colors.textDark }]} numberOfLines={1}>
+          {/* Sleek Dual Valuation Micro-Tiles */}
+          <View style={styles.metricTileRow}>
+            <View
+              style={[
+                styles.metricTile,
+                {
+                  backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+                  borderColor: colors.border
+                }
+              ]}
+            >
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>MARKET VALUE</Text>
+              <Text style={[styles.metricValue, { color: colors.textDark }]} numberOfLines={1}>
                 {formatCurrency(item.marketValue)}
               </Text>
             </View>
-            <View style={[styles.valDivider, { backgroundColor: isDarkMode ? '#334155' : '#cbd5e1' }]} />
-            <View style={styles.valCol}>
-              <Text style={[styles.valLabel, { color: colors.textMuted }]}>ASSESSED VALUE</Text>
-              <Text style={[styles.valValue, { color: colors.accentGreen }]} numberOfLines={1}>
+
+            <View
+              style={[
+                styles.metricTile,
+                {
+                  backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+                  borderColor: colors.border
+                }
+              ]}
+            >
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>ASSESSED VALUE</Text>
+              <Text style={[styles.metricValue, { color: colors.accentGreen }]} numberOfLines={1}>
                 {formatCurrency(item.assessedValue)}
               </Text>
             </View>
           </View>
         </View>
 
-        {/* Card Footer: Timestamp, Photos & Quick View Action */}
+        {/* Card Footer: Timestamp & Photo indicator */}
         <View style={[styles.cardFooter, { borderTopColor: isDarkMode ? '#1e293b' : '#f1f5f9' }]}>
-          <View style={styles.footerInfo}>
+          <View style={styles.footerLeft}>
             <View style={styles.timeRow}>
-              <Ionicons name="time-outline" size={13} color={colors.textMuted} />
+              <Ionicons name="time-outline" size={12} color={colors.textMuted} />
               <Text style={[styles.timeText, { color: colors.textMuted }]} numberOfLines={1}>
-                Recorded {formatFriendlyDate(item.savedAt)}
+                {formatFriendlyDate(item.savedAt)}
               </Text>
             </View>
             {item.attachmentsCount > 0 ? (
-              <View style={styles.photoCountRow}>
-                <Ionicons name="images-outline" size={12} color={colors.accentGold} />
-                <Text style={[styles.photoCountText, { color: colors.accentGold }]}>
+              <View style={[styles.photoCountBadge, { backgroundColor: isDarkMode ? '#78350f33' : '#fef3c7' }]}>
+                <Ionicons name="images-outline" size={11} color={colors.accentGold} />
+                <Text style={[styles.photoCountBadgeText, { color: colors.accentGold }]}>
                   {item.attachmentsCount} photo{item.attachmentsCount > 1 ? 's' : ''}
                 </Text>
               </View>
             ) : null}
           </View>
-
-          <TouchableOpacity
-            style={[styles.openFormBtn, { backgroundColor: colors.primary }]}
-            onPress={(e) => {
-              e.stopPropagation();
-              handleOpenForm(item);
-            }}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="document-text-outline" size={13} color="#ffffff" />
-            <Text style={styles.openFormBtnText}>View Form</Text>
-          </TouchableOpacity>
         </View>
-      </TouchableOpacity>
+      </View>
     );
   };
 
@@ -985,38 +988,56 @@ const styles = StyleSheet.create({
   },
   cardHeader: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    paddingBottom: 8,
+    marginBottom: 8
   },
-  trackingHeaderRow: {
+  cardHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    flex: 1,
+    marginRight: 6
+  },
+  categoryBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
     flexWrap: 'wrap'
+  },
+  modulePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 6
+  },
+  modulePillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.2
+  },
+  kindPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 6
+  },
+  kindPillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.2
   },
   trackingNoText: {
     fontSize: 14,
-    fontFamily: 'monospace',
     fontWeight: '800'
-  },
-  typeBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    marginTop: 2
-  },
-  kindBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 5,
-    gap: 3
-  },
-  kindBadgeText: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.3
   },
   partitionBadge: {
     paddingHorizontal: 6,
@@ -1036,7 +1057,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 3.5,
     borderRadius: 6,
     gap: 4
   },
@@ -1053,61 +1074,61 @@ const styles = StyleSheet.create({
     borderWidth: 1
   },
   cardBody: {
-    gap: 6,
-    marginBottom: 8
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6
+    gap: 4,
+    marginBottom: 6
   },
   ownerText: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '800',
-    flex: 1
-  },
-  infoText: {
-    fontSize: 12,
-    fontWeight: '600',
-    flex: 1
-  },
-  valuationContainer: {
-    flexDirection: 'row',
-    borderRadius: 8,
-    borderWidth: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    marginTop: 4
-  },
-  valCol: {
-    flex: 1
-  },
-  valLabel: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.5,
     marginBottom: 2
   },
-  valValue: {
-    fontSize: 13,
-    fontWeight: '800'
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5
   },
-  valDivider: {
-    width: 1,
-    marginHorizontal: 12
+  metaText: {
+    fontSize: 12,
+    fontWeight: '500',
+    flex: 1
+  },
+  metricTileRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 6
+  },
+  metricTile: {
+    flex: 1,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1
+  },
+  metricLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.5
+  },
+  metricValue: {
+    fontSize: 13,
+    fontWeight: '800',
+    marginTop: 2
   },
   cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 4,
-    paddingTop: 10,
+    marginTop: 8,
+    paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#e2e8f018'
+    borderTopColor: '#f1f5f9'
   },
-  footerInfo: {
+  footerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     flex: 1,
-    marginRight: 8
+    marginRight: 6
   },
   timeRow: {
     flexDirection: 'row',
@@ -1116,17 +1137,18 @@ const styles = StyleSheet.create({
   },
   timeText: {
     fontSize: 11,
-    fontWeight: '500',
-    flexShrink: 1
+    fontWeight: '500'
   },
-  photoCountRow: {
+  photoCountBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginTop: 2
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 5
   },
-  photoCountText: {
-    fontSize: 11,
+  photoCountBadgeText: {
+    fontSize: 10,
     fontWeight: '700'
   },
   openFormBtn: {
@@ -1135,7 +1157,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 6,
-    gap: 4
+    gap: 3
   },
   openFormBtnText: {
     fontSize: 11,

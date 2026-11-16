@@ -492,16 +492,25 @@ export const TransactionsScreen = ({ navigation }) => {
     const isDownloaded = isTransactionDownloaded(item.TrackingNo, item.FormworkflowId);
     const hasPending = typeof hasPendingEdits === 'function' && hasPendingEdits(item.TrackingNo, item.FormworkflowId);
     const isSyncedDraft = typeof isTransactionSyncedDraft === 'function' && isTransactionSyncedDraft(item.TrackingNo, item.FormworkflowId);
-    const isThisDownloading = downloadingId === item.FormworkflowId;
 
-    const kindLabel = item.TransactionTypeId === 2 ? 'Building FAAS' :
-                      item.TransactionTypeId === 1 ? 'Land Appraisal' :
-                      item.TransactionTypeId === 3 ? 'Machinery FAAS' : 'Property Assessment';
-    const moduleLabel = (item.RequestType && item.RequestType.toLowerCase().includes('inspection')) ||
-                        (item.TrackingNo || '').toUpperCase().startsWith('RFI-')
-                        ? 'Field Inspection'
-                        : 'Property Assessment';
-    const typeLabel = `${moduleLabel} • ${kindLabel}`;
+    const isLand = item.TransactionTypeId === 1;
+    const isMach = item.TransactionTypeId === 3;
+    const kindLabel = isLand ? 'Land' : isMach ? 'Machinery' : 'Building';
+    const kindColor = isLand ? (isDarkMode ? '#2dd4bf' : '#0f766e') :
+                      isMach ? (isDarkMode ? '#818cf8' : '#4f46e5') :
+                      (isDarkMode ? '#fbbf24' : '#d97706');
+    const kindBg = isLand ? (isDarkMode ? '#134e4a44' : '#ccfbf1') :
+                   isMach ? (isDarkMode ? '#312e8144' : '#e0e7ff') :
+                   (isDarkMode ? '#78350f44' : '#fef3c7');
+    const kindIcon = isLand ? 'leaf-outline' : isMach ? 'construct-outline' : 'business-outline';
+
+    const isInspection = (item.RequestType && item.RequestType.toLowerCase().includes('inspection')) ||
+                         (item.TrackingNo || '').toUpperCase().startsWith('RFI-');
+    const moduleLabel = isInspection ? 'Inspection Request' : 'Property Assessment';
+    const moduleIcon = isInspection ? 'search-circle-outline' : 'document-text-outline';
+    const moduleColor = isInspection ? (isDarkMode ? '#60a5fa' : '#2563eb') : (isDarkMode ? '#a78bfa' : '#7c3aed');
+    const moduleBg = isInspection ? (isDarkMode ? '#1e3a8a33' : '#eff6ff') : (isDarkMode ? '#4c1d9533' : '#f5f3ff');
+
     const ownerOrApplicant = item.Owner || item.Requestor || 'Property Owner';
     const hasDistinctApplicant = item.Requestor && item.Owner && item.Requestor.toLowerCase() !== item.Owner.toLowerCase();
     const showReferenceNo = item.ARPNo && item.ARPNo !== item.TrackingNo;
@@ -517,37 +526,13 @@ export const TransactionsScreen = ({ navigation }) => {
           shadows.card
         ]}
       >
+        {/* Card Header: Tracking No + Status & 3-Dots */}
         <View style={styles.cardHeader}>
-          <View style={{ flex: 1, paddingRight: 6 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-              <Text style={[styles.trackingNoText, { color: colors.textDark }]}>{item.TrackingNo || 'Unassigned Tracking No.'}</Text>
-              {!item.HasPartition ? (
-                <View style={styles.noPartitionBadge}>
-                  <Ionicons name="lock-closed" size={10} color="#b91c1c" />
-                  <Text style={styles.noPartitionBadgeText}>NO PARTITION</Text>
-                </View>
-              ) : null}
-              {item.HasPartition && item.PartitionCount > 1 ? (
-                <View style={styles.multiPartitionBadge}>
-                  <Ionicons name="layers-outline" size={10} color="#0369a1" />
-                  <Text style={styles.multiPartitionBadgeText}>{item.PartitionCount} PARTITIONS</Text>
-                </View>
-              ) : null}
-              {hasPending ? (
-                <View style={styles.pendingEditsBadge}>
-                  <Ionicons name="cloud-upload" size={10} color="#b45309" />
-                  <Text style={styles.pendingEditsBadgeText}>UNSYNCED EDITS</Text>
-                </View>
-              ) : isSyncedDraft ? (
-                <View style={[styles.syncedDraftBadge, isDarkMode && { backgroundColor: '#064e3b33', borderColor: '#065f46' }]}>
-                  <Ionicons name="checkmark-done" size={10} color={isDarkMode ? '#34d399' : '#059669'} />
-                  <Text style={[styles.syncedDraftBadgeText, isDarkMode && { color: '#34d399' }]}>SYNCED DRAFT</Text>
-                </View>
-              ) : null}
-            </View>
-            <Text style={styles.typeBadgeText}>{typeLabel}</Text>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={[styles.trackingNoText, { color: colors.textDark }]} numberOfLines={1}>
+            {item.TrackingNo || 'Unassigned'}
+          </Text>
+
+          <View style={styles.cardHeaderRight}>
             <StatusBadge
               statusId={item.CurrentStatusId}
               statusText={item.CurrentStatus}
@@ -568,40 +553,49 @@ export const TransactionsScreen = ({ navigation }) => {
               }}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
-              <Ionicons name="ellipsis-vertical" size={18} color={colors.textDark} />
+              <Ionicons name="ellipsis-vertical" size={17} color={colors.textDark} />
             </TouchableOpacity>
           </View>
         </View>
 
-        <View style={styles.cardBody}>
-          <View style={styles.infoRow}>
-            <Ionicons name="person-circle-outline" size={15} color={colors.textDark} />
-            <Text style={[styles.ownerText, { color: colors.textDark }]}>
-              Owner / Applicant: {ownerOrApplicant}
-            </Text>
+        {/* Workflow & Property Hierarchy Indicators: [Inspection Request / Property Assessment] > [Land / Building / Machinery] */}
+        <View style={styles.categoryBadgeRow}>
+          <View style={[styles.modulePill, { backgroundColor: moduleBg }]}>
+            <Ionicons name={moduleIcon} size={12} color={moduleColor} />
+            <Text style={[styles.modulePillText, { color: moduleColor }]}>{moduleLabel}</Text>
           </View>
 
-          {hasDistinctApplicant ? (
-            <View style={styles.infoRow}>
-              <Ionicons name="people-outline" size={14} color={colors.textMuted} />
-              <Text style={[styles.infoText, { color: colors.textMuted }]}>
-                Representative / Requestor: {item.Requestor}
-              </Text>
-            </View>
-          ) : null}
+          <Ionicons name="chevron-forward" size={11} color={colors.textMuted} />
 
-          {showReferenceNo ? (
-            <View style={styles.infoRow}>
-              <Ionicons name="pricetag-outline" size={14} color={colors.textMuted} />
-              <Text style={[styles.infoText, { color: colors.textMuted }]}>PIN / TDN Ref: {item.ARPNo}</Text>
-            </View>
-          ) : null}
+          <View style={[styles.kindPill, { backgroundColor: kindBg }]}>
+            <Ionicons name={kindIcon} size={11} color={kindColor} />
+            <Text style={[styles.kindPillText, { color: kindColor }]}>{kindLabel}</Text>
+          </View>
+        </View>
 
-          <View style={styles.infoRow}>
-            <Ionicons name="calendar-outline" size={14} color={colors.textMuted} />
-            <Text style={[styles.infoText, { color: colors.textMuted }]}>
-              Date Submitted: {formatSubmittedDate(item.SubmittedDate)}
-            </Text>
+        {/* Card Body: Owner & Clean Reference Metadata */}
+        <View style={styles.cardBody}>
+          <Text style={[styles.ownerText, { color: colors.textDark }]} numberOfLines={1}>
+            {ownerOrApplicant}
+          </Text>
+
+          <View style={styles.metaRow}>
+            {showReferenceNo ? (
+              <View style={styles.metaItem}>
+                <Ionicons name="pricetag-outline" size={12} color={colors.textMuted} />
+                <Text style={[styles.metaText, { color: colors.textMuted }]} numberOfLines={1}>
+                  PIN: {item.ARPNo}
+                </Text>
+              </View>
+            ) : null}
+            {hasDistinctApplicant ? (
+              <View style={styles.metaItem}>
+                <Ionicons name="people-outline" size={12} color={colors.textMuted} />
+                <Text style={[styles.metaText, { color: colors.textMuted }]} numberOfLines={1}>
+                  Req: {item.Requestor}
+                </Text>
+              </View>
+            ) : null}
           </View>
 
           {item.Remarks ? (
@@ -611,37 +605,59 @@ export const TransactionsScreen = ({ navigation }) => {
                 isDarkMode && { backgroundColor: '#0f172a', borderColor: '#334155' }
               ]}
             >
-              <Text style={[styles.remarksText, { color: colors.textMuted }]} numberOfLines={2}>
-                • {item.Remarks}
+              <Text style={[styles.remarksText, { color: colors.textMuted }]} numberOfLines={1}>
+                "{item.Remarks}"
               </Text>
             </View>
           ) : null}
         </View>
 
-        {/* Card Footer: Status Indicator & Open Hint */}
+        {/* Card Footer: Partition Details, Sync/Offline Status & Chevron */}
         <View style={[styles.cardFooter, { borderTopColor: isDarkMode ? '#1e293b' : '#f1f5f9' }]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
-            {hasPending ? (
-              <View style={styles.pendingFooterBadge}>
-                <Ionicons name="cloud-upload" size={12} color="#b45309" />
-                <Text style={styles.pendingFooterBadgeText}>Unsynced Edits</Text>
+          <View style={styles.footerLeft}>
+            {!item.HasPartition ? (
+              <View style={styles.noPartitionBadge}>
+                <Ionicons name="lock-closed" size={10} color="#b91c1c" />
+                <Text style={styles.noPartitionBadgeText}>NO PARTITION</Text>
               </View>
-            ) : isDownloaded ? (
-              <View style={styles.downloadedBadge}>
-                <Ionicons name="checkmark-circle" size={12} color="#16a34a" />
-                <Text style={styles.downloadedBadgeText}>Downloaded</Text>
-              </View>
-            ) : item.HasPartition ? (
-              <View style={[styles.downloadedBadge, { backgroundColor: isDarkMode ? '#1e293b' : '#f1f5f9' }]}>
-                <Ionicons name="cloud-outline" size={12} color={colors.textMuted} />
-                <Text style={[styles.downloadedBadgeText, { color: colors.textMuted }]}>Available Online</Text>
+            ) : item.PartitionCount > 1 ? (
+              <View style={styles.multiPartitionBadge}>
+                <Ionicons name="layers-outline" size={10} color="#0369a1" />
+                <Text style={styles.multiPartitionBadgeText}>{item.PartitionCount} PARTITIONS</Text>
               </View>
             ) : (
-              <View style={styles.lockedBadge}>
-                <Ionicons name="lock-closed" size={11} color="#b91c1c" />
-                <Text style={styles.lockedBadgeText}>Pending Office Partition</Text>
+              <View style={[styles.singlePartitionBadge, { backgroundColor: isDarkMode ? '#1e293b' : '#f1f5f9' }]}>
+                <Text style={[styles.singlePartitionBadgeText, { color: colors.textMuted }]}>PART A</Text>
               </View>
             )}
+
+            {hasPending ? (
+              <View style={styles.pendingEditsBadge}>
+                <Ionicons name="cloud-upload" size={10} color="#b45309" />
+                <Text style={styles.pendingEditsBadgeText}>UNSYNCED</Text>
+              </View>
+            ) : isSyncedDraft ? (
+              <View style={[styles.syncedDraftBadge, isDarkMode && { backgroundColor: '#064e3b33', borderColor: '#065f46' }]}>
+                <Ionicons name="checkmark-done" size={10} color={isDarkMode ? '#34d399' : '#059669'} />
+                <Text style={[styles.syncedDraftBadgeText, isDarkMode && { color: '#34d399' }]}>SYNCED</Text>
+              </View>
+            ) : null}
+          </View>
+
+          <View style={styles.footerRight}>
+            <View style={styles.statusDownloadRow}>
+              <Ionicons
+                name={isDownloaded ? "checkmark-circle" : item.HasPartition ? "cloud-outline" : "lock-closed-outline"}
+                size={12}
+                color={isDownloaded ? "#16a34a" : colors.textMuted}
+              />
+              <Text style={[styles.downloadStatusText, { color: isDownloaded ? "#16a34a" : colors.textMuted }]}>
+                {isDownloaded ? 'Downloaded' : item.HasPartition ? 'Online' : 'Locked'}
+              </Text>
+            </View>
+            <Text style={[styles.dateText, { color: colors.textMuted }]}>
+              • {formatSubmittedDate(item.SubmittedDate)}
+            </Text>
           </View>
         </View>
       </View>
@@ -1464,23 +1480,67 @@ const styles = StyleSheet.create({
   transCard: {
     backgroundColor: '#ffffff',
     borderRadius: 16,
-    padding: 16,
+    padding: 14,
     borderWidth: 1,
     borderColor: COLORS.border
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
-    paddingBottom: 10,
-    marginBottom: 10
+    paddingBottom: 8,
+    marginBottom: 8
+  },
+  cardHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+    marginRight: 6
+  },
+  cardHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6
+  },
+  categoryBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+    flexWrap: 'wrap'
+  },
+  modulePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 6
+  },
+  modulePillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.2
+  },
+  kindPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 6
+  },
+  kindPillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.2
   },
   trackingNoText: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: COLORS.primaryDark
+    fontSize: 14,
+    fontWeight: '800'
   },
   noPartitionBadge: {
     flexDirection: 'row',
@@ -1497,37 +1557,39 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '800',
     color: '#b91c1c',
-    letterSpacing: 0.4
+    letterSpacing: 0.3
   },
-  lockedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fef2f2',
-    borderWidth: 1,
-    borderColor: '#fecaca',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    gap: 4
+  singlePartitionBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 5
   },
-  lockedBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#991b1b'
-  },
-  typeBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: COLORS.textMuted,
-    marginTop: 2
+  singlePartitionBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.3
   },
   cardBody: {
-    gap: 6
+    gap: 4
   },
   ownerText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: COLORS.textDark
+    fontSize: 15,
+    fontWeight: '800'
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flexWrap: 'wrap'
+  },
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4
+  },
+  metaText: {
+    fontSize: 12,
+    fontWeight: '500'
   },
   infoRow: {
     flexDirection: 'row',
@@ -1541,9 +1603,10 @@ const styles = StyleSheet.create({
   },
   remarksBox: {
     backgroundColor: '#f8fafc',
-    padding: 8,
-    borderRadius: 8,
-    marginTop: 4
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginTop: 2
   },
   remarksText: {
     fontSize: 11,
@@ -1554,10 +1617,34 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 12,
-    paddingTop: 10,
+    marginTop: 10,
+    paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: '#f8fafc'
+  },
+  footerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexShrink: 1
+  },
+  footerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4
+  },
+  statusDownloadRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3
+  },
+  downloadStatusText: {
+    fontSize: 11,
+    fontWeight: '700'
+  },
+  dateText: {
+    fontSize: 11,
+    fontWeight: '500'
   },
   downloadedBadge: {
     flexDirection: 'row',
@@ -1608,7 +1695,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fef3c7',
     borderWidth: 1,
     borderColor: '#fde68a',
-    paddingHorizontal: 6,
+    paddingHorizontal: 5,
     paddingVertical: 2,
     borderRadius: 4,
     gap: 3

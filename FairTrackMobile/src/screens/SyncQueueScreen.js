@@ -323,9 +323,23 @@ export const SyncQueueScreen = ({ navigation }) => {
 
   const renderTransactionCard = ({ item }) => {
     const isThisSyncing = syncingKey === item.key;
-    const typeColor = item.type === 'UPDATE_BUILDING' ? COLORS.accentGold :
-                      item.type === 'UPDATE_LAND' ? COLORS.accentBlue :
-                      item.type === 'UPDATE_MACHINERY' ? '#475569' : COLORS.primary;
+    const isLand = item.type === 'UPDATE_LAND' || (item.kind || '').toLowerCase().includes('land');
+    const isMach = item.type === 'UPDATE_MACHINERY' || (item.kind || '').toLowerCase().includes('machinery');
+    const kindLabel = isLand ? 'Land' : isMach ? 'Machinery' : 'Building';
+    const kindColor = isLand ? (isDarkMode ? '#2dd4bf' : '#0f766e') :
+                      isMach ? (isDarkMode ? '#818cf8' : '#4f46e5') :
+                      (isDarkMode ? '#fbbf24' : '#d97706');
+    const kindBg = isLand ? (isDarkMode ? '#134e4a44' : '#ccfbf1') :
+                   isMach ? (isDarkMode ? '#312e8144' : '#e0e7ff') :
+                   (isDarkMode ? '#78350f44' : '#fef3c7');
+    const kindIcon = isLand ? 'leaf-outline' : isMach ? 'construct-outline' : 'business-outline';
+
+    const isInspection = (item.trackingNo || '').toUpperCase().startsWith('RFI-') ||
+                         (item.moduleLabel && item.moduleLabel.toLowerCase().includes('inspection'));
+    const moduleLabel = isInspection ? 'Inspection Request' : 'Property Assessment';
+    const moduleIcon = isInspection ? 'search-circle-outline' : 'document-text-outline';
+    const moduleColor = isInspection ? (isDarkMode ? '#60a5fa' : '#2563eb') : (isDarkMode ? '#a78bfa' : '#7c3aed');
+    const moduleBg = isInspection ? (isDarkMode ? '#1e3a8a33' : '#eff6ff') : (isDarkMode ? '#4c1d9533' : '#f5f3ff');
 
     return (
       <View
@@ -338,65 +352,73 @@ export const SyncQueueScreen = ({ navigation }) => {
           shadows.card
         ]}
       >
-        {/* Card Header: Tracking, Badges, 3-Dots */}
+        {/* Card Header: Tracking No + Queue Status & 3-Dots */}
         <View style={styles.cardHeader}>
-          <View style={{ flex: 1, paddingRight: 6 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-              <Text style={[styles.trackingNoText, { color: colors.textDark }]}>
-                {item.trackingNo}
-              </Text>
-              <View style={styles.pendingEditsBadge}>
-                <Ionicons name="cloud-upload" size={10} color="#b45309" />
-                <Text style={styles.pendingEditsBadgeText}>UNSYNCED EDITS</Text>
-              </View>
-              {item.partitions.length > 1 ? (
-                <View style={styles.multiPartitionBadge}>
-                  <Ionicons name="layers-outline" size={10} color="#0369a1" />
-                  <Text style={styles.multiPartitionBadgeText}>{item.partitions.length} PARTITIONS</Text>
-                </View>
-              ) : null}
-            </View>
-            <Text style={styles.typeBadgeText}>
-              {item.moduleLabel} • {item.kind}
-            </Text>
-          </View>
+          <Text style={[styles.trackingNoText, { color: colors.textDark }]} numberOfLines={1}>
+            {item.trackingNo}
+          </Text>
 
-          <TouchableOpacity
-            style={[
-              styles.threeDotsBtn,
-              {
-                backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc',
-                borderColor: colors.border
-              }
-            ]}
-            onPress={() => handleOpenMenu(item)}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            disabled={isThisSyncing}
-          >
-            <Ionicons name="ellipsis-vertical" size={18} color={colors.textDark} />
-          </TouchableOpacity>
+          <View style={styles.cardHeaderRight}>
+            <View style={styles.pendingEditsBadge}>
+              <Ionicons name="cloud-upload" size={10} color="#b45309" />
+              <Text style={styles.pendingEditsBadgeText}>
+                {item.partitions.length} {item.partitions.length === 1 ? 'EDIT' : 'EDITS'}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[
+                styles.threeDotsBtn,
+                {
+                  backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc',
+                  borderColor: colors.border
+                }
+              ]}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleOpenMenu(item);
+              }}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              disabled={isThisSyncing}
+            >
+              <Ionicons name="ellipsis-vertical" size={17} color={colors.textDark} />
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {/* Card Body: Owner, Location, Partitions Chips, Time */}
+        {/* Workflow & Property Hierarchy Indicators: [Inspection Request / Property Assessment] > [Land / Building / Machinery] */}
+        <View style={styles.categoryBadgeRow}>
+          <View style={[styles.modulePill, { backgroundColor: moduleBg }]}>
+            <Ionicons name={moduleIcon} size={12} color={moduleColor} />
+            <Text style={[styles.modulePillText, { color: moduleColor }]}>{moduleLabel}</Text>
+          </View>
+
+          <Ionicons name="chevron-forward" size={11} color={colors.textMuted} />
+
+          <View style={[styles.kindPill, { backgroundColor: kindBg }]}>
+            <Ionicons name={kindIcon} size={11} color={kindColor} />
+            <Text style={[styles.kindPillText, { color: kindColor }]}>{kindLabel}</Text>
+          </View>
+        </View>
+
+        {/* Card Body: Owner, Location & Partition Chips */}
         <View style={styles.cardBody}>
-          <View style={styles.infoRow}>
-            <Ionicons name="person-circle-outline" size={15} color={colors.textDark} />
-            <Text style={[styles.ownerText, { color: colors.textDark }]} numberOfLines={1}>
-              Owner / Applicant: {item.owner}
-            </Text>
-          </View>
+          <Text style={[styles.ownerText, { color: colors.textDark }]} numberOfLines={1}>
+            {item.owner}
+          </Text>
 
-          <View style={styles.infoRow}>
-            <Ionicons name="location-outline" size={14} color={colors.textMuted} />
-            <Text style={[styles.infoText, { color: colors.textMuted }]} numberOfLines={1}>
-              {item.location}
-            </Text>
-          </View>
+          {item.location ? (
+            <View style={styles.metaRow}>
+              <Ionicons name="location-outline" size={12} color={colors.textMuted} />
+              <Text style={[styles.metaText, { color: colors.textMuted }]} numberOfLines={1}>
+                {item.location}
+              </Text>
+            </View>
+          ) : null}
 
-          {/* Partitions with offline edits */}
+          {/* Partitions with offline edits as clean visual chips */}
           <View style={styles.partitionChipRow}>
             <Text style={[styles.partitionChipLabel, { color: colors.textMuted }]}>
-              Partitions with edits:
+              Partitions:
             </Text>
             {item.partitions.map((pt) => (
               <View
@@ -412,33 +434,28 @@ export const SyncQueueScreen = ({ navigation }) => {
               </View>
             ))}
           </View>
-
-          <View style={styles.infoRow}>
-            <Ionicons name="time-outline" size={13} color={colors.textMuted} />
-            <Text style={[styles.timeText, { color: colors.textMuted }]}>
-              Modified: {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </Text>
-          </View>
         </View>
 
-        {/* Card Footer: Status Pill */}
+        {/* Card Footer: Timestamp & Syncing State */}
         <View style={[styles.cardFooter, { borderTopColor: isDarkMode ? '#1e293b' : '#f1f5f9' }]}>
+          <View style={styles.timeRow}>
+            <Ionicons name="time-outline" size={12} color={colors.textMuted} />
+            <Text style={[styles.timeText, { color: colors.textMuted }]}>
+              Modified {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </Text>
+          </View>
+
           {isThisSyncing ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+            <View style={styles.syncingRow}>
               <ActivityIndicator size="small" color="#0284c7" />
-              <Text style={{ fontSize: 12, fontWeight: '700', color: '#0284c7' }}>
-                Syncing edits to web portal...
+              <Text style={styles.syncingText}>
+                Syncing...
               </Text>
             </View>
           ) : (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
-              <View style={styles.pendingEditsFooterBadge}>
-                <Ionicons name="cloud-upload" size={12} color="#b45309" />
-                <Text style={styles.pendingEditsFooterBadgeText}>
-                  {item.partitions.length} {item.partitions.length === 1 ? 'Partition Edit' : 'Partition Edits'} Queued
-                </Text>
-              </View>
-            </View>
+            <Text style={[styles.timeText, { color: colors.textMuted }]}>
+              Tap ⋮ for sync & actions
+            </Text>
           )}
         </View>
       </View>
@@ -984,23 +1001,67 @@ const styles = StyleSheet.create({
   transCard: {
     backgroundColor: '#ffffff',
     borderRadius: 16,
-    padding: 16,
+    padding: 14,
     borderWidth: 1,
     borderColor: COLORS.border
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
-    paddingBottom: 10,
-    marginBottom: 10
+    paddingBottom: 8,
+    marginBottom: 8
+  },
+  cardHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+    marginRight: 6
+  },
+  cardHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6
+  },
+  categoryBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+    flexWrap: 'wrap'
+  },
+  modulePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 6
+  },
+  modulePillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.2
+  },
+  kindPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 6
+  },
+  kindPillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.2
   },
   trackingNoText: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: COLORS.primaryDark
+    fontSize: 14,
+    fontWeight: '800'
   },
   pendingEditsBadge: {
     flexDirection: 'row',
@@ -1010,7 +1071,7 @@ const styles = StyleSheet.create({
     borderColor: '#fde68a',
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 4,
+    borderRadius: 5,
     gap: 3
   },
   pendingEditsBadgeText: {
@@ -1043,42 +1104,46 @@ const styles = StyleSheet.create({
     marginTop: 2
   },
   threeDotsBtn: {
-    width: 34,
-    height: 34,
+    width: 32,
+    height: 32,
     borderRadius: 8,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center'
   },
   cardBody: {
-    gap: 6
+    gap: 4
   },
   ownerText: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '800',
-    color: COLORS.textDark
+    marginBottom: 2
   },
-  infoRow: {
+  metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6
+    gap: 5
   },
-  infoText: {
+  metaText: {
     fontSize: 12,
-    color: COLORS.textMuted,
-    fontWeight: '600'
+    fontWeight: '500',
+    flex: 1
+  },
+  timeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4
   },
   timeText: {
     fontSize: 11,
-    color: COLORS.textMuted,
-    fontWeight: '600'
+    fontWeight: '500'
   },
   partitionChipRow: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
     gap: 6,
-    marginVertical: 4
+    marginTop: 4
   },
   partitionChipLabel: {
     fontSize: 11,
@@ -1099,10 +1164,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 8,
-    marginTop: 12,
-    paddingTop: 10,
+    marginTop: 10,
+    paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#f8fafc'
+    borderTopColor: '#f1f5f9'
+  },
+  syncingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6
+  },
+  syncingText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0284c7'
+  },
+  quickSyncBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    gap: 4
+  },
+  quickSyncBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#ffffff'
   },
   pendingEditsFooterBadge: {
     flexDirection: 'row',
