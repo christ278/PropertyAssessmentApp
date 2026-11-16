@@ -20,7 +20,7 @@ import { useTheme } from '../context/ThemeContext';
 import { ActionModal } from '../components/ActionModal';
 
 export const LoginScreen = () => {
-  const { colors, shadows } = useTheme();
+  const { isDarkMode, colors, shadows } = useTheme();
   const insets = useSafeAreaInsets();
   const topInset = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 47 : 20);
   const { login, serverUrl, updateServerUrl } = useContext(AuthContext);
@@ -101,21 +101,26 @@ export const LoginScreen = () => {
         </TouchableOpacity>
 
         {/* Brand Section */}
-        <View style={[styles.brandContainer, { marginTop: topInset + 24 }]}>
-          <Image
-            source={require('../../assets/logo.png')}
-            style={styles.appLogo}
-            resizeMode="cover"
-          />
-          <Text style={[styles.brandTitle, { color: colors.primaryDark }]}>FAIRTRACK</Text>
-          <Text style={[styles.brandSubtitle, { color: colors.textMuted }]}>
-            City Assessor's Mobile Field Portal
-          </Text>
-          <View style={[styles.tagBadge, { backgroundColor: colors.primaryLight }]}>
-            <Text style={[styles.tagBadgeText, { color: colors.primary }]}>
-              Koronadal City &bull; Offline &amp; JWT Secured
+        <View style={[styles.brandContainer, { marginTop: topInset + 16 }]}>
+          <View style={[styles.logoCard, shadows.sm, { backgroundColor: isDarkMode ? '#1e293b' : '#ffffff' }]}>
+            <Image
+              source={require('../../assets/logo.png')}
+              style={styles.appLogo}
+              resizeMode="contain"
+            />
+          </View>
+          <View style={[styles.cityBadge, { backgroundColor: isDarkMode ? '#064e3b' : '#ecfdf5', borderColor: isDarkMode ? '#059669' : '#a7f3d0' }]}>
+            <Text style={[styles.cityBadgeText, { color: isDarkMode ? '#34d399' : '#047857' }]}>
+              CITY OF KORONADAL
             </Text>
           </View>
+          <Text style={[styles.brandTitle, { color: isDarkMode ? '#f8fafc' : colors.primaryDark }]}>FAIRTRACK</Text>
+          <Text style={[styles.brandSubtitle, { color: isDarkMode ? '#34d399' : '#047857' }]}>
+            Office of the City Assessor
+          </Text>
+          <Text style={[styles.brandDescription, { color: colors.textMuted }]}>
+            Field Appraisal, Information and Records Tracking System
+          </Text>
         </View>
 
         {/* Login Card */}
@@ -284,42 +289,51 @@ const styles = StyleSheet.create({
   },
   brandContainer: {
     alignItems: 'center',
-    marginBottom: 28,
-    marginTop: 40
+    marginBottom: 24,
+    marginTop: 20
+  },
+  logoCard: {
+    width: 96,
+    height: 96,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(5, 150, 105, 0.15)'
   },
   appLogo: {
-    width: 90,
-    height: 90,
-    borderRadius: 22,
-    marginBottom: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 6
+    width: 80,
+    height: 80
+  },
+  cityBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 6
+  },
+  cityBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1
   },
   brandTitle: {
     fontSize: 28,
     fontWeight: '900',
-    color: COLORS.primaryDark,
-    letterSpacing: -0.5
+    letterSpacing: 1.5
   },
   brandSubtitle: {
-    fontSize: 13,
-    color: COLORS.textMuted,
+    fontSize: 14,
+    fontWeight: '700',
     marginTop: 2
   },
-  tagBadge: {
-    backgroundColor: COLORS.primaryLight,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginTop: 8
-  },
-  tagBadgeText: {
+  brandDescription: {
     fontSize: 11,
-    fontWeight: '700',
-    color: COLORS.primary
+    textAlign: 'center',
+    marginTop: 4,
+    maxWidth: 280,
+    lineHeight: 16
   },
   card: {
     backgroundColor: '#ffffff',

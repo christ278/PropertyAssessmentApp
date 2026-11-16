@@ -86,20 +86,26 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-// Configure Static Files with explicit font MIME types for offline intranet deployment
+// Enable CORS for mobile apps, Expo web, and external clients
+app.UseCors("AllowMobileClients");
+
+// Configure Static Files with explicit font MIME types and CORS headers for mobile clients / uploads
 var contentTypeProvider = new FileExtensionContentTypeProvider();
 contentTypeProvider.Mappings[".woff2"] = "font/woff2";
 contentTypeProvider.Mappings[".woff"] = "font/woff";
 contentTypeProvider.Mappings[".ttf"] = "font/ttf";
 app.UseStaticFiles(new StaticFileOptions
 {
-    ContentTypeProvider = contentTypeProvider
+    ContentTypeProvider = contentTypeProvider,
+    OnPrepareResponse = ctx =>
+    {
+        ctx.Context.Response.Headers.Append("Access-Control-Allow-Origin", "*");
+        ctx.Context.Response.Headers.Append("Access-Control-Allow-Headers", "*");
+        ctx.Context.Response.Headers.Append("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+    }
 });
 
-app.UseStaticFiles();
 app.UseRouting();
-
-app.UseCors("AllowMobileClients");
 
 app.UseAuthentication();
 app.UseAuthorization();

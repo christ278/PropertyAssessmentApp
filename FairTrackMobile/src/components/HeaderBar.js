@@ -85,28 +85,54 @@ export const HeaderBar = ({
           </TouchableOpacity>
         ) : (
           <Image
-          source={require('../../assets/logo.png')}
-          style={styles.headerLogo}
-          resizeMode="cover" />
+            source={require('../../assets/logo.png')}
+            style={styles.headerLogo}
+            resizeMode="contain"
+          />
         )}
         <View style={styles.titleContainer}>
-          <Text
-            style={[
-              styles.title,
-              { color: isDarkMode ? colors.textDark : colors.primaryDark }
-            ]}
-            numberOfLines={1}
-          >
-            {title || 'FAIRTRACK'}
-          </Text>
-          {(subtitle !== undefined ? subtitle : "City Assessor's Office") ? (
-            <Text
-              style={[styles.subtitle, { color: colors.textMuted }]}
-              numberOfLines={1}
-            >
-              {subtitle !== undefined ? subtitle : "City Assessor's Office"}
-            </Text>
-          ) : null}
+          {(!title || title === 'FAIRTRACK' || title === 'City Assessor') ? (
+            <>
+              <Text
+                style={[
+                  styles.title,
+                  { color: isDarkMode ? colors.textDark : '#0f172a' }
+                ]}
+                numberOfLines={1}
+              >
+                City Assessor
+              </Text>
+              <Text
+                style={[
+                  styles.brandSubBadge,
+                  { color: isDarkMode ? '#34d399' : '#047857' }
+                ]}
+                numberOfLines={1}
+              >
+                FAIRTRACK
+              </Text>
+            </>
+          ) : (
+            <>
+              <Text
+                style={[
+                  styles.title,
+                  { color: isDarkMode ? colors.textDark : colors.primaryDark }
+                ]}
+                numberOfLines={1}
+              >
+                {title}
+              </Text>
+              {(subtitle !== undefined ? subtitle : "City Assessor's Office") ? (
+                <Text
+                  style={[styles.subtitle, { color: colors.textMuted }]}
+                  numberOfLines={1}
+                >
+                  {subtitle !== undefined ? subtitle : "City Assessor's Office"}
+                </Text>
+              ) : null}
+            </>
+          )}
         </View>
       </View>
 
@@ -417,17 +443,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center'
   },
   headerLogo: {
-    width: 32,
-    height: 32,
-    borderRadius: 8
+    width: 36,
+    height: 36,
+    marginRight: 2
   },
   titleContainer: {
     flex: 1
   },
   title: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '800',
     letterSpacing: -0.3
+  },
+  brandSubBadge: {
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    marginTop: 1
   },
   subtitle: {
     fontSize: 12,
