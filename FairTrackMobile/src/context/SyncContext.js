@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MobileApi } from '../api/mobileApi';
 import storageResetEpoch from '../constants/storageResetEpoch.json';
-import { downloadServerFileToMobile, ensurePayloadFilesHaveBase64 } from '../utils/fileStorage';
+import { downloadServerFileToMobile, ensurePayloadFilesHaveBase64, savePartitionAttachmentsOffline } from '../utils/fileStorage';
 
 export const SyncContext = createContext();
 
@@ -325,7 +325,7 @@ export const SyncProvider = ({ children }) => {
   // Helper to physically download & cache all partition sketches and attachments to local storage
   const cachePartitionFilesLocally = async (partitions, tracking) => {
     if (!Array.isArray(partitions) || partitions.length === 0) return [];
-    return await Promise.all(partitions.map(async (p) => {
+    return await Promise.all(partitions.map(async (p, idx) => {
       let updatedAtts = p.attachments || [];
       if (Array.isArray(p.attachments)) {
         updatedAtts = await Promise.all(p.attachments.map(async (a) => {
@@ -341,11 +341,31 @@ export const SyncProvider = ({ children }) => {
       if (p.sketchUrl && !p.sketchUrl.startsWith('file:') && !p.sketchUrl.startsWith('data:')) {
         updatedSketch = await downloadServerFileToMobile(p.sketchUrl, tracking, p.sketchFileName || 'sketch.jpg', 'sketch');
       }
+
+      // Also persist to partition offline draft store so individual forms load immediately
+      const partIndex = p.index != null ? p.index : idx;
+      try {
+        await savePartitionAttachmentsOffline(tracking, partIndex, updatedAtts, updatedSketch);
+      } catch (_) {}
+
+      // Keep partition formData TDN aligned with local file paths
+      let updatedPartFormData = p.formData ? withPascalCaseKeys(p.formData) : null;
+      if (updatedPartFormData) {
+        if (updatedPartFormData.TDN) {
+          if (updatedSketch) updatedPartFormData.TDN.FloorPlanSketchPath = updatedSketch;
+          if (updatedAtts) updatedPartFormData.TDN.Attachments = updatedAtts;
+        }
+        if (updatedPartFormData.tdn) {
+          if (updatedSketch) updatedPartFormData.tdn.FloorPlanSketchPath = updatedSketch;
+          if (updatedAtts) updatedPartFormData.tdn.Attachments = updatedAtts;
+        }
+      }
+
       return {
         ...p,
         attachments: updatedAtts,
         sketchUrl: updatedSketch,
-        formData: p.formData ? withPascalCaseKeys(p.formData) : null
+        formData: updatedPartFormData
       };
     }));
   };
@@ -396,13 +416,28 @@ export const SyncProvider = ({ children }) => {
           }));
         }
 
+        let updatedRootFormData = res.formData ? withPascalCaseKeys(res.formData) : res.formData;
+        if (updatedRootFormData) {
+          if (updatedRootFormData.TDN) {
+            if (rootSketch) updatedRootFormData.TDN.FloorPlanSketchPath = rootSketch;
+            if (rootAtts) updatedRootFormData.TDN.Attachments = rootAtts;
+          }
+          if (updatedRootFormData.tdn) {
+            if (rootSketch) updatedRootFormData.tdn.FloorPlanSketchPath = rootSketch;
+            if (rootAtts) updatedRootFormData.tdn.Attachments = rootAtts;
+          }
+        }
+        try {
+          await savePartitionAttachmentsOffline(tracking, 0, rootAtts, rootSketch);
+        } catch (_) {}
+
         const updated = {
           ...downloadedForms,
           [key]: {
             ...res,
             sketchUrl: rootSketch,
             attachments: rootAtts,
-            formData: res.formData ? withPascalCaseKeys(res.formData) : res.formData,
+            formData: updatedRootFormData,
             partitions: partitionsWithLocalFiles,
             transItem: {
               ...transItem,
@@ -1058,11 +1093,26 @@ export const SyncProvider = ({ children }) => {
             }));
           }
 
+          let updatedRootFormData = res.formData ? withPascalCaseKeys(res.formData) : res.formData;
+          if (updatedRootFormData) {
+            if (updatedRootFormData.TDN) {
+              if (rootSketch) updatedRootFormData.TDN.FloorPlanSketchPath = rootSketch;
+              if (rootAtts) updatedRootFormData.TDN.Attachments = rootAtts;
+            }
+            if (updatedRootFormData.tdn) {
+              if (rootSketch) updatedRootFormData.tdn.FloorPlanSketchPath = rootSketch;
+              if (rootAtts) updatedRootFormData.tdn.Attachments = rootAtts;
+            }
+          }
+          try {
+            await savePartitionAttachmentsOffline(tracking, 0, rootAtts, rootSketch);
+          } catch (_) {}
+
           currentDownloads[key] = {
             ...res,
             sketchUrl: rootSketch,
             attachments: rootAtts,
-            formData: res.formData ? withPascalCaseKeys(res.formData) : res.formData,
+            formData: updatedRootFormData,
             partitions: partitionsWithLocalFiles,
             transItem: {
               ...item,

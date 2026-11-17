@@ -407,8 +407,24 @@ export const MachineryFormScreen = ({ route, navigation }) => {
           if (livePart) {
             populateFromPartition(livePart);
           }
-          const liveAtts = Array.isArray(livePart?.attachments) ? livePart.attachments : (targetIdx === 0 ? (liveRes.attachments || []) : []);
-          setAttachments(liveAtts);
+          const localAtts = (offlineAttData.attachments && offlineAttData.attachments.length > 0)
+            ? offlineAttData.attachments
+            : (downloaded?.currentPartition?.attachments || (targetIdx === 0 ? downloaded?.attachments : []) || []);
+
+          if (localAtts.length > 0) {
+            const merged = [...localAtts];
+            if (Array.isArray(liveAtts)) {
+              for (const la of liveAtts) {
+                const laId = la?.id || la?.Id || la?.fileUrl || la?.FileUrl;
+                if (!merged.some(m => (m?.id || m?.Id || m?.fileUrl || m?.FileUrl) === laId)) {
+                  merged.push(la);
+                }
+              }
+            }
+            setAttachments(merged);
+          } else {
+            setAttachments(liveAtts);
+          }
           if (typeof downloadSingleTransaction === 'function') {
             await downloadSingleTransaction({
               TrackingNo: trackingNoParam || liveRes.trackingNo,
@@ -580,7 +596,14 @@ export const MachineryFormScreen = ({ route, navigation }) => {
       if (t.Memoranda) setMemoranda(t.Memoranda);
 
       const rawAtts = t.Attachments || t.attachments;
-      if (Array.isArray(rawAtts) && rawAtts.length > 0) setAttachments(rawAtts);
+      if (Array.isArray(rawAtts) && rawAtts.length > 0) {
+        setAttachments(prev => {
+          if (prev && prev.length > 0 && prev.some(a => (a?.fileUrl || a?.FileUrl || a?.uri)?.startsWith('file:'))) {
+            return prev;
+          }
+          return rawAtts;
+        });
+      }
     }
 
     if (d.TDNMachine) {

@@ -173,7 +173,8 @@ export const downloadServerFileToMobile = async (serverUrl, trackingNo, fileName
       return localFilePath;
     }
 
-    const res = await FileSystem.downloadAsync(fullUrl, localFilePath);
+    const targetUrl = encodeURI(fullUrl);
+    const res = await FileSystem.downloadAsync(targetUrl, localFilePath);
     if (res && res.status >= 200 && res.status < 300) {
       return res.uri;
     } else {

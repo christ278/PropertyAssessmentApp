@@ -712,6 +712,10 @@ export const BuildingFormScreen = ({ route, navigation }) => {
 
           if (offlineAttData.sketchUrl) {
             setSketchUrl(offlineAttData.sketchUrl);
+          } else if (downloaded?.currentPartition?.sketchUrl && (downloaded.currentPartition.sketchUrl.startsWith('file:') || downloaded.currentPartition.sketchUrl.startsWith('data:'))) {
+            setSketchUrl(downloaded.currentPartition.sketchUrl);
+          } else if (targetIdx === 0 && downloaded?.sketchUrl && (downloaded.sketchUrl.startsWith('file:') || downloaded.sketchUrl.startsWith('data:'))) {
+            setSketchUrl(downloaded.sketchUrl);
           } else if (liveSketch) {
             setSketchUrl(liveSketch);
           } else if (downloaded?.currentPartition?.sketchUrl) {
@@ -838,9 +842,23 @@ export const BuildingFormScreen = ({ route, navigation }) => {
       if (t.QuarterEffectivity != null) setQuarterEffectivity(t.QuarterEffectivity.toString());
       if (t.Memoranda) setMemoranda(t.Memoranda);
       if (t.Taxability != null) setTaxability(!!t.Taxability);
-      if (t.FloorPlanSketchPath) setSketchUrl(t.FloorPlanSketchPath);
+      if (t.FloorPlanSketchPath) {
+        setSketchUrl(prev => {
+          if (prev && (prev.startsWith('file:') || prev.startsWith('data:'))) {
+            return prev;
+          }
+          return t.FloorPlanSketchPath;
+        });
+      }
       const rawAtts = t.Attachments || t.attachments;
-      if (rawAtts && Array.isArray(rawAtts) && rawAtts.length > 0) setAttachments(rawAtts);
+      if (rawAtts && Array.isArray(rawAtts) && rawAtts.length > 0) {
+        setAttachments(prev => {
+          if (prev && prev.length > 0 && prev.some(a => (a?.fileUrl || a?.FileUrl || a?.uri)?.startsWith('file:'))) {
+            return prev;
+          }
+          return rawAtts;
+        });
+      }
     }
 
     if (d.refOwner) {

@@ -25,7 +25,7 @@ export const DEFAULT_BASE_URL = Platform.OS === 'web'
 
 export const resolveServerUrl = async (path) => {
   if (!path) return '';
-  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:') || path.startsWith('file:') || path.startsWith('blob:') || path.startsWith('content:')) {
+  if (path.startsWith('data:') || path.startsWith('file:') || path.startsWith('blob:') || path.startsWith('content:')) {
     return path;
   }
   let base = DEFAULT_BASE_URL.replace(/\/+$/, '');
@@ -39,6 +39,18 @@ export const resolveServerUrl = async (path) => {
       }
     }
   } catch (e) {}
+
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    // If the path contains localhost or 10.0.2.2 on physical device, re-base it onto active base
+    if (Platform.OS !== 'web' && (path.includes('localhost') || path.includes('10.0.2.2'))) {
+      try {
+        const urlObj = new URL(path);
+        return `${base}${urlObj.pathname}${urlObj.search}`;
+      } catch (_) {}
+    }
+    return path;
+  }
+
   const cleanPath = path.startsWith('/') ? path : '/' + path;
   return `${base}${cleanPath}`;
 };
