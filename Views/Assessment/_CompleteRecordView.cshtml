@@ -36,6 +36,17 @@
                 if (val.ValueKind == JsonValueKind.String) return val.GetString() ?? "";
                 if (val.ValueKind == JsonValueKind.Number) return val.ToString();
             }
+            if (el.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var prop in el.EnumerateObject())
+                {
+                    if (string.Equals(prop.Name, k, StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (prop.Value.ValueKind == JsonValueKind.String) return prop.Value.GetString() ?? "";
+                        if (prop.Value.ValueKind == JsonValueKind.Number) return prop.Value.ToString();
+                    }
+                }
+            }
         }
         return "";
     }
@@ -48,6 +59,17 @@
             {
                 if (val.ValueKind == JsonValueKind.Number && val.TryGetDecimal(out var d)) return d;
                 if (val.ValueKind == JsonValueKind.String && decimal.TryParse(val.GetString(), out var d2)) return d2;
+            }
+            if (el.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var prop in el.EnumerateObject())
+                {
+                    if (string.Equals(prop.Name, k, StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (prop.Value.ValueKind == JsonValueKind.Number && prop.Value.TryGetDecimal(out var d)) return d;
+                        if (prop.Value.ValueKind == JsonValueKind.String && decimal.TryParse(prop.Value.GetString(), out var d2)) return d2;
+                    }
+                }
             }
         }
         return 0m;
@@ -209,12 +231,47 @@
                             <tbody class="divide-y divide-slate-200 dark:divide-stone-800">
                                 @foreach (var row in landRows.Value.EnumerateArray())
                                 {
+                                    var rowArea = PropDec(row, "areaSQM", "areaSqm", "area", "Area");
+                                    var rowUnit = PropDec(row, "unitValue", "UnitValue");
+                                    var rowMv = PropDec(row, "baseMarketValue", "BaseMarketValue", "marketValue", "MarketValue");
+                                    if (rowMv <= 0 && rowArea > 0 && rowUnit > 0)
+                                    {
+                                        rowMv = Math.Round(rowArea * rowUnit, 2);
+                                    }
                                     <tr>
-                                        <td class="px-3 py-2 font-bold">@Dash(PropStr(row, "classification", "Classification"))</td>
-                                        <td class="px-3 py-2">@Dash(PropStr(row, "subClass", "SubClass"))</td>
-                                        <td class="px-3 py-2 text-right">@PropDec(row, "area", "Area").ToString("N2")</td>
-                                        <td class="px-3 py-2 text-right">@Money(PropDec(row, "unitValue", "UnitValue"))</td>
-                                        <td class="px-3 py-2 text-right font-bold">@Money(PropDec(row, "baseMarketValue", "BaseMarketValue", "marketValue"))</td>
+                                        <td class="px-3 py-2 font-bold">@Dash(PropStr(row, "classificationName", "ClassificationName", "classification", "Classification"))</td>
+                                        <td class="px-3 py-2">@Dash(PropStr(row, "subClassName", "SubClassName", "subClass", "SubClass"))</td>
+                                        <td class="px-3 py-2 text-right">@rowArea.ToString("N2")</td>
+                                        <td class="px-3 py-2 text-right">@Money(rowUnit)</td>
+                                        <td class="px-3 py-2 text-right font-bold">@Money(rowMv)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else if (Model.LandDetails?.TDNLandDetails != null && Model.LandDetails.TDNLandDetails.Any())
+                {
+                    <div class="overflow-x-auto rounded-2xl border border-slate-200 dark:border-stone-800">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 dark:bg-stone-950 border-b border-slate-200 dark:border-stone-800 text-[10px] uppercase text-slate-500">
+                                    <th class="px-3 py-2">Classification</th>
+                                    <th class="px-3 py-2">Sub-Class</th>
+                                    <th class="px-3 py-2 text-right">Area (sqm)</th>
+                                    <th class="px-3 py-2 text-right">Unit Value</th>
+                                    <th class="px-3 py-2 text-right">Base Market Value</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200 dark:divide-stone-800">
+                                @foreach (var ld in Model.LandDetails.TDNLandDetails.OrderBy(d => d.OrderNo))
+                                {
+                                    <tr>
+                                        <td class="px-3 py-2 font-bold">@Dash(ld.ClassificationName)</td>
+                                        <td class="px-3 py-2">@Dash(ld.SubClassName)</td>
+                                        <td class="px-3 py-2 text-right">@ld.AreaSQM.ToString("N2")</td>
+                                        <td class="px-3 py-2 text-right">@Money(ld.UnitValue)</td>
+                                        <td class="px-3 py-2 text-right font-bold">@Money(ld.MarketValue)</td>
                                     </tr>
                                 }
                             </tbody>
@@ -237,11 +294,44 @@
                             <tbody class="divide-y divide-slate-200 dark:divide-stone-800">
                                 @foreach (var row in impRows.Value.EnumerateArray())
                                 {
+                                    var impQty = PropDec(row, "qty", "Qty", "quantity", "Quantity");
+                                    var impUnit = PropDec(row, "unitValue", "UnitValue");
+                                    var impMv = PropDec(row, "baseMarketValue", "BaseMarketValue", "marketValue", "MarketValue");
+                                    if (impMv <= 0 && impQty > 0 && impUnit > 0)
+                                    {
+                                        impMv = Math.Round(impQty * impUnit, 2);
+                                    }
                                     <tr>
-                                        <td class="px-3 py-2 font-bold">@Dash(PropStr(row, "kind", "Kind", "productClass", "ProductClass"))</td>
-                                        <td class="px-3 py-2 text-right">@PropDec(row, "qty", "Qty", "quantity", "Quantity").ToString("N0")</td>
-                                        <td class="px-3 py-2 text-right">@Money(PropDec(row, "unitValue", "UnitValue"))</td>
-                                        <td class="px-3 py-2 text-right font-bold">@Money(PropDec(row, "baseMarketValue", "BaseMarketValue", "marketValue", "MarketValue"))</td>
+                                        <td class="px-3 py-2 font-bold">@Dash(PropStr(row, "typeDescription", "TypeDescription", "productClass", "ProductClass", "kind", "Kind"))</td>
+                                        <td class="px-3 py-2 text-right">@impQty.ToString("N0")</td>
+                                        <td class="px-3 py-2 text-right">@Money(impUnit)</td>
+                                        <td class="px-3 py-2 text-right font-bold">@Money(impMv)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else if (Model.LandDetails?.TDNLandImprovements != null && Model.LandDetails.TDNLandImprovements.Any())
+                {
+                    <div class="overflow-x-auto rounded-2xl border border-slate-200 dark:border-stone-800">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 dark:bg-stone-950 border-b border-slate-200 dark:border-stone-800 text-[10px] uppercase text-slate-500">
+                                    <th class="px-3 py-2">Improvement / Kind</th>
+                                    <th class="px-3 py-2 text-right">Quantity</th>
+                                    <th class="px-3 py-2 text-right">Unit Value</th>
+                                    <th class="px-3 py-2 text-right">Market Value</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200 dark:divide-stone-800">
+                                @foreach (var imp in Model.LandDetails.TDNLandImprovements.OrderBy(i => i.OrderNo))
+                                {
+                                    <tr>
+                                        <td class="px-3 py-2 font-bold">@Dash(imp.ProductClass)</td>
+                                        <td class="px-3 py-2 text-right">@imp.Quantity.ToString("N0")</td>
+                                        <td class="px-3 py-2 text-right">@Money(imp.UnitValue)</td>
+                                        <td class="px-3 py-2 text-right font-bold">@Money(imp.MarketValue)</td>
                                     </tr>
                                 }
                             </tbody>

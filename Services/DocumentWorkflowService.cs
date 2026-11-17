@@ -12,19 +12,25 @@ public class DocumentWorkflowService : IDocumentWorkflowService
     private readonly ILandHoldingRequestService _lhService;
     private readonly ITaxMappingService _tmService;
     private readonly IPhilSmsService? _philSmsService;
+    private readonly IPropertyAssessmentRequestService? _rpaService;
+    private readonly IRequestForInspectionService? _rfiService;
 
     public DocumentWorkflowService(
         ApplicationDbContext context,
         ITaxDeclarationRequestService tdService,
         ILandHoldingRequestService lhService,
         ITaxMappingService tmService,
-        IPhilSmsService? philSmsService = null)
+        IPhilSmsService? philSmsService = null,
+        IPropertyAssessmentRequestService? rpaService = null,
+        IRequestForInspectionService? rfiService = null)
     {
         _context = context;
         _tdService = tdService;
         _lhService = lhService;
         _tmService = tmService;
         _philSmsService = philSmsService;
+        _rpaService = rpaService;
+        _rfiService = rfiService;
 
         EnsureSeedSettings();
     }
@@ -501,7 +507,10 @@ public class DocumentWorkflowService : IDocumentWorkflowService
                 }
             }
         }
-        else if (requestType == "RequestForInspection")
+        RequestForInspection? rfiToSync = null;
+        PropertyAssessmentRequest? rpaToSync = null;
+
+        if (requestType == "RequestForInspection")
         {
             var item = _context.RequestForInspections.FirstOrDefault(r => r.Id == requestId);
             if (item != null)
@@ -517,6 +526,7 @@ public class DocumentWorkflowService : IDocumentWorkflowService
                     item.Status = (RequestForInspectionStatus)targetStatusId;
 
                 _context.SaveChanges();
+                rfiToSync = item;
                 bool isNowApproved = item.Status >= RequestForInspectionStatus.Approval && item.Status != RequestForInspectionStatus.Deferred;
                 if (!wasApproved && isNowApproved)
                 {
@@ -545,8 +555,8 @@ public class DocumentWorkflowService : IDocumentWorkflowService
                 else if (Enum.IsDefined(typeof(PropertyAssessmentStatus), targetStatusId))
                     item.Status = (PropertyAssessmentStatus)targetStatusId;
 
-                SyncPropertyAssessmentPartitionTaxDeclarations(item);
                 _context.SaveChanges();
+                rpaToSync = item;
                 bool isNowApproved = item.Status >= PropertyAssessmentStatus.Approved && item.Status != PropertyAssessmentStatus.Deferred;
                 if (!wasApproved && isNowApproved)
                 {
@@ -595,6 +605,18 @@ public class DocumentWorkflowService : IDocumentWorkflowService
 
         _context.DocumentForwardingLogs.Add(log);
         _context.SaveChanges();
+
+        if (rpaToSync != null)
+        {
+            if (_rpaService != null)
+                _rpaService.SyncPartitionTaxDeclarationStatuses(rpaToSync);
+            else
+                SyncPropertyAssessmentPartitionTaxDeclarations(rpaToSync);
+        }
+        if (rfiToSync != null && _rfiService != null)
+        {
+            _rfiService.SyncPartitionTaxDeclarationStatuses(rfiToSync);
+        }
 
         if (shouldSendApprovalSms)
         {

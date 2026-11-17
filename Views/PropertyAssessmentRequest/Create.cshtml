@@ -1724,6 +1724,10 @@
                         if (draft.contactNo && document.querySelector('input[name="ContactNo"]')) document.querySelector('input[name="ContactNo"]').value = draft.contactNo;
                         if (draft.address && document.querySelector('input[name="Address"]')) document.querySelector('input[name="Address"]').value = draft.address;
                         if (draft.requestor && document.querySelector('input[name="Requestor"]')) document.querySelector('input[name="Requestor"]').value = draft.requestor;
+                        if (draft.propertyLocation && document.getElementById('locationInput')) document.getElementById('locationInput').value = draft.propertyLocation;
+                        if (draft.orNumber && document.querySelector('input[name="ORNumber"]')) document.querySelector('input[name="ORNumber"]').value = draft.orNumber;
+                        if (draft.orDateIssued && document.querySelector('input[name="ORDateIssued"]')) document.querySelector('input[name="ORDateIssued"]').value = draft.orDateIssued;
+                        if (draft.ownerId && document.getElementById('requestOwnerIdInput')) document.getElementById('requestOwnerIdInput').value = draft.ownerId;
                         if (draft.purpose && document.querySelector('input[name="Purpose"]')) document.querySelector('input[name="Purpose"]').value = draft.purpose;
                         if (draft.notes && document.querySelector('textarea[name="Notes"]')) document.querySelector('textarea[name="Notes"]').value = draft.notes;
                         if (draft.status && document.querySelector('select[name="Status"]')) document.querySelector('select[name="Status"]').value = draft.status;
@@ -1769,6 +1773,16 @@
                             if (!draft.kind && generatedPartitions[0]?.kind && document.getElementById('kindSelect')) {
                                 document.getElementById('kindSelect').value = generatedPartitions[0].kind;
                             }
+                            renderPartitionsTable();
+                        }
+                    }
+                }
+                else {
+                    const serverPartJson = document.getElementById('GeneratedPartitionsJson')?.value;
+                    if (serverPartJson && serverPartJson.trim().startsWith('[') && serverPartJson.trim().length > 2) {
+                        const parsedParts = JSON.parse(serverPartJson);
+                        if (Array.isArray(parsedParts) && parsedParts.length > 0) {
+                            generatedPartitions = parsedParts;
                             renderPartitionsTable();
                         }
                     }
@@ -2650,6 +2664,10 @@
                 contactNo: document.querySelector('input[name="ContactNo"]')?.value,
                 address: document.querySelector('input[name="Address"]')?.value,
                 requestor: document.querySelector('input[name="Requestor"]')?.value,
+                propertyLocation: document.getElementById('locationInput')?.value,
+                orNumber: document.querySelector('input[name="ORNumber"]')?.value,
+                orDateIssued: document.querySelector('input[name="ORDateIssued"]')?.value,
+                ownerId: document.getElementById('requestOwnerIdInput')?.value,
                 purpose: document.querySelector('input[name="Purpose"]')?.value,
                 notes: document.querySelector('textarea[name="Notes"]')?.value,
                 status: document.querySelector('select[name="Status"]')?.value,

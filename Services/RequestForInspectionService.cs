@@ -406,7 +406,7 @@ public class RequestForInspectionService : IRequestForInspectionService
                 if (partitions.Count > 0)
                 {
                     tdnList = partitions
-                        .Where(p => !string.IsNullOrWhiteSpace(p.SystemGeneratedTDN) && !CastTdGenerator.IsUnapprovedCastTd(p.SystemGeneratedTDN))
+                        .Where(p => !string.IsNullOrWhiteSpace(p.SystemGeneratedTDN))
                         .Select(p => p.SystemGeneratedTDN)
                         .Where(s => !string.IsNullOrWhiteSpace(s))
                         .Distinct()
@@ -429,6 +429,21 @@ public class RequestForInspectionService : IRequestForInspectionService
             .Where(t => (tdnList.Count > 0 && tdnList.Contains(t.TaxDeclarationNumber)) ||
                         (!string.IsNullOrEmpty(trackingToken) && t.Memoranda != null && t.Memoranda.Contains(trackingToken)))
             .ToList();
+
+        if (partitions.Count > 0 && tds.Count > partitions.Count)
+        {
+            var expectedPins = partitions.Select(p => p.PIN?.Trim()).Where(s => !string.IsNullOrEmpty(s)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var expectedArps = partitions.Select(p => p.ARPNo?.Trim()).Where(s => !string.IsNullOrEmpty(s) && s != CastTdGenerator.DefaultArpNumber).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var expectedOwners = partitions.Select(p => p.NewOwnerName?.Trim()).Where(s => !string.IsNullOrEmpty(s)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (!string.IsNullOrWhiteSpace(request.OwnerName)) expectedOwners.Add(request.OwnerName.Trim());
+
+            tds = tds.Where(t =>
+                (!string.IsNullOrEmpty(trackingToken) && t.Memoranda != null && t.Memoranda.Contains(trackingToken)) ||
+                !CastTdGenerator.IsUnapprovedCastTd(t.TaxDeclarationNumber) ||
+                expectedPins.Contains(t.PropertyIndexNumber) ||
+                expectedArps.Contains(t.ARPNo) ||
+                expectedOwners.Contains(t.OwnerName)).ToList();
+        }
 
         var wfSig = PropertyAssessmentRequestService.ResolveWorkflowSignatories(_context, request.Id, request.TrackingNumber, request.Representative ?? request.ContactPerson);
         bool partitionsModified = false;
