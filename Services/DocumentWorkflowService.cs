@@ -11,17 +11,20 @@ public class DocumentWorkflowService : IDocumentWorkflowService
     private readonly ITaxDeclarationRequestService _tdService;
     private readonly ILandHoldingRequestService _lhService;
     private readonly ITaxMappingService _tmService;
+    private readonly IPhilSmsService? _philSmsService;
 
     public DocumentWorkflowService(
         ApplicationDbContext context,
         ITaxDeclarationRequestService tdService,
         ILandHoldingRequestService lhService,
-        ITaxMappingService tmService)
+        ITaxMappingService tmService,
+        IPhilSmsService? philSmsService = null)
     {
         _context = context;
         _tdService = tdService;
         _lhService = lhService;
         _tmService = tmService;
+        _philSmsService = philSmsService;
 
         EnsureSeedSettings();
     }
@@ -409,17 +412,24 @@ public class DocumentWorkflowService : IDocumentWorkflowService
             || targetStatusId == (int) TaxMappingRequestStatus.Released
             || targetStatusId == (int) TaxDeclarationRequestStatus.Released));
         bool isDeferred = (actionTaken == "Returned" || targetStage == WorkflowStage.Returned || actionTaken == "Deferred");
+        bool isApprovedForReleasing = !isDeferred && (targetStage == WorkflowStage.Releasing || targetStage == WorkflowStage.ReleasingGIS || targetStage == WorkflowStage.ReleasingRecords);
+        bool shouldSendApprovalSms = false;
+        string? smsContactNo = null;
+        string? smsOwnerName = null;
+        Guid? smsOwnerId = null;
+        string? smsRefNo = null;
 
         if (requestType == "TaxDeclarationRequest")
         {
             var item = _tdService.GetById(requestId);
             if (item != null)
             {
+                bool wasApproved = item.Status == RequestStatus.Approved;
                 trackingNo = item.TrackingNumber;
                 item.UpdatedDate = DateTime.Now;
                 if (!string.IsNullOrWhiteSpace(orNumber)) item.ORNumber = orNumber.Trim();
                 if (orDateIssued.HasValue) item.ORDateIssued = orDateIssued.Value;
-                if (isCompleted)
+                if (isCompleted || isApprovedForReleasing)
                     item.Status = RequestStatus.Approved;
                 else if (isDeferred)
                     item.Status = RequestStatus.Rejected;
@@ -427,6 +437,13 @@ public class DocumentWorkflowService : IDocumentWorkflowService
                     item.Status = RequestStatus.UnderReview;
                 
                 _tdService.Update(item, null, "");
+                if (!wasApproved && item.Status == RequestStatus.Approved)
+                {
+                    shouldSendApprovalSms = true;
+                    smsContactNo = item.ContactNo;
+                    smsOwnerName = item.OwnerName;
+                    smsRefNo = item.TrackingNumber;
+                }
             }
         }
         else if (requestType == "LandHoldingRequest")
@@ -434,11 +451,12 @@ public class DocumentWorkflowService : IDocumentWorkflowService
             var item = _lhService.GetById(requestId);
             if (item != null)
             {
+                bool wasApproved = item.Status == LandHoldingRequestStatus.Approved;
                 trackingNo = item.TrackingNumber;
                 item.UpdatedDate = DateTime.Now;
                 if (!string.IsNullOrWhiteSpace(orNumber)) item.ORNumber = orNumber.Trim();
                 if (orDateIssued.HasValue) item.ORDateIssued = orDateIssued.Value;
-                if (isCompleted)
+                if (isCompleted || isApprovedForReleasing)
                     item.Status = LandHoldingRequestStatus.Approved;
                 else if (isDeferred)
                     item.Status = LandHoldingRequestStatus.Rejected;
@@ -446,6 +464,13 @@ public class DocumentWorkflowService : IDocumentWorkflowService
                     item.Status = LandHoldingRequestStatus.Processing;
 
                 _lhService.Update(item, null, "");
+                if (!wasApproved && item.Status == LandHoldingRequestStatus.Approved)
+                {
+                    shouldSendApprovalSms = true;
+                    smsContactNo = item.ContactNo;
+                    smsOwnerName = item.OwnerName;
+                    smsRefNo = item.TrackingNumber;
+                }
             }
         }
         else if (requestType == "TaxMappingRequest")
@@ -453,11 +478,12 @@ public class DocumentWorkflowService : IDocumentWorkflowService
             var item = _tmService.GetById(requestId);
             if (item != null)
             {
+                bool wasApproved = item.Status == RequestStatus.Approved;
                 trackingNo = item.RequestNumber;
                 item.UpdatedDate = DateTime.Now;
                 if (!string.IsNullOrWhiteSpace(orNumber)) item.ORNumber = orNumber.Trim();
                 if (orDateIssued.HasValue) item.ORDateIssued = orDateIssued.Value;
-                if (isCompleted)
+                if (isCompleted || isApprovedForReleasing)
                     item.Status = RequestStatus.Approved;
                 else if (isDeferred)
                     item.Status = RequestStatus.Rejected;
@@ -465,6 +491,14 @@ public class DocumentWorkflowService : IDocumentWorkflowService
                     item.Status = RequestStatus.UnderReview;
 
                 _tmService.Update(item, null, "");
+                if (!wasApproved && item.Status == RequestStatus.Approved)
+                {
+                    shouldSendApprovalSms = true;
+                    smsContactNo = item.OwnerContactNo;
+                    smsOwnerName = item.ApplicantName;
+                    smsOwnerId = item.OwnerId;
+                    smsRefNo = item.RequestNumber;
+                }
             }
         }
         else if (requestType == "RequestForInspection")
@@ -472,6 +506,7 @@ public class DocumentWorkflowService : IDocumentWorkflowService
             var item = _context.RequestForInspections.FirstOrDefault(r => r.Id == requestId);
             if (item != null)
             {
+                bool wasApproved = item.Status >= RequestForInspectionStatus.Approval && item.Status != RequestForInspectionStatus.Deferred;
                 trackingNo = item.TrackingNumber;
                 item.UpdatedDate = DateTime.Now;
                 if (isCompleted)
@@ -482,6 +517,15 @@ public class DocumentWorkflowService : IDocumentWorkflowService
                     item.Status = (RequestForInspectionStatus)targetStatusId;
 
                 _context.SaveChanges();
+                bool isNowApproved = item.Status >= RequestForInspectionStatus.Approval && item.Status != RequestForInspectionStatus.Deferred;
+                if (!wasApproved && isNowApproved)
+                {
+                    shouldSendApprovalSms = true;
+                    smsContactNo = item.ContactNumber;
+                    smsOwnerName = item.OwnerName;
+                    smsOwnerId = item.OwnerId;
+                    smsRefNo = item.TrackingNumber;
+                }
             }
         }
         else if (requestType == "PropertyAssessmentRequest")
@@ -489,6 +533,7 @@ public class DocumentWorkflowService : IDocumentWorkflowService
             var item = _context.PropertyAssessmentRequests.FirstOrDefault(r => r.Id == requestId);
             if (item != null)
             {
+                bool wasApproved = item.Status >= PropertyAssessmentStatus.Approved && item.Status != PropertyAssessmentStatus.Deferred;
                 if (!string.IsNullOrWhiteSpace(orNumber)) item.ORNumber = orNumber.Trim();
                 if (orDateIssued.HasValue) item.ORDateIssued = orDateIssued.Value;
                 trackingNo = item.TrackingNumber;
@@ -502,6 +547,15 @@ public class DocumentWorkflowService : IDocumentWorkflowService
 
                 SyncPropertyAssessmentPartitionTaxDeclarations(item);
                 _context.SaveChanges();
+                bool isNowApproved = item.Status >= PropertyAssessmentStatus.Approved && item.Status != PropertyAssessmentStatus.Deferred;
+                if (!wasApproved && isNowApproved)
+                {
+                    shouldSendApprovalSms = true;
+                    smsContactNo = item.ContactNo;
+                    smsOwnerName = !string.IsNullOrWhiteSpace(item.NewOwnerName) ? item.NewOwnerName : item.Requestor;
+                    smsOwnerId = item.OwnerId;
+                    smsRefNo = item.TrackingNumber;
+                }
             }
         }
 
@@ -542,7 +596,86 @@ public class DocumentWorkflowService : IDocumentWorkflowService
         _context.DocumentForwardingLogs.Add(log);
         _context.SaveChanges();
 
+        if (shouldSendApprovalSms)
+        {
+            TrySendApprovalSmsNotification(
+                requestType,
+                smsContactNo,
+                smsOwnerName,
+                smsOwnerId,
+                string.IsNullOrWhiteSpace(smsRefNo) ? trackingNo : smsRefNo!,
+                forwardedByName);
+        }
+
         return log;
+    }
+
+    public static string BuildApprovalSmsTemplate(string requestType, string ownerName, string refNo)
+    {
+        var safeOwner = string.IsNullOrWhiteSpace(ownerName) ? "Valued Taxpayer" : ownerName.Trim();
+        var safeRef = string.IsNullOrWhiteSpace(refNo) ? "your transaction" : refNo.Trim();
+
+        return requestType switch
+        {
+            "PropertyAssessmentRequest" =>
+                $"Dear {safeOwner}, your Property Assessment Request ({safeRef}) has been APPROVED by the City Assessor's Office. Your Tax Declaration is now queued for printing and releasing. Please wait for the releasing schedule or present your O.R./claim stub. - City Assessor's Office",
+            "RequestForInspection" =>
+                $"Dear {safeOwner}, your Request for Inspection ({safeRef}) has been APPROVED by the City Assessor's Office. Your assessment/FAAS record is now queued for printing and releasing. - City Assessor's Office",
+            "LandHoldingRequest" =>
+                $"Dear {safeOwner}, your Certificate of Property Holdings / Land Holding Request ({safeRef}) has been APPROVED by the City Assessor's Office and is now ready for printing and releasing. - City Assessor's Office",
+            "TaxMappingRequest" =>
+                $"Dear {safeOwner}, your Tax Mapping Request ({safeRef}) has been APPROVED by the City Assessor's Office (GIS Division) and is now ready for printing and releasing. - City Assessor's Office",
+            "TaxDeclarationRequest" =>
+                $"Dear {safeOwner}, your Tax Declaration Request ({safeRef}) has been APPROVED by the City Assessor's Office and is now ready for printing and releasing. - City Assessor's Office",
+            _ =>
+                $"Dear {safeOwner}, your request ({safeRef}) has been APPROVED by the City Assessor's Office and is now ready for printing and releasing. - City Assessor's Office"
+        };
+    }
+
+    private void TrySendApprovalSmsNotification(
+        string requestType,
+        string? contactNo,
+        string? ownerName,
+        Guid? ownerId,
+        string refNo,
+        string? sentBy)
+    {
+        if (_philSmsService == null) return;
+
+        var phone = contactNo?.Trim();
+        if (string.IsNullOrWhiteSpace(phone) && ownerId.HasValue && ownerId.Value != Guid.Empty)
+        {
+            phone = _context.TaxpayerOwners
+                .AsNoTracking()
+                .Where(o => o.Id == ownerId.Value)
+                .Select(o => o.ContactNo)
+                .FirstOrDefault()
+                ?.Trim();
+        }
+
+        if (string.IsNullOrWhiteSpace(phone)) return;
+
+        var message = BuildApprovalSmsTemplate(requestType, ownerName ?? string.Empty, refNo);
+        var smsService = _philSmsService;
+        var recipientName = string.IsNullOrWhiteSpace(ownerName) ? null : ownerName.Trim();
+        var senderUser = string.IsNullOrWhiteSpace(sentBy) ? "System Approval" : sentBy.Trim();
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await smsService.SendSmsAsync(
+                    recipient: phone,
+                    message: message,
+                    ownerId: ownerId,
+                    recipientName: recipientName,
+                    sentBy: senderUser);
+            }
+            catch
+            {
+                // Do not block workflow approval if SMS gateway fails
+            }
+        });
     }
 
     public bool ClaimDocument(Guid requestId, string requestType, Guid userId, string userName)
@@ -558,7 +691,9 @@ public class DocumentWorkflowService : IDocumentWorkflowService
             // Auto-create initial receiving log and claim it immediately (CAST Pool -> Checkout logic)
             var division = (requestType == "TaxMappingRequest") 
                 ? DivisionType.Division2_GIS_TaxMapping 
-                : (requestType == "LandHoldingRequest" ? DivisionType.Division3_RecordsAndCertification : DivisionType.Division1_TaxAssessmentAndLandHolding);
+                : ((requestType == "LandHoldingRequest" || requestType == "TaxDeclarationRequest")
+                    ? DivisionType.Division3_RecordsAndCertification
+                    : DivisionType.Division1_TaxAssessmentAndLandHolding);
 
             string trackingNo = "TRK-" + requestId.ToString().Substring(0, 8);
             if (requestType == "TaxDeclarationRequest")

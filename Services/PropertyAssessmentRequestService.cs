@@ -171,6 +171,7 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                         var effectiveOwnerTin = !string.IsNullOrWhiteSpace(p.OwnerTIN) ? p.OwnerTIN : (request.OwnerTIN ?? string.Empty);
                         var resolvedOwnerId = ResolveOwnerId(p.OwnerId ?? request.OwnerId, effectiveOwnerTin, effectiveOwnerName);
                         p.OwnerId = resolvedOwnerId;
+                        var wfSig = ResolveWorkflowSignatories(_context, request.Id, request.TrackingNumber, request.Requestor);
 
                         var newTd = new TaxDeclaration
                         {
@@ -221,19 +222,19 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                                                 ? $"Reassessed due to Physical Change (PC) Â· Renovation / Expansion under Assessment Request #{request.TrackingNumber}. Supersedes prior TD #{refTd?.TaxDeclarationNumber ?? request.PrevTDN} (PIN: #{refTd?.PropertyIndexNumber ?? request.PrevPIN}) with upward adjustment in Fair Market Value and Assessed Value following structural renovation/expansion."
                                                 : $"Created from Assessment Partition Request {request.TrackingNumber} (Partition {p.PartitionIndex}, Duplicated from {p.BaseTDN}).")))),
                             Status = (request.Status >= PropertyAssessmentStatus.Approved && request.Status != PropertyAssessmentStatus.Deferred) ? AssessmentStatus.Active : AssessmentStatus.Pending,
-                            AppraisedByName = !string.IsNullOrWhiteSpace(p.AppraisedByName) ? (string.IsNullOrWhiteSpace(p.AppraisedByPosition) ? p.AppraisedByName : $"{p.AppraisedByName} ({p.AppraisedByPosition})") : "Elena G. Reyes (Property Appraiser)",
-                            DateAppraised = p.DateAppraised ?? DateTime.Now,
-                            AssessedByName = !string.IsNullOrWhiteSpace(p.AssessedByName) ? (string.IsNullOrWhiteSpace(p.AssessedByPosition) ? p.AssessedByName : $"{p.AssessedByName} ({p.AssessedByPosition})") : "Marcus Aurelius Santos (Assessment Officer)",
-                            DateAssessed = p.DateAssessed ?? DateTime.Now,
-                            RecommendingApprovalName = !string.IsNullOrWhiteSpace(p.RecommendingApprovalName) ? (string.IsNullOrWhiteSpace(p.RecommendingApprovalPosition) ? p.RecommendingApprovalName : $"{p.RecommendingApprovalName} ({p.RecommendingApprovalPosition})") : "Engr. Roberto M. Dela Rosa (Assistant Assessor)",
-                            DateRecommended = p.DateRecommended ?? DateTime.Now,
-                            ApprovedByName = !string.IsNullOrWhiteSpace(p.ApprovedByName) ? p.ApprovedByName : "Atty. Clarissa V. Mendoza (City Assessor)",
-                            DateApproved = p.DateApproved ?? DateTime.Now,
-                            EntryInRollName = !string.IsNullOrWhiteSpace(p.EntryInRollName) ? p.EntryInRollName : "Patricia Ann Villanueva",
-                            EntryInRollPosition = !string.IsNullOrWhiteSpace(p.EntryInRollPosition) ? p.EntryInRollPosition : "Assessment Roll Clerk",
-                            EntryInRollDate = p.EntryInRollDate ?? DateTime.Now,
-                            DateEncoded = p.DateEncoded ?? DateTime.Now,
-                            EncodedByName = !string.IsNullOrWhiteSpace(p.EncodedByName) ? (string.IsNullOrWhiteSpace(p.EncodedByPosition) ? p.EncodedByName : $"{p.EncodedByName} ({p.EncodedByPosition})") : (request.Requestor ?? "System Appraiser"),
+                            AppraisedByName = !string.IsNullOrWhiteSpace(p.AppraisedByName) ? (string.IsNullOrWhiteSpace(p.AppraisedByPosition) ? p.AppraisedByName : $"{p.AppraisedByName} ({p.AppraisedByPosition})") : wfSig.AppraisedByName,
+                            DateAppraised = p.DateAppraised ?? wfSig.DateAppraised,
+                            AssessedByName = !string.IsNullOrWhiteSpace(p.AssessedByName) ? (string.IsNullOrWhiteSpace(p.AssessedByPosition) ? p.AssessedByName : $"{p.AssessedByName} ({p.AssessedByPosition})") : wfSig.AssessedByName,
+                            DateAssessed = p.DateAssessed ?? wfSig.DateAssessed ?? DateTime.Now,
+                            RecommendingApprovalName = !string.IsNullOrWhiteSpace(p.RecommendingApprovalName) ? (string.IsNullOrWhiteSpace(p.RecommendingApprovalPosition) ? p.RecommendingApprovalName : $"{p.RecommendingApprovalName} ({p.RecommendingApprovalPosition})") : wfSig.RecommendingApprovalName,
+                            DateRecommended = p.DateRecommended ?? wfSig.DateRecommended,
+                            ApprovedByName = !string.IsNullOrWhiteSpace(p.ApprovedByName) ? p.ApprovedByName : wfSig.ApprovedByName,
+                            DateApproved = p.DateApproved ?? wfSig.DateApproved,
+                            EntryInRollName = !string.IsNullOrWhiteSpace(p.EntryInRollName) ? p.EntryInRollName : wfSig.EntryInRollName,
+                            EntryInRollPosition = !string.IsNullOrWhiteSpace(p.EntryInRollPosition) ? p.EntryInRollPosition : wfSig.EntryInRollPosition,
+                            EntryInRollDate = p.EntryInRollDate ?? wfSig.EntryInRollDate,
+                            DateEncoded = p.DateEncoded ?? wfSig.DateEncoded ?? DateTime.Now,
+                            EncodedByName = !string.IsNullOrWhiteSpace(p.EncodedByName) ? (string.IsNullOrWhiteSpace(p.EncodedByPosition) ? p.EncodedByName : $"{p.EncodedByName} ({p.EncodedByPosition})") : (wfSig.EncodedByName ?? request.Requestor ?? string.Empty),
 
                             // CAST Building & Structural characteristics
                             BuildingClassification = p.BuildingClassification,
@@ -546,6 +547,7 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                         (!string.IsNullOrEmpty(trackingToken) && t.Memoranda != null && t.Memoranda.Contains(trackingToken)))
             .ToList();
 
+        var wfSig = ResolveWorkflowSignatories(_context, request.Id, request.TrackingNumber, request.Requestor);
         bool partitionsModified = false;
         foreach (var td in tds)
         {
@@ -675,6 +677,7 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
 
                 if (isApproved)
                 {
+                    ApplyWorkflowSignatories(td, matchingPartition, wfSig);
                     // Approved request: assign official positive sequential series (not 00000)
                     bool needsSequence = string.IsNullOrWhiteSpace(currentTd)
                                       || CastTdGenerator.IsUnapprovedCastTd(currentTd)
@@ -1076,6 +1079,7 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
             var effectiveConfOwnerName = !string.IsNullOrWhiteSpace(conf?.NewOwnerName) ? conf.NewOwnerName : request.NewOwnerName;
             var effectiveConfOwnerTin = !string.IsNullOrWhiteSpace(conf?.OwnerTIN) ? conf.OwnerTIN : (request.OwnerTIN ?? string.Empty);
             var resolvedConfOwnerId = ResolveOwnerId(conf?.OwnerId ?? request.OwnerId, effectiveConfOwnerTin, effectiveConfOwnerName);
+            var wfSigSingle = ResolveWorkflowSignatories(_context, request.Id, request.TrackingNumber, request.Requestor);
 
             var newTd = new TaxDeclaration
             {
@@ -1135,19 +1139,19 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                                             : $"Created from Partition Request {request.TrackingNumber} (Partition {letterSuffix} of {partitionCount}). Previous TD: {request.PrevTDN}")))))),
                 TransactionCode = request.TransactionTypeCode,
                 Status = (request.Status >= PropertyAssessmentStatus.Approved && request.Status != PropertyAssessmentStatus.Deferred) ? AssessmentStatus.Active : AssessmentStatus.Pending,
-                AppraisedByName = !string.IsNullOrWhiteSpace(conf?.AppraisedByName) ? (string.IsNullOrWhiteSpace(conf.AppraisedByPosition) ? conf.AppraisedByName : $"{conf.AppraisedByName} ({conf.AppraisedByPosition})") : "Elena G. Reyes (Property Appraiser)",
-                DateAppraised = conf?.DateAppraised ?? DateTime.Now,
-                AssessedByName = !string.IsNullOrWhiteSpace(conf?.AssessedByName) ? (string.IsNullOrWhiteSpace(conf.AssessedByPosition) ? conf.AssessedByName : $"{conf.AssessedByName} ({conf.AssessedByPosition})") : "Marcus Aurelius Santos (Assessment Officer)",
-                DateAssessed = conf?.DateAssessed ?? DateTime.Now,
-                RecommendingApprovalName = !string.IsNullOrWhiteSpace(conf?.RecommendingApprovalName) ? (string.IsNullOrWhiteSpace(conf.RecommendingApprovalPosition) ? conf.RecommendingApprovalName : $"{conf.RecommendingApprovalName} ({conf.RecommendingApprovalPosition})") : "Engr. Roberto M. Dela Rosa (Assistant Assessor)",
-                DateRecommended = conf?.DateRecommended ?? DateTime.Now,
-                ApprovedByName = !string.IsNullOrWhiteSpace(conf?.ApprovedByName) ? conf.ApprovedByName : "Atty. Clarissa V. Mendoza (City Assessor)",
-                DateApproved = conf?.DateApproved ?? DateTime.Now,
-                EntryInRollName = !string.IsNullOrWhiteSpace(conf?.EntryInRollName) ? conf.EntryInRollName : "Patricia Ann Villanueva",
-                EntryInRollPosition = !string.IsNullOrWhiteSpace(conf?.EntryInRollPosition) ? conf.EntryInRollPosition : "Assessment Roll Clerk",
-                EntryInRollDate = conf?.EntryInRollDate ?? DateTime.Now,
-                DateEncoded = conf?.DateEncoded ?? DateTime.Now,
-                EncodedByName = !string.IsNullOrWhiteSpace(conf?.EncodedByName) ? (string.IsNullOrWhiteSpace(conf.EncodedByPosition) ? conf.EncodedByName : $"{conf.EncodedByName} ({conf.EncodedByPosition})") : (request.Requestor ?? "System Appraiser"),
+                AppraisedByName = !string.IsNullOrWhiteSpace(conf?.AppraisedByName) ? (string.IsNullOrWhiteSpace(conf.AppraisedByPosition) ? conf.AppraisedByName : $"{conf.AppraisedByName} ({conf.AppraisedByPosition})") : wfSigSingle.AppraisedByName,
+                DateAppraised = conf?.DateAppraised ?? wfSigSingle.DateAppraised,
+                AssessedByName = !string.IsNullOrWhiteSpace(conf?.AssessedByName) ? (string.IsNullOrWhiteSpace(conf.AssessedByPosition) ? conf.AssessedByName : $"{conf.AssessedByName} ({conf.AssessedByPosition})") : wfSigSingle.AssessedByName,
+                DateAssessed = conf?.DateAssessed ?? wfSigSingle.DateAssessed ?? DateTime.Now,
+                RecommendingApprovalName = !string.IsNullOrWhiteSpace(conf?.RecommendingApprovalName) ? (string.IsNullOrWhiteSpace(conf.RecommendingApprovalPosition) ? conf.RecommendingApprovalName : $"{conf.RecommendingApprovalName} ({conf.RecommendingApprovalPosition})") : wfSigSingle.RecommendingApprovalName,
+                DateRecommended = conf?.DateRecommended ?? wfSigSingle.DateRecommended,
+                ApprovedByName = !string.IsNullOrWhiteSpace(conf?.ApprovedByName) ? conf.ApprovedByName : wfSigSingle.ApprovedByName,
+                DateApproved = conf?.DateApproved ?? wfSigSingle.DateApproved,
+                EntryInRollName = !string.IsNullOrWhiteSpace(conf?.EntryInRollName) ? conf.EntryInRollName : wfSigSingle.EntryInRollName,
+                EntryInRollPosition = !string.IsNullOrWhiteSpace(conf?.EntryInRollPosition) ? conf.EntryInRollPosition : wfSigSingle.EntryInRollPosition,
+                EntryInRollDate = conf?.EntryInRollDate ?? wfSigSingle.EntryInRollDate,
+                DateEncoded = conf?.DateEncoded ?? wfSigSingle.DateEncoded ?? DateTime.Now,
+                EncodedByName = !string.IsNullOrWhiteSpace(conf?.EncodedByName) ? (string.IsNullOrWhiteSpace(conf.EncodedByPosition) ? conf.EncodedByName : $"{conf.EncodedByName} ({conf.EncodedByPosition})") : (wfSigSingle.EncodedByName ?? request.Requestor ?? string.Empty),
 
                 // Building Specs
                 OccupancyPermitNo = conf?.OccupancyPermitNo ?? string.Empty,
@@ -1459,5 +1463,127 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
         if (dep != null) return dep.PercentDepreciated;
 
         return Math.Min(age * 2.0m, 80m);
+    }
+
+    public sealed class WorkflowSignatoriesInfo
+    {
+        public string? EncodedByName { get; set; }
+        public DateTime? DateEncoded { get; set; }
+        public string? AppraisedByName { get; set; }
+        public DateTime? DateAppraised { get; set; }
+        public string? AssessedByName { get; set; }
+        public DateTime? DateAssessed { get; set; }
+        public string? RecommendingApprovalName { get; set; }
+        public DateTime? DateRecommended { get; set; }
+        public string? ApprovedByName { get; set; }
+        public DateTime? DateApproved { get; set; }
+        public string? EntryInRollName { get; set; }
+        public string? EntryInRollPosition { get; set; }
+        public DateTime? EntryInRollDate { get; set; }
+    }
+
+    public static WorkflowSignatoriesInfo ResolveWorkflowSignatories(
+        ApplicationDbContext context,
+        Guid requestId,
+        string? trackingNumber,
+        string? fallbackEncodedBy = null)
+    {
+        var logs = context.DocumentForwardingLogs
+            .AsNoTracking()
+            .Where(l => l.RequestId == requestId || (!string.IsNullOrEmpty(trackingNumber) && l.TrackingNumber == trackingNumber))
+            .OrderBy(l => l.Timestamp)
+            .ToList();
+
+        (string? Name, string? Role, DateTime? Date) PickStage(params WorkflowStage[] stages)
+        {
+            var forwarded = logs.LastOrDefault(l => stages.Contains(l.FromStage) && !string.IsNullOrWhiteSpace(l.ForwardedByName));
+            if (forwarded != null)
+            {
+                return (forwarded.ForwardedByName.Trim(), forwarded.ForwardedByRole?.Trim(), forwarded.Timestamp);
+            }
+
+            var assigned = logs.LastOrDefault(l => stages.Contains(l.ToStage) && !string.IsNullOrWhiteSpace(l.AssignedUserName));
+            if (assigned != null)
+            {
+                return (assigned.AssignedUserName!.Trim(), assigned.AssignedToRole?.Trim(), assigned.Timestamp);
+            }
+
+            return (null, null, null);
+        }
+
+        static string? FormatWithRole(string? name, string? role)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return null;
+            return string.IsNullOrWhiteSpace(role) ? name : $"{name} ({role})";
+        }
+
+        var enc = PickStage(WorkflowStage.ClerkReceiving);
+        var app = PickStage(WorkflowStage.Inspection, WorkflowStage.Replotting);
+        var ass = PickStage(WorkflowStage.ValuationAndExamination, WorkflowStage.CheckAndReview);
+        var rec = PickStage(WorkflowStage.RecommendingApproval);
+
+        var apprLog = logs.LastOrDefault(l =>
+            l.FromStage == WorkflowStage.AssessorApproval ||
+            (l.ToStage == WorkflowStage.AssessorApproval && !string.IsNullOrWhiteSpace(l.ActionTaken) && l.ActionTaken.Contains("Approv", StringComparison.OrdinalIgnoreCase)));
+        string? apprName = apprLog != null && !string.IsNullOrWhiteSpace(apprLog.ForwardedByName)
+            ? FormatWithRole(apprLog.ForwardedByName.Trim(), apprLog.ForwardedByRole?.Trim())
+            : FormatWithRole(PickStage(WorkflowStage.AssessorApproval).Name, PickStage(WorkflowStage.AssessorApproval).Role);
+        DateTime? apprDate = apprLog?.Timestamp ?? PickStage(WorkflowStage.AssessorApproval).Date;
+
+        var roll = PickStage(WorkflowStage.Printing, WorkflowStage.Releasing);
+
+        return new WorkflowSignatoriesInfo
+        {
+            EncodedByName = FormatWithRole(enc.Name, enc.Role) ?? fallbackEncodedBy,
+            DateEncoded = enc.Date,
+            AppraisedByName = FormatWithRole(app.Name, app.Role),
+            DateAppraised = app.Date,
+            AssessedByName = FormatWithRole(ass.Name, ass.Role),
+            DateAssessed = ass.Date,
+            RecommendingApprovalName = FormatWithRole(rec.Name, rec.Role),
+            DateRecommended = rec.Date,
+            ApprovedByName = apprName,
+            DateApproved = apprDate,
+            EntryInRollName = roll.Name,
+            EntryInRollPosition = roll.Role,
+            EntryInRollDate = roll.Date
+        };
+    }
+
+    public static void ApplyWorkflowSignatories(TaxDeclaration td, AssessmentPartitionItem? p, WorkflowSignatoriesInfo wf)
+    {
+        if (td == null || wf == null) return;
+
+        if (string.IsNullOrWhiteSpace(p?.AppraisedByName) && !string.IsNullOrWhiteSpace(wf.AppraisedByName))
+        {
+            td.AppraisedByName = wf.AppraisedByName;
+            if (wf.DateAppraised.HasValue) td.DateAppraised = wf.DateAppraised;
+        }
+        if (string.IsNullOrWhiteSpace(p?.AssessedByName) && !string.IsNullOrWhiteSpace(wf.AssessedByName))
+        {
+            td.AssessedByName = wf.AssessedByName;
+            if (wf.DateAssessed.HasValue) td.DateAssessed = wf.DateAssessed.Value;
+        }
+        if (string.IsNullOrWhiteSpace(p?.RecommendingApprovalName) && !string.IsNullOrWhiteSpace(wf.RecommendingApprovalName))
+        {
+            td.RecommendingApprovalName = wf.RecommendingApprovalName;
+            if (wf.DateRecommended.HasValue) td.DateRecommended = wf.DateRecommended;
+        }
+        if (string.IsNullOrWhiteSpace(p?.ApprovedByName) && !string.IsNullOrWhiteSpace(wf.ApprovedByName))
+        {
+            td.ApprovedByName = wf.ApprovedByName;
+            if (wf.DateApproved.HasValue) td.DateApproved = wf.DateApproved;
+        }
+        if (string.IsNullOrWhiteSpace(p?.EntryInRollName) && !string.IsNullOrWhiteSpace(wf.EntryInRollName))
+        {
+            td.EntryInRollName = wf.EntryInRollName;
+            td.EntryInRollPosition = wf.EntryInRollPosition;
+            if (wf.EntryInRollDate.HasValue) td.EntryInRollDate = wf.EntryInRollDate;
+        }
+        if (string.IsNullOrWhiteSpace(p?.EncodedByName) && !string.IsNullOrWhiteSpace(wf.EncodedByName))
+        {
+            td.EncodedByName = wf.EncodedByName;
+            if (wf.DateEncoded.HasValue) td.DateEncoded = wf.DateEncoded.Value;
+        }
     }
 }

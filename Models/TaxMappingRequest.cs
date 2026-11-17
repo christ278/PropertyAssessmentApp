@@ -40,6 +40,8 @@ public class TaxMappingRequest
     public string ApplicantName { get; set; } = string.Empty;
 
     [Display(Name = "Owner Contact Number")]
+    [RegularExpression(@"^\s*(?:\+?63|0)?9\d{2}[\s\-\(\)]*\d{3}[\s\-\(\)]*\d{4}\s*$",
+        ErrorMessage = "Invalid SMS contact number format. Use 09XXXXXXXXX or +639XXXXXXXXX (e.g., 09171234567).")]
     public string? OwnerContactNo { get; set; }
 
     [Required(ErrorMessage = "Property Index No. (PIN) is required.")]

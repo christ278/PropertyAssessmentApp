@@ -2900,6 +2900,7 @@
         $('#inputBldgArpNo').val(arp);
         $('#inputMachineryArpNo').val(arp);
         $('#bannerDisplayArpNo').text(arp);
+        if ($('#bannerInputArpNo').length) $('#bannerInputArpNo').val(arp);
 
         const officialTdn = formatOfficialTDN(effYearVal, brgyVal, $('#inputTdn').val(), partitionIndex + 1);
         $('#inputTdn').val(officialTdn);
@@ -2919,6 +2920,14 @@
         $('#inputLandArpNo, #inputBldgArpNo, #inputMachineryArpNo').on('input', function() {
             const v = $(this).val().trim() || '187-00-0000-000-000';
             $('#bannerDisplayArpNo').text(v);
+            if ($('#bannerInputArpNo').length && $('#bannerInputArpNo').val() !== v) {
+                $('#bannerInputArpNo').val(v);
+            }
+        });
+        $('#bannerInputArpNo').on('input', function() {
+            const v = $(this).val().trim();
+            $('#bannerDisplayArpNo').text(v || '187-00-0000-000-000');
+            $('#inputLandArpNo, #inputBldgArpNo, #inputMachineryArpNo').val(v);
         });
         $('#selectLandBarangay, #inputLandSectionNo, #inputLandLotNo, #inputLandParcelNo, #inputLandEffYear, #selectMachineryBarangay, #inputMachinerySectionNo, #inputMachineryLotNo, #inputMachineryEffYear, #container-building-appraisal input[name="DistrictOrBarangay"], #inputBldgSectionNo, #inputLotNumber, #container-building-appraisal input[name="EffectivityYear"]').on('input change', function() {
             syncCastArpAndTdnLive();

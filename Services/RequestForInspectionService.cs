@@ -162,6 +162,7 @@ public class RequestForInspectionService : IRequestForInspectionService
                         var effectiveOwnerTin = !string.IsNullOrWhiteSpace(p.OwnerTIN) ? p.OwnerTIN : string.Empty;
                         var resolvedOwnerId = ResolveOwnerId(p.OwnerId ?? request.OwnerId, effectiveOwnerTin, effectiveOwnerName);
                         p.OwnerId = resolvedOwnerId;
+                        var wfSig = PropertyAssessmentRequestService.ResolveWorkflowSignatories(_context, request.Id, request.TrackingNumber, request.Representative ?? request.ContactPerson);
 
                         var newTd = new TaxDeclaration
                         {
@@ -201,8 +202,19 @@ public class RequestForInspectionService : IRequestForInspectionService
                             PreviousAssessedValue = refTd?.AssessedValue ?? 0m,
                             Memoranda = !string.IsNullOrWhiteSpace(p.Memoranda) ? p.Memoranda : $"Created from Request for Inspection {request.TrackingNumber} (Partition {p.PartitionIndex}, Duplicated from {p.BaseTDN}).",
                             Status = (request.Status == RequestForInspectionStatus.Approval || request.Status == RequestForInspectionStatus.Printing || request.Status == RequestForInspectionStatus.Releasing) ? AssessmentStatus.Active : AssessmentStatus.Pending,
-                            DateEncoded = DateTime.Now,
-                            EncodedByName = request.Representative ?? request.ContactPerson ?? "System Inspector",
+                            AppraisedByName = !string.IsNullOrWhiteSpace(p.AppraisedByName) ? p.AppraisedByName : wfSig.AppraisedByName,
+                            DateAppraised = p.DateAppraised ?? wfSig.DateAppraised,
+                            AssessedByName = !string.IsNullOrWhiteSpace(p.AssessedByName) ? p.AssessedByName : wfSig.AssessedByName,
+                            DateAssessed = p.DateAssessed ?? wfSig.DateAssessed ?? DateTime.Now,
+                            RecommendingApprovalName = !string.IsNullOrWhiteSpace(p.RecommendingApprovalName) ? p.RecommendingApprovalName : wfSig.RecommendingApprovalName,
+                            DateRecommended = p.DateRecommended ?? wfSig.DateRecommended,
+                            ApprovedByName = !string.IsNullOrWhiteSpace(p.ApprovedByName) ? p.ApprovedByName : wfSig.ApprovedByName,
+                            DateApproved = p.DateApproved ?? wfSig.DateApproved,
+                            EntryInRollName = !string.IsNullOrWhiteSpace(p.EntryInRollName) ? p.EntryInRollName : wfSig.EntryInRollName,
+                            EntryInRollPosition = !string.IsNullOrWhiteSpace(p.EntryInRollPosition) ? p.EntryInRollPosition : wfSig.EntryInRollPosition,
+                            EntryInRollDate = p.EntryInRollDate ?? wfSig.EntryInRollDate,
+                            DateEncoded = p.DateEncoded ?? wfSig.DateEncoded ?? DateTime.Now,
+                            EncodedByName = !string.IsNullOrWhiteSpace(p.EncodedByName) ? p.EncodedByName : (wfSig.EncodedByName ?? request.Representative ?? request.ContactPerson ?? string.Empty),
 
                             BuildingClassification = p.BuildingClassification,
                             StructuralType = p.StructuralType,
@@ -418,12 +430,17 @@ public class RequestForInspectionService : IRequestForInspectionService
                         (!string.IsNullOrEmpty(trackingToken) && t.Memoranda != null && t.Memoranda.Contains(trackingToken)))
             .ToList();
 
+        var wfSig = PropertyAssessmentRequestService.ResolveWorkflowSignatories(_context, request.Id, request.TrackingNumber, request.Representative ?? request.ContactPerson);
         bool partitionsModified = false;
         foreach (var td in tds)
         {
             if (td.Status == AssessmentStatus.Pending || td.Status == AssessmentStatus.Active)
             {
                 td.Status = targetStatus;
+            }
+            if (targetStatus == AssessmentStatus.Active)
+            {
+                PropertyAssessmentRequestService.ApplyWorkflowSignatories(td, null, wfSig);
             }
 
             var matchingPartition = partitions.FirstOrDefault(p =>

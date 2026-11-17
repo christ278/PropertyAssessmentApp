@@ -1,4 +1,4 @@
-﻿@model PropertyAssessmentApp.Models.TaxMappingRequest
+@model PropertyAssessmentApp.Models.TaxMappingRequest
 @using PropertyAssessmentApp.Models
 
 @{
@@ -84,7 +84,8 @@
                     </div>
                     <div>
                         <label asp-for="OwnerContactNo" class="block text-slate-600 dark:text-stone-400 mb-1 font-bold">CONTACT NUMBER</label>
-                        <input asp-for="OwnerContactNo" id="ownerPhoneInput" autocomplete="off" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold" />
+                        <input asp-for="OwnerContactNo" id="ownerPhoneInput" autocomplete="off" class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white font-bold" placeholder="0917-000-0000 or +639171234567" />
+                        <span asp-validation-for="OwnerContactNo" id="ownerPhoneValidation" class="text-rose-500 font-bold text-[11px] mt-1 block"></span>
                     </div>
                 </div>
             </div>
@@ -687,6 +688,11 @@
                     $('#docRequestsTable').removeClass('border-rose-500 ring-2 ring-rose-500/30');
                 }
 
+                if (!validateOwnerSmsPhone()) {
+                    isValid = false;
+                    if (!$firstInvalid) $firstInvalid = $('#ownerPhoneInput');
+                }
+
                 if (!isValid) {
                     e.preventDefault();
                     if ($firstInvalid) {
@@ -699,6 +705,30 @@
                     return false;
                 }
             });
+
+            function validateOwnerSmsPhone() {
+                const $inp = $('#ownerPhoneInput');
+                const $span = $('#ownerPhoneValidation');
+                if (!$inp.length) return true;
+                const raw = ($inp.val() || '').trim();
+                if (!raw) {
+                    $inp.removeClass('border-rose-500 ring-2 ring-rose-500/30');
+                    $span.text('');
+                    return true;
+                }
+                const compact = raw.replace(/[\s\-()]/g, '');
+                const ok = /^(?:\+?63|0)?9\d{9}$/.test(compact);
+                if (!ok) {
+                    $inp.addClass('border-rose-500 ring-2 ring-rose-500/30');
+                    $span.text('Invalid SMS contact number format. Use 09XXXXXXXXX or +639XXXXXXXXX (e.g., 09171234567).');
+                    return false;
+                }
+                $inp.removeClass('border-rose-500 ring-2 ring-rose-500/30');
+                $span.text('');
+                return true;
+            }
+
+            $(document).on('input blur', '#ownerPhoneInput', validateOwnerSmsPhone);
 
             $(document).on('input keyup change', '#tdNoInput, #pinInput, #ownerNameInput, input[name="ORNumber"], input[name="Purposes"], .doc-fee-select', function() {
                 $(this).removeClass('border-rose-500 ring-2 ring-rose-500/30');
