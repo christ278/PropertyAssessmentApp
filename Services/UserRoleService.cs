@@ -129,6 +129,33 @@ public class UserRoleService : IUserRoleService
             analyticsMod.IsActive = true;
         }
 
+        // Ensure User Performance & Division Statistics (DASHBOARD_USER_PERFORMANCE) module exists in SystemModules
+        var userPerfMod = _context.SystemModules.FirstOrDefault(m => m.ModuleCode == "DASHBOARD_USER_PERFORMANCE");
+        if (userPerfMod == null)
+        {
+            _context.SystemModules.Add(new SystemModule
+            {
+                ModuleCode = "DASHBOARD_USER_PERFORMANCE",
+                ModuleName = "User Performance & Division Stats",
+                Category = "Dashboards",
+                ControllerName = "Dashboard",
+                ActionName = "UserPerformance",
+                Icon = "users",
+                SortOrder = 5,
+                IsActive = true
+            });
+        }
+        else
+        {
+            userPerfMod.ModuleName = "User Performance & Division Stats";
+            userPerfMod.Category = "Dashboards";
+            userPerfMod.ControllerName = "Dashboard";
+            userPerfMod.ActionName = "UserPerformance";
+            userPerfMod.Icon = "users";
+            userPerfMod.SortOrder = 5;
+            userPerfMod.IsActive = true;
+        }
+
         // Deactivate obsolete/legacy ANALYTICS placeholder so only DASHBOARD_ANALYTICS is shown in Role Permissions
         var obsoleteAnalytics = _context.SystemModules.FirstOrDefault(m => m.ModuleCode == "ANALYTICS");
         if (obsoleteAnalytics != null && obsoleteAnalytics.IsActive)
@@ -207,6 +234,42 @@ public class UserRoleService : IUserRoleService
                 CanEdit = true,
                 CanDelete = true,
                 CanApprove = true,
+                UpdatedDate = DateTime.Now
+            });
+            _context.SaveChanges();
+        }
+
+        userPerfMod = _context.SystemModules.FirstOrDefault(m => m.ModuleCode == "DASHBOARD_USER_PERFORMANCE");
+        if (userPerfMod != null && adminRole != null &&
+            !_context.RoleModulePermissions.Any(p => p.RoleId == adminRole.Id && p.ModuleId == userPerfMod.ModuleId))
+        {
+            _context.RoleModulePermissions.Add(new RoleModulePermission
+            {
+                RoleId = adminRole.Id,
+                ModuleId = userPerfMod.ModuleId,
+                CanView = true,
+                CanCreate = true,
+                CanEdit = true,
+                CanDelete = true,
+                CanApprove = true,
+                UpdatedDate = DateTime.Now
+            });
+            _context.SaveChanges();
+        }
+
+        var headRole = _context.UserRoleSettings.FirstOrDefault(r => r.RoleName == "City Assessor Head" || r.RoleName == "City Assessor");
+        if (userPerfMod != null && headRole != null &&
+            !_context.RoleModulePermissions.Any(p => p.RoleId == headRole.Id && p.ModuleId == userPerfMod.ModuleId))
+        {
+            _context.RoleModulePermissions.Add(new RoleModulePermission
+            {
+                RoleId = headRole.Id,
+                ModuleId = userPerfMod.ModuleId,
+                CanView = true,
+                CanCreate = false,
+                CanEdit = false,
+                CanDelete = false,
+                CanApprove = false,
                 UpdatedDate = DateTime.Now
             });
             _context.SaveChanges();

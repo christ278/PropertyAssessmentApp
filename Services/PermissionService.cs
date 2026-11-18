@@ -116,7 +116,16 @@ public class PermissionService : IPermissionService
         // Workflow Queues (Pool & MyTransactions) & Settings
         if (controllerName.Equals("Workflow", StringComparison.OrdinalIgnoreCase))
         {
-            if (actionName != null && actionName.Equals("Settings", StringComparison.OrdinalIgnoreCase))
+            if (actionName != null && (
+                actionName.Equals("Settings", StringComparison.OrdinalIgnoreCase) ||
+                actionName.Equals("UpdateWorkflowSettings", StringComparison.OrdinalIgnoreCase) ||
+                actionName.Equals("Calendar", StringComparison.OrdinalIgnoreCase) ||
+                actionName.Equals("UpdateOfficeSchedule", StringComparison.OrdinalIgnoreCase) ||
+                actionName.Equals("SaveHoliday", StringComparison.OrdinalIgnoreCase) ||
+                actionName.Equals("DeleteHoliday", StringComparison.OrdinalIgnoreCase) ||
+                actionName.Equals("ToggleHoliday", StringComparison.OrdinalIgnoreCase) ||
+                actionName.Equals("FetchNagerHolidays", StringComparison.OrdinalIgnoreCase) ||
+                actionName.Equals("SaveDivisionCharterTime", StringComparison.OrdinalIgnoreCase)))
             {
                 var settingsMod = _context.SystemModules.FirstOrDefault(m => m.ModuleCode == "WORKFLOW_SETTINGS");
                 if (settingsMod == null) return false;
@@ -182,6 +191,9 @@ public class PermissionService : IPermissionService
                 "getassessmentrollpage" => "DASHBOARD_ANALYTICS",
                 "exportassessmentrollcsv" => "DASHBOARD_ANALYTICS",
                 "getkoronadalbarangays" => "DASHBOARD_ANALYTICS",
+                "userperformance" => "DASHBOARD_USER_PERFORMANCE",
+                "getuserperformancedata" => "DASHBOARD_USER_PERFORMANCE",
+                "exportuserperformancecsv" => "DASHBOARD_USER_PERFORMANCE",
                 _ => null
             };
 

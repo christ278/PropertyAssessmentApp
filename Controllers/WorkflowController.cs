@@ -13,19 +13,25 @@ public class WorkflowController : Controller
     private readonly IPermissionService _permissionService;
     private readonly IHubContext<WorkflowHub> _hubContext;
     private readonly IWorkflowNotifier _workflowNotifier;
+    private readonly ICharterSlaService _charterSlaService;
+    private readonly IHttpClientFactory _httpClientFactory;
 
     public WorkflowController(
         IDocumentWorkflowService workflowService,
         PropertyAssessmentApp.Data.ApplicationDbContext context,
         IPermissionService permissionService,
         IHubContext<WorkflowHub> hubContext,
-        IWorkflowNotifier workflowNotifier)
+        IWorkflowNotifier workflowNotifier,
+        ICharterSlaService charterSlaService,
+        IHttpClientFactory httpClientFactory)
     {
         _workflowService = workflowService;
         _context = context;
         _permissionService = permissionService;
         _hubContext = hubContext;
         _workflowNotifier = workflowNotifier;
+        _charterSlaService = charterSlaService;
+        _httpClientFactory = httpClientFactory;
     }
 
     private static string GetTargetController(string requestType) => requestType switch
@@ -769,6 +775,8 @@ public class WorkflowController : Controller
     {
         ViewBag.Div1Setting = _workflowService.GetDivisionSetting(DivisionType.Division1_TaxAssessmentAndLandHolding);
         ViewBag.Div2Setting = _workflowService.GetDivisionSetting(DivisionType.Division2_GIS_TaxMapping);
+        ViewBag.Div3Setting = _workflowService.GetDivisionSetting(DivisionType.Division3_RecordsAndCertification);
+        ViewBag.DivisionSettings = _context.WorkflowDivisionSettings.OrderBy(d => (int)d.Division).ToList();
         ViewBag.Div1Stages = _workflowService.GetStagesForDivision(DivisionType.Division1_TaxAssessmentAndLandHolding);
         ViewBag.Div2Stages = _workflowService.GetStagesForDivision(DivisionType.Division2_GIS_TaxMapping);
 
@@ -798,6 +806,33 @@ public class WorkflowController : Controller
 
         try
         {
+            var divisionType = request.TransactionTypeId switch
+            {
+                1 or 2 => DivisionType.Division1_TaxAssessmentAndLandHolding,
+                3 => DivisionType.Division2_GIS_TaxMapping,
+                4 or 5 => DivisionType.Division3_RecordsAndCertification,
+                _ => (DivisionType)0
+            };
+
+            if ((int)divisionType > 0 && request.Sequences != null)
+            {
+                var divSetting = _context.WorkflowDivisionSettings.FirstOrDefault(d => d.Division == divisionType);
+                if (divSetting != null && divSetting.CharterTargetMinutes > 0)
+                {
+                    int allocated = request.Sequences
+                        .GroupBy(s => s.CurrentStatusId)
+                        .Sum(g => Math.Max(0, g.First().EstimatedMinutes));
+                    if (allocated > divSetting.CharterTargetMinutes)
+                    {
+                        return Json(new
+                        {
+                            success = false,
+                            message = $"Total section time ({allocated} mins) exceeds the Division {(int)divisionType} budget ({divSetting.CharterTargetMinutes} mins). Please adjust the section minutes or increase the division time."
+                        });
+                    }
+                }
+            }
+
             var existing = _context.WorkflowSequences.Where(w => w.TransactionTypeId == request.TransactionTypeId).ToList();
             _context.WorkflowSequences.RemoveRange(existing);
 
@@ -810,7 +845,8 @@ public class WorkflowController : Controller
                         TransactionTypeId = request.TransactionTypeId,
                         CurrentStatusId = seqDto.CurrentStatusId,
                         NextStatusId = seqDto.NextStatusId,
-                        IsApproval = seqDto.IsApproval
+                        IsApproval = seqDto.IsApproval,
+                        EstimatedMinutes = seqDto.EstimatedMinutes < 0 ? 0 : seqDto.EstimatedMinutes
                     });
                 }
             }
@@ -881,5 +917,180 @@ public class WorkflowController : Controller
         _workflowService.MoveStage(stageId, moveUp);
         TempData["SuccessMessage"] = "Workflow sequence updated.";
         return RedirectToAction(nameof(Settings));
+    }
+
+    // =========================================================================
+    // OFFICE HOURS, BREAKTIME & HOLIDAY CALENDAR (CITIZEN'S CHARTER SLA)
+    // =========================================================================
+
+    [HttpGet]
+    public IActionResult Calendar()
+    {
+        var setting = _charterSlaService.GetScheduleSetting();
+        var holidays = _charterSlaService.GetHolidays(activeOnly: false);
+        ViewBag.Setting = setting;
+        ViewBag.Holidays = holidays;
+        ViewBag.PauseReason = _charterSlaService.GetClockPauseReason(DateTime.Now, setting, holidays);
+        return View();
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult UpdateOfficeSchedule(OfficeScheduleSetting model)
+    {
+        if (model.WorkEndTime <= model.WorkStartTime)
+        {
+            TempData["ErrorMessage"] = "Office End Time must be later than Office Start Time.";
+            return RedirectToAction(nameof(Calendar));
+        }
+
+        if (model.HasBreakTime && (model.BreakEndTime <= model.BreakStartTime || model.BreakStartTime < model.WorkStartTime || model.BreakEndTime > model.WorkEndTime))
+        {
+            TempData["ErrorMessage"] = "Breaktime must fall within Office Start and End Times, with Break End later than Break Start.";
+            return RedirectToAction(nameof(Calendar));
+        }
+
+        _charterSlaService.UpdateScheduleSetting(model);
+        TempData["SuccessMessage"] = "Office hours, breaktime, and working days updated successfully.";
+        return RedirectToAction(nameof(Calendar));
+    }
+
+    [HttpPost]
+    public IActionResult SaveHoliday([FromBody] OfficeHoliday holiday)
+    {
+        if (holiday == null || string.IsNullOrWhiteSpace(holiday.Name))
+        {
+            return Json(new { success = false, message = "Holiday name is required." });
+        }
+
+        var saved = _charterSlaService.SaveHoliday(holiday);
+        return Json(new { success = true, holiday = saved, message = $"Holiday '{saved.Name}' saved." });
+    }
+
+    [HttpPost]
+    public IActionResult DeleteHoliday(int id)
+    {
+        bool deleted = _charterSlaService.DeleteHoliday(id);
+        return Json(new { success = deleted, message = deleted ? "Holiday removed." : "Holiday not found." });
+    }
+
+    [HttpPost]
+    public IActionResult ToggleHoliday(int id)
+    {
+        bool toggled = _charterSlaService.ToggleHoliday(id);
+        return Json(new { success = toggled, message = toggled ? "Holiday status updated." : "Holiday not found." });
+    }
+
+    private sealed class NagerHolidayApiItem
+    {
+        public string? Date { get; set; }
+        public string? LocalName { get; set; }
+        public string? Name { get; set; }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> FetchNagerHolidays(int year, int month, string countryCode = "PH")
+    {
+        if (year < 2000 || year > 2100 || month < 1 || month > 12)
+        {
+            return Json(new { success = false, message = "Invalid year or month." });
+        }
+
+        string code = string.IsNullOrWhiteSpace(countryCode) ? "PH" : countryCode.Trim().ToUpperInvariant();
+        try
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.Timeout = TimeSpan.FromSeconds(10);
+            var url = $"https://date.nager.at/api/v3/PublicHolidays/{year}/{code}";
+            var resp = await client.GetAsync(url);
+            if (!resp.IsSuccessStatusCode)
+            {
+                return Json(new { success = false, message = $"Nager.Date returned HTTP {(int)resp.StatusCode}." });
+            }
+
+            var json = await resp.Content.ReadAsStringAsync();
+            var items = System.Text.Json.JsonSerializer.Deserialize<List<NagerHolidayApiItem>>(
+                json,
+                new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+
+            var existingDates = _charterSlaService.GetHolidays(activeOnly: false)
+                .Select(h => h.HolidayDate.Date)
+                .ToHashSet();
+
+            int added = 0;
+            int matchedInMonth = 0;
+            foreach (var item in items)
+            {
+                if (!DateTime.TryParse(item.Date, out var parsedDate)) continue;
+                if (parsedDate.Year != year || parsedDate.Month != month) continue;
+
+                matchedInMonth++;
+                var holidayName = !string.IsNullOrWhiteSpace(item.LocalName) ? item.LocalName!.Trim() : (item.Name?.Trim() ?? "Public Holiday");
+                if (!existingDates.Contains(parsedDate.Date))
+                {
+                    added++;
+                }
+                _charterSlaService.SaveHoliday(new OfficeHoliday
+                {
+                    HolidayDate = parsedDate.Date,
+                    Name = holidayName,
+                    IsRecurringYearly = false,
+                    IsActive = true
+                });
+            }
+
+            var allHolidays = _charterSlaService.GetHolidays(activeOnly: false)
+                .Select(h => new
+                {
+                    id = h.Id,
+                    date = h.HolidayDate.ToString("yyyy-MM-dd"),
+                    monthDay = h.HolidayDate.ToString("MM-dd"),
+                    name = h.Name,
+                    isRecurringYearly = h.IsRecurringYearly,
+                    isActive = h.IsActive
+                }).ToList();
+
+            string monthLabel = new DateTime(year, month, 1).ToString("MMMM yyyy");
+            string msg = matchedInMonth == 0
+                ? $"No {code} public holidays found in Nager.Date for {monthLabel}."
+                : $"Fetched {matchedInMonth} {code} holiday(s) for {monthLabel} ({added} newly added).";
+
+            return Json(new { success = true, matchedCount = matchedInMonth, addedCount = added, holidays = allHolidays, message = msg });
+        }
+        catch (Exception ex)
+        {
+            return Json(new { success = false, message = $"Failed to fetch Nager.Date holidays: {ex.Message}" });
+        }
+    }
+
+    [HttpPost]
+    public IActionResult SaveDivisionCharterTime(int divisionId, int charterTargetMinutes)
+    {
+        if (divisionId < 1 || divisionId > 3 || charterTargetMinutes < 0)
+        {
+            return Json(new { success = false, message = "Invalid division or duration." });
+        }
+
+        var division = (DivisionType)divisionId;
+        var setting = _context.WorkflowDivisionSettings.FirstOrDefault(d => d.Division == division);
+        if (setting == null)
+        {
+            setting = new WorkflowDivisionSetting
+            {
+                Division = division,
+                DivisionName = $"Division {divisionId}",
+                CharterTargetMinutes = charterTargetMinutes,
+                UpdatedDate = DateTime.Now
+            };
+            _context.WorkflowDivisionSettings.Add(setting);
+        }
+        else
+        {
+            setting.CharterTargetMinutes = charterTargetMinutes;
+            setting.UpdatedDate = DateTime.Now;
+        }
+
+        _context.SaveChanges();
+        return Json(new { success = true, divisionId, charterTargetMinutes, message = $"Division {divisionId} transaction time set to {charterTargetMinutes} min(s)." });
     }
 }

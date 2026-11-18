@@ -32,6 +32,10 @@
             </a>
             @if (canAccess)
             {
+                <a asp-action="ImportExcel" class="px-4 py-3 rounded-xl bg-white dark:bg-stone-900 hover:bg-slate-50 dark:hover:bg-stone-800 border border-slate-200 dark:border-stone-800 text-slate-700 dark:text-stone-200 font-bold text-xs font-mono flex items-center gap-2 shadow-sm transition-all">
+                    <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                    Import Excel
+                </a>
                 <button type="button" onclick="openFaasKindModal()" class="px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white font-bold text-xs font-mono flex items-center gap-2 shadow-md shadow-emerald-600/20 transition-all cursor-pointer">
                     <i data-lucide="plus" class="w-4 h-4"></i>
                     Encode New FAAS
@@ -162,7 +166,20 @@
                                     <span class="block text-[10px] text-slate-400 dark:text-stone-500">@item.PropertyIndexNumber</span>
                                 </td>
                                 <td class="px-3 sm:px-4 py-3.5">
-                                    <div class="font-bold text-slate-800 dark:text-stone-200">@item.OwnerName</div>
+                                    @{
+                                        bool hasNoOwner = string.IsNullOrWhiteSpace(item.OwnerName) || item.OwnerName.Trim().Equals("UNKNOWN OWNER", StringComparison.OrdinalIgnoreCase);
+                                    }
+                                    @if (hasNoOwner)
+                                    {
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                                            <i data-lucide="alert-triangle" class="w-3 h-3"></i>
+                                            No Owner
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <div class="font-bold text-slate-800 dark:text-stone-200">@item.OwnerName</div>
+                                    }
                                     <span class="text-[10px] text-slate-500 dark:text-stone-500 block truncate max-w-[220px]">@item.OwnerAddress</span>
                                     <div class="md:hidden mt-1 flex items-center gap-1.5 flex-wrap">
                                         <span class="text-[10px] text-slate-500 dark:text-stone-400 font-semibold">@item.DistrictOrBarangay</span>

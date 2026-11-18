@@ -31,6 +31,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<RoleModulePermission> RoleModulePermissions { get; set; } = null!;
     public DbSet<TransactionStatus> TransactionStatuses { get; set; } = null!;
     public DbSet<WorkflowSequence> WorkflowSequences { get; set; } = null!;
+    public DbSet<OfficeScheduleSetting> OfficeScheduleSettings { get; set; } = null!;
+    public DbSet<OfficeHoliday> OfficeHolidays { get; set; } = null!;
     public DbSet<DataTransferLog> DataTransferLogs { get; set; } = null!;
     public DbSet<SmsNotificationLog> SmsNotificationLogs { get; set; } = null!;
     public DbSet<BuildingClassification> BuildingClassifications { get; set; } = null!;

@@ -423,7 +423,7 @@ public class AssessmentService : IAssessmentService
         }
     }
 
-    private void SyncChildEntities(TaxDeclaration declaration)
+    public void SyncChildEntities(TaxDeclaration declaration)
     {
         if (declaration.Kind == PropertyKind.Building)
         {

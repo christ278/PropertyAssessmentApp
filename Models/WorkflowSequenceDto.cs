@@ -7,6 +7,7 @@ public class WorkflowSequenceDto
     public int CurrentStatusId { get; set; }
     public int? NextStatusId { get; set; }
     public bool IsApproval { get; set; }
+    public int EstimatedMinutes { get; set; }
 }
 
 public class UpdateWorkflowSettingsRequest

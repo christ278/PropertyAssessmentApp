@@ -14,6 +14,7 @@ public class AssessmentController : Controller
     private readonly ITaxDeclarationPdfService _tdPdfService;
     private readonly IPropertyAssessmentRequestService _rpaService;
     private readonly IWebHostEnvironment _env;
+    private readonly IExcelAssessmentImportService _excelImportService;
 
     public AssessmentController(
         IAssessmentService assessmentService,
@@ -21,7 +22,8 @@ public class AssessmentController : Controller
         ApplicationDbContext context,
         ITaxDeclarationPdfService tdPdfService,
         IPropertyAssessmentRequestService rpaService,
-        IWebHostEnvironment env)
+        IWebHostEnvironment env,
+        IExcelAssessmentImportService excelImportService)
     {
         _assessmentService = assessmentService;
         _ownerService = ownerService;
@@ -29,6 +31,7 @@ public class AssessmentController : Controller
         _tdPdfService = tdPdfService;
         _rpaService = rpaService;
         _env = env;
+        _excelImportService = excelImportService;
     }
 
     // GET: /Assessment/PrintPdf/5
@@ -1198,6 +1201,115 @@ public class AssessmentController : Controller
             TempData["SuccessMessage"] = $"Tax Declaration {record.TaxDeclarationNumber} was deleted.";
         }
         return RedirectToAction(nameof(Index));
+    }
+
+    // =========================================================================
+    // EXCEL ASSESSMENT ROLL IMPORTER
+    // =========================================================================
+
+    [HttpGet]
+    public IActionResult ImportExcel()
+    {
+        var koronadalIds = _context.CityMunicipalities
+            .AsNoTracking()
+            .Where(c => c.Name.Contains("Koronadal"))
+            .Select(c => c.Id)
+            .ToList();
+
+        var koronadalBarangays = koronadalIds.Any()
+            ? _context.Barangays
+                .AsNoTracking()
+                .Where(b => koronadalIds.Contains(b.CityMunicipalityId))
+                .OrderBy(b => b.Name)
+                .Select(b => b.Name)
+                .ToList()
+            : _context.Barangays
+                .AsNoTracking()
+                .OrderBy(b => b.Name)
+                .Select(b => b.Name)
+                .ToList();
+
+        ViewBag.KoronadalBarangays = koronadalBarangays;
+        return View();
+    }
+
+    [HttpPost]
+    [RequestSizeLimit(52_428_800)]
+    public IActionResult PreviewExcelImport(
+        IFormFile? file,
+        string defaultBarangay = "BRGY. ZONE I",
+        string defaultMunicipality = "Koronadal City",
+        string defaultProvince = "South Cotabato",
+        bool registerOwners = true,
+        bool bridgeMotherChild = true,
+        bool updateExisting = false)
+    {
+        if (file == null || file.Length == 0)
+        {
+            return Json(new { success = false, message = "Please select an .xlsx Excel file." });
+        }
+
+        if (!file.FileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+        {
+            return Json(new { success = false, message = "Only .xlsx files are supported." });
+        }
+
+        try
+        {
+            using var stream = file.OpenReadStream();
+            var preview = _excelImportService.PreviewImport(stream, new ExcelImportOptionsDto
+            {
+                DefaultBarangay = defaultBarangay,
+                DefaultMunicipality = defaultMunicipality,
+                DefaultProvince = defaultProvince,
+                RegisterOwners = registerOwners,
+                BridgeMotherChild = bridgeMotherChild,
+                UpdateExisting = updateExisting
+            });
+            return Json(new { success = true, preview });
+        }
+        catch (Exception ex)
+        {
+            return Json(new { success = false, message = $"Failed to parse Excel file: {ex.Message}" });
+        }
+    }
+
+    [HttpPost]
+    [RequestSizeLimit(52_428_800)]
+    public IActionResult ExecuteExcelImport(
+        IFormFile? file,
+        string defaultBarangay = "BRGY. ZONE I",
+        string defaultMunicipality = "Koronadal City",
+        string defaultProvince = "South Cotabato",
+        bool registerOwners = true,
+        bool bridgeMotherChild = true,
+        bool updateExisting = false)
+    {
+        if (file == null || file.Length == 0)
+        {
+            return Json(new { success = false, message = "Please select an .xlsx Excel file." });
+        }
+
+        try
+        {
+            using var stream = file.OpenReadStream();
+            var encodedBy = User.Identity?.Name ?? "Excel Import";
+            var result = _excelImportService.ExecuteImport(stream, new ExcelImportOptionsDto
+            {
+                DefaultBarangay = defaultBarangay,
+                DefaultMunicipality = defaultMunicipality,
+                DefaultProvince = defaultProvince,
+                RegisterOwners = registerOwners,
+                BridgeMotherChild = bridgeMotherChild,
+                UpdateExisting = updateExisting
+            }, encodedBy);
+
+            return Json(new { success = true, result });
+        }
+        catch (Exception ex)
+        {
+            return Json(new { success = false, message = $"Import failed: {ex.Message}" });
+        }
     }
 }
 

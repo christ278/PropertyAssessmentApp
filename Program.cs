@@ -44,6 +44,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 
 builder.Services.AddSingleton<IFileStorageService, FileStorageService>();
 builder.Services.AddScoped<IAssessmentService, AssessmentService>();
+builder.Services.AddScoped<IExcelAssessmentImportService, ExcelAssessmentImportService>();
 builder.Services.AddSingleton<IOrderPaymentService, OrderPaymentService>();
 builder.Services.AddScoped<IOwnerService, OwnerService>();
 builder.Services.AddSingleton<IGeographicService, GeographicService>();
@@ -54,6 +55,7 @@ builder.Services.AddScoped<ILandHoldingRequestService, LandHoldingRequestService
 builder.Services.AddScoped<IRequestForInspectionService, RequestForInspectionService>();
 builder.Services.AddScoped<IPropertyAssessmentRequestService, PropertyAssessmentRequestService>();
 builder.Services.AddScoped<IDocumentWorkflowService, DocumentWorkflowService>();
+builder.Services.AddScoped<ICharterSlaService, CharterSlaService>();
 builder.Services.AddScoped<IUserRoleService, UserRoleService>();
 builder.Services.AddScoped<IPermissionService, PermissionService>();
 builder.Services.AddScoped<IDataTransferService, DataTransferService>();

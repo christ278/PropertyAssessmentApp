@@ -186,7 +186,20 @@
                     <i data-lucide="map-pin" class="w-4 h-4"></i> Owner &amp; Property Location
                 </h2>
                 <div class="grid grid-cols-2 gap-3">
-                    <div class="col-span-2"><span class="text-[10px] text-slate-400 block">REGISTERED OWNER / DECLARANT (@roleBadge.ToUpper())</span><strong class="text-slate-900 dark:text-white text-sm">@Dash(Model.OwnerName)</strong></div>
+                    <div class="col-span-2">
+                        <span class="text-[10px] text-slate-400 block">REGISTERED OWNER / DECLARANT (@roleBadge.ToUpper())</span>
+                        @if (string.IsNullOrWhiteSpace(Model.OwnerName) || Model.OwnerName.Trim().Equals("UNKNOWN OWNER", StringComparison.OrdinalIgnoreCase))
+                        {
+                            <span class="inline-flex items-center gap-1.5 mt-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                                <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i>
+                                Flagged: No Owner Recorded
+                            </span>
+                        }
+                        else
+                        {
+                            <strong class="text-slate-900 dark:text-white text-sm">@Dash(Model.OwnerName)</strong>
+                        }
+                    </div>
                     <div><span class="text-[10px] text-slate-400 block">OWNER TIN</span><strong class="text-slate-900 dark:text-white">@Dash(Model.OwnerTin)</strong></div>
                     <div><span class="text-[10px] text-slate-400 block">CONTACT / EMAIL</span><strong class="text-slate-900 dark:text-white">@Dash(Model.OwnerPhone) / @Dash(Model.OwnerEmail)</strong></div>
                     <div class="col-span-2"><span class="text-[10px] text-slate-400 block">OWNER MAILING ADDRESS</span><strong class="text-slate-900 dark:text-white">@Dash(Model.OwnerAddress)</strong></div>
@@ -232,6 +245,8 @@
                                 @foreach (var row in landRows.Value.EnumerateArray())
                                 {
                                     var rowArea = PropDec(row, "areaSQM", "areaSqm", "area", "Area");
+                                    var rowHas = PropDec(row, "areaHAS", "AreaHAS");
+                                    var rowUnitStr = PropStr(row, "areaUnit", "AreaUnit");
                                     var rowUnit = PropDec(row, "unitValue", "UnitValue");
                                     var rowMv = PropDec(row, "baseMarketValue", "BaseMarketValue", "marketValue", "MarketValue");
                                     if (rowMv <= 0 && rowArea > 0 && rowUnit > 0)
@@ -241,7 +256,17 @@
                                     <tr>
                                         <td class="px-3 py-2 font-bold">@Dash(PropStr(row, "classificationName", "ClassificationName", "classification", "Classification"))</td>
                                         <td class="px-3 py-2">@Dash(PropStr(row, "subClassName", "SubClassName", "subClass", "SubClass"))</td>
-                                        <td class="px-3 py-2 text-right">@rowArea.ToString("N2")</td>
+                                        <td class="px-3 py-2 text-right">
+                                            @if (string.Equals(rowUnitStr, "HAS", StringComparison.OrdinalIgnoreCase) && rowHas > 0)
+                                            {
+                                                <span>@rowHas.ToString("0.####") has.</span>
+                                                <span class="block text-[10px] text-slate-400">(@rowArea.ToString("N2") sqm)</span>
+                                            }
+                                            else
+                                            {
+                                                @rowArea.ToString("N2")
+                                            }
+                                        </td>
                                         <td class="px-3 py-2 text-right">@Money(rowUnit)</td>
                                         <td class="px-3 py-2 text-right font-bold">@Money(rowMv)</td>
                                     </tr>

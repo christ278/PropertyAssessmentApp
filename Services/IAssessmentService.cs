@@ -19,4 +19,5 @@ public interface IAssessmentService
     decimal GetDefaultAssessmentLevel(PropertyClassification classification);
     string GenerateCastTdNumber(int targetYear, string? barangay);
     string FormatCastArpNumber(string? barangay, string? sectionNo, string? lotOrParcelNo);
+    void SyncChildEntities(TaxDeclaration declaration);
 }

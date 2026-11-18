@@ -18,12 +18,18 @@ public class DashboardController : Controller
     private readonly IDocumentWorkflowService _workflow;
     private readonly IPermissionService _permissions;
     private readonly ApplicationDbContext _context;
+    private readonly ICharterSlaService _charterSlaService;
 
-    public DashboardController(IDocumentWorkflowService workflow, IPermissionService permissions, ApplicationDbContext context)
+    public DashboardController(
+        IDocumentWorkflowService workflow,
+        IPermissionService permissions,
+        ApplicationDbContext context,
+        ICharterSlaService charterSlaService)
     {
         _workflow = workflow;
         _permissions = permissions;
         _context = context;
+        _charterSlaService = charterSlaService;
     }
 
     // GET: /Dashboard  -> routes to the most senior dashboard the user has been granted
@@ -32,6 +38,7 @@ public class DashboardController : Controller
         if (_permissions.HasModuleAccess(User, "Dashboard", "SystemOwner")) return RedirectToAction(nameof(SystemOwner), new { startDate, endDate });
         if (_permissions.HasModuleAccess(User, "Dashboard", "AssessorHead")) return RedirectToAction(nameof(AssessorHead), new { startDate, endDate });
         if (_permissions.HasModuleAccess(User, "Dashboard", "Analytics")) return RedirectToAction(nameof(Analytics));
+        if (_permissions.HasModuleAccess(User, "Dashboard", "UserPerformance")) return RedirectToAction(nameof(UserPerformance), new { startDate, endDate });
         if (_permissions.HasModuleAccess(User, "Dashboard", "Staff")) return RedirectToAction(nameof(Staff), new { startDate, endDate });
         return View("NoDashboard");
     }
@@ -479,6 +486,14 @@ public class DashboardController : Controller
         f.PageSize = 50000;
         var paged = GetFilteredAssessmentRollPage(f);
 
+        static string EscapeCsv(string? val)
+        {
+            if (string.IsNullOrEmpty(val)) return "";
+            if (val.Contains(',') || val.Contains('"') || val.Contains('\n') || val.Contains('\r'))
+                return $"\"{val.Replace("\"", "\"\"")}\"";
+            return val;
+        }
+
         var sb = new StringBuilder();
         sb.AppendLine("\"TD No.\",\"Previous TD No.\",\"Section\",\"Parcel No.\",\"Owner Name\",\"Owner Address\",\"Prev Owner\",\"CAD No.\",\"Survey No.\",\"Title No.\",\"Previous PIN\",\"Classification\",\"Kind\",\"Actual Use\",\"Area (sqm)\",\"Market Value (PHP)\",\"Assessed Value (PHP)\",\"Bldg. Count\",\"Mach. Count\",\"Memoranda\",\"Effectivity Date\"");
 
@@ -524,6 +539,14 @@ public class DashboardController : Controller
         }
 
         var data = BuildExecutiveAnalyticsData(filter ?? new DashboardAnalyticsFilterDto());
+        static string EscapeCsv(string? val)
+        {
+            if (string.IsNullOrEmpty(val)) return "";
+            if (val.Contains(',') || val.Contains('"') || val.Contains('\n') || val.Contains('\r'))
+                return $"\"{val.Replace("\"", "\"\"")}\"";
+            return val;
+        }
+
         var sb = new StringBuilder();
         sb.AppendLine("\"Barangay Code\",\"Barangay Name\",\"Total Parcels\",\"Active TDs\",\"Cancelled TDs\",\"Total Land Area (sqm)\",\"Total Market Value (PHP)\",\"Total Assessed Value (PHP)\",\"Status\"");
 
@@ -1494,6 +1517,504 @@ public class DashboardController : Controller
             Page = page,
             PageSize = pageSize,
             TotalPages = totalPages
+        };
+    }
+
+    // =========================================================================
+    // USER PERFORMANCE & DIVISION COMPLETION STATISTICS DASHBOARD
+    // =========================================================================
+
+    [HttpGet]
+    public IActionResult UserPerformance(DateTime? startDate = null, DateTime? endDate = null)
+    {
+        if (!_permissions.HasModuleAccess(User, "Dashboard", "UserPerformance"))
+        {
+            TempData["ErrorMessage"] = "Access Denied: Your assigned user role does not have permission to access User Performance & Division Statistics.";
+            return RedirectToAction("AccessDenied", "Account");
+        }
+
+        ViewBag.InitialStartDate = startDate?.ToString("yyyy-MM-dd") ?? string.Empty;
+        ViewBag.InitialEndDate = endDate?.ToString("yyyy-MM-dd") ?? string.Empty;
+        return View();
+    }
+
+    [HttpPost]
+    public IActionResult GetUserPerformanceData([FromBody] UserPerformanceFilterDto? filter)
+    {
+        if (!_permissions.HasModuleAccess(User, "Dashboard", "UserPerformance"))
+        {
+            return Json(new { success = false, message = "Access Denied: Your assigned user role does not have permission to access User Performance & Division Statistics." });
+        }
+
+        try
+        {
+            var data = BuildUserPerformanceData(filter ?? new UserPerformanceFilterDto());
+            return Json(new { success = true, data });
+        }
+        catch (Exception ex)
+        {
+            return Json(new { success = false, message = $"Failed to load user performance data: {ex.Message}" });
+        }
+    }
+
+    [HttpGet]
+    public IActionResult ExportUserPerformanceCsv(DateTime? startDate = null, DateTime? endDate = null, int? divisionId = null, string? requestType = null, string? search = null)
+    {
+        if (!_permissions.HasModuleAccess(User, "Dashboard", "UserPerformance"))
+        {
+            return Forbid();
+        }
+
+        var data = BuildUserPerformanceData(new UserPerformanceFilterDto
+        {
+            StartDate = startDate,
+            EndDate = endDate,
+            DivisionId = divisionId,
+            RequestType = requestType,
+            Search = search
+        });
+
+        static string EscapeCsv(string? val)
+        {
+            if (string.IsNullOrEmpty(val)) return "";
+            if (val.Contains(',') || val.Contains('"') || val.Contains('\n') || val.Contains('\r'))
+                return $"\"{val.Replace("\"", "\"\"")}\"";
+            return val;
+        }
+
+        var sb = new StringBuilder();
+        sb.AppendLine("Rank,Full Name,Username,Role,Division,Transactions Processed,Forwarded,Overdue,Last Active");
+        foreach (var row in data.UserLeaderboard)
+        {
+            sb.AppendLine(string.Join(",",
+                row.Rank,
+                EscapeCsv(row.FullName),
+                EscapeCsv(row.Username),
+                EscapeCsv(row.RoleDisplay),
+                EscapeCsv(row.DivisionName),
+                row.ActiveClaimedCount,
+                row.ForwardedCount,
+                row.OverdueCount,
+                EscapeCsv(row.LastActiveText)));
+        }
+
+        sb.AppendLine();
+        sb.AppendLine("Division Comparison");
+        sb.AppendLine("Division,Total Transactions,Finished,Ongoing,Pending,Deferred,Completion Rate (%),Avg Turnaround (Days),Share of Finished (%)");
+        foreach (var d in data.DivisionStats)
+        {
+            sb.AppendLine(string.Join(",",
+                EscapeCsv(d.DivisionName),
+                d.TotalTransactions,
+                d.FinishedCount,
+                d.OngoingCount,
+                d.PendingCount,
+                d.DeferredCount,
+                d.CompletionRate.ToString("0.0", CultureInfo.InvariantCulture),
+                d.AvgTurnaroundDays.ToString("0.0", CultureInfo.InvariantCulture),
+                d.ShareOfFinishedPercent.ToString("0.0", CultureInfo.InvariantCulture)));
+        }
+
+        var bytes = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
+        return File(bytes, "text/csv; charset=utf-8", $"User_Performance_Division_Stats_{DateTime.Now:yyyyMMdd_HHmm}.csv");
+    }
+
+    private UserPerformanceDashboardDataDto BuildUserPerformanceData(UserPerformanceFilterDto filter)
+    {
+        DateTime? start = filter.StartDate?.Date;
+        DateTime? end = filter.EndDate?.Date;
+        if (start.HasValue && end.HasValue && start > end)
+        {
+            (start, end) = (end, start);
+        }
+
+        string periodLabel = (start.HasValue || end.HasValue)
+            ? $"{(start.HasValue ? start.Value.ToString("MMM dd, yyyy") : "Start")} – {(end.HasValue ? end.Value.ToString("MMM dd, yyyy") : "Today")}"
+            : "All Time";
+
+        // 1. Unified workflow items for division completion comparison & active claimed counts
+        var allQueueItems = GetAllItems();
+
+        if (!string.IsNullOrWhiteSpace(filter.RequestType))
+        {
+            allQueueItems = allQueueItems
+                .Where(i => string.Equals(i.RequestType, filter.RequestType, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+
+        var dateFilteredQueue = allQueueItems;
+        if (start.HasValue)
+            dateFilteredQueue = dateFilteredQueue.Where(i => i.DateSubmitted.Date >= start.Value).ToList();
+        if (end.HasValue)
+            dateFilteredQueue = dateFilteredQueue.Where(i => i.DateSubmitted.Date <= end.Value).ToList();
+
+        static bool IsItemFinished(WorkflowQueueItemDto i) =>
+            string.Equals(i.StatusText, "Released", StringComparison.OrdinalIgnoreCase) ||
+            i.CurrentStage == WorkflowStage.Completed;
+
+        var divisions = new[]
+        {
+            (Id: 1, ShortName: "Division 1", Name: "Division 1: Tax Assessment & Land Holding"),
+            (Id: 2, ShortName: "Division 2", Name: "Division 2: GIS & Tax Mapping"),
+            (Id: 3, ShortName: "Division 3", Name: "Division 3: Records & Certification")
+        };
+
+        int totalFinishedAllDivs = dateFilteredQueue.Count(IsItemFinished);
+
+        var divisionStats = new List<DivisionComparisonDto>();
+        foreach (var div in divisions)
+        {
+            var divItems = dateFilteredQueue.Where(i => (int)i.Division == div.Id).ToList();
+            int finished = divItems.Count(IsItemFinished);
+            int deferred = divItems.Count(i => !IsItemFinished(i) && (i.IsDeferred || i.CurrentStage == WorkflowStage.Returned));
+            int ongoing = divItems.Count(i => !IsItemFinished(i) && !i.IsDeferred && i.CurrentStage != WorkflowStage.Returned && i.IsClaimed);
+            int pending = divItems.Count(i => !IsItemFinished(i) && !i.IsDeferred && i.CurrentStage != WorkflowStage.Returned && !i.IsClaimed);
+
+            var turnaroundSamples = divItems
+                .Where(i => IsItemFinished(i) && i.LastForwardedDate.HasValue && i.LastForwardedDate.Value >= i.DateSubmitted)
+                .Select(i => (decimal)(i.LastForwardedDate!.Value - i.DateSubmitted).TotalDays)
+                .ToList();
+
+            decimal avgTurnaround = turnaroundSamples.Any() ? Math.Round(turnaroundSamples.Average(), 1) : 0m;
+            decimal completionRate = divItems.Count > 0 ? Math.Round((decimal)finished / divItems.Count * 100m, 1) : 0m;
+            decimal share = totalFinishedAllDivs > 0 ? Math.Round((decimal)finished / totalFinishedAllDivs * 100m, 1) : 0m;
+
+            var finishedWithSla = divItems.Where(i => IsItemFinished(i) && i.SlaStatus != null).ToList();
+            int onTime = finishedWithSla.Count(i => i.SlaStatus!.SlaState is "OnTrack" or "DueSoon");
+            int overdue = finishedWithSla.Count(i => i.SlaStatus!.SlaState == "Overdue");
+            int withTarget = onTime + overdue;
+            decimal slaCompliance = withTarget > 0 ? Math.Round((decimal)onTime / withTarget * 100m, 1) : 0m;
+            double avgWorkingMins = finishedWithSla.Any() ? Math.Round(finishedWithSla.Average(i => i.SlaStatus!.ElapsedWorkingMinutes), 1) : 0;
+
+            divisionStats.Add(new DivisionComparisonDto
+            {
+                DivisionId = div.Id,
+                ShortName = div.ShortName,
+                DivisionName = div.Name,
+                TotalTransactions = divItems.Count,
+                FinishedCount = finished,
+                OngoingCount = ongoing,
+                PendingCount = pending,
+                DeferredCount = deferred,
+                CompletionRate = completionRate,
+                AvgTurnaroundDays = avgTurnaround,
+                ShareOfFinishedPercent = share,
+                OnTimeFinishedCount = onTime,
+                OverdueFinishedCount = overdue,
+                SlaComplianceRate = slaCompliance,
+                AvgWorkingMinutes = avgWorkingMins
+            });
+        }
+
+        // Request type breakdown (filtered by Division if selected)
+        var scopedQueueForReqTypes = (filter.DivisionId.HasValue && filter.DivisionId.Value > 0)
+            ? dateFilteredQueue.Where(i => (int)i.Division == filter.DivisionId.Value).ToList()
+            : dateFilteredQueue;
+
+        static string FormatRequestTypeName(string rt) => rt switch
+        {
+            "PropertyAssessmentRequest" => "Property Assessment (RPA)",
+            "RequestForInspection" => "Request for Inspection (RFI)",
+            "LandHoldingRequest" => "Land Holding",
+            "TaxDeclarationRequest" => "Tax Declaration / Certification",
+            "TaxMappingRequest" => "GIS Tax Mapping",
+            _ => rt
+        };
+
+        var requestTypeStats = scopedQueueForReqTypes
+            .GroupBy(i => i.RequestType)
+            .Select(g =>
+            {
+                int total = g.Count();
+                int fin = g.Count(IsItemFinished);
+                return new RequestTypeDivisionStatDto
+                {
+                    RequestType = g.Key,
+                    DisplayName = FormatRequestTypeName(g.Key),
+                    TotalCount = total,
+                    FinishedCount = fin,
+                    CompletionRate = total > 0 ? Math.Round((decimal)fin / total * 100m, 1) : 0m
+                };
+            })
+            .OrderByDescending(x => x.TotalCount)
+            .ToList();
+
+        // Finished trend over time by division
+        var finishedItemsAll = allQueueItems.Where(IsItemFinished).ToList();
+        var trendEnd = end ?? DateTime.Now.Date;
+        var trendStart = start ?? trendEnd.AddDays(-13);
+        int spanDays = (int)(trendEnd - trendStart).TotalDays + 1;
+
+        var trendLabels = new List<string>();
+        var div1Trend = new List<int>();
+        var div2Trend = new List<int>();
+        var div3Trend = new List<int>();
+
+        if (spanDays <= 45)
+        {
+            for (var day = trendStart; day <= trendEnd; day = day.AddDays(1))
+            {
+                trendLabels.Add(day.ToString("MMM dd"));
+                div1Trend.Add(finishedItemsAll.Count(i => (int)i.Division == 1 && (i.LastForwardedDate ?? i.DateSubmitted).Date == day));
+                div2Trend.Add(finishedItemsAll.Count(i => (int)i.Division == 2 && (i.LastForwardedDate ?? i.DateSubmitted).Date == day));
+                div3Trend.Add(finishedItemsAll.Count(i => (int)i.Division == 3 && (i.LastForwardedDate ?? i.DateSubmitted).Date == day));
+            }
+        }
+        else
+        {
+            var mStart = new DateTime(trendStart.Year, trendStart.Month, 1);
+            for (var m = mStart; m <= trendEnd; m = m.AddMonths(1))
+            {
+                var nextM = m.AddMonths(1);
+                trendLabels.Add(m.ToString("MMM yyyy"));
+                div1Trend.Add(finishedItemsAll.Count(i => (int)i.Division == 1 && (i.LastForwardedDate ?? i.DateSubmitted) >= m && (i.LastForwardedDate ?? i.DateSubmitted) < nextM));
+                div2Trend.Add(finishedItemsAll.Count(i => (int)i.Division == 2 && (i.LastForwardedDate ?? i.DateSubmitted) >= m && (i.LastForwardedDate ?? i.DateSubmitted) < nextM));
+                div3Trend.Add(finishedItemsAll.Count(i => (int)i.Division == 3 && (i.LastForwardedDate ?? i.DateSubmitted) >= m && (i.LastForwardedDate ?? i.DateSubmitted) < nextM));
+            }
+        }
+
+        // 2. DocumentForwardingLogs for user performance
+        var logsQuery = _context.DocumentForwardingLogs.AsNoTracking().AsQueryable();
+        if (start.HasValue)
+            logsQuery = logsQuery.Where(l => l.Timestamp >= start.Value);
+        if (end.HasValue)
+            logsQuery = logsQuery.Where(l => l.Timestamp < end.Value.AddDays(1));
+        if (filter.DivisionId.HasValue && filter.DivisionId.Value > 0)
+            logsQuery = logsQuery.Where(l => (int)l.Division == filter.DivisionId.Value);
+        if (!string.IsNullOrWhiteSpace(filter.RequestType))
+            logsQuery = logsQuery.Where(l => l.RequestType == filter.RequestType);
+
+        var logs = logsQuery.ToList();
+
+        // Filter out system-generated placeholder entries if any
+        var userLogs = logs
+            .Where(l => !string.IsNullOrWhiteSpace(l.ForwardedByName) &&
+                        !string.Equals(l.ForwardedByName.Trim(), "System User", StringComparison.OrdinalIgnoreCase) &&
+                        !string.Equals(l.ForwardedByName.Trim(), "System Intake", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        var users = _context.UserAccounts.AsNoTracking().ToList();
+        var activeClaimedItems = allQueueItems
+            .Where(i => i.IsClaimed && !IsItemFinished(i))
+            .ToList();
+
+        var slaSetting = _charterSlaService.GetScheduleSetting();
+        var slaHolidays = _charterSlaService.GetHolidays(activeOnly: true);
+        var sequences = _context.WorkflowSequences.AsNoTracking().ToList();
+        var queueByReq = allQueueItems
+            .GroupBy(i => i.RequestId)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        var involvedReqIds = userLogs.Select(l => l.RequestId).Distinct().ToList();
+        var allReqLogsById = involvedReqIds.Any()
+            ? _context.DocumentForwardingLogs.AsNoTracking()
+                .Where(l => involvedReqIds.Contains(l.RequestId))
+                .OrderBy(l => l.Timestamp)
+                .ToList()
+                .GroupBy(l => l.RequestId)
+                .ToDictionary(g => g.Key, g => g.ToList())
+            : new Dictionary<Guid, List<DocumentForwardingLog>>();
+
+        static int GetTxTypeId(string requestType) => requestType switch
+        {
+            "RequestForInspection" => 1,
+            "PropertyAssessmentRequest" => 2,
+            "TaxMappingRequest" => 3,
+            "TaxDeclarationRequest" => 4,
+            "LandHoldingRequest" => 5,
+            _ => 0
+        };
+
+        int GetStageMaxMinutes(int txTypeId, int stageId) =>
+            sequences
+                .Where(s => s.TransactionTypeId == txTypeId && s.CurrentStatusId == stageId && s.EstimatedMinutes > 0)
+                .Select(s => s.EstimatedMinutes)
+                .FirstOrDefault();
+
+        static string GetDivisionShortName(int? divId) => divId switch
+        {
+            1 => "Division 1: Assessment & Land Holding",
+            2 => "Division 2: GIS & Tax Mapping",
+            3 => "Division 3: Records & Certification",
+            _ => "Unassigned"
+        };
+
+        static bool IsApprovalOrReleaseLog(DocumentForwardingLog l) =>
+            l.IsForApproval ||
+            l.ActionTaken.Contains("Approve", StringComparison.OrdinalIgnoreCase) ||
+            l.ActionTaken.Contains("Release", StringComparison.OrdinalIgnoreCase) ||
+            l.ToStage is WorkflowStage.AssessorApproval or WorkflowStage.ApprovalGIS or WorkflowStage.ApprovalRecords
+                or WorkflowStage.Releasing or WorkflowStage.ReleasingGIS or WorkflowStage.ReleasingRecords or WorkflowStage.Completed;
+
+        static bool IsDeferredOrReturnedLog(DocumentForwardingLog l) =>
+            l.IsDeferred ||
+            l.ActionTaken.Contains("Defer", StringComparison.OrdinalIgnoreCase) ||
+            l.ActionTaken.Contains("Return", StringComparison.OrdinalIgnoreCase) ||
+            l.ToStage is WorkflowStage.Deferred or WorkflowStage.Returned;
+
+        // Match logs to UserAccount records; also include any historical ForwardedByName not present in UserAccounts
+        var matchedLogIds = new HashSet<Guid>();
+        var leaderboard = new List<UserPerformanceRowDto>();
+
+        foreach (var u in users)
+        {
+            if (filter.DivisionId.HasValue && filter.DivisionId.Value > 0 && u.DivisionId != filter.DivisionId.Value)
+                continue;
+
+            var uLogs = userLogs.Where(l =>
+                string.Equals(l.ForwardedByName.Trim(), u.FullName.Trim(), StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(l.ForwardedByName.Trim(), u.Username.Trim(), StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            foreach (var l in uLogs) matchedLogIds.Add(l.Id);
+
+            var claimedItems = activeClaimedItems.Where(i =>
+                i.AssignedUserId == u.Id ||
+                (!string.IsNullOrWhiteSpace(i.AssignedUserName) &&
+                 (string.Equals(i.AssignedUserName.Trim(), u.FullName.Trim(), StringComparison.OrdinalIgnoreCase) ||
+                  string.Equals(i.AssignedUserName.Trim(), u.Username.Trim(), StringComparison.OrdinalIgnoreCase))))
+                .ToList();
+            int claimed = claimedItems.Count;
+
+            var overdueReqIds = new HashSet<Guid>();
+            bool hasRoleMaxTime = u.WorkflowRoleId.HasValue && u.WorkflowRoleId.Value > 0 &&
+                sequences.Any(s => s.CurrentStatusId == u.WorkflowRoleId.Value && s.EstimatedMinutes > 0);
+
+            foreach (var ci in claimedItems)
+            {
+                int txTypeId = GetTxTypeId(ci.RequestType);
+                int maxMins = GetStageMaxMinutes(txTypeId, (int)ci.CurrentStage);
+                if (maxMins > 0 && ci.SlaStatus != null && ci.SlaStatus.StageElapsedWorkingMinutes > maxMins)
+                {
+                    overdueReqIds.Add(ci.RequestId);
+                }
+            }
+
+            var forwardedLogs = uLogs.Where(l => !IsDeferredOrReturnedLog(l)).ToList();
+            foreach (var fl in forwardedLogs)
+            {
+                int txTypeId = GetTxTypeId(fl.RequestType);
+                int maxMins = GetStageMaxMinutes(txTypeId, (int)fl.FromStage);
+                if (maxMins <= 0) continue;
+
+                DateTime stageStart = queueByReq.TryGetValue(fl.RequestId, out var qItem) ? qItem.DateSubmitted : fl.Timestamp;
+                if (allReqLogsById.TryGetValue(fl.RequestId, out var reqLogs))
+                {
+                    var arrival = reqLogs.LastOrDefault(rl => rl.Timestamp < fl.Timestamp && rl.ToStage == fl.FromStage && !rl.IsDeferred);
+                    if (arrival != null) stageStart = arrival.Timestamp;
+                }
+
+                double elapsedMins = _charterSlaService.CalculateWorkingMinutes(stageStart, fl.Timestamp, slaSetting, slaHolidays);
+                if (elapsedMins > maxMins)
+                {
+                    overdueReqIds.Add(fl.RequestId);
+                }
+            }
+
+            string roleLabel = !string.IsNullOrWhiteSpace(u.WorkflowRoleName)
+                ? u.WorkflowRoleName
+                : u.Role.ToString();
+
+            leaderboard.Add(new UserPerformanceRowDto
+            {
+                UserId = u.Id,
+                FullName = u.FullName,
+                Username = u.Username,
+                RoleDisplay = roleLabel,
+                DivisionId = u.DivisionId,
+                DivisionName = GetDivisionShortName(u.DivisionId),
+                UniqueTransactionsProcessed = uLogs.Select(l => l.RequestId).Distinct().Count(),
+                TotalActions = uLogs.Count,
+                ForwardedCount = forwardedLogs.Select(l => l.RequestId).Distinct().Count(),
+                ApprovedOrReleasedCount = uLogs.Count(IsApprovalOrReleaseLog),
+                DeferredOrReturnedCount = uLogs.Count(IsDeferredOrReturnedLog),
+                ActiveClaimedCount = claimed,
+                OverdueCount = overdueReqIds.Count,
+                HasRoleMaxTime = hasRoleMaxTime,
+                LastActiveDate = uLogs.Any() ? uLogs.Max(l => l.Timestamp) : null,
+                IsActive = u.IsActive
+            });
+        }
+
+        // Include any ForwardedByName not matched to a UserAccount (e.g., legacy/renamed users)
+        var unmatchedGroups = userLogs
+            .Where(l => !matchedLogIds.Contains(l.Id))
+            .GroupBy(l => l.ForwardedByName.Trim(), StringComparer.OrdinalIgnoreCase);
+
+        foreach (var grp in unmatchedGroups)
+        {
+            var gLogs = grp.ToList();
+            var latest = gLogs.OrderByDescending(l => l.Timestamp).First();
+            int divId = (int)latest.Division;
+
+            leaderboard.Add(new UserPerformanceRowDto
+            {
+                UserId = null,
+                FullName = grp.Key,
+                Username = "-",
+                RoleDisplay = latest.ForwardedByRole,
+                DivisionId = divId,
+                DivisionName = GetDivisionShortName(divId),
+                UniqueTransactionsProcessed = gLogs.Select(l => l.RequestId).Distinct().Count(),
+                TotalActions = gLogs.Count,
+                ForwardedCount = gLogs.Count(l => !IsDeferredOrReturnedLog(l)),
+                ApprovedOrReleasedCount = gLogs.Count(IsApprovalOrReleaseLog),
+                DeferredOrReturnedCount = gLogs.Count(IsDeferredOrReturnedLog),
+                ActiveClaimedCount = 0,
+                LastActiveDate = gLogs.Max(l => l.Timestamp),
+                IsActive = true
+            });
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.Search))
+        {
+            var q = filter.Search.Trim();
+            leaderboard = leaderboard.Where(r =>
+                r.FullName.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                r.Username.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                r.RoleDisplay.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                r.DivisionName.Contains(q, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+
+        leaderboard = leaderboard
+            .OrderByDescending(r => r.ForwardedCount)
+            .ThenByDescending(r => r.ActiveClaimedCount)
+            .ThenBy(r => r.FullName)
+            .ToList();
+
+        for (int i = 0; i < leaderboard.Count; i++)
+        {
+            leaderboard[i].Rank = i + 1;
+        }
+
+        var topDiv = divisionStats.OrderByDescending(d => d.FinishedCount).ThenByDescending(d => d.CompletionRate).FirstOrDefault();
+        var topUser = leaderboard.FirstOrDefault(u => u.UniqueTransactionsProcessed > 0);
+        int totalQueueInPeriod = dateFilteredQueue.Count;
+        decimal overallRate = totalQueueInPeriod > 0 ? Math.Round((decimal)totalFinishedAllDivs / totalQueueInPeriod * 100m, 1) : 0m;
+
+        return new UserPerformanceDashboardDataDto
+        {
+            PeriodLabel = periodLabel,
+            TotalActionsProcessed = userLogs.Count,
+            UniqueTransactionsProcessed = userLogs.Select(l => l.RequestId).Distinct().Count(),
+            ActiveContributors = leaderboard.Count(u => u.UniqueTransactionsProcessed > 0),
+            TotalActiveUsers = users.Count(u => u.IsActive),
+            TotalTransactionsInPeriod = totalQueueInPeriod,
+            TotalFinishedInPeriod = totalFinishedAllDivs,
+            OverallCompletionRate = overallRate,
+            TopDivisionName = topDiv != null && topDiv.FinishedCount > 0 ? topDiv.ShortName : "—",
+            TopDivisionFinished = topDiv?.FinishedCount ?? 0,
+            TopDivisionRate = topDiv?.CompletionRate ?? 0m,
+            TopUserName = topUser?.FullName ?? "—",
+            TopUserRole = topUser?.RoleDisplay ?? string.Empty,
+            TopUserTransactions = topUser?.UniqueTransactionsProcessed ?? 0,
+            DivisionStats = divisionStats,
+            TrendLabels = trendLabels,
+            Div1FinishedTrend = div1Trend,
+            Div2FinishedTrend = div2Trend,
+            Div3FinishedTrend = div3Trend,
+            RequestTypeStats = requestTypeStats,
+            UserLeaderboard = leaderboard
         };
     }
 }

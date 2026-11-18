@@ -1,0 +1,480 @@
+@using PropertyAssessmentApp.Models
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Office Hours & Holiday Calendar";
+    var setting = ViewBag.Setting as OfficeScheduleSetting ?? new OfficeScheduleSetting();
+    var holidays = ViewBag.Holidays as List<OfficeHoliday> ?? new List<OfficeHoliday>();
+    var pauseReason = ViewBag.PauseReason as string;
+    var holidaysJson = JsonSerializer.Serialize(holidays.Select(h => new
+    {
+        id = h.Id,
+        date = h.HolidayDate.ToString("yyyy-MM-dd"),
+        monthDay = h.HolidayDate.ToString("MM-dd"),
+        name = h.Name,
+        isRecurringYearly = h.IsRecurringYearly,
+        isActive = h.IsActive
+    }));
+}
+
+<div class="space-y-6 font-sans pb-12">
+
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <div class="flex flex-wrap items-center gap-2.5">
+                <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-800 dark:text-white">
+                    Office Hours &amp; Holiday Calendar
+                </h1>
+                @if (string.IsNullOrEmpty(pauseReason))
+                {
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        SLA Clock Running
+                    </span>
+                }
+                else
+                {
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">
+                        <i data-lucide="pause-circle" class="w-3.5 h-3.5"></i>
+                        SLA Clock Paused: @pauseReason
+                    </span>
+                }
+            </div>
+            <p class="text-xs sm:text-sm text-slate-500 dark:text-stone-400 mt-1">
+                Configure Citizen's Charter working days, office hours, breaktime, and holidays. Timers automatically pause outside office hours and on holidays.
+            </p>
+        </div>
+
+        <a asp-action="Settings" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-300 dark:border-stone-700 bg-white dark:bg-stone-900 hover:bg-slate-50 dark:hover:bg-stone-800 text-xs font-bold text-slate-700 dark:text-stone-200 shadow-xs transition">
+            <i data-lucide="git-branch" class="w-4 h-4 text-emerald-600"></i>
+            Transaction Workflow Manager
+        </a>
+    </div>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-bold flex items-center gap-2">
+            <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+            <span>@TempData["SuccessMessage"]</span>
+        </div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300 text-xs font-bold flex items-center gap-2">
+            <i data-lucide="alert-circle" class="w-4 h-4"></i>
+            <span>@TempData["ErrorMessage"]</span>
+        </div>
+    }
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- LEFT: OFFICE HOURS, BREAKTIME & WORKING DAYS -->
+        <div class="lg:col-span-5 bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 rounded-2xl p-5 shadow-sm space-y-5">
+            <div class="border-b border-slate-200 dark:border-stone-800 pb-3">
+                <h2 class="text-sm font-extrabold text-slate-800 dark:text-white flex items-center gap-2">
+                    <i data-lucide="clock" class="w-4 h-4 text-emerald-600"></i>
+                    Office Hours &amp; Working Days
+                </h2>
+                <p class="text-[11px] text-slate-500 dark:text-stone-400 mt-0.5">
+                    Default: 8:00 AM – 5:00 PM with 12:00 PM – 1:00 PM breaktime (Mon–Fri)
+                </p>
+            </div>
+
+            <form asp-action="UpdateOfficeSchedule" method="post" class="space-y-4">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="Id" value="@setting.Id" />
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-stone-400 mb-1">Office Start Time</label>
+                        <input type="time" name="WorkStartTime" value="@setting.WorkStartTime.ToString(@"hh\:mm")" required class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-700 bg-slate-50 dark:bg-stone-950 text-xs font-bold text-slate-800 dark:text-stone-100" />
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-stone-400 mb-1">Office End Time</label>
+                        <input type="time" name="WorkEndTime" value="@setting.WorkEndTime.ToString(@"hh\:mm")" required class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-700 bg-slate-50 dark:bg-stone-950 text-xs font-bold text-slate-800 dark:text-stone-100" />
+                    </div>
+                </div>
+
+                <!-- Breaktime Config -->
+                <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-3">
+                    <label class="flex items-center justify-between cursor-pointer">
+                        <span class="text-xs font-bold text-slate-800 dark:text-stone-100 flex items-center gap-2">
+                            <i data-lucide="coffee" class="w-4 h-4 text-amber-500"></i>
+                            Exclude Breaktime (Auto-Pause)
+                        </span>
+                        <input type="checkbox" id="hasBreakToggle" name="HasBreakTime" value="true" @(setting.HasBreakTime ? "checked" : "") onchange="toggleBreakInputs()" class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+                        <input type="hidden" name="HasBreakTime" value="false" />
+                    </label>
+                    <div id="breakTimeFields" class="grid grid-cols-2 gap-3 @(setting.HasBreakTime ? "" : "opacity-50 pointer-events-none")">
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-stone-400 mb-1">Break Start</label>
+                            <input type="time" name="BreakStartTime" value="@setting.BreakStartTime.ToString(@"hh\:mm")" class="w-full px-3 py-1.5 rounded-xl border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-xs font-bold text-slate-800 dark:text-stone-100" />
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-stone-400 mb-1">Break End</label>
+                            <input type="time" name="BreakEndTime" value="@setting.BreakEndTime.ToString(@"hh\:mm")" class="w-full px-3 py-1.5 rounded-xl border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-xs font-bold text-slate-800 dark:text-stone-100" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Working Days -->
+                <div>
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-stone-400 mb-2">Working Days</label>
+                    <div class="grid grid-cols-4 sm:grid-cols-7 lg:grid-cols-4 gap-2">
+                        @{
+                            var days = new (string Name, string Label, bool Checked)[]
+                            {
+                                ("WorkMonday", "Mon", setting.WorkMonday),
+                                ("WorkTuesday", "Tue", setting.WorkTuesday),
+                                ("WorkWednesday", "Wed", setting.WorkWednesday),
+                                ("WorkThursday", "Thu", setting.WorkThursday),
+                                ("WorkFriday", "Fri", setting.WorkFriday),
+                                ("WorkSaturday", "Sat", setting.WorkSaturday),
+                                ("WorkSunday", "Sun", setting.WorkSunday)
+                            };
+                        }
+                        @foreach (var d in days)
+                        {
+                            <label class="flex items-center gap-1.5 px-2.5 py-2 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-950 text-xs font-bold cursor-pointer hover:border-emerald-400 transition">
+                                <input type="checkbox" name="@d.Name" value="true" @(d.Checked ? "checked" : "") class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+                                <input type="hidden" name="@d.Name" value="false" />
+                                <span>@d.Label</span>
+                            </label>
+                        }
+                    </div>
+                </div>
+
+                <!-- Pause When Deferred -->
+                <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
+                    <label class="flex items-center justify-between cursor-pointer">
+                        <div>
+                            <div class="text-xs font-bold text-slate-800 dark:text-stone-100">Pause Clock When Deferred</div>
+                            <div class="text-[11px] text-slate-500 dark:text-stone-400">Stops Citizen's Charter timer while waiting on applicant requirements</div>
+                        </div>
+                        <input type="checkbox" name="PauseWhenDeferred" value="true" @(setting.PauseWhenDeferred ? "checked" : "") class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+                        <input type="hidden" name="PauseWhenDeferred" value="false" />
+                    </label>
+                </div>
+
+                <button type="submit" class="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition flex items-center justify-center gap-2 cursor-pointer">
+                    <i data-lucide="save" class="w-4 h-4"></i>
+                    Save Office Schedule
+                </button>
+            </form>
+        </div>
+
+        <!-- RIGHT: INTERACTIVE HOLIDAY CALENDAR -->
+        <div class="lg:col-span-7 bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 rounded-2xl p-5 shadow-sm space-y-5">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-stone-800 pb-3">
+                <div>
+                    <h2 class="text-sm font-extrabold text-slate-800 dark:text-white flex items-center gap-2">
+                        <i data-lucide="calendar-days" class="w-4 h-4 text-emerald-600"></i>
+                        Holiday Calendar
+                    </h2>
+                    <p class="text-[11px] text-slate-500 dark:text-stone-400 mt-0.5">
+                        Click any date to tag or edit a holiday. Tagged holidays are excluded from processing time.
+                    </p>
+                </div>
+                <div class="flex flex-wrap items-center gap-1.5">
+                    <button type="button" onclick="changeMonth(-1)" class="p-1.5 rounded-lg border border-slate-200 dark:border-stone-700 hover:bg-slate-100 dark:hover:bg-stone-800 cursor-pointer"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
+                    <span id="calendarMonthLabel" class="px-3 text-xs font-extrabold text-slate-800 dark:text-white min-w-[130px] text-center"></span>
+                    <button type="button" onclick="changeMonth(1)" class="p-1.5 rounded-lg border border-slate-200 dark:border-stone-700 hover:bg-slate-100 dark:hover:bg-stone-800 cursor-pointer"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
+                    <button type="button" onclick="goToday()" class="ml-1 px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-stone-800 text-[11px] font-bold hover:bg-slate-200 dark:hover:bg-stone-700 cursor-pointer">Today</button>
+                    <button type="button" id="btnFetchNager" onclick="fetchNagerHolidaysForMonth()" class="ml-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold inline-flex items-center gap-1 shadow-xs transition cursor-pointer" title="Fetch Philippine Public Holidays from Nager.Date for this month">
+                        <i data-lucide="cloud-download" class="w-3.5 h-3.5"></i>
+                        <span>Fetch Holiday</span>
+                    </button>
+                </div>
+            </div>
+
+            <div id="nagerSyncStatus" class="hidden px-3 py-2 rounded-xl text-xs font-bold"></div>
+
+            <!-- Calendar Grid -->
+            <div>
+                <div class="grid grid-cols-7 gap-1.5 text-center text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                    <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+                </div>
+                <div id="calendarGrid" class="grid grid-cols-7 gap-1.5"></div>
+            </div>
+
+            <!-- Tag Holiday Quick Panel -->
+            <div id="holidayEditorPanel" class="p-4 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-extrabold text-slate-800 dark:text-white" id="editorHeading">Tag a Holiday Date</span>
+                    <button type="button" id="deleteHolidayBtn" onclick="deleteSelectedHoliday()" class="hidden text-xs font-bold text-rose-600 hover:text-rose-700 cursor-pointer">Remove Holiday</button>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
+                    <input type="hidden" id="editHolidayId" value="0" />
+                    <div class="sm:col-span-4">
+                        <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Date</label>
+                        <input type="date" id="editHolidayDate" class="w-full px-3 py-1.5 rounded-xl border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-xs font-semibold" />
+                    </div>
+                    <div class="sm:col-span-5">
+                        <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Holiday Name</label>
+                        <input type="text" id="editHolidayName" placeholder="e.g., Independence Day" class="w-full px-3 py-1.5 rounded-xl border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-xs font-semibold" />
+                    </div>
+                    <div class="sm:col-span-3 flex items-center justify-between gap-2">
+                        <label class="inline-flex items-center gap-1.5 text-[11px] font-semibold cursor-pointer">
+                            <input type="checkbox" id="editHolidayRecurring" class="rounded border-slate-300 text-emerald-600" />
+                            <span>Yearly</span>
+                        </label>
+                        <button type="button" onclick="saveHolidayForm()" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer">Save</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Holiday List -->
+            <div class="overflow-x-auto max-h-56 rounded-xl border border-slate-200 dark:border-stone-800">
+                <table class="w-full text-left text-xs border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50 dark:bg-stone-950 border-b border-slate-200 dark:border-stone-800 text-[10px] uppercase text-slate-500">
+                            <th class="px-3 py-2">Date</th>
+                            <th class="px-3 py-2">Holiday Name</th>
+                            <th class="px-3 py-2">Type</th>
+                            <th class="px-3 py-2 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="holidayTableBody" class="divide-y divide-slate-100 dark:divide-stone-800"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    let holidays = @Html.Raw(holidaysJson);
+    let viewDate = new Date();
+    viewDate.setDate(1);
+
+    const workingDays = {
+        0: @(setting.WorkSunday ? "true" : "false"),
+        1: @(setting.WorkMonday ? "true" : "false"),
+        2: @(setting.WorkTuesday ? "true" : "false"),
+        3: @(setting.WorkWednesday ? "true" : "false"),
+        4: @(setting.WorkThursday ? "true" : "false"),
+        5: @(setting.WorkFriday ? "true" : "false"),
+        6: @(setting.WorkSaturday ? "true" : "false")
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('editHolidayDate').value = formatIso(new Date());
+        renderCalendar();
+        renderHolidayTable();
+        if (window.lucide) lucide.createIcons();
+    });
+
+    function toggleBreakInputs() {
+        const enabled = document.getElementById('hasBreakToggle').checked;
+        const fields = document.getElementById('breakTimeFields');
+        if (enabled) fields.classList.remove('opacity-50', 'pointer-events-none');
+        else fields.classList.add('opacity-50', 'pointer-events-none');
+    }
+
+    function formatIso(d) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    }
+
+    function findHolidayForDate(iso) {
+        const md = iso.slice(5);
+        return holidays.find(h => h.isActive && (h.date === iso || (h.isRecurringYearly && h.monthDay === md)));
+    }
+
+    function changeMonth(delta) {
+        viewDate.setMonth(viewDate.getMonth() + delta);
+        renderCalendar();
+    }
+
+    function goToday() {
+        viewDate = new Date();
+        viewDate.setDate(1);
+        renderCalendar();
+    }
+
+    function renderCalendar() {
+        const year = viewDate.getFullYear();
+        const month = viewDate.getMonth();
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        document.getElementById('calendarMonthLabel').textContent = `${monthNames[month]} ${year}`;
+
+        const firstDay = new Date(year, month, 1).getDay();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const todayIso = formatIso(new Date());
+        const grid = document.getElementById('calendarGrid');
+        let html = '';
+
+        for (let i = 0; i < firstDay; i++) {
+            html += `<div class="h-14 rounded-xl bg-slate-50/40 dark:bg-stone-950/30"></div>`;
+        }
+
+        for (let d = 1; d <= daysInMonth; d++) {
+            const cur = new Date(year, month, d);
+            const iso = formatIso(cur);
+            const dow = cur.getDay();
+            const isWorkDay = workingDays[dow];
+            const holiday = findHolidayForDate(iso);
+            const isToday = iso === todayIso;
+
+            let bgClass = 'bg-white dark:bg-stone-950 border-slate-200 dark:border-stone-800 hover:border-emerald-400';
+            if (holiday) bgClass = 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800 hover:border-rose-500';
+            else if (!isWorkDay) bgClass = 'bg-slate-100/70 dark:bg-stone-900/50 border-slate-200/70 dark:border-stone-800 text-slate-400';
+
+            const ringClass = isToday ? 'ring-2 ring-emerald-500' : '';
+
+            html += `
+                <button type="button" onclick="selectCalendarDate('${iso}')" class="h-14 p-1.5 rounded-xl border ${bgClass} ${ringClass} flex flex-col justify-between text-left transition cursor-pointer overflow-hidden">
+                    <div class="flex items-center justify-between w-full">
+                        <span class="text-xs font-extrabold ${holiday ? 'text-rose-700 dark:text-rose-300' : ''}">${d}</span>
+                        ${holiday ? '<span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>' : ''}
+                    </div>
+                    ${holiday ? `<span class="text-[9px] font-bold text-rose-700 dark:text-rose-300 truncate w-full">${escHtml(holiday.name)}</span>` : (!isWorkDay ? '<span class="text-[9px] text-slate-400">Off</span>' : '')}
+                </button>
+            `;
+        }
+        grid.innerHTML = html;
+    }
+
+    function selectCalendarDate(iso) {
+        const existing = holidays.find(h => h.date === iso) || findHolidayForDate(iso);
+        document.getElementById('editHolidayDate').value = iso;
+        if (existing) {
+            document.getElementById('editHolidayId').value = existing.id;
+            document.getElementById('editHolidayName').value = existing.name;
+            document.getElementById('editHolidayRecurring').checked = existing.isRecurringYearly;
+            document.getElementById('editorHeading').textContent = `Edit Holiday (${iso})`;
+            document.getElementById('deleteHolidayBtn').classList.remove('hidden');
+        } else {
+            document.getElementById('editHolidayId').value = 0;
+            document.getElementById('editHolidayName').value = '';
+            document.getElementById('editHolidayRecurring').checked = false;
+            document.getElementById('editorHeading').textContent = `Tag Holiday (${iso})`;
+            document.getElementById('deleteHolidayBtn').classList.add('hidden');
+        }
+        document.getElementById('editHolidayName').focus();
+    }
+
+    async function saveHolidayForm() {
+        const id = parseInt(document.getElementById('editHolidayId').value || '0', 10);
+        const date = document.getElementById('editHolidayDate').value;
+        const name = document.getElementById('editHolidayName').value.trim();
+        const isRecurringYearly = document.getElementById('editHolidayRecurring').checked;
+        if (!date || !name) {
+            alert('Please enter both a date and a holiday name.');
+            return;
+        }
+
+        const resp = await fetch('@Url.Action("SaveHoliday", "Workflow")', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, holidayDate: date, name, isRecurringYearly, isActive: true })
+        });
+        const res = await resp.json();
+        if (res.success && res.holiday) {
+            const h = {
+                id: res.holiday.id,
+                date: res.holiday.holidayDate.slice(0, 10),
+                monthDay: res.holiday.holidayDate.slice(5, 10),
+                name: res.holiday.name,
+                isRecurringYearly: res.holiday.isRecurringYearly,
+                isActive: res.holiday.isActive
+            };
+            const idx = holidays.findIndex(x => x.id === h.id || x.date === h.date);
+            if (idx >= 0) holidays[idx] = h;
+            else holidays.push(h);
+            holidays.sort((a, b) => a.date.localeCompare(b.date));
+            renderCalendar();
+            renderHolidayTable();
+            selectCalendarDate(h.date);
+        } else {
+            alert(res.message || 'Failed to save holiday.');
+        }
+    }
+
+    async function deleteSelectedHoliday() {
+        const id = parseInt(document.getElementById('editHolidayId').value || '0', 10);
+        if (!id) return;
+        await deleteHolidayById(id);
+    }
+
+    async function deleteHolidayById(id) {
+        const resp = await fetch('@Url.Action("DeleteHoliday", "Workflow")?id=' + id, { method: 'POST' });
+        const res = await resp.json();
+        if (res.success) {
+            holidays = holidays.filter(h => h.id !== id);
+            renderCalendar();
+            renderHolidayTable();
+            document.getElementById('editHolidayId').value = 0;
+            document.getElementById('editHolidayName').value = '';
+            document.getElementById('deleteHolidayBtn').classList.add('hidden');
+        }
+    }
+
+    function renderHolidayTable() {
+        const tbody = document.getElementById('holidayTableBody');
+        if (!holidays.length) {
+            tbody.innerHTML = '<tr><td colspan="4" class="px-3 py-6 text-center text-slate-400">No holidays tagged yet. Click any calendar date above to add one.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = holidays.map(h => `
+            <tr class="hover:bg-slate-50 dark:hover:bg-stone-800/40">
+                <td class="px-3 py-2 font-mono font-bold">${escHtml(h.date)}</td>
+                <td class="px-3 py-2 font-bold text-slate-800 dark:text-stone-100">${escHtml(h.name)}</td>
+                <td class="px-3 py-2">
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${h.isRecurringYearly ? 'bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300' : 'bg-slate-100 text-slate-600 dark:bg-stone-800 dark:text-stone-300'}">
+                        ${h.isRecurringYearly ? 'Yearly' : 'One-Time'}
+                    </span>
+                </td>
+                <td class="px-3 py-2 text-right space-x-2">
+                    <button type="button" onclick="selectCalendarDate('${h.date}')" class="text-emerald-600 hover:underline font-bold cursor-pointer">Edit</button>
+                    <button type="button" onclick="deleteHolidayById(${h.id})" class="text-rose-600 hover:underline font-bold cursor-pointer">Delete</button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    async function fetchNagerHolidaysForMonth() {
+        const year = viewDate.getFullYear();
+        const month = viewDate.getMonth() + 1;
+        const btn = document.getElementById('btnFetchNager');
+        const statusEl = document.getElementById('nagerSyncStatus');
+
+        if (btn) btn.disabled = true;
+        if (statusEl) {
+            statusEl.className = 'px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 dark:bg-stone-800 dark:text-stone-200';
+            statusEl.textContent = 'Fetching holidays from Nager.Date...';
+            statusEl.classList.remove('hidden');
+        }
+
+        try {
+            const url = `@Url.Action("FetchNagerHolidays", "Workflow")?year=${year}&month=${month}&countryCode=PH`;
+            const resp = await fetch(url, { method: 'POST' });
+            const res = await resp.json();
+            if (res.success) {
+                holidays = res.holidays || [];
+                renderCalendar();
+                renderHolidayTable();
+                if (statusEl) {
+                    statusEl.className = 'px-3 py-2 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800';
+                    statusEl.textContent = res.message;
+                }
+            } else if (statusEl) {
+                statusEl.className = 'px-3 py-2 rounded-xl text-xs font-bold bg-rose-50 text-rose-800 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800';
+                statusEl.textContent = res.message || 'Failed to fetch holidays.';
+            }
+        } catch (err) {
+            if (statusEl) {
+                statusEl.className = 'px-3 py-2 rounded-xl text-xs font-bold bg-rose-50 text-rose-800 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800';
+                statusEl.textContent = 'Error connecting to Nager.Date.';
+            }
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    function escHtml(s) {
+        return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+</script>

@@ -240,6 +240,27 @@
                                     <div class="text-[10px] text-slate-400 dark:text-stone-500">
                                         @item.DateSubmitted.ToString("MMM dd, yyyy hh:mm tt")
                                     </div>
+                                    @if (item.SlaStatus != null)
+                                    {
+                                        var slaBadge = item.SlaStatus.SlaState switch
+                                        {
+                                            "Overdue" => "bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 border-rose-200 dark:border-rose-800",
+                                            "DueSoon" => "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border-amber-200 dark:border-amber-800",
+                                            "OnTrack" => "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800",
+                                            _ => "bg-slate-100 text-slate-600 dark:bg-stone-800 dark:text-stone-300 border-slate-200 dark:border-stone-700"
+                                        };
+                                        <div class="mt-1 flex flex-wrap items-center gap-1">
+                                            <span class="px-1.5 py-0.5 rounded-md border text-[9px] font-bold @slaBadge" title="Citizen's Charter Working Time">
+                                                @item.SlaStatus.SummaryText
+                                            </span>
+                                            @if (item.SlaStatus.IsCurrentlyPaused && !string.IsNullOrEmpty(item.SlaStatus.PauseReason))
+                                            {
+                                                <span class="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-stone-800 text-slate-500 dark:text-stone-400 text-[9px] font-semibold">
+                                                    Paused: @item.SlaStatus.PauseReason
+                                                </span>
+                                            }
+                                        </div>
+                                    }
                                 </td>
 
                                 <!-- Owner / Applicant -->

@@ -17,4 +17,6 @@ public class WorkflowSequence
     public int? NextStatusId { get; set; }
 
     public bool IsApproval { get; set; } = false;
+
+    public int EstimatedMinutes { get; set; } = 0;
 }

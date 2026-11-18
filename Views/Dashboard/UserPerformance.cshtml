@@ -1,0 +1,650 @@
+@{
+    ViewData["Title"] = "User Performance & Division Statistics";
+    var initialStart = ViewBag.InitialStartDate as string ?? "";
+    var initialEnd = ViewBag.InitialEndDate as string ?? "";
+}
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+<style>
+    .perf-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 1rem;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .dark .perf-card {
+        background: #1c1917;
+        border-color: #292524;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3);
+    }
+    .perf-kpi:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.08);
+    }
+    .dark .perf-kpi:hover {
+        box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.4);
+    }
+    .apexcharts-tooltip {
+        border-radius: 10px !important;
+        font-family: inherit !important;
+        box-shadow: 0 8px 16px -2px rgba(0,0,0,0.12) !important;
+    }
+</style>
+
+<div class="space-y-5 font-sans pb-12">
+
+    <!-- 1. TOP HEADER & CONTROLS -->
+    <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+        <div>
+            <div class="flex items-center gap-2.5">
+                <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-800 dark:text-white">
+                    User Performance &amp; Division Statistics
+                </h1>
+                <span id="periodBadge" class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300">
+                    All Time
+                </span>
+            </div>
+            <p class="text-xs sm:text-sm text-slate-500 dark:text-stone-400 mt-0.5">
+                Staff transaction throughput and statistical completion comparison across divisions
+            </p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+            <div class="inline-flex rounded-xl border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-900 p-1 shadow-xs">
+                <button type="button" onclick="applyPreset('all', this)" class="preset-btn px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-600 text-white transition">All Time</button>
+                <button type="button" onclick="applyPreset('7d', this)" class="preset-btn px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-600 dark:text-stone-300 hover:bg-slate-100 dark:hover:bg-stone-800 transition">7D</button>
+                <button type="button" onclick="applyPreset('30d', this)" class="preset-btn px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-600 dark:text-stone-300 hover:bg-slate-100 dark:hover:bg-stone-800 transition">30D</button>
+                <button type="button" onclick="applyPreset('month', this)" class="preset-btn px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-600 dark:text-stone-300 hover:bg-slate-100 dark:hover:bg-stone-800 transition">This Month</button>
+                <button type="button" onclick="applyPreset('year', this)" class="preset-btn px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-600 dark:text-stone-300 hover:bg-slate-100 dark:hover:bg-stone-800 transition">This Year</button>
+            </div>
+
+            <button type="button" onclick="loadPerformanceData()" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition cursor-pointer">
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                Refresh
+            </button>
+
+            <a id="exportCsvBtn" href="#" onclick="exportPerformanceCsv(event)" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-300 dark:border-stone-700 bg-white dark:bg-stone-900 hover:bg-slate-50 dark:hover:bg-stone-800 text-slate-700 dark:text-stone-200 text-xs font-bold shadow-xs transition">
+                <i data-lucide="download" class="w-3.5 h-3.5 text-emerald-600"></i>
+                Export CSV
+            </a>
+        </div>
+    </div>
+
+    <!-- 2. FILTER BAR -->
+    <div class="perf-card p-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+            <div>
+                <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-stone-400 mb-1">Start Date</label>
+                <input type="text" id="filterStartDate" value="@initialStart" placeholder="Any start date" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-700 bg-slate-50 dark:bg-stone-950 text-xs font-semibold text-slate-800 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/40" />
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-stone-400 mb-1">End Date</label>
+                <input type="text" id="filterEndDate" value="@initialEnd" placeholder="Any end date" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-700 bg-slate-50 dark:bg-stone-950 text-xs font-semibold text-slate-800 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/40" />
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-stone-400 mb-1">Division</label>
+                <select id="filterDivision" onchange="loadPerformanceData()" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-700 bg-slate-50 dark:bg-stone-950 text-xs font-semibold text-slate-800 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/40">
+                    <option value="">All Divisions</option>
+                    <option value="1">Division 1: Tax Assessment &amp; Land Holding</option>
+                    <option value="2">Division 2: GIS &amp; Tax Mapping</option>
+                    <option value="3">Division 3: Records &amp; Certification</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-stone-400 mb-1">Transaction Type</label>
+                <select id="filterRequestType" onchange="loadPerformanceData()" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-700 bg-slate-50 dark:bg-stone-950 text-xs font-semibold text-slate-800 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/40">
+                    <option value="">All Transaction Types</option>
+                    <option value="PropertyAssessmentRequest">Property Assessment (RPA)</option>
+                    <option value="RequestForInspection">Request for Inspection (RFI)</option>
+                    <option value="LandHoldingRequest">Land Holding</option>
+                    <option value="TaxDeclarationRequest">Tax Declaration / Certification</option>
+                    <option value="TaxMappingRequest">GIS Tax Mapping</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-stone-400 mb-1">Search User / Role</label>
+                <div class="relative">
+                    <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                    <input type="text" id="filterSearch" placeholder="Name, username, role..." onkeydown="if(event.key==='Enter'){loadPerformanceData();}" class="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 dark:border-stone-700 bg-slate-50 dark:bg-stone-950 text-xs font-semibold text-slate-800 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/40" />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. KPI BENTO CARDS -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+        <div class="perf-card perf-kpi p-4 border-l-4 border-l-emerald-500">
+            <div class="flex items-center justify-between">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-stone-400">Transactions Processed</span>
+                <span class="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"><i data-lucide="file-check-2" class="w-4 h-4"></i></span>
+            </div>
+            <div id="kpiUniqueTx" class="text-2xl font-extrabold text-slate-900 dark:text-white mt-2">0</div>
+            <div id="kpiTotalActions" class="text-[11px] text-slate-500 dark:text-stone-400 mt-1">0 total workflow actions</div>
+        </div>
+
+        <div class="perf-card perf-kpi p-4 border-l-4 border-l-sky-500">
+            <div class="flex items-center justify-between">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-stone-400">Active Contributors</span>
+                <span class="p-2 rounded-xl bg-sky-50 dark:bg-sky-500/15 text-sky-600 dark:text-sky-400"><i data-lucide="users" class="w-4 h-4"></i></span>
+            </div>
+            <div id="kpiContributors" class="text-2xl font-extrabold text-slate-900 dark:text-white mt-2">0</div>
+            <div id="kpiTotalUsers" class="text-[11px] text-slate-500 dark:text-stone-400 mt-1">of 0 active staff accounts</div>
+        </div>
+
+        <div class="perf-card perf-kpi p-4 border-l-4 border-l-teal-500">
+            <div class="flex items-center justify-between">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-stone-400">Finished / Released</span>
+                <span class="p-2 rounded-xl bg-teal-50 dark:bg-teal-500/15 text-teal-600 dark:text-teal-400"><i data-lucide="check-circle-2" class="w-4 h-4"></i></span>
+            </div>
+            <div id="kpiFinished" class="text-2xl font-extrabold text-slate-900 dark:text-white mt-2">0</div>
+            <div id="kpiCompletionRate" class="text-[11px] text-slate-500 dark:text-stone-400 mt-1">0.0% completion rate</div>
+        </div>
+
+        <div class="perf-card perf-kpi p-4 border-l-4 border-l-amber-500">
+            <div class="flex items-center justify-between">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-stone-400">Top Division</span>
+                <span class="p-2 rounded-xl bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400"><i data-lucide="building-2" class="w-4 h-4"></i></span>
+            </div>
+            <div id="kpiTopDivName" class="text-lg font-extrabold text-slate-900 dark:text-white mt-2 truncate">—</div>
+            <div id="kpiTopDivMeta" class="text-[11px] text-slate-500 dark:text-stone-400 mt-1">0 finished (0.0%)</div>
+        </div>
+
+        <div class="perf-card perf-kpi p-4 border-l-4 border-l-violet-500">
+            <div class="flex items-center justify-between">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-stone-400">Top Performer</span>
+                <span class="p-2 rounded-xl bg-violet-50 dark:bg-violet-500/15 text-violet-600 dark:text-violet-400"><i data-lucide="award" class="w-4 h-4"></i></span>
+            </div>
+            <div id="kpiTopUserName" class="text-lg font-extrabold text-slate-900 dark:text-white mt-2 truncate">—</div>
+            <div id="kpiTopUserMeta" class="text-[11px] text-slate-500 dark:text-stone-400 mt-1">0 transactions processed</div>
+        </div>
+    </div>
+
+    <!-- 4. DIVISION STATISTICAL COMPARISON CHARTS -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        <div class="perf-card p-5 lg:col-span-7">
+            <div class="flex items-center justify-between mb-3">
+                <div>
+                    <h2 class="text-sm font-extrabold text-slate-800 dark:text-white">Division Transaction Status Comparison</h2>
+                    <p class="text-[11px] text-slate-500 dark:text-stone-400">Finished vs Ongoing vs Pending vs Deferred per division</p>
+                </div>
+            </div>
+            <div id="divisionBarChart" class="min-h-[300px]"></div>
+        </div>
+
+        <div class="perf-card p-5 lg:col-span-5">
+            <div class="flex items-center justify-between mb-3">
+                <div>
+                    <h2 class="text-sm font-extrabold text-slate-800 dark:text-white">Share of Finished Transactions by Division</h2>
+                    <p class="text-[11px] text-slate-500 dark:text-stone-400">Proportion of completed/released transactions</p>
+                </div>
+            </div>
+            <div id="divisionShareChart" class="min-h-[300px]"></div>
+        </div>
+    </div>
+
+    <!-- 5. FINISHED TREND BY DIVISION + DIVISION SUMMARY TABLE -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        <div class="perf-card p-5 lg:col-span-6">
+            <div class="mb-3">
+                <h2 class="text-sm font-extrabold text-slate-800 dark:text-white">Finished Transactions Trend by Division</h2>
+                <p class="text-[11px] text-slate-500 dark:text-stone-400">Completed/released output timeline comparing all 3 divisions</p>
+            </div>
+            <div id="divisionTrendChart" class="min-h-[280px]"></div>
+        </div>
+
+        <div class="perf-card p-5 lg:col-span-6">
+            <div class="mb-3">
+                <h2 class="text-sm font-extrabold text-slate-800 dark:text-white">Division Statistical Summary</h2>
+                <p class="text-[11px] text-slate-500 dark:text-stone-400">Completion rate, average turnaround, and queue distribution</p>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs border-collapse">
+                    <thead>
+                        <tr class="border-b border-slate-200 dark:border-stone-800 text-[10px] uppercase tracking-wider text-slate-500 dark:text-stone-400">
+                            <th class="py-2.5 pr-3">Division</th>
+                            <th class="py-2.5 px-2 text-right">Total</th>
+                            <th class="py-2.5 px-2 text-right text-emerald-600 dark:text-emerald-400">Finished</th>
+                            <th class="py-2.5 px-2 text-right">Ongoing</th>
+                            <th class="py-2.5 px-2 text-right">Pending</th>
+                            <th class="py-2.5 px-2 text-right">Deferred</th>
+                            <th class="py-2.5 px-2 text-right">Completion %</th>
+                            <th class="py-2.5 px-2 text-right">Charter SLA %</th>
+                            <th class="py-2.5 pl-2 text-right">Avg Work Time</th>
+                        </tr>
+                    </thead>
+                    <tbody id="divisionStatsBody" class="divide-y divide-slate-100 dark:divide-stone-800">
+                        <tr><td colspan="9" class="py-8 text-center text-slate-400">Loading division statistics...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 6. TOP USERS CHART + REQUEST TYPE BREAKDOWN -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        <div class="perf-card p-5 lg:col-span-7">
+            <div class="mb-3">
+                <h2 class="text-sm font-extrabold text-slate-800 dark:text-white">Top Staff Performance</h2>
+                <p class="text-[11px] text-slate-500 dark:text-stone-400">Top 12 users ranked by forwarded transactions and active workload</p>
+            </div>
+            <div id="topUsersChart" class="min-h-[320px]"></div>
+        </div>
+
+        <div class="perf-card p-5 lg:col-span-5">
+            <div class="mb-3">
+                <h2 class="text-sm font-extrabold text-slate-800 dark:text-white">Completion by Transaction Type</h2>
+                <p class="text-[11px] text-slate-500 dark:text-stone-400">Finished vs total volume per service type</p>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs border-collapse">
+                    <thead>
+                        <tr class="border-b border-slate-200 dark:border-stone-800 text-[10px] uppercase tracking-wider text-slate-500 dark:text-stone-400">
+                            <th class="py-2.5 pr-3">Transaction Type</th>
+                            <th class="py-2.5 px-2 text-right">Total</th>
+                            <th class="py-2.5 px-2 text-right text-emerald-600 dark:text-emerald-400">Finished</th>
+                            <th class="py-2.5 pl-2 text-right">Rate</th>
+                        </tr>
+                    </thead>
+                    <tbody id="requestTypeStatsBody" class="divide-y divide-slate-100 dark:divide-stone-800">
+                        <tr><td colspan="4" class="py-8 text-center text-slate-400">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 7. DETAILED USER PERFORMANCE TABLE -->
+    <div class="perf-card p-5">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <div>
+                <h2 class="text-base font-extrabold text-slate-800 dark:text-white">User Performance Breakdown</h2>
+                <p class="text-[11px] text-slate-500 dark:text-stone-400">How many transactions and workflow actions each user processed in the selected period</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-3">
+                <select id="breakdownDivisionFilter" onchange="renderUserTable()" class="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-stone-700 bg-slate-50 dark:bg-stone-950 text-xs font-semibold text-slate-800 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/40">
+                    <option value="">All Divisions</option>
+                    <option value="1">Division 1: Assessment &amp; Land Holding</option>
+                    <option value="2">Division 2: GIS &amp; Tax Mapping</option>
+                    <option value="3">Division 3: Records &amp; Certification</option>
+                    <option value="0">Unassigned</option>
+                </select>
+                <label class="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-stone-300 cursor-pointer select-none">
+                    <input type="checkbox" id="hideZeroUsersToggle" onchange="renderUserTable()" class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+                    <span>Hide users with 0 processed transactions</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-stone-800">
+            <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                    <tr class="bg-slate-50 dark:bg-stone-950 border-b border-slate-200 dark:border-stone-800 text-[10px] uppercase tracking-wider text-slate-500 dark:text-stone-400">
+                        <th class="px-3 py-3">#</th>
+                        <th class="px-3 py-3">User</th>
+                        <th class="px-3 py-3">Role &amp; Division</th>
+                        <th class="px-3 py-3 text-right">Transactions Processed</th>
+                        <th class="px-3 py-3 text-right">Forwarded</th>
+                        <th class="px-3 py-3 text-right">Overdue</th>
+                        <th class="px-3 py-3">Last Active</th>
+                    </tr>
+                </thead>
+                <tbody id="userPerformanceTableBody" class="divide-y divide-slate-100 dark:divide-stone-800">
+                    <tr><td colspan="7" class="py-10 text-center text-slate-400">Loading user performance data...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    let divisionBarChart = null;
+    let divisionShareChart = null;
+    let divisionTrendChart = null;
+    let topUsersChart = null;
+    let latestUsers = [];
+
+    document.addEventListener('DOMContentLoaded', function () {
+        flatpickr('#filterStartDate', {
+            dateFormat: 'Y-m-d',
+            allowInput: true,
+            onChange: () => loadPerformanceData()
+        });
+        flatpickr('#filterEndDate', {
+            dateFormat: 'Y-m-d',
+            allowInput: true,
+            onChange: () => loadPerformanceData()
+        });
+
+        loadPerformanceData();
+    });
+
+    function formatIsoDate(d) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    }
+
+    function applyPreset(preset, btn) {
+        document.querySelectorAll('.preset-btn').forEach(b => {
+            b.classList.remove('bg-emerald-600', 'text-white');
+            b.classList.add('text-slate-600', 'dark:text-stone-300');
+        });
+        if (btn) {
+            btn.classList.add('bg-emerald-600', 'text-white');
+            btn.classList.remove('text-slate-600', 'dark:text-stone-300');
+        }
+
+        const now = new Date();
+        let start = '';
+        let end = formatIsoDate(now);
+
+        if (preset === 'all') {
+            start = '';
+            end = '';
+        } else if (preset === '7d') {
+            const s = new Date(now);
+            s.setDate(s.getDate() - 6);
+            start = formatIsoDate(s);
+        } else if (preset === '30d') {
+            const s = new Date(now);
+            s.setDate(s.getDate() - 29);
+            start = formatIsoDate(s);
+        } else if (preset === 'month') {
+            start = formatIsoDate(new Date(now.getFullYear(), now.getMonth(), 1));
+        } else if (preset === 'year') {
+            start = formatIsoDate(new Date(now.getFullYear(), 0, 1));
+        }
+
+        const startEl = document.getElementById('filterStartDate');
+        const endEl = document.getElementById('filterEndDate');
+        if (startEl._flatpickr) startEl._flatpickr.setDate(start || null, false);
+        else startEl.value = start;
+        if (endEl._flatpickr) endEl._flatpickr.setDate(end || null, false);
+        else endEl.value = end;
+
+        loadPerformanceData();
+    }
+
+    function getFilterPayload() {
+        const startVal = document.getElementById('filterStartDate').value.trim();
+        const endVal = document.getElementById('filterEndDate').value.trim();
+        const divVal = document.getElementById('filterDivision').value;
+        const reqVal = document.getElementById('filterRequestType').value;
+        const searchVal = document.getElementById('filterSearch').value.trim();
+
+        return {
+            startDate: startVal || null,
+            endDate: endVal || null,
+            divisionId: divVal ? parseInt(divVal, 10) : null,
+            requestType: reqVal || null,
+            search: searchVal || null
+        };
+    }
+
+    function exportPerformanceCsv(e) {
+        e.preventDefault();
+        const f = getFilterPayload();
+        const params = new URLSearchParams();
+        if (f.startDate) params.set('startDate', f.startDate);
+        if (f.endDate) params.set('endDate', f.endDate);
+        if (f.divisionId) params.set('divisionId', f.divisionId);
+        if (f.requestType) params.set('requestType', f.requestType);
+        if (f.search) params.set('search', f.search);
+        window.location.href = '@Url.Action("ExportUserPerformanceCsv", "Dashboard")' + (params.toString() ? '?' + params.toString() : '');
+    }
+
+    async function loadPerformanceData() {
+        const payload = getFilterPayload();
+        try {
+            const resp = await fetch('@Url.Action("GetUserPerformanceData", "Dashboard")', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const res = await resp.json();
+            if (!res.success) {
+                console.error(res.message);
+                return;
+            }
+            renderDashboard(res.data);
+        } catch (err) {
+            console.error('Error loading user performance data:', err);
+        }
+    }
+
+    function escHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function isDarkMode() {
+        return document.documentElement.classList.contains('dark');
+    }
+
+    function renderDashboard(data) {
+        document.getElementById('periodBadge').textContent = data.periodLabel || 'All Time';
+        document.getElementById('kpiUniqueTx').textContent = (data.uniqueTransactionsProcessed || 0).toLocaleString();
+        document.getElementById('kpiTotalActions').textContent = `${(data.totalActionsProcessed || 0).toLocaleString()} total workflow actions`;
+        document.getElementById('kpiContributors').textContent = (data.activeContributors || 0).toLocaleString();
+        document.getElementById('kpiTotalUsers').textContent = `of ${(data.totalActiveUsers || 0).toLocaleString()} active staff accounts`;
+        document.getElementById('kpiFinished').textContent = (data.totalFinishedInPeriod || 0).toLocaleString();
+        document.getElementById('kpiCompletionRate').textContent = `${Number(data.overallCompletionRate || 0).toFixed(1)}% of ${(data.totalTransactionsInPeriod || 0).toLocaleString()} transactions`;
+        document.getElementById('kpiTopDivName').textContent = data.topDivisionName || '—';
+        document.getElementById('kpiTopDivMeta').textContent = `${(data.topDivisionFinished || 0).toLocaleString()} finished (${Number(data.topDivisionRate || 0).toFixed(1)}%)`;
+        document.getElementById('kpiTopUserName').textContent = data.topUserName || '—';
+        document.getElementById('kpiTopUserMeta').textContent = `${(data.topUserTransactions || 0).toLocaleString()} transactions${data.topUserRole ? ' • ' + data.topUserRole : ''}`;
+
+        renderDivisionCharts(data);
+        renderDivisionTable(data.divisionStats || []);
+        renderRequestTypeTable(data.requestTypeStats || []);
+
+        latestUsers = data.userLeaderboard || [];
+        renderTopUsersChart(latestUsers);
+        renderUserTable();
+
+        if (window.lucide) lucide.createIcons();
+    }
+
+    function renderDivisionCharts(data) {
+        const dark = isDarkMode();
+        const textColor = dark ? '#a8a29e' : '#64748b';
+        const gridColor = dark ? '#292524' : '#e2e8f0';
+        const divs = data.divisionStats || [];
+        const categories = divs.map(d => d.shortName);
+
+        if (divisionBarChart) divisionBarChart.destroy();
+        divisionBarChart = new ApexCharts(document.querySelector('#divisionBarChart'), {
+            chart: { type: 'bar', height: 300, toolbar: { show: false }, fontFamily: 'inherit', foreColor: textColor },
+            plotOptions: { bar: { horizontal: false, columnWidth: '58%', borderRadius: 5 } },
+            colors: ['#10b981', '#0ea5e9', '#f59e0b', '#ef4444'],
+            series: [
+                { name: 'Finished', data: divs.map(d => d.finishedCount) },
+                { name: 'Ongoing', data: divs.map(d => d.ongoingCount) },
+                { name: 'Pending', data: divs.map(d => d.pendingCount) },
+                { name: 'Deferred', data: divs.map(d => d.deferredCount) }
+            ],
+            xaxis: { categories },
+            grid: { borderColor: gridColor, strokeDashArray: 4 },
+            legend: { position: 'top' },
+            theme: { mode: dark ? 'dark' : 'light' }
+        });
+        divisionBarChart.render();
+
+        if (divisionShareChart) divisionShareChart.destroy();
+        const finishedCounts = divs.map(d => d.finishedCount);
+        const totalFinished = finishedCounts.reduce((a, b) => a + b, 0);
+        divisionShareChart = new ApexCharts(document.querySelector('#divisionShareChart'), {
+            chart: { type: 'donut', height: 300, fontFamily: 'inherit', foreColor: textColor },
+            labels: divs.map(d => `${d.shortName} (${d.completionRate.toFixed(1)}%)`),
+            series: totalFinished > 0 ? finishedCounts : [1, 0, 0],
+            colors: totalFinished > 0 ? ['#10b981', '#0ea5e9', '#8b5cf6'] : ['#cbd5e1', '#cbd5e1', '#cbd5e1'],
+            plotOptions: {
+                pie: {
+                    donut: {
+                        size: '65%',
+                        labels: {
+                            show: true,
+                            total: {
+                                show: true,
+                                label: 'Total Finished',
+                                formatter: () => totalFinished.toLocaleString()
+                            }
+                        }
+                    }
+                }
+            },
+            dataLabels: { enabled: totalFinished > 0 },
+            legend: { position: 'bottom' },
+            theme: { mode: dark ? 'dark' : 'light' }
+        });
+        divisionShareChart.render();
+
+        if (divisionTrendChart) divisionTrendChart.destroy();
+        divisionTrendChart = new ApexCharts(document.querySelector('#divisionTrendChart'), {
+            chart: { type: 'area', height: 280, toolbar: { show: false }, fontFamily: 'inherit', foreColor: textColor },
+            stroke: { curve: 'smooth', width: 2.5 },
+            fill: { type: 'gradient', gradient: { opacityFrom: 0.35, opacityTo: 0.05 } },
+            colors: ['#10b981', '#0ea5e9', '#8b5cf6'],
+            series: [
+                { name: 'Division 1', data: data.div1FinishedTrend || [] },
+                { name: 'Division 2', data: data.div2FinishedTrend || [] },
+                { name: 'Division 3', data: data.div3FinishedTrend || [] }
+            ],
+            xaxis: { categories: data.trendLabels || [] },
+            grid: { borderColor: gridColor, strokeDashArray: 4 },
+            legend: { position: 'top' },
+            theme: { mode: dark ? 'dark' : 'light' }
+        });
+        divisionTrendChart.render();
+    }
+
+    function renderDivisionTable(divs) {
+        const tbody = document.getElementById('divisionStatsBody');
+        if (!divs.length) {
+            tbody.innerHTML = '<tr><td colspan="8" class="py-8 text-center text-slate-400">No division data found.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = divs.map(d => `
+            <tr class="hover:bg-slate-50/80 dark:hover:bg-stone-800/40 transition">
+                <td class="py-2.5 pr-3 font-bold text-slate-800 dark:text-stone-100">${escHtml(d.divisionName)}</td>
+                <td class="py-2.5 px-2 text-right font-semibold">${d.totalTransactions.toLocaleString()}</td>
+                <td class="py-2.5 px-2 text-right font-extrabold text-emerald-600 dark:text-emerald-400">${d.finishedCount.toLocaleString()}</td>
+                <td class="py-2.5 px-2 text-right text-sky-600 dark:text-sky-400 font-semibold">${d.ongoingCount.toLocaleString()}</td>
+                <td class="py-2.5 px-2 text-right text-amber-600 dark:text-amber-400 font-semibold">${d.pendingCount.toLocaleString()}</td>
+                <td class="py-2.5 px-2 text-right text-rose-600 dark:text-rose-400 font-semibold">${d.deferredCount.toLocaleString()}</td>
+                <td class="py-2.5 px-2 text-right">
+                    <div class="inline-flex items-center gap-1.5">
+                        <div class="w-14 h-1.5 bg-slate-200 dark:bg-stone-700 rounded-full overflow-hidden">
+                            <div class="h-full bg-emerald-500 rounded-full" style="width:${Math.min(100, d.completionRate)}%"></div>
+                        </div>
+                        <span class="font-bold">${Number(d.completionRate).toFixed(1)}%</span>
+                    </div>
+                </td>
+                <td class="py-2.5 px-2 text-right font-bold ${(d.onTimeFinishedCount + d.overdueFinishedCount) > 0 ? (d.slaComplianceRate >= 80 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400') : 'text-slate-400'}">
+                    ${(d.onTimeFinishedCount + d.overdueFinishedCount) > 0 ? Number(d.slaComplianceRate).toFixed(1) + '%' : '—'}
+                </td>
+                <td class="py-2.5 pl-2 text-right font-mono text-slate-600 dark:text-stone-300">${d.avgWorkingMinutes > 0 ? Math.round(d.avgWorkingMinutes) + 'm' : Number(d.avgTurnaroundDays).toFixed(1) + 'd'}</td>
+            </tr>
+        `).join('');
+    }
+
+    function renderRequestTypeTable(items) {
+        const tbody = document.getElementById('requestTypeStatsBody');
+        if (!items.length) {
+            tbody.innerHTML = '<tr><td colspan="4" class="py-8 text-center text-slate-400">No transactions found in this period.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = items.map(r => `
+            <tr class="hover:bg-slate-50/80 dark:hover:bg-stone-800/40 transition">
+                <td class="py-2.5 pr-3 font-bold text-slate-800 dark:text-stone-100">${escHtml(r.displayName)}</td>
+                <td class="py-2.5 px-2 text-right font-semibold">${r.totalCount.toLocaleString()}</td>
+                <td class="py-2.5 px-2 text-right font-extrabold text-emerald-600 dark:text-emerald-400">${r.finishedCount.toLocaleString()}</td>
+                <td class="py-2.5 pl-2 text-right font-bold">${Number(r.completionRate).toFixed(1)}%</td>
+            </tr>
+        `).join('');
+    }
+
+    function renderTopUsersChart(users) {
+        const dark = isDarkMode();
+        const textColor = dark ? '#a8a29e' : '#64748b';
+        const gridColor = dark ? '#292524' : '#e2e8f0';
+
+        const top = users.filter(u => (u.forwardedCount + u.activeClaimedCount) > 0).slice(0, 12);
+        if (topUsersChart) topUsersChart.destroy();
+        topUsersChart = new ApexCharts(document.querySelector('#topUsersChart'), {
+            chart: { type: 'bar', height: 320, toolbar: { show: false }, fontFamily: 'inherit', foreColor: textColor },
+            plotOptions: { bar: { horizontal: true, borderRadius: 5, barHeight: '62%' } },
+            colors: ['#0ea5e9', '#10b981', '#ef4444'],
+            series: [
+                { name: 'Forwarded', data: top.map(u => u.forwardedCount) },
+                { name: 'Transactions Processed (My Transactions)', data: top.map(u => u.activeClaimedCount) },
+                { name: 'Overdue', data: top.map(u => u.overdueCount) }
+            ],
+            xaxis: { categories: top.map(u => u.fullName) },
+            grid: { borderColor: gridColor, strokeDashArray: 4 },
+            legend: { position: 'top' },
+            noData: { text: 'No user activity recorded in this period.' },
+            theme: { mode: dark ? 'dark' : 'light' }
+        });
+        topUsersChart.render();
+    }
+
+    function renderUserTable() {
+        const tbody = document.getElementById('userPerformanceTableBody');
+        const hideZero = document.getElementById('hideZeroUsersToggle').checked;
+        const divFilter = document.getElementById('breakdownDivisionFilter')?.value ?? '';
+        let rows = latestUsers;
+        if (divFilter !== '') {
+            const targetDiv = parseInt(divFilter, 10);
+            rows = targetDiv === 0
+                ? rows.filter(u => !u.divisionId)
+                : rows.filter(u => u.divisionId === targetDiv);
+        }
+        if (hideZero) {
+            rows = rows.filter(u => (u.activeClaimedCount + u.forwardedCount) > 0);
+        }
+
+        if (!rows.length) {
+            tbody.innerHTML = '<tr><td colspan="7" class="py-10 text-center text-slate-400">No matching users found.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = rows.map((u, idx) => `
+            <tr class="hover:bg-slate-50/80 dark:hover:bg-stone-800/40 transition">
+                <td class="px-3 py-2.5 font-mono font-bold text-slate-400">${idx + 1}</td>
+                <td class="px-3 py-2.5">
+                    <div class="font-bold text-slate-900 dark:text-white">${escHtml(u.fullName)}</div>
+                    <div class="text-[11px] font-mono text-slate-400">@@${escHtml(u.username)}</div>
+                </td>
+                <td class="px-3 py-2.5">
+                    <div class="font-semibold text-slate-700 dark:text-stone-200">${escHtml(u.roleDisplay)}</div>
+                    <div class="text-[11px] text-slate-400">${escHtml(u.divisionName)}</div>
+                </td>
+                <td class="px-3 py-2.5 text-right" title="Currently in user's My Transactions">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-extrabold ${u.activeClaimedCount > 0 ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300' : 'bg-slate-100 text-slate-500 dark:bg-stone-800 dark:text-stone-400'}">
+                        ${u.activeClaimedCount.toLocaleString()}
+                    </span>
+                </td>
+                <td class="px-3 py-2.5 text-right font-bold text-sky-600 dark:text-sky-400">${u.forwardedCount.toLocaleString()}</td>
+                <td class="px-3 py-2.5 text-right">
+                    ${u.overdueCount > 0
+                        ? `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300" title="Exceeded role maximum time"><i data-lucide="clock-alert" class="w-3.5 h-3.5 text-rose-600 dark:text-rose-400"></i>${u.overdueCount.toLocaleString()}</span>`
+                        : `<span class="text-slate-400 font-semibold">0</span>`}
+                </td>
+                <td class="px-3 py-2.5 text-[11px] font-mono text-slate-500 dark:text-stone-400">${escHtml(u.lastActiveText)}</td>
+            </tr>
+        `).join('');
+
+        if (window.lucide) lucide.createIcons();
+    }
+</script>

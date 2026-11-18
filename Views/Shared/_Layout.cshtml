@@ -187,7 +187,8 @@
     bool canDashHead = PermissionService.CanAccess(User, "Dashboard", "AssessorHead");
     bool canDashAdmin = PermissionService.CanAccess(User, "Dashboard", "SystemOwner");
     bool canDashAnalytics = PermissionService.CanAccess(User, "Dashboard", "Analytics");
-    bool showDashboardGroup = canDashStaff || canDashHead || canDashAdmin || canDashAnalytics;
+    bool canDashUserPerf = PermissionService.CanAccess(User, "Dashboard", "UserPerformance");
+    bool showDashboardGroup = canDashStaff || canDashHead || canDashAdmin || canDashAnalytics || canDashUserPerf;
 
     bool canPool = PermissionService.CanAccess(User, "Workflow", "Pool");
     bool canMyTransactions = PermissionService.CanAccess(User, "Workflow", "MyTransactions") || canPool;
@@ -249,6 +250,13 @@
                             <a asp-controller="Dashboard" asp-action="Analytics" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold text-xs transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Dashboard" && currentAction == "Analytics" ? "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold" : "text-slate-600 dark:text-stone-400 hover:text-emerald-700 dark:hover:text-emerald-400")">
                                 <i data-lucide="bar-chart-3" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
                                 <span>Executive Analytics</span>
+                            </a>
+                        }
+                        @if (canDashUserPerf)
+                        {
+                            <a asp-controller="Dashboard" asp-action="UserPerformance" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold text-xs transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Dashboard" && currentAction == "UserPerformance" ? "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold" : "text-slate-600 dark:text-stone-400 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                                <i data-lucide="users" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
+                                <span>User Performance</span>
                             </a>
                         }
                         @if (canDashAdmin)
@@ -488,6 +496,10 @@
                                 <i data-lucide="git-pull-request" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
                                 <span>Workflow Pipeline</span>
                             </a>
+                            <a asp-controller="Workflow" asp-action="Calendar" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold text-xs transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Workflow" && currentAction == "Calendar" ? "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold" : "text-slate-600 dark:text-stone-400 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                                <i data-lucide="calendar-clock" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
+                                <span>Office Hours &amp; Holidays</span>
+                            </a>
                         }
 
                         @if (canFileLocation)
@@ -581,6 +593,16 @@
                                         <div>
                                             <div class="font-bold">Executive Analytics</div>
                                             <div class="text-[10px] text-slate-500 dark:text-stone-400 font-normal">RPTA assessment roll &amp; valuation</div>
+                                        </div>
+                                    </a>
+                                }
+                                @if (canDashUserPerf)
+                                {
+                                    <a asp-controller="Dashboard" asp-action="UserPerformance" class="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 text-xs @(currentController == "Dashboard" && currentAction == "UserPerformance" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold" : "text-slate-700 dark:text-stone-300")">
+                                        <i data-lucide="users" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                                        <div>
+                                            <div class="font-bold">User Performance</div>
+                                            <div class="text-[10px] text-slate-500 dark:text-stone-400 font-normal">Staff output &amp; division completion</div>
                                         </div>
                                     </a>
                                 }
@@ -990,11 +1012,18 @@
                                                 <div class="px-2 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-stone-500">Configurations</div>
                                                 @if (canWorkflowSettings)
                                                 {
-                                                    <a asp-controller="Workflow" asp-action="Settings" class="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Workflow" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold ring-1 ring-emerald-500/20" : "text-slate-700 dark:text-stone-300")">
+                                                    <a asp-controller="Workflow" asp-action="Settings" class="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Workflow" && currentAction == "Settings" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold ring-1 ring-emerald-500/20" : "text-slate-700 dark:text-stone-300")">
                                                         <i data-lucide="git-pull-request" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
                                                         <div>
                                                             <div class="font-bold">Workflow Pipeline</div>
                                                             <div class="text-[10px] text-slate-500 dark:text-stone-400">Transaction approval stages</div>
+                                                        </div>
+                                                    </a>
+                                                    <a asp-controller="Workflow" asp-action="Calendar" class="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Workflow" && currentAction == "Calendar" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold ring-1 ring-emerald-500/20" : "text-slate-700 dark:text-stone-300")">
+                                                        <i data-lucide="calendar-clock" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                                                        <div>
+                                                            <div class="font-bold">Office Hours &amp; Holidays</div>
+                                                            <div class="text-[10px] text-slate-500 dark:text-stone-400">Citizen's Charter SLA calendar</div>
                                                         </div>
                                                     </a>
                                                 }

@@ -6387,6 +6387,91 @@ namespace PropertyAssessmentApp.Migrations
                         });
                 });
 
+            modelBuilder.Entity("PropertyAssessmentApp.Models.OfficeHoliday", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("HolidayDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsRecurringYearly")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("OfficeHolidays");
+                });
+
+            modelBuilder.Entity("PropertyAssessmentApp.Models.OfficeScheduleSetting", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<TimeSpan>("BreakEndTime")
+                        .HasColumnType("time");
+
+                    b.Property<TimeSpan>("BreakStartTime")
+                        .HasColumnType("time");
+
+                    b.Property<bool>("HasBreakTime")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("PauseWhenDeferred")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("UpdatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<TimeSpan>("WorkEndTime")
+                        .HasColumnType("time");
+
+                    b.Property<bool>("WorkFriday")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("WorkMonday")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("WorkSaturday")
+                        .HasColumnType("bit");
+
+                    b.Property<TimeSpan>("WorkStartTime")
+                        .HasColumnType("time");
+
+                    b.Property<bool>("WorkSunday")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("WorkThursday")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("WorkTuesday")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("WorkWednesday")
+                        .HasColumnType("bit");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("OfficeScheduleSettings");
+                });
+
             modelBuilder.Entity("PropertyAssessmentApp.Models.OrderPayment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -8972,6 +9057,9 @@ namespace PropertyAssessmentApp.Migrations
                     b.Property<bool>("AutoNotifyNextStage")
                         .HasColumnType("bit");
 
+                    b.Property<int>("CharterTargetMinutes")
+                        .HasColumnType("int");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -9012,6 +9100,9 @@ namespace PropertyAssessmentApp.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("SequenceId"));
 
                     b.Property<int>("CurrentStatusId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("EstimatedMinutes")
                         .HasColumnType("int");
 
                     b.Property<bool>("IsApproval")

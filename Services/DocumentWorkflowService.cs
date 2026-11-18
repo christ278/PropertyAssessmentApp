@@ -14,6 +14,7 @@ public class DocumentWorkflowService : IDocumentWorkflowService
     private readonly IPhilSmsService? _philSmsService;
     private readonly IPropertyAssessmentRequestService? _rpaService;
     private readonly IRequestForInspectionService? _rfiService;
+    private readonly ICharterSlaService? _charterSlaService;
 
     public DocumentWorkflowService(
         ApplicationDbContext context,
@@ -22,7 +23,8 @@ public class DocumentWorkflowService : IDocumentWorkflowService
         ITaxMappingService tmService,
         IPhilSmsService? philSmsService = null,
         IPropertyAssessmentRequestService? rpaService = null,
-        IRequestForInspectionService? rfiService = null)
+        IRequestForInspectionService? rfiService = null,
+        ICharterSlaService? charterSlaService = null)
     {
         _context = context;
         _tdService = tdService;
@@ -31,6 +33,7 @@ public class DocumentWorkflowService : IDocumentWorkflowService
         _philSmsService = philSmsService;
         _rpaService = rpaService;
         _rfiService = rfiService;
+        _charterSlaService = charterSlaService;
 
         EnsureSeedSettings();
     }
@@ -62,6 +65,20 @@ public class DocumentWorkflowService : IDocumentWorkflowService
                 RequireMapperVerification = true,
                 RequireHeadAssessorApproval = true,
                 SlaHoursTarget = 72
+            });
+        }
+
+        if (!_context.WorkflowDivisionSettings.Any(s => s.Division == DivisionType.Division3_RecordsAndCertification))
+        {
+            _context.WorkflowDivisionSettings.Add(new WorkflowDivisionSetting
+            {
+                Division = DivisionType.Division3_RecordsAndCertification,
+                DivisionName = "Division 3: Records & Certification Division",
+                Description = "Handles Tax Declaration Requests, Land Holding Certifications, and Official Records.",
+                RequireAppraiserReview = false,
+                RequireMapperVerification = false,
+                RequireHeadAssessorApproval = true,
+                SlaHoursTarget = 48
             });
         }
 
@@ -1296,7 +1313,9 @@ public class DocumentWorkflowService : IDocumentWorkflowService
             int stageId = (int)currentStage;
             bool isClaimed = lastLog?.IsClaimed ?? false;
             bool isDeferred = lastLog?.IsDeferred ?? false;
-            bool isDone = lastLog?.ToStage == WorkflowStage.Completed || lh.Status == LandHoldingRequestStatus.Approved;
+            bool isDone = lastLog != null
+                ? (lastLog.ToStage == WorkflowStage.Completed || (lastLog.ActionTaken == "Released" && stageId == 30))
+                : lh.Status == LandHoldingRequestStatus.Approved;
 
             var (statusText, isApproval, isReleased) = ResolveTransactionStatus(
                 5,
@@ -1370,7 +1389,9 @@ public class DocumentWorkflowService : IDocumentWorkflowService
             int stageId = (int)currentStage;
             bool isClaimed = lastLog?.IsClaimed ?? false;
             bool isDeferred = lastLog?.IsDeferred ?? false;
-            bool isDone = lastLog?.ToStage == WorkflowStage.Completed || td.Status == RequestStatus.Approved;
+            bool isDone = lastLog != null
+                ? (lastLog.ToStage == WorkflowStage.Completed || (lastLog.ActionTaken == "Released" && stageId == 30))
+                : td.Status == RequestStatus.Approved;
 
             var (statusText, isApproval, isReleased) = ResolveTransactionStatus(
                 4,
@@ -1410,6 +1431,49 @@ public class DocumentWorkflowService : IDocumentWorkflowService
                 ORDateIssued = td.ORDateIssued
             });
         }
+        if (_charterSlaService != null && items.Count > 0)
+        {
+            var setting = _charterSlaService.GetScheduleSetting();
+            var holidays = _charterSlaService.GetHolidays(activeOnly: true);
+            var sequences = _context.WorkflowSequences.AsNoTracking().ToList();
+            var divisionCharterMap = _context.WorkflowDivisionSettings.AsNoTracking()
+                .ToDictionary(d => d.Division, d => d.CharterTargetMinutes);
+            var itemIds = items.Select(i => i.RequestId).Distinct().ToList();
+            var logsByReq = _context.DocumentForwardingLogs.AsNoTracking()
+                .Where(l => itemIds.Contains(l.RequestId))
+                .ToList()
+                .GroupBy(l => l.RequestId)
+                .ToDictionary(g => g.Key, g => (IReadOnlyList<DocumentForwardingLog>)g.ToList());
+
+            foreach (var item in items)
+            {
+                int txTypeId = item.RequestType switch
+                {
+                    "RequestForInspection" => 1,
+                    "PropertyAssessmentRequest" => 2,
+                    "TaxMappingRequest" => 3,
+                    "TaxDeclarationRequest" => 4,
+                    "LandHoldingRequest" => 5,
+                    _ => 0
+                };
+                bool isFinished = string.Equals(item.StatusText, "Released", StringComparison.OrdinalIgnoreCase) || item.CurrentStage == WorkflowStage.Completed;
+                var reqLogs = logsByReq.TryGetValue(item.RequestId, out var l) ? l : Array.Empty<DocumentForwardingLog>();
+                int? divCharter = divisionCharterMap.TryGetValue(item.Division, out var cm) && cm > 0 ? cm : null;
+                item.SlaStatus = _charterSlaService.EvaluateTransactionSla(
+                    txTypeId,
+                    item.DateSubmitted,
+                    item.CurrentStage,
+                    isFinished,
+                    item.IsDeferred,
+                    isFinished ? item.LastForwardedDate : null,
+                    reqLogs,
+                    setting,
+                    holidays,
+                    sequences,
+                    divCharter);
+            }
+        }
+
         return items;
     }
 
@@ -1528,7 +1592,9 @@ public class DocumentWorkflowService : IDocumentWorkflowService
                 int stageId = (int)currentStage;
                 bool isClaimed = lastLog?.IsClaimed ?? false;
                 bool isDeferred = lastLog?.IsDeferred ?? false;
-                bool isDone = lastLog?.ToStage == WorkflowStage.Completed || tm.Status == RequestStatus.Approved;
+                bool isDone = lastLog != null
+                    ? (lastLog.ToStage == WorkflowStage.Completed || (lastLog.ActionTaken == "Released" && stageId == 19))
+                    : tm.Status == RequestStatus.Approved;
 
                 var (statusText, isApproval, isReleased) = ResolveTransactionStatus(
                     3,
@@ -1567,6 +1633,49 @@ public class DocumentWorkflowService : IDocumentWorkflowService
                     ORNumber = tm.ORNumber,
                     ORDateIssued = tm.ORDateIssued
                 });
+            }
+        }
+
+        if (_charterSlaService != null && items.Count > 0)
+        {
+            var setting = _charterSlaService.GetScheduleSetting();
+            var holidays = _charterSlaService.GetHolidays(activeOnly: true);
+            var sequences = _context.WorkflowSequences.AsNoTracking().ToList();
+            var divisionCharterMap = _context.WorkflowDivisionSettings.AsNoTracking()
+                .ToDictionary(d => d.Division, d => d.CharterTargetMinutes);
+            var itemIds = items.Select(i => i.RequestId).Distinct().ToList();
+            var logsByReq = _context.DocumentForwardingLogs.AsNoTracking()
+                .Where(l => itemIds.Contains(l.RequestId))
+                .ToList()
+                .GroupBy(l => l.RequestId)
+                .ToDictionary(g => g.Key, g => (IReadOnlyList<DocumentForwardingLog>)g.ToList());
+
+            foreach (var item in items)
+            {
+                int txTypeId = item.RequestType switch
+                {
+                    "RequestForInspection" => 1,
+                    "PropertyAssessmentRequest" => 2,
+                    "TaxMappingRequest" => 3,
+                    "TaxDeclarationRequest" => 4,
+                    "LandHoldingRequest" => 5,
+                    _ => 0
+                };
+                bool isFinished = string.Equals(item.StatusText, "Released", StringComparison.OrdinalIgnoreCase) || item.CurrentStage == WorkflowStage.Completed;
+                var reqLogs = logsByReq.TryGetValue(item.RequestId, out var l) ? l : Array.Empty<DocumentForwardingLog>();
+                int? divCharter = divisionCharterMap.TryGetValue(item.Division, out var cm) && cm > 0 ? cm : null;
+                item.SlaStatus = _charterSlaService.EvaluateTransactionSla(
+                    txTypeId,
+                    item.DateSubmitted,
+                    item.CurrentStage,
+                    isFinished,
+                    item.IsDeferred,
+                    isFinished ? item.LastForwardedDate : null,
+                    reqLogs,
+                    setting,
+                    holidays,
+                    sequences,
+                    divCharter);
             }
         }
 

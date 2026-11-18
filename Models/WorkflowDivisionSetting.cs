@@ -29,6 +29,9 @@ public class WorkflowDivisionSetting
     [Display(Name = "Default Turnaround SLA (Hours)")]
     public int SlaHoursTarget { get; set; } = 48;
 
+    [Display(Name = "Citizen's Charter Total Time (Minutes)")]
+    public int CharterTargetMinutes { get; set; } = 0;
+
     [Display(Name = "Auto-Notify Next Stage Officer")]
     public bool AutoNotifyNextStage { get; set; } = true;
 
