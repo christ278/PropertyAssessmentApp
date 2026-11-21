@@ -63,9 +63,9 @@ public class DataTransferUtilityController : Controller
             CorporateName = tdnDto.DisplayName,
             TaxIdentNo = tdnDto.RPTIN.HasValue ? $"TIN-{tdnDto.RPTIN}" : "000-000-000-000",
             RptinNumber = tdnDto.RPTIN.HasValue ? $"RPTIN-{tdnDto.RPTIN}" : $"RPTIN-{DateTime.Now.Year}-{new Random().Next(1000, 9999)}",
-            Address = !string.IsNullOrWhiteSpace(tdnDto.OwnerAddress) ? tdnDto.OwnerAddress : (!string.IsNullOrWhiteSpace(tdnDto.Location) ? tdnDto.Location : "General Santos City"),
+            Address = !string.IsNullOrWhiteSpace(tdnDto.OwnerAddress) ? tdnDto.OwnerAddress : (!string.IsNullOrWhiteSpace(tdnDto.Location) ? tdnDto.Location : "Koronadal City"),
             ContactNo = tdnDto.PropAdminContactNo ?? "0917-000-0000",
-            Email = "taxpayer@gensan.gov.ph"
+            Email = "taxpayer@koronadal.gov.ph"
         };
 
         ViewBag.ExistingOwners = _ownerService.GetAll();

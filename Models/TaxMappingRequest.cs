@@ -160,7 +160,7 @@ public class TaxMappingRequest
     public string ProvinceName { get; set; } = "South Cotabato";
 
     [ValidateNever]
-    public string CityMunicipalityName { get; set; } = "General Santos City";
+    public string CityMunicipalityName { get; set; } = "Koronadal City";
 
     [ValidateNever]
     public string BarangayName { get; set; } = "Brgy. Central";

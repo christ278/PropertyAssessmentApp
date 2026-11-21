@@ -180,7 +180,7 @@ public class RequestForInspectionService : IRequestForInspectionService
                             OwnerCivilStatus = p.OwnerCivilStatus ?? "Single",
                             DistrictOrBarangay = effBarangay,
                             StreetNo = !string.IsNullOrWhiteSpace(p.StreetLocation) ? p.StreetLocation : (request.PropertyLocation ?? string.Empty),
-                            Municipality = !string.IsNullOrWhiteSpace(p.CityMunicipality) ? p.CityMunicipality : (refTd?.Municipality ?? "General Santos City"),
+                            Municipality = !string.IsNullOrWhiteSpace(p.CityMunicipality) ? p.CityMunicipality : (refTd?.Municipality ?? "Koronadal City"),
                             ProvinceCity = !string.IsNullOrWhiteSpace(p.Province) ? p.Province : (refTd?.ProvinceCity ?? "South Cotabato"),
                             Kind = Enum.TryParse<PropertyKind>(p.Kind, true, out var parsedKind) ? parsedKind : (refTd?.Kind ?? PropertyKind.Land),
                             Classification = Enum.TryParse<PropertyClassification>(p.Classification, true, out var parsedClass) ? parsedClass : (refTd?.Classification ?? PropertyClassification.Residential),

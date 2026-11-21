@@ -241,6 +241,8 @@ public class TaxDeclaration
     [Display(Name = "Date Encoded")]
     public DateTime? DateEncoded { get; set; } = DateTime.Now;
 
+    public bool IsMigrated { get; set; } = false;
+
     // -------------------------------------------------------------
     // NAVIGATION PROPERTIES TO NORMALIZED CHILD TABLES
     // -------------------------------------------------------------
@@ -290,7 +292,7 @@ public class TaxDeclaration
             {
                 TaxDeclarationId = Id,
                 StreetNo = _streetNo,
-                Municipality = _municipality ?? "General Santos City",
+                Municipality = _municipality ?? "Koronadal City",
                 DistrictOrBarangay = _districtOrBarangay ?? "Brgy. Central",
                 ProvinceCity = _provinceCity ?? "South Cotabato",
                 LandTaxDeclarationId = _landTaxDeclarationId,
@@ -387,7 +389,7 @@ public class TaxDeclaration
                 ARPNo = _arpNo,
                 StreetNo = _streetNo,
                 Purok = _purok,
-                Municipality = _municipality ?? "General Santos City",
+                Municipality = _municipality ?? "Koronadal City",
                 DistrictOrBarangay = _districtOrBarangay ?? "Brgy. Central",
                 ProvinceCity = _provinceCity ?? "South Cotabato",
                 BoundaryNorth = _boundaryNorth ?? "Lot 101",
@@ -434,7 +436,7 @@ public class TaxDeclaration
             {
                 TaxDeclarationId = Id,
                 StreetNo = _streetNo,
-                Municipality = _municipality ?? "General Santos City",
+                Municipality = _municipality ?? "Koronadal City",
                 DistrictOrBarangay = _districtOrBarangay ?? "Brgy. Central",
                 ProvinceCity = _provinceCity ?? "South Cotabato",
                 ARPNo = _arpNo,
@@ -694,7 +696,7 @@ public class TaxDeclaration
     [NotMapped]
     public string Municipality
     {
-        get => BuildingDetails?.Municipality ?? LandDetails?.Municipality ?? MachineryDetails?.Municipality ?? _municipality ?? "General Santos City";
+        get => BuildingDetails?.Municipality ?? LandDetails?.Municipality ?? MachineryDetails?.Municipality ?? _municipality ?? "Koronadal City";
         set 
         { 
             _municipality = value; 

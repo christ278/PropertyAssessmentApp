@@ -23,7 +23,7 @@ public class TDNBuilding
     public string? StreetNo { get; set; }
 
     [Display(Name = "Municipality")]
-    public string? Municipality { get; set; } = "General Santos City";
+    public string? Municipality { get; set; } = "Koronadal City";
 
     [Display(Name = "Barangay / District")]
     public string? DistrictOrBarangay { get; set; } = "Brgy. Central";

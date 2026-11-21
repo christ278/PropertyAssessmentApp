@@ -5,6 +5,7 @@ namespace PropertyAssessmentApp.Services;
 public interface IAssessmentService
 {
     IEnumerable<TaxDeclaration> GetAll(string? search = null, PropertyKind? kind = null, string? status = null);
+    (List<TaxDeclaration> Items, int TotalCount) GetPaged(string? search = null, PropertyKind? kind = null, string? status = null, int page = 1, int limit = 10);
     TaxDeclaration? GetById(Guid id);
     TaxDeclaration? GetByTdNumber(string tdNumber);
     void Add(TaxDeclaration declaration);

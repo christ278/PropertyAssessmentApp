@@ -118,7 +118,7 @@ public class TaxDeclarationPdfService : ITaxDeclarationPdfService
                 row.RelativeItem().Column(c =>
                 {
                     c.Item().Text("REPUBLIC OF THE PHILIPPINES • LOCAL GOVERNMENT UNIT").FontSize(7.5f).Bold().FontColor(Colors.Grey.Darken2);
-                    c.Item().Text($"OFFICE OF THE CITY ASSESSOR — {ValueOr(td.Municipality, "General Santos City").ToUpperInvariant()}").FontSize(11).ExtraBold().FontColor(Colors.Black);
+                    c.Item().Text($"OFFICE OF THE CITY ASSESSOR — {ValueOr(td.Municipality, "Koronadal City").ToUpperInvariant()}").FontSize(11).ExtraBold().FontColor(Colors.Black);
                     c.Item().Text($"REAL PROPERTY FAAS & TAX DECLARATION MASTER RECORD ({td.Kind.ToString().ToUpperInvariant()})").FontSize(10).Black().FontColor(Colors.Teal.Darken3);
                 });
 
@@ -245,7 +245,7 @@ public class TaxDeclarationPdfService : ITaxDeclarationPdfService
                     KeyValueCell(t, "No. / Street", ValueOr(td.StreetNo, "N/A"));
                     KeyValueCell(t, "Purok / Zone", ValueOr(td.Purok, "N/A"));
                     KeyValueCell(t, "Barangay / District", ValueOr(td.DistrictOrBarangay, "N/A"));
-                    KeyValueCell(t, "City / Municipality", ValueOr(td.Municipality, "General Santos City"));
+                    KeyValueCell(t, "City / Municipality", ValueOr(td.Municipality, "Koronadal City"));
                     KeyValueCell(t, "Province / City", ValueOr(td.ProvinceCity, "South Cotabato"));
                 });
             }));
@@ -1009,7 +1009,7 @@ public class TaxDeclarationPdfService : ITaxDeclarationPdfService
                 });
                 loc.Item().Row(r =>
                 {
-                    r.RelativeItem().Element(e => UnderlinedField(e, "Municipality:", ValueOr(td.Municipality, "General Santos City")));
+                    r.RelativeItem().Element(e => UnderlinedField(e, "Municipality:", ValueOr(td.Municipality, "Koronadal City")));
                     r.ConstantItem(14);
                     r.RelativeItem().Element(e => UnderlinedField(e, "Province/City:", ValueOr(td.ProvinceCity, "South Cotabato")));
                 });
@@ -1762,7 +1762,7 @@ public class TaxDeclarationPdfService : ITaxDeclarationPdfService
                 });
                 loc.Item().Row(r =>
                 {
-                    r.RelativeItem().Element(e => UnderlinedField(e, "Municipality:", ValueOr(td.Municipality, "General Santos City")));
+                    r.RelativeItem().Element(e => UnderlinedField(e, "Municipality:", ValueOr(td.Municipality, "Koronadal City")));
                     r.ConstantItem(14);
                     r.RelativeItem().Element(e => UnderlinedField(e, "Province/City:", ValueOr(td.ProvinceCity, "South Cotabato")));
                 });

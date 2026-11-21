@@ -16,7 +16,7 @@ public class AssessmentService : IAssessmentService
         _context = context;
     }
 
-    public IEnumerable<TaxDeclaration> GetAll(string? search = null, PropertyKind? kind = null, string? status = null)
+    private IQueryable<TaxDeclaration> BuildFilteredQuery(string? search, PropertyKind? kind, string? status)
     {
         IQueryable<TaxDeclaration> query = _context.TaxDeclarations
             .Include(t => t.BuildingDetails)
@@ -64,7 +64,30 @@ public class AssessmentService : IAssessmentService
             }
         }
 
-        return query.OrderByDescending(r => r.DateAssessed).ToList();
+        return query.OrderByDescending(r => r.DateAssessed);
+    }
+
+    public IEnumerable<TaxDeclaration> GetAll(string? search = null, PropertyKind? kind = null, string? status = null)
+    {
+        return BuildFilteredQuery(search, kind, status).ToList();
+    }
+
+    public (List<TaxDeclaration> Items, int TotalCount) GetPaged(string? search = null, PropertyKind? kind = null, string? status = null, int page = 1, int limit = 10)
+    {
+        int safeLimit = limit <= 0 ? 10 : Math.Min(limit, 100);
+        int safePage = page < 1 ? 1 : page;
+
+        var query = BuildFilteredQuery(search, kind, status);
+        int totalCount = query.Count();
+        int totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)safeLimit));
+        if (safePage > totalPages) safePage = totalPages;
+
+        var items = query
+            .Skip((safePage - 1) * safeLimit)
+            .Take(safeLimit)
+            .ToList();
+
+        return (items, totalCount);
     }
 
     public TaxDeclaration? GetById(Guid id)
@@ -652,7 +675,7 @@ public class AssessmentService : IAssessmentService
                 }
                 if (newFloors != null)
                 {
-                    if (existingBldg.FloorLevels.Any()) _context.TDNBuildingFloors.RemoveRange(existingBldg.FloorLevels);
+                    if (existingBldg.FloorLevels.Any()) _context.TDNBuildingFloors.RemoveRange(existingBldg.FloorLevels.ToList());
                     existingBldg.FloorLevels.Clear();
                     foreach (var fl in newFloors)
                     {
@@ -662,7 +685,7 @@ public class AssessmentService : IAssessmentService
                 }
                 if (newAddItems != null)
                 {
-                    if (existingBldg.AdditionalItems.Any()) _context.TDNBuildingAdditionalItems.RemoveRange(existingBldg.AdditionalItems);
+                    if (existingBldg.AdditionalItems.Any()) _context.TDNBuildingAdditionalItems.RemoveRange(existingBldg.AdditionalItems.ToList());
                     existingBldg.AdditionalItems.Clear();
                     foreach (var ai in newAddItems)
                     {
@@ -672,7 +695,7 @@ public class AssessmentService : IAssessmentService
                 }
                 if (materials.Any())
                 {
-                    if (existingBldg.StructuralMaterials.Any()) _context.TDNBuildingStructuralMaterials.RemoveRange(existingBldg.StructuralMaterials);
+                    if (existingBldg.StructuralMaterials.Any()) _context.TDNBuildingStructuralMaterials.RemoveRange(existingBldg.StructuralMaterials.ToList());
                     existingBldg.StructuralMaterials.Clear();
                     foreach (var sm in materials)
                     {
@@ -682,7 +705,7 @@ public class AssessmentService : IAssessmentService
                 }
                 if (bldg.LandReferencesJson != null || newLandRefs.Any())
                 {
-                    if (existingBldg.LandReferences.Any()) _context.TDNBuildingLandReferences.RemoveRange(existingBldg.LandReferences);
+                    if (existingBldg.LandReferences.Any()) _context.TDNBuildingLandReferences.RemoveRange(existingBldg.LandReferences.ToList());
                     existingBldg.LandReferences.Clear();
                     foreach (var lr in newLandRefs)
                     {
@@ -894,7 +917,7 @@ public class AssessmentService : IAssessmentService
                 // Update details safely using DbSet RemoveRange + Add to avoid EF Core concurrency exceptions on new Guid keys
                 if (newLandDetails != null)
                 {
-                    if (existingLand.TDNLandDetails.Any()) _context.TDNLandDetails.RemoveRange(existingLand.TDNLandDetails);
+                    if (existingLand.TDNLandDetails.Any()) _context.TDNLandDetails.RemoveRange(existingLand.TDNLandDetails.ToList());
                     existingLand.TDNLandDetails.Clear();
                     foreach (var d in newLandDetails)
                     {
@@ -904,7 +927,7 @@ public class AssessmentService : IAssessmentService
                 }
                 if (newLandImps != null)
                 {
-                    if (existingLand.TDNLandImprovements.Any()) _context.TDNLandImprovements.RemoveRange(existingLand.TDNLandImprovements);
+                    if (existingLand.TDNLandImprovements.Any()) _context.TDNLandImprovements.RemoveRange(existingLand.TDNLandImprovements.ToList());
                     existingLand.TDNLandImprovements.Clear();
                     foreach (var imp in newLandImps)
                     {
@@ -914,7 +937,7 @@ public class AssessmentService : IAssessmentService
                 }
                 if (newBaseMarkets != null)
                 {
-                    if (existingLand.TDNLandBaseMarkets.Any()) _context.TDNLandBaseMarkets.RemoveRange(existingLand.TDNLandBaseMarkets);
+                    if (existingLand.TDNLandBaseMarkets.Any()) _context.TDNLandBaseMarkets.RemoveRange(existingLand.TDNLandBaseMarkets.ToList());
                     existingLand.TDNLandBaseMarkets.Clear();
                     foreach (var b in newBaseMarkets)
                     {
@@ -924,7 +947,7 @@ public class AssessmentService : IAssessmentService
                 }
                 if (newLandPropAssessments != null)
                 {
-                    if (existingLand.TDNLandPropertyAssessments.Any()) _context.TDNLandPropertyAssessments.RemoveRange(existingLand.TDNLandPropertyAssessments);
+                    if (existingLand.TDNLandPropertyAssessments.Any()) _context.TDNLandPropertyAssessments.RemoveRange(existingLand.TDNLandPropertyAssessments.ToList());
                     existingLand.TDNLandPropertyAssessments.Clear();
                     foreach (var p in newLandPropAssessments)
                     {
@@ -1119,7 +1142,7 @@ public class AssessmentService : IAssessmentService
 
                 if (newMachDetails != null)
                 {
-                    if (existingMach.TDNMachineryDetails.Any()) _context.TDNMachineryDetails.RemoveRange(existingMach.TDNMachineryDetails);
+                    if (existingMach.TDNMachineryDetails.Any()) _context.TDNMachineryDetails.RemoveRange(existingMach.TDNMachineryDetails.ToList());
                     existingMach.TDNMachineryDetails.Clear();
                     foreach (var d in newMachDetails)
                     {
@@ -1129,7 +1152,7 @@ public class AssessmentService : IAssessmentService
                 }
                 if (newMachPropAssessments != null)
                 {
-                    if (existingMach.TDNMachineryPropertyAssessments.Any()) _context.TDNMachineryPropertyAssessments.RemoveRange(existingMach.TDNMachineryPropertyAssessments);
+                    if (existingMach.TDNMachineryPropertyAssessments.Any()) _context.TDNMachineryPropertyAssessments.RemoveRange(existingMach.TDNMachineryPropertyAssessments.ToList());
                     existingMach.TDNMachineryPropertyAssessments.Clear();
                     foreach (var p in newMachPropAssessments)
                     {

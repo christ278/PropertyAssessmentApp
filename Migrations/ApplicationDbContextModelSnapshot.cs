@@ -8566,6 +8566,9 @@ namespace PropertyAssessmentApp.Migrations
                     b.Property<bool>("IsCancelledAndSuperseded")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsMigrated")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsPossessor")
                         .HasColumnType("bit");
 

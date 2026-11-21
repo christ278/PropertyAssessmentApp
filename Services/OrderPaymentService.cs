@@ -1,19 +1,24 @@
+using Microsoft.EntityFrameworkCore;
+using PropertyAssessmentApp.Data;
 using PropertyAssessmentApp.Models;
 
 namespace PropertyAssessmentApp.Services;
 
 public class OrderPaymentService : IOrderPaymentService
 {
-    private readonly List<OrderPayment> _records = new();
+    private readonly ApplicationDbContext _context;
 
-    public OrderPaymentService()
+    public OrderPaymentService(ApplicationDbContext context)
     {
-        SeedSampleData();
+        _context = context;
+        EnsureSeedData();
     }
 
-    private void SeedSampleData()
+    private void EnsureSeedData()
     {
-        _records.AddRange(new[]
+        if (_context.OrderPayments.Any()) return;
+
+        _context.OrderPayments.AddRange(new[]
         {
             new OrderPayment
             {
@@ -82,11 +87,12 @@ public class OrderPaymentService : IOrderPaymentService
                 UpdatedDate = DateTime.Now.AddDays(-4)
             }
         });
+        _context.SaveChanges();
     }
 
     public IEnumerable<OrderPayment> GetAll(string? search = null, bool? isActive = null, string? category = null)
     {
-        var query = _records.AsEnumerable();
+        var query = _context.OrderPayments.AsNoTracking().AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -103,15 +109,16 @@ public class OrderPaymentService : IOrderPaymentService
 
         if (!string.IsNullOrWhiteSpace(category))
         {
-            query = query.Where(r => r.Category.Equals(category, StringComparison.OrdinalIgnoreCase));
+            var cat = category.Trim().ToLower();
+            query = query.Where(r => r.Category.ToLower() == cat);
         }
 
-        return query.OrderBy(r => r.Code);
+        return query.OrderBy(r => r.Code).ToList();
     }
 
     public OrderPayment? GetById(Guid id)
     {
-        return _records.FirstOrDefault(r => r.Id == id);
+        return _context.OrderPayments.FirstOrDefault(r => r.Id == id);
     }
 
     public void Add(OrderPayment item)
@@ -122,30 +129,44 @@ public class OrderPaymentService : IOrderPaymentService
         }
         item.CreatedDate = DateTime.Now;
         item.UpdatedDate = DateTime.Now;
-        _records.Add(item);
+        _context.OrderPayments.Add(item);
+        _context.SaveChanges();
     }
 
     public void Update(OrderPayment item)
     {
-        var index = _records.FindIndex(r => r.Id == item.Id);
-        if (index != -1)
+        var existing = _context.OrderPayments.FirstOrDefault(r => r.Id == item.Id);
+        if (existing != null)
         {
-            item.UpdatedDate = DateTime.Now;
-            _records[index] = item;
+            existing.Code = item.Code;
+            existing.Particular = item.Particular;
+            existing.UnitCost = item.UnitCost;
+            existing.Category = item.Category;
+            existing.IsActive = item.IsActive;
+            existing.UpdatedDate = DateTime.Now;
+            _context.SaveChanges();
         }
     }
 
     public void Delete(Guid id)
     {
-        var item = GetById(id);
+        var item = _context.OrderPayments.FirstOrDefault(r => r.Id == id);
         if (item != null)
         {
-            _records.Remove(item);
+            _context.OrderPayments.Remove(item);
+            _context.SaveChanges();
         }
     }
 
-    public int GetTotalCount() => _records.Count;
-    public int GetActiveCount() => _records.Count(r => r.IsActive);
-    public decimal GetAverageFee() => _records.Any() ? Math.Round(_records.Average(r => r.UnitCost), 2) : 0m;
-    public IEnumerable<string> GetCategories() => _records.Select(r => r.Category).Distinct().OrderBy(c => c);
+    public int GetTotalCount() => _context.OrderPayments.Count();
+    public int GetActiveCount() => _context.OrderPayments.Count(r => r.IsActive);
+    public decimal GetAverageFee() => _context.OrderPayments.Any()
+        ? Math.Round(_context.OrderPayments.Average(r => r.UnitCost), 2)
+        : 0m;
+    public IEnumerable<string> GetCategories() => _context.OrderPayments
+        .AsNoTracking()
+        .Select(r => r.Category)
+        .Distinct()
+        .OrderBy(c => c)
+        .ToList();
 }

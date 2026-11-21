@@ -93,7 +93,7 @@ export const SyncQueueScreen = ({ navigation }) => {
       const brgy = tdn.DistrictOrBarangay || p.districtOrBarangay || transItem?.Barangay || '';
       const city = tdn.CityMunicipality || p.cityMunicipality || transItem?.CityMunicipality || '';
       const locTokens = [street, brgy, city].filter(Boolean);
-      const location = locTokens.length > 0 ? locTokens.join(', ') : (transItem?.Barangay ? `${transItem.Barangay}, General Santos City` : 'Field Location');
+      const location = locTokens.length > 0 ? locTokens.join(', ') : (transItem?.Barangay ? `${transItem.Barangay}, Koronadal City` : 'Field Location');
 
       if (!map.has(key)) {
         map.set(key, {

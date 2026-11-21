@@ -7,6 +7,12 @@
     var search = ViewBag.Search as string ?? "";
     var selectedKind = ViewBag.Kind as PropertyKind?;
     var selectedStatus = (ViewBag.Status as string ?? "").Trim().ToLowerInvariant();
+    int limit = ViewBag.Limit is int l ? l : 10;
+    int currentPage = ViewBag.Page is int p ? p : 1;
+    int totalCount = ViewBag.TotalCount is int tc ? tc : Model.Count();
+    int totalPages = ViewBag.TotalPages is int tp ? tp : 1;
+    int showingStart = totalCount == 0 ? 0 : ((currentPage - 1) * limit) + 1;
+    int showingEnd = Math.Min(currentPage * limit, totalCount);
     bool canAccess = PermissionService.CanAccess(User, "Assessment");
     bool canPrintTd = PermissionService.CanAccess(User, "Assessment", "PrintPdf");
     bool canPrintTaxDec = PermissionService.CanAccess(User, "Assessment", "PrintTaxDeclaration");
@@ -85,6 +91,7 @@
 
     <!-- Search & Filter Controls (Adaptive) -->
     <form method="get" asp-action="Index" class="flex flex-wrap items-center justify-between gap-4 bg-white dark:bg-stone-900 p-4 rounded-2xl border border-slate-200 dark:border-stone-800 shadow-sm font-mono text-xs">
+        <input type="hidden" name="page" value="1" />
         <div class="flex items-center gap-2 flex-1 min-w-[240px]">
             <i data-lucide="search" class="w-4 h-4 text-slate-400 dark:text-stone-400"></i>
             <input type="text" name="search" value="@search" placeholder="Search by TD No, PIN, Owner, or Barangay..." class="w-full bg-slate-50 dark:bg-stone-950 px-4 py-2 rounded-xl border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600">
@@ -93,12 +100,12 @@
         <div class="flex flex-wrap items-center gap-3">
             <div class="flex items-center gap-2 bg-slate-50 dark:bg-stone-800 px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-700 shadow-xs shrink-0">
                 <span class="limit-label text-[10px] text-slate-500 dark:text-emerald-400 font-semibold uppercase">Limit:</span>
-                <select class="table-limit-select bg-transparent font-semibold text-slate-900 dark:text-white focus:outline-none cursor-pointer">
-                    <option value="5" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">5</option>
-                    <option value="10" selected class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">10</option>
-                    <option value="25" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">25</option>
-                    <option value="50" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">50</option>
-                    <option value="100" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">100</option>
+                <select name="limit" onchange="this.form.submit()" class="bg-transparent font-semibold text-slate-900 dark:text-white focus:outline-none cursor-pointer">
+                    <option value="5" selected="@(limit == 5 ? "selected" : null)" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">5</option>
+                    <option value="10" selected="@(limit == 10 ? "selected" : null)" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">10</option>
+                    <option value="25" selected="@(limit == 25 ? "selected" : null)" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">25</option>
+                    <option value="50" selected="@(limit == 50 ? "selected" : null)" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">50</option>
+                    <option value="100" selected="@(limit == 100 ? "selected" : null)" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">100</option>
                 </select>
             </div>
 
@@ -121,8 +128,8 @@
         </div>
     </form>
 
-    <!-- Assessment Records Monospaced Table (Adaptive & Paginated) -->
-    <div class="bg-white dark:bg-stone-900 rounded-3xl border border-slate-200 dark:border-stone-800 shadow-sm paginated-table-card">
+    <!-- Assessment Records Monospaced Table (Adaptive & Server-Paginated) -->
+    <div class="bg-white dark:bg-stone-900 rounded-3xl border border-slate-200 dark:border-stone-800 shadow-sm">
         <div class="overflow-x-auto min-h-[260px] pb-4 rounded-3xl">
             <table class="w-full text-left text-xs font-mono">
                 <thead class="bg-slate-100 dark:bg-stone-950 text-slate-600 dark:text-stone-400 border-b border-slate-200 dark:border-stone-800 font-bold">
@@ -160,6 +167,12 @@
                                         {
                                             <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-300 border border-slate-200 dark:border-stone-700" title="@item.TransactionCodeDisplay">
                                                 @item.TransactionCode
+                                            </span>
+                                        }
+                                        @if (item.IsMigrated)
+                                        {
+                                            <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-sky-100 dark:bg-sky-500/20 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-500/40" title="Imported via Excel Assessment Roll Upload">
+                                                Migrated
                                             </span>
                                         }
                                     </div>
@@ -291,15 +304,56 @@
             </table>
         </div>
 
-        <!-- Pagination Controls -->
-        <div class="table-pagination-footer p-4 sm:p-6 pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-200 dark:border-stone-800 text-xs font-mono">
+        <!-- Server-Side Pagination Controls -->
+        <div class="p-4 sm:p-6 pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-200 dark:border-stone-800 text-xs font-mono">
             <div class="text-slate-500 dark:text-stone-400 text-center sm:text-left">
-                Showing <span class="font-bold text-slate-900 dark:text-white table-showing-start">1</span> to 
-                <span class="font-bold text-slate-900 dark:text-white table-showing-end">10</span> of 
-                <span class="font-bold text-slate-900 dark:text-white table-total-count">@Model.Count()</span> entries
+                Showing <span class="font-bold text-slate-900 dark:text-white">@showingStart</span> to 
+                <span class="font-bold text-slate-900 dark:text-white">@showingEnd</span> of 
+                <span class="font-bold text-slate-900 dark:text-white">@totalCount</span> entries
             </div>
-            <div class="flex items-center gap-1.5 flex-wrap justify-center table-pagination-buttons">
-            </div>
+            @if (totalPages > 1)
+            {
+                int startPage = Math.Max(1, currentPage - 2);
+                int endPage = Math.Min(totalPages, startPage + 4);
+                startPage = Math.Max(1, endPage - 4);
+                <div class="flex items-center gap-1.5 flex-wrap justify-center">
+                    @if (currentPage > 1)
+                    {
+                        <a asp-action="Index" asp-route-search="@search" asp-route-kind="@((int?)selectedKind)" asp-route-status="@selectedStatus" asp-route-limit="@limit" asp-route-page="@(currentPage - 1)" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-slate-700 dark:text-stone-200 hover:bg-slate-50 dark:hover:bg-stone-700 font-bold">Prev</a>
+                    }
+                    @if (startPage > 1)
+                    {
+                        <a asp-action="Index" asp-route-search="@search" asp-route-kind="@((int?)selectedKind)" asp-route-status="@selectedStatus" asp-route-limit="@limit" asp-route-page="1" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-slate-700 dark:text-stone-200 hover:bg-slate-50 dark:hover:bg-stone-700 font-bold">1</a>
+                        @if (startPage > 2)
+                        {
+                            <span class="px-1.5 text-slate-400">...</span>
+                        }
+                    }
+                    @for (int i = startPage; i <= endPage; i++)
+                    {
+                        if (i == currentPage)
+                        {
+                            <span class="px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold shadow-xs">@i</span>
+                        }
+                        else
+                        {
+                            <a asp-action="Index" asp-route-search="@search" asp-route-kind="@((int?)selectedKind)" asp-route-status="@selectedStatus" asp-route-limit="@limit" asp-route-page="@i" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-slate-700 dark:text-stone-200 hover:bg-slate-50 dark:hover:bg-stone-700 font-bold">@i</a>
+                        }
+                    }
+                    @if (endPage < totalPages)
+                    {
+                        @if (endPage < totalPages - 1)
+                        {
+                            <span class="px-1.5 text-slate-400">...</span>
+                        }
+                        <a asp-action="Index" asp-route-search="@search" asp-route-kind="@((int?)selectedKind)" asp-route-status="@selectedStatus" asp-route-limit="@limit" asp-route-page="@totalPages" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-slate-700 dark:text-stone-200 hover:bg-slate-50 dark:hover:bg-stone-700 font-bold">@totalPages</a>
+                    }
+                    @if (currentPage < totalPages)
+                    {
+                        <a asp-action="Index" asp-route-search="@search" asp-route-kind="@((int?)selectedKind)" asp-route-status="@selectedStatus" asp-route-limit="@limit" asp-route-page="@(currentPage + 1)" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-slate-700 dark:text-stone-200 hover:bg-slate-50 dark:hover:bg-stone-700 font-bold">Next</a>
+                    }
+                </div>
+            }
         </div>
     </div>
 </div>

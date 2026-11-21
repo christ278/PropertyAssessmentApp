@@ -35,6 +35,15 @@ public class ExcelImportSampleRowDto
     public string StatusNote { get; set; } = string.Empty;
 }
 
+public class ExcelImportValidationIssueDto
+{
+    public int RowNumber { get; set; }
+    public string TdNo { get; set; } = string.Empty;
+    public string Field { get; set; } = string.Empty;
+    public string Value { get; set; } = string.Empty;
+    public string Reason { get; set; } = string.Empty;
+}
+
 public class ExcelImportPreviewDto
 {
     public string SheetName { get; set; } = string.Empty;
@@ -43,11 +52,13 @@ public class ExcelImportPreviewDto
     public int ExistingInDbCount { get; set; }
     public int DuplicateInFileCount { get; set; }
     public int NoOwnerCount { get; set; }
+    public int MissingKindCount { get; set; }
     public int CancelledCount { get; set; }
     public int HasUnitCount { get; set; }
     public int NewOwnersToRegisterCount { get; set; }
     public List<string> DuplicateTdns { get; set; } = new();
     public List<string> Warnings { get; set; } = new();
+    public List<ExcelImportValidationIssueDto> ValidationIssues { get; set; } = new();
     public List<ExcelImportSampleRowDto> SampleRows { get; set; } = new();
 }
 
@@ -60,6 +71,7 @@ public class ExcelImportResultDto
     public int LineageBridgedCount { get; set; }
     public int NoOwnerFlaggedCount { get; set; }
     public List<string> Warnings { get; set; } = new();
+    public List<ExcelImportValidationIssueDto> ValidationIssues { get; set; } = new();
 }
 
 public interface IExcelAssessmentImportService
@@ -107,6 +119,9 @@ public class ExcelAssessmentImportService : IExcelAssessmentImportService
         public decimal MarketValue { get; set; }
         public decimal AssessedValue { get; set; }
         public string LotRefArpNo { get; set; } = string.Empty;
+        public string LotRefLotNo { get; set; } = string.Empty;
+        public decimal LotRefAreaSqm { get; set; }
+        public string LotRefSurveyNo { get; set; } = string.Empty;
         public string TransactionCode { get; set; } = string.Empty;
         public string Memoranda { get; set; } = string.Empty;
         public string Effectivity { get; set; } = string.Empty;
@@ -130,39 +145,95 @@ public class ExcelAssessmentImportService : IExcelAssessmentImportService
             .Where(n => !string.IsNullOrEmpty(n))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        var seenInFile = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var firstRowByTdn = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var dupTdns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var newOwners = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var validationIssues = new List<ExcelImportValidationIssueDto>();
 
         int newCount = 0, existingCount = 0, noOwnerCount = 0, cancelledCount = 0, hasUnitCount = 0, emptyKindCount = 0;
         var sampleRows = new List<ExcelImportSampleRowDto>();
 
         foreach (var r in rows)
         {
-            if (string.IsNullOrWhiteSpace(r.TdNo)) continue;
+            bool missingTd = string.IsNullOrWhiteSpace(r.TdNo);
+            bool missingOwner = string.IsNullOrWhiteSpace(r.OwnerName);
+            bool missingKind = string.IsNullOrWhiteSpace(r.KindRaw);
 
-            bool isDup = !seenInFile.Add(r.TdNo);
-            if (isDup) dupTdns.Add(r.TdNo);
+            if (missingTd)
+            {
+                validationIssues.Add(new ExcelImportValidationIssueDto
+                {
+                    RowNumber = r.RowNumber,
+                    TdNo = "(blank)",
+                    Field = "TD No.",
+                    Value = "",
+                    Reason = "Missing TD No. (row will be skipped)"
+                });
+                continue;
+            }
 
+            if (missingOwner)
+            {
+                noOwnerCount++;
+                validationIssues.Add(new ExcelImportValidationIssueDto
+                {
+                    RowNumber = r.RowNumber,
+                    TdNo = r.TdNo,
+                    Field = "Owner Name",
+                    Value = "",
+                    Reason = "Missing Owner Name (row will be skipped)"
+                });
+            }
+
+            if (missingKind)
+            {
+                emptyKindCount++;
+                validationIssues.Add(new ExcelImportValidationIssueDto
+                {
+                    RowNumber = r.RowNumber,
+                    TdNo = r.TdNo,
+                    Field = "KIND",
+                    Value = "",
+                    Reason = "Missing KIND (row will be skipped)"
+                });
+            }
+
+            bool isDup = firstRowByTdn.TryGetValue(r.TdNo, out int firstRow);
+            if (isDup)
+            {
+                dupTdns.Add(r.TdNo);
+                validationIssues.Add(new ExcelImportValidationIssueDto
+                {
+                    RowNumber = r.RowNumber,
+                    TdNo = r.TdNo,
+                    Field = "TD No.",
+                    Value = r.TdNo,
+                    Reason = $"Duplicate TD No. (first seen at Row {firstRow}; row will be skipped)"
+                });
+            }
+            else
+            {
+                firstRowByTdn[r.TdNo] = r.RowNumber;
+            }
+
+            bool willSkip = isDup || missingOwner || missingKind;
             bool inDb = existingTdns.Contains(r.TdNo);
-            if (!isDup)
+            if (!willSkip)
             {
                 if (inDb) existingCount++;
                 else newCount++;
-            }
 
-            if (string.IsNullOrWhiteSpace(r.OwnerName)) noOwnerCount++;
-            else if (!existingOwners.Contains(r.OwnerName)) newOwners.Add(r.OwnerName);
+                if (!existingOwners.Contains(r.OwnerName)) newOwners.Add(r.OwnerName);
+            }
 
             if (r.IsCancelled) cancelledCount++;
             if (r.AreaUnit == "HAS") hasUnitCount++;
-            if (string.IsNullOrWhiteSpace(r.KindRaw)) emptyKindCount++;
 
             if (sampleRows.Count < 25)
             {
-                string note = isDup ? "Duplicate in file"
+                string note = isDup ? $"Duplicate (Row {firstRow})"
+                    : (missingOwner || missingKind) ? $"Skipped (Missing {(missingOwner && missingKind ? "Owner & KIND" : missingOwner ? "Owner" : "KIND")})"
                     : inDb ? "Already in DB"
-                    : string.IsNullOrWhiteSpace(r.OwnerName) ? "No Owner (will flag)"
                     : "Ready";
 
                 sampleRows.Add(new ExcelImportSampleRowDto
@@ -170,8 +241,8 @@ public class ExcelAssessmentImportService : IExcelAssessmentImportService
                     RowNumber = r.RowNumber,
                     TdNo = r.TdNo,
                     PreviousTdNo = r.PreviousTdNo,
-                    OwnerName = string.IsNullOrWhiteSpace(r.OwnerName) ? "— No Owner —" : r.OwnerName,
-                    Kind = string.IsNullOrWhiteSpace(r.KindRaw) ? "LAND (default)" : r.KindRaw,
+                    OwnerName = missingOwner ? "— Missing Owner —" : r.OwnerName,
+                    Kind = missingKind ? "— Missing KIND —" : r.KindRaw,
                     Classification = r.Classification,
                     AreaRaw = string.IsNullOrWhiteSpace(r.AreaRaw) ? "-" : r.AreaRaw,
                     MarketValue = r.MarketValue,
@@ -187,9 +258,9 @@ public class ExcelAssessmentImportService : IExcelAssessmentImportService
         if (dupTdns.Count > 0)
             warnings.Add($"Duplicate TDN(s) in file ({dupTdns.Count}): {string.Join(", ", dupTdns.Take(10))}. Duplicate rows will be skipped.");
         if (noOwnerCount > 0)
-            warnings.Add($"{noOwnerCount} row(s) have no Owner Name — they will be imported with the 'No Owner' warning flag.");
+            warnings.Add($"{noOwnerCount} row(s) are missing Owner Name and will be skipped.");
         if (emptyKindCount > 0)
-            warnings.Add($"{emptyKindCount} row(s) have an empty KIND — they will default to LAND.");
+            warnings.Add($"{emptyKindCount} row(s) are missing KIND and will be skipped.");
 
         return new ExcelImportPreviewDto
         {
@@ -199,11 +270,13 @@ public class ExcelAssessmentImportService : IExcelAssessmentImportService
             ExistingInDbCount = existingCount,
             DuplicateInFileCount = dupTdns.Count,
             NoOwnerCount = noOwnerCount,
+            MissingKindCount = emptyKindCount,
             CancelledCount = cancelledCount,
             HasUnitCount = hasUnitCount,
             NewOwnersToRegisterCount = options.RegisterOwners ? newOwners.Count : 0,
             DuplicateTdns = dupTdns.OrderBy(x => x).ToList(),
             Warnings = warnings,
+            ValidationIssues = validationIssues,
             SampleRows = sampleRows
         };
     }
@@ -230,7 +303,7 @@ public class ExcelAssessmentImportService : IExcelAssessmentImportService
             .GroupBy(t => t.TaxDeclarationNumber.Trim(), StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
-        var seenInFile = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var firstRowByTdn = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var importedOrUpdated = new List<TaxDeclaration>();
 
         foreach (var r in rows)
@@ -238,12 +311,60 @@ public class ExcelAssessmentImportService : IExcelAssessmentImportService
             if (string.IsNullOrWhiteSpace(r.TdNo))
             {
                 result.SkippedCount++;
+                result.ValidationIssues.Add(new ExcelImportValidationIssueDto
+                {
+                    RowNumber = r.RowNumber,
+                    TdNo = "(blank)",
+                    Field = "TD No.",
+                    Value = "",
+                    Reason = "Missing TD No. (skipped)"
+                });
                 continue;
             }
 
-            if (!seenInFile.Add(r.TdNo))
+            if (firstRowByTdn.TryGetValue(r.TdNo, out int firstRow))
             {
                 result.SkippedCount++;
+                result.ValidationIssues.Add(new ExcelImportValidationIssueDto
+                {
+                    RowNumber = r.RowNumber,
+                    TdNo = r.TdNo,
+                    Field = "TD No.",
+                    Value = r.TdNo,
+                    Reason = $"Duplicate TD No. (first seen at Row {firstRow}; skipped)"
+                });
+                continue;
+            }
+            firstRowByTdn[r.TdNo] = r.RowNumber;
+
+            bool missingOwner = string.IsNullOrWhiteSpace(r.OwnerName);
+            bool missingKind = string.IsNullOrWhiteSpace(r.KindRaw);
+            if (missingOwner || missingKind)
+            {
+                result.SkippedCount++;
+                if (missingOwner)
+                {
+                    result.NoOwnerFlaggedCount++;
+                    result.ValidationIssues.Add(new ExcelImportValidationIssueDto
+                    {
+                        RowNumber = r.RowNumber,
+                        TdNo = r.TdNo,
+                        Field = "Owner Name",
+                        Value = "",
+                        Reason = "Missing Owner Name (skipped)"
+                    });
+                }
+                if (missingKind)
+                {
+                    result.ValidationIssues.Add(new ExcelImportValidationIssueDto
+                    {
+                        RowNumber = r.RowNumber,
+                        TdNo = r.TdNo,
+                        Field = "KIND",
+                        Value = "",
+                        Reason = "Missing KIND (skipped)"
+                    });
+                }
                 continue;
             }
 
@@ -256,11 +377,7 @@ public class ExcelAssessmentImportService : IExcelAssessmentImportService
 
             // 1. Resolve or Register Owner
             Guid? ownerId = null;
-            if (string.IsNullOrWhiteSpace(r.OwnerName))
-            {
-                result.NoOwnerFlaggedCount++;
-            }
-            else if (options.RegisterOwners)
+            if (options.RegisterOwners)
             {
                 var cleanOwner = r.OwnerName.Trim();
                 if (!ownerCache.TryGetValue(cleanOwner, out var owner))
@@ -327,6 +444,8 @@ public class ExcelAssessmentImportService : IExcelAssessmentImportService
             td.EncodedByName = string.IsNullOrWhiteSpace(encodedBy) ? "Excel Import" : encodedBy;
             td.DateEncoded = DateTime.Now;
             td.DateAssessed = new DateTime(effYear, 1, 1);
+            td.DateApproved = td.DateAssessed;
+            td.IsMigrated = true;
 
             if (r.IsCancelled)
             {
@@ -360,12 +479,19 @@ public class ExcelAssessmentImportService : IExcelAssessmentImportService
                 };
                 td.LandAppraisalDetailsJson = JsonSerializer.Serialize(appraisalRow);
             }
-            else if ((kind == PropertyKind.Building || kind == PropertyKind.Machinery) && !string.IsNullOrWhiteSpace(r.LotRefArpNo))
+            else if ((kind == PropertyKind.Building || kind == PropertyKind.Machinery))
             {
-                td.LandTdNo = r.LotRefArpNo;
+                if (!string.IsNullOrWhiteSpace(r.LotRefArpNo)) td.LandTdNo = r.LotRefArpNo;
+                if (string.IsNullOrWhiteSpace(td.LotNo) && !string.IsNullOrWhiteSpace(r.LotRefLotNo)) td.LotNo = r.LotRefLotNo;
+                if (string.IsNullOrWhiteSpace(td.SurveyNo) && !string.IsNullOrWhiteSpace(r.LotRefSurveyNo)) td.SurveyNo = r.LotRefSurveyNo;
             }
 
             _assessmentService.SyncChildEntities(td);
+
+            if (kind == PropertyKind.Building && td.BuildingDetails != null && r.LotRefAreaSqm > 0)
+            {
+                td.BuildingDetails.LandAreaSqm = r.LotRefAreaSqm;
+            }
 
             if (!exists)
             {
@@ -386,7 +512,7 @@ public class ExcelAssessmentImportService : IExcelAssessmentImportService
         // Pass 2: Bridge Mother <-> Child Lineage
         if (options.BridgeMotherChild)
         {
-            int bridged = BridgeLineage(tdCache, importedOrUpdated);
+            int bridged = BridgeLineage(tdCache, importedOrUpdated, _assessmentService);
             result.LineageBridgedCount = bridged;
             if (bridged > 0) _context.SaveChanges();
         }
@@ -427,7 +553,7 @@ public class ExcelAssessmentImportService : IExcelAssessmentImportService
         return owner;
     }
 
-    private static int BridgeLineage(Dictionary<string, TaxDeclaration> tdCache, List<TaxDeclaration> imported)
+    private static int BridgeLineage(Dictionary<string, TaxDeclaration> tdCache, List<TaxDeclaration> imported, IAssessmentService assessmentService)
     {
         int bridged = 0;
 
@@ -435,7 +561,7 @@ public class ExcelAssessmentImportService : IExcelAssessmentImportService
             string.IsNullOrWhiteSpace(raw)
                 ? new List<string>()
                 : raw.Split(new[] { ',', ';', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries)
-                     .Select(s => s.Trim())
+                     .Select(s => NormalizeTdSectionCode(s.Trim()))
                      .Where(s => !string.IsNullOrWhiteSpace(s))
                      .Distinct(StringComparer.OrdinalIgnoreCase)
                      .ToList();
@@ -443,8 +569,9 @@ public class ExcelAssessmentImportService : IExcelAssessmentImportService
         static string AppendToken(string? existing, string token)
         {
             var list = SplitTokens(existing);
-            if (!list.Contains(token, StringComparer.OrdinalIgnoreCase))
-                list.Add(token);
+            var norm = NormalizeTdSectionCode(token);
+            if (!list.Contains(norm, StringComparer.OrdinalIgnoreCase))
+                list.Add(norm);
             return string.Join(", ", list);
         }
 
@@ -461,6 +588,7 @@ public class ExcelAssessmentImportService : IExcelAssessmentImportService
                         mother.SupersededByTdns = updatedSup;
                         mother.Status = AssessmentStatus.Cancelled;
                         mother.IsCancelledAndSuperseded = true;
+                        assessmentService.SyncChildEntities(mother);
                         bridged++;
                     }
                 }
@@ -475,6 +603,7 @@ public class ExcelAssessmentImportService : IExcelAssessmentImportService
                     if (!string.Equals(nextChild.PreviousTdNo, updatedPrev, StringComparison.OrdinalIgnoreCase))
                     {
                         nextChild.PreviousTdNo = updatedPrev;
+                        assessmentService.SyncChildEntities(nextChild);
                         bridged++;
                     }
                 }
@@ -560,8 +689,8 @@ public class ExcelAssessmentImportService : IExcelAssessmentImportService
 
                 string Get(int idx) => cells.TryGetValue(idx, out var v) ? v : "";
 
-                string tdNo = !string.IsNullOrWhiteSpace(Get(1)) ? Get(1) : Get(6);
-                string prevTdNo = !string.IsNullOrWhiteSpace(Get(2)) ? Get(2) : Get(7);
+                string tdNo = NormalizeTdSectionCode(!string.IsNullOrWhiteSpace(Get(1)) ? Get(1) : Get(6));
+                string prevTdNo = NormalizeTdSectionList(!string.IsNullOrWhiteSpace(Get(2)) ? Get(2) : Get(7));
                 string ownerName = Get(8);
                 string kindRaw = Get(19);
 
@@ -578,7 +707,7 @@ public class ExcelAssessmentImportService : IExcelAssessmentImportService
                     RowNumber = rowNum,
                     TdNo = tdNo,
                     PreviousTdNo = prevTdNo,
-                    SectionNo = Get(4),
+                    SectionNo = Get(4).PadLeft(4, '0'),
                     ParcelNo = Get(5),
                     OwnerName = ownerName,
                     OwnerAddress = Get(9),
@@ -600,7 +729,10 @@ public class ExcelAssessmentImportService : IExcelAssessmentImportService
                     AreaUnit = areaUnit,
                     MarketValue = Math.Round(ParseDecimal(Get(24)), 2),
                     AssessedValue = Math.Round(ParseDecimal(Get(25)), 2),
-                    LotRefArpNo = Get(29),
+                    LotRefArpNo = NormalizeTdSectionCode(Get(29)),
+                    LotRefLotNo = Get(30),
+                    LotRefAreaSqm = ParseArea(Get(31)).AreaSqm,
+                    LotRefSurveyNo = Get(32),
                     TransactionCode = Get(33),
                     Memoranda = Get(34),
                     Effectivity = Get(35),
@@ -644,6 +776,23 @@ public class ExcelAssessmentImportService : IExcelAssessmentImportService
         return (Math.Round(num, 2), Math.Round(num / 10000m, 4), "SQM");
     }
 
+    private static string NormalizeTdSectionCode(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return string.Empty;
+        return Regex.Replace(raw.Trim(), @"\b(\d{2})-(\d{3})-(\d{4,6})\b", m =>
+            $"{m.Groups[1].Value}-{m.Groups[2].Value.PadLeft(4, '0')}-{m.Groups[3].Value}");
+    }
+
+    private static string NormalizeTdSectionList(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return string.Empty;
+        var parts = raw.Split(new[] { ',', ';', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(s => NormalizeTdSectionCode(s))
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+        return string.Join(", ", parts);
+    }
+
     private static (bool IsCancelled, string SupersededBy) ParseCancellationFromRemarks(string? remarks)
     {
         if (string.IsNullOrWhiteSpace(remarks)) return (false, string.Empty);
@@ -651,7 +800,7 @@ public class ExcelAssessmentImportService : IExcelAssessmentImportService
         if (!isCancelled) return (false, string.Empty);
 
         var matches = Regex.Matches(remarks, @"\b\d{2}-\d{3,4}-\d{4,6}\b");
-        var tdns = matches.Select(m => m.Value).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var tdns = matches.Select(m => NormalizeTdSectionCode(m.Value)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         return (true, string.Join(", ", tdns));
     }
 

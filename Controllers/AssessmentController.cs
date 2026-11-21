@@ -85,8 +85,11 @@ public class AssessmentController : Controller
     }
 
     // GET: /Assessment
-    public IActionResult Index(string? search, PropertyKind? kind, string? status)
+    public IActionResult Index(string? search, PropertyKind? kind, string? status, int limit = 10, int page = 1)
     {
+        int safeLimit = (limit is 5 or 10 or 25 or 50 or 100) ? limit : 10;
+        int safePage = page < 1 ? 1 : page;
+
         ViewBag.Search = search;
         ViewBag.Kind = kind;
         ViewBag.Status = status;
@@ -96,7 +99,15 @@ public class AssessmentController : Controller
         ViewBag.TotalRevenue = _assessmentService.GetTotalEstimatedTaxRevenue();
         ViewBag.TotalProperties = _assessmentService.GetTotalActivePropertiesCount();
 
-        var records = _assessmentService.GetAll(search, kind, status);
+        var (records, totalCount) = _assessmentService.GetPaged(search, kind, status, safePage, safeLimit);
+        int totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)safeLimit));
+        if (safePage > totalPages) safePage = totalPages;
+
+        ViewBag.Limit = safeLimit;
+        ViewBag.Page = safePage;
+        ViewBag.TotalCount = totalCount;
+        ViewBag.TotalPages = totalPages;
+
         return View(records);
     }
 
@@ -404,7 +415,7 @@ public class AssessmentController : Controller
             StreetLocation = td.StreetNo ?? string.Empty,
             Purok = td.Purok,
             DistrictOrBarangay = string.IsNullOrWhiteSpace(td.DistrictOrBarangay) ? "Dadiangas East" : td.DistrictOrBarangay,
-            CityMunicipality = string.IsNullOrWhiteSpace(td.Municipality) ? "General Santos City" : td.Municipality,
+            CityMunicipality = string.IsNullOrWhiteSpace(td.Municipality) ? "Koronadal City" : td.Municipality,
             Province = string.IsNullOrWhiteSpace(td.ProvinceCity) ? "South Cotabato" : td.ProvinceCity,
             BoundaryNorth = td.BoundaryNorth,
             BoundaryEast = td.BoundaryEast,
@@ -603,7 +614,7 @@ public class AssessmentController : Controller
             : (!string.IsNullOrWhiteSpace(p.AdministratorName) ? p.AdministratorName.Trim() : (td.OwnerName ?? "Property Owner"));
         td.OwnerAddress = !string.IsNullOrWhiteSpace(p.OwnerAddress)
             ? p.OwnerAddress.Trim()
-            : (!string.IsNullOrWhiteSpace(p.AdministratorAddress) ? p.AdministratorAddress.Trim() : (td.OwnerAddress ?? "General Santos City"));
+            : (!string.IsNullOrWhiteSpace(p.AdministratorAddress) ? p.AdministratorAddress.Trim() : (td.OwnerAddress ?? "Koronadal City"));
         td.OwnerTin = !string.IsNullOrWhiteSpace(p.OwnerTIN)
             ? p.OwnerTIN.Trim()
             : (!string.IsNullOrWhiteSpace(p.AdministratorTin) ? p.AdministratorTin.Trim() : (td.OwnerTin ?? "000-000-000-000"));
@@ -632,10 +643,10 @@ public class AssessmentController : Controller
 
         td.StreetNo = !string.IsNullOrWhiteSpace(p.StreetLocation)
             ? p.StreetLocation.Trim()
-            : (!string.IsNullOrWhiteSpace(p.PropertyLocation) ? p.PropertyLocation.Trim() : (td.StreetNo ?? "General Santos City"));
+            : (!string.IsNullOrWhiteSpace(p.PropertyLocation) ? p.PropertyLocation.Trim() : (td.StreetNo ?? "Koronadal City"));
         td.Purok = p.Purok;
         td.DistrictOrBarangay = !string.IsNullOrWhiteSpace(p.DistrictOrBarangay) ? p.DistrictOrBarangay.Trim() : (td.DistrictOrBarangay ?? "Dadiangas East");
-        td.Municipality = !string.IsNullOrWhiteSpace(p.CityMunicipality) ? p.CityMunicipality.Trim() : "General Santos City";
+        td.Municipality = !string.IsNullOrWhiteSpace(p.CityMunicipality) ? p.CityMunicipality.Trim() : "Koronadal City";
         td.ProvinceCity = !string.IsNullOrWhiteSpace(p.Province) ? p.Province.Trim() : "South Cotabato";
 
         if (!string.IsNullOrWhiteSpace(p.Classification))

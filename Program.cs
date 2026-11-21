@@ -45,7 +45,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 builder.Services.AddSingleton<IFileStorageService, FileStorageService>();
 builder.Services.AddScoped<IAssessmentService, AssessmentService>();
 builder.Services.AddScoped<IExcelAssessmentImportService, ExcelAssessmentImportService>();
-builder.Services.AddSingleton<IOrderPaymentService, OrderPaymentService>();
+builder.Services.AddScoped<IOrderPaymentService, OrderPaymentService>();
 builder.Services.AddScoped<IOwnerService, OwnerService>();
 builder.Services.AddSingleton<IGeographicService, GeographicService>();
 builder.Services.AddScoped<IUserAccountService, UserAccountService>();
@@ -78,6 +78,51 @@ QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
 var app = builder.Build();
 
+// Seed all 27 official Koronadal City barangays into the Barangays table if missing
+using (var scope = app.Services.CreateScope())
+{
+    try
+    {
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var geo = scope.ServiceProvider.GetRequiredService<IGeographicService>();
+        var koronadalCity = db.CityMunicipalities.FirstOrDefault(c => c.Name.Contains("Koronadal"));
+        if (koronadalCity != null)
+        {
+            var geoKoronadal = geo.GetCitiesByProvince(Guid.Parse("10000000-0000-0000-0000-000000000001"))
+                .FirstOrDefault(c => c.Name.Contains("Koronadal", StringComparison.OrdinalIgnoreCase));
+            if (geoKoronadal != null)
+            {
+                var existing = db.Barangays.Where(b => b.CityMunicipalityId == koronadalCity.Id).ToList();
+                var existingNames = existing.Select(b => b.Name.Trim().ToLowerInvariant()).ToHashSet();
+                var existingCodes = existing.Select(b => b.Code.Trim().ToLowerInvariant()).ToHashSet();
+                bool added = false;
+
+                foreach (var gb in geo.GetBarangaysByCity(geoKoronadal.Id))
+                {
+                    var normName = gb.Name.Trim().ToLowerInvariant();
+                    var altZone1 = normName.Replace("zone i ", "zone 1 ");
+                    if (existingNames.Contains(normName) || existingNames.Contains(altZone1) || existingCodes.Contains(gb.Code.Trim().ToLowerInvariant()))
+                        continue;
+
+                    db.Barangays.Add(new PropertyAssessmentApp.Models.Barangay
+                    {
+                        Id = Guid.NewGuid(),
+                        CityMunicipalityId = koronadalCity.Id,
+                        Code = gb.Code,
+                        Name = gb.Name,
+                        District = gb.District,
+                        IsActive = true
+                    });
+                    added = true;
+                }
+
+                if (added) db.SaveChanges();
+            }
+        }
+    }
+    catch { }
+}
+
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
@@ -85,8 +130,6 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
     app.UseHttpsRedirection();
 }
-
-app.UseHttpsRedirection();
 
 // Enable CORS for mobile apps, Expo web, and external clients
 app.UseCors("AllowMobileClients");

@@ -32,7 +32,7 @@ public class TDNLand
     // Property Location
     public string? StreetNo { get; set; }
     public string? Purok { get; set; }
-    public string? Municipality { get; set; } = "General Santos City";
+    public string? Municipality { get; set; } = "Koronadal City";
     public string? DistrictOrBarangay { get; set; } = "Brgy. Central";
     public string? ProvinceCity { get; set; } = "South Cotabato";
 

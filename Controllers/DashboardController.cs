@@ -486,14 +486,6 @@ public class DashboardController : Controller
         f.PageSize = 50000;
         var paged = GetFilteredAssessmentRollPage(f);
 
-        static string EscapeCsv(string? val)
-        {
-            if (string.IsNullOrEmpty(val)) return "";
-            if (val.Contains(',') || val.Contains('"') || val.Contains('\n') || val.Contains('\r'))
-                return $"\"{val.Replace("\"", "\"\"")}\"";
-            return val;
-        }
-
         var sb = new StringBuilder();
         sb.AppendLine("\"TD No.\",\"Previous TD No.\",\"Section\",\"Parcel No.\",\"Owner Name\",\"Owner Address\",\"Prev Owner\",\"CAD No.\",\"Survey No.\",\"Title No.\",\"Previous PIN\",\"Classification\",\"Kind\",\"Actual Use\",\"Area (sqm)\",\"Market Value (PHP)\",\"Assessed Value (PHP)\",\"Bldg. Count\",\"Mach. Count\",\"Memoranda\",\"Effectivity Date\"");
 
@@ -539,13 +531,6 @@ public class DashboardController : Controller
         }
 
         var data = BuildExecutiveAnalyticsData(filter ?? new DashboardAnalyticsFilterDto());
-        static string EscapeCsv(string? val)
-        {
-            if (string.IsNullOrEmpty(val)) return "";
-            if (val.Contains(',') || val.Contains('"') || val.Contains('\n') || val.Contains('\r'))
-                return $"\"{val.Replace("\"", "\"\"")}\"";
-            return val;
-        }
 
         var sb = new StringBuilder();
         sb.AppendLine("\"Barangay Code\",\"Barangay Name\",\"Total Parcels\",\"Active TDs\",\"Cancelled TDs\",\"Total Land Area (sqm)\",\"Total Market Value (PHP)\",\"Total Assessed Value (PHP)\",\"Status\"");

@@ -79,7 +79,7 @@ public class Owner
         get => CityMunicipality?.Name ?? _cityMunicipalityName;
         set => _cityMunicipalityName = value;
     }
-    private string _cityMunicipalityName = "General Santos City";
+    private string _cityMunicipalityName = "Koronadal City";
 
     [ValidateNever]
     [Display(Name = "Barangay Name")]
