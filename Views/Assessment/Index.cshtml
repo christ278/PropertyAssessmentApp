@@ -251,10 +251,11 @@
                                         }
                                         @if (taggingsByTd.TryGetValue(item.Id, out var latestTag))
                                         {
+                                            var amtStr = latestTag.Amount.HasValue ? $"₱{latestTag.Amount.Value:N2}" : "";
                                             var (tagLabel, tagClasses, tagTitle) = latestTag.TagType switch
                                             {
-                                                PropertyTagType.Mortgage => ("Mortgaged", "bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300 border-amber-300 dark:border-amber-500/40", $"Mortgaged to {latestTag.PartyName} ({(latestTag.Amount.HasValue ? $"₱{latestTag.Amount.Value:N2}" : "")})"),
-                                                PropertyTagType.Bailbond => ("Bailbond", "bg-indigo-100 text-indigo-800 dark:bg-indigo-500/20 dark:text-indigo-300 border-indigo-300 dark:border-indigo-500/40", $"Bailbond to {latestTag.PartyName} ({(latestTag.Amount.HasValue ? $"₱{latestTag.Amount.Value:N2}" : "")})"),
+                                                PropertyTagType.Mortgage => ("Mortgaged", "bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300 border-amber-300 dark:border-amber-500/40", $"Mortgaged to {latestTag.PartyName} ({amtStr})"),
+                                                PropertyTagType.Bailbond => ("Bailbond", "bg-indigo-100 text-indigo-800 dark:bg-indigo-500/20 dark:text-indigo-300 border-indigo-300 dark:border-indigo-500/40", $"Bailbond to {latestTag.PartyName} ({amtStr})"),
                                                 PropertyTagType.Release => ("Released", "bg-teal-100 text-teal-800 dark:bg-teal-500/20 dark:text-teal-300 border-teal-300 dark:border-teal-500/40", $"Released Per Doc No. {latestTag.PerDocNo}"),
                                                 _ => ("Cancelled Tag", "bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300 border-rose-200 dark:border-rose-500/30", $"Reason: {latestTag.ReasonForCancellation}")
                                             };
