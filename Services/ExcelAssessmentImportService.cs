@@ -435,10 +435,10 @@ public class ExcelAssessmentImportService : IExcelAssessmentImportService
             td.EffectivityYear = effYear;
             td.EffectivityQuarter = ParseEffectivityQuarter(r.Effectivity) switch
             {
-                2 => "2nd Quarter",
+                2 => "2nd Semester",
                 3 => "3rd Quarter",
                 4 => "4th Quarter",
-                _ => "1st Quarter"
+                _ => "1st Semester"
             };
             td.Memoranda = string.IsNullOrWhiteSpace(r.Memoranda) ? r.Remarks : r.Memoranda.Trim();
             td.EncodedByName = string.IsNullOrWhiteSpace(encodedBy) ? "Excel Import" : encodedBy;

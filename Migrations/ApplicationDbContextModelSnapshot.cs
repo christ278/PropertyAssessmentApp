@@ -6775,6 +6775,86 @@ namespace PropertyAssessmentApp.Migrations
                     b.ToTable("PropertyAssessmentRequests");
                 });
 
+            modelBuilder.Entity("PropertyAssessmentApp.Models.PropertyTagging", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("BookNo")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("DateCancelled")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("OwnerName")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("PageNo")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("PartyName")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("PerDocNo")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("PostedByName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid?>("PostedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("PropertyIndexNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("ReasonForCancellation")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("SeriesOf")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime?>("TagDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("TagType")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TaxDeclarationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("TaxDeclarationNumber")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TaxDeclarationId");
+
+                    b.ToTable("PropertyTaggings");
+                });
+
             modelBuilder.Entity("PropertyAssessmentApp.Models.Province", b =>
                 {
                     b.Property<Guid>("Id")
@@ -9185,6 +9265,17 @@ namespace PropertyAssessmentApp.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Owner");
+                });
+
+            modelBuilder.Entity("PropertyAssessmentApp.Models.PropertyTagging", b =>
+                {
+                    b.HasOne("PropertyAssessmentApp.Models.TaxDeclaration", "TaxDeclaration")
+                        .WithMany()
+                        .HasForeignKey("TaxDeclarationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("TaxDeclaration");
                 });
 
             modelBuilder.Entity("PropertyAssessmentApp.Models.RoleModulePermission", b =>

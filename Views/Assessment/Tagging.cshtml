@@ -1,0 +1,586 @@
+@model IEnumerable<PropertyAssessmentApp.Models.PropertyTagging>
+@using PropertyAssessmentApp.Models
+@{
+    ViewData["Title"] = "Property Tagging";
+    var users = ViewBag.Users as IEnumerable<dynamic> ?? Enumerable.Empty<dynamic>();
+    var selectedTd = ViewBag.SelectedTd;
+    var filterType = ViewBag.FilterType as PropertyTagType?;
+    var search = ViewBag.Search as string ?? "";
+    int currentPage = ViewBag.Page is int p ? p : 1;
+    int totalCount = ViewBag.TotalCount is int tc ? tc : 0;
+    int totalPages = ViewBag.TotalPages is int tp ? tp : 1;
+    const int pageSize = 15;
+    int showingStart = totalCount == 0 ? 0 : ((currentPage - 1) * pageSize) + 1;
+    int showingEnd = Math.Min(currentPage * pageSize, totalCount);
+
+    int mortgageCount = ViewBag.MortgageCount is int mc ? mc : 0;
+    int bailbondCount = ViewBag.BailbondCount is int bc ? bc : 0;
+    int releaseCount = ViewBag.ReleaseCount is int rc ? rc : 0;
+    int cancellationCount = ViewBag.CancellationCount is int cc ? cc : 0;
+}
+
+<div class="space-y-8">
+    <!-- Page Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <div class="inline-flex items-center gap-2 text-xs font-mono text-emerald-700 dark:text-emerald-400 font-bold mb-1">
+                <i data-lucide="bookmark-check" class="w-4 h-4"></i>
+                <span>Property Encumbrance &amp; Status Registry</span>
+            </div>
+            <h1 class="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Property Tagging</h1>
+            <p class="text-slate-500 dark:text-stone-400 text-sm">Manage Mortgage, Bailbond, Release, and Cancellation annotations on Real Property Tax Declarations.</p>
+        </div>
+        <a asp-action="Index" class="px-4 py-3 rounded-xl bg-white dark:bg-stone-900 hover:bg-slate-50 dark:hover:bg-stone-800 border border-slate-200 dark:border-stone-800 text-slate-700 dark:text-stone-200 font-bold text-xs font-mono inline-flex items-center gap-2 shadow-sm transition-all self-start sm:self-auto">
+            <i data-lucide="layers" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+            <span>Assessment Records</span>
+        </a>
+    </div>
+
+    <!-- Summary Metrics Cards (Consistent with Assessment Index) -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="p-5 rounded-2xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 space-y-1 shadow-sm sinsilyo-card-light border-l-4 border-l-amber-500">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-mono text-amber-700 dark:text-amber-400 font-bold uppercase">Mortgages</span>
+                <i data-lucide="landmark" class="w-4 h-4 text-amber-600 dark:text-amber-400"></i>
+            </div>
+            <div class="text-2xl font-black font-mono text-slate-900 dark:text-white">@mortgageCount</div>
+            <span class="text-[10px] font-mono text-slate-500 dark:text-stone-500">Annotated Encumbrances</span>
+        </div>
+
+        <div class="p-5 rounded-2xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 space-y-1 shadow-sm sinsilyo-card-light border-l-4 border-l-indigo-500">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-mono text-indigo-700 dark:text-indigo-400 font-bold uppercase">Bailbonds</span>
+                <i data-lucide="shield-alert" class="w-4 h-4 text-indigo-600 dark:text-indigo-400"></i>
+            </div>
+            <div class="text-2xl font-black font-mono text-slate-900 dark:text-white">@bailbondCount</div>
+            <span class="text-[10px] font-mono text-slate-500 dark:text-stone-500">Property Bond Annotations</span>
+        </div>
+
+        <div class="p-5 rounded-2xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 space-y-1 shadow-sm sinsilyo-card-light border-l-4 border-l-emerald-600">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-mono text-emerald-700 dark:text-emerald-400 font-bold uppercase">Releases</span>
+                <i data-lucide="unlock" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+            </div>
+            <div class="text-2xl font-black font-mono text-slate-900 dark:text-white">@releaseCount</div>
+            <span class="text-[10px] font-mono text-slate-500 dark:text-stone-500">Cleared &amp; Released</span>
+        </div>
+
+        <div class="p-5 rounded-2xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 space-y-1 shadow-sm sinsilyo-card-light border-l-4 border-l-rose-500">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-mono text-rose-700 dark:text-rose-400 font-bold uppercase">Cancellations</span>
+                <i data-lucide="x-circle" class="w-4 h-4 text-rose-600 dark:text-rose-400"></i>
+            </div>
+            <div class="text-2xl font-black font-mono text-slate-900 dark:text-white">@cancellationCount</div>
+            <span class="text-[10px] font-mono text-slate-500 dark:text-stone-500">Cancelled Declarations</span>
+        </div>
+    </div>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-mono font-bold flex items-center gap-2.5 shadow-xs">
+            <i data-lucide="check-circle-2" class="w-4 h-4 shrink-0"></i>
+            <span>@TempData["SuccessMessage"]</span>
+        </div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300 text-xs font-mono font-bold flex items-center gap-2.5 shadow-xs">
+            <i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+            <span>@TempData["ErrorMessage"]</span>
+        </div>
+    }
+
+    <!-- Tagging Form Card -->
+    <form asp-action="SaveTagging" method="post" id="taggingForm" class="bg-white dark:bg-stone-900 rounded-3xl border border-slate-200 dark:border-stone-800 shadow-sm overflow-hidden">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="TaxDeclarationId" id="TaxDeclarationId" value="@(selectedTd != null ? selectedTd.Id.ToString() : "")" />
+
+        <div class="px-6 sm:px-8 py-5 bg-slate-50/70 dark:bg-stone-950/60 border-b border-slate-200 dark:border-stone-800 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-2.5">
+                <span class="w-7 h-7 rounded-xl bg-emerald-600 text-white text-xs font-mono font-extrabold flex items-center justify-center shadow-xs">
+                    <i data-lucide="tag" class="w-3.5 h-3.5"></i>
+                </span>
+                <div>
+                    <h2 class="text-sm font-mono font-extrabold uppercase tracking-wider text-slate-900 dark:text-white">New Property Tagging</h2>
+                    <p class="text-[11px] font-mono text-slate-500 dark:text-stone-400">Select a Tax Declaration first, choose the Tagging Type, then complete the required details.</p>
+                </div>
+            </div>
+            <span id="activeTypePill" class="px-3 py-1 rounded-lg border text-[11px] font-mono font-bold uppercase bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/40">
+                Mortgage
+            </span>
+        </div>
+
+        <div class="p-6 sm:p-8 space-y-6">
+            <!-- Step 1 & Step 2: Select TDN + Tagging Type -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5 items-end">
+                <div class="md:col-span-2 space-y-1.5">
+                    <label for="tdnSearchInput" class="block text-[11px] leading-4 font-mono font-bold uppercase tracking-wider text-slate-600 dark:text-stone-300">
+                        1. Tax Declaration Number (TDN) <span class="text-rose-500">*</span>
+                    </label>
+                    <div class="relative">
+                        <div class="flex items-center gap-2">
+                            <div class="relative flex-1">
+                                <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+                                <input type="text" id="tdnSearchInput" autocomplete="off"
+                                       value="@(selectedTd != null ? selectedTd.TaxDeclarationNumber : "")"
+                                       placeholder="Search by TD No., PIN, or Owner Name..."
+                                       class="w-full h-[42px] box-border pl-10 pr-4 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600 transition-colors" />
+                            </div>
+                            <button type="button" id="clearTdnBtn" title="Clear selected TDN" class="h-[42px] px-3.5 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-300 text-xs font-mono font-bold hover:bg-slate-200 dark:hover:bg-stone-700 transition-colors cursor-pointer">
+                                Clear
+                            </button>
+                        </div>
+                        <div id="tdnDropdown" class="hidden absolute z-30 mt-1.5 w-full max-h-64 overflow-y-auto rounded-2xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-700 shadow-xl divide-y divide-slate-100 dark:divide-stone-800"></div>
+                    </div>
+                </div>
+
+                <div class="space-y-1.5">
+                    <label for="TagType" class="block text-[11px] leading-4 font-mono font-bold uppercase tracking-wider text-slate-600 dark:text-stone-300">
+                        2. Tagging Type <span class="text-rose-500">*</span>
+                    </label>
+                    <select name="TagType" id="TagType" class="w-full h-[42px] box-border px-4 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600 cursor-pointer transition-colors">
+                        <option value="1">Mortgage</option>
+                        <option value="2">Bailbond</option>
+                        <option value="3">Release</option>
+                        <option value="4">Cancellation</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Selected Property Details Snapshot (Always structured, updates on TDN pick) -->
+            <div id="selectedTdEmpty" class="@(selectedTd != null ? "hidden" : "") p-4 rounded-2xl border border-dashed border-slate-200 dark:border-stone-800 bg-slate-50/50 dark:bg-stone-950/40 text-xs font-mono text-slate-400 dark:text-stone-500 flex items-center gap-2.5">
+                <i data-lucide="info" class="w-4 h-4 text-slate-400 shrink-0"></i>
+                <span>Search and select a TDN above to view the property Owner and PIN details.</span>
+            </div>
+
+            <div id="selectedTdDetails" class="@(selectedTd != null ? "" : "hidden") p-4 sm:p-5 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs font-mono">
+                <div>
+                    <span class="block text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-400 mb-0.5">Selected TDN</span>
+                    <span id="detailTdn" class="font-extrabold text-slate-900 dark:text-white">@(selectedTd?.TaxDeclarationNumber ?? "—")</span>
+                </div>
+                <div>
+                    <span class="block text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-400 mb-0.5">Owner Name</span>
+                    <span id="detailOwner" class="font-extrabold text-slate-900 dark:text-white">@(selectedTd?.OwnerName ?? "—")</span>
+                </div>
+                <div>
+                    <span class="block text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-400 mb-0.5">Property Index No. (PIN)</span>
+                    <span id="detailPin" class="font-extrabold text-slate-900 dark:text-white">@(selectedTd?.PropertyIndexNumber ?? "—")</span>
+                </div>
+                <div>
+                    <span class="block text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-400 mb-0.5">Kind &amp; Status</span>
+                    <span id="detailKindStatus" class="font-bold text-slate-700 dark:text-stone-300">@(selectedTd != null ? $"{selectedTd.Kind} • {selectedTd.Status}" : "—")</span>
+                </div>
+            </div>
+
+            <!-- Cancellation Notice Banner -->
+            <div id="cancellationWarning" class="hidden p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/60 text-rose-800 dark:text-rose-300 text-xs font-mono flex items-center gap-2.5">
+                <i data-lucide="alert-triangle" class="w-4 h-4 shrink-0"></i>
+                <span>Saving a <strong>Cancellation</strong> tag will also update the selected Tax Declaration status to <strong>Cancelled &amp; Superseded</strong>.</span>
+            </div>
+
+            <!-- Step 3: Dynamic Fields per Tagging Type -->
+            <div class="pt-4 border-t border-slate-100 dark:border-stone-800 space-y-4">
+                <div class="text-[11px] font-mono font-bold uppercase tracking-wider text-slate-500 dark:text-stone-400">
+                    3. Tagging Details
+                </div>
+
+                <!-- Mortgage & Bailbond Fields -->
+                <div id="sectionMortgageBailbond" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                        <label id="partyLabel" for="PartyName" class="block text-[11px] font-mono font-bold uppercase text-slate-600 dark:text-stone-400 mb-1.5">
+                            Is Mortgage To <span class="text-rose-500">*</span>
+                        </label>
+                        <input type="text" name="PartyName" id="PartyName" placeholder="Enter bank, institution, or party..."
+                               class="w-full h-[42px] px-4 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-xs font-mono font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600" />
+                    </div>
+                    <div>
+                        <label for="MbAmount" class="block text-[11px] font-mono font-bold uppercase text-slate-600 dark:text-stone-400 mb-1.5">
+                            Amount <span class="text-rose-500">*</span>
+                        </label>
+                        <div class="relative">
+                            <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-mono font-bold text-slate-400">₱</span>
+                            <input type="number" step="0.01" min="0" name="Amount" id="MbAmount" placeholder="0.00"
+                                   class="w-full h-[42px] pl-8 pr-4 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-xs font-mono font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600" />
+                        </div>
+                    </div>
+                    <div>
+                        <label for="MbDate" class="block text-[11px] font-mono font-bold uppercase text-slate-600 dark:text-stone-400 mb-1.5">
+                            Date <span class="text-rose-500">*</span>
+                        </label>
+                        <input type="date" name="TagDate" id="MbDate" value="@DateTime.Now.ToString("yyyy-MM-dd")"
+                               class="w-full h-[42px] px-4 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-xs font-mono font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600" />
+                    </div>
+                </div>
+
+                <!-- Release Fields -->
+                <div id="sectionRelease" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div>
+                        <label for="RelDate" class="block text-[11px] font-mono font-bold uppercase text-slate-600 dark:text-stone-400 mb-1.5">
+                            Date <span class="text-rose-500">*</span>
+                        </label>
+                        <input type="date" id="RelDate" value="@DateTime.Now.ToString("yyyy-MM-dd")" disabled
+                               class="w-full h-[42px] px-4 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-xs font-mono font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600" />
+                    </div>
+                    <div>
+                        <label for="PerDocNo" class="block text-[11px] font-mono font-bold uppercase text-slate-600 dark:text-stone-400 mb-1.5">
+                            Per Doc No. <span class="text-rose-500">*</span>
+                        </label>
+                        <input type="text" name="PerDocNo" id="PerDocNo" placeholder="Document No." disabled
+                               class="w-full h-[42px] px-4 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-xs font-mono font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600" />
+                    </div>
+                    <div>
+                        <label for="PageNo" class="block text-[11px] font-mono font-bold uppercase text-slate-600 dark:text-stone-400 mb-1.5">
+                            Page No.
+                        </label>
+                        <input type="text" name="PageNo" id="PageNo" placeholder="Page No." disabled
+                               class="w-full h-[42px] px-4 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-xs font-mono font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600" />
+                    </div>
+                    <div>
+                        <label for="BookNo" class="block text-[11px] font-mono font-bold uppercase text-slate-600 dark:text-stone-400 mb-1.5">
+                            Book No.
+                        </label>
+                        <input type="text" name="BookNo" id="BookNo" placeholder="Book No." disabled
+                               class="w-full h-[42px] px-4 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-xs font-mono font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600" />
+                    </div>
+                    <div>
+                        <label for="SeriesOf" class="block text-[11px] font-mono font-bold uppercase text-slate-600 dark:text-stone-400 mb-1.5">
+                            Series Of
+                        </label>
+                        <input type="text" name="SeriesOf" id="SeriesOf" placeholder="e.g. 2026" disabled
+                               class="w-full h-[42px] px-4 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-xs font-mono font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600" />
+                    </div>
+                    <div>
+                        <label for="RelAmount" class="block text-[11px] font-mono font-bold uppercase text-slate-600 dark:text-stone-400 mb-1.5">
+                            Amount
+                        </label>
+                        <div class="relative">
+                            <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-mono font-bold text-slate-400">₱</span>
+                            <input type="number" step="0.01" min="0" id="RelAmount" placeholder="0.00" disabled
+                                   class="w-full h-[42px] pl-8 pr-4 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-xs font-mono font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600" />
+                        </div>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label for="PostedByUserId" class="block text-[11px] font-mono font-bold uppercase text-slate-600 dark:text-stone-400 mb-1.5">
+                            Posted By <span class="text-rose-500">*</span>
+                        </label>
+                        <select name="PostedByUserId" id="PostedByUserId" disabled
+                                class="w-full h-[42px] px-4 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-xs font-mono font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600 cursor-pointer">
+                            <option value="">-- Select User --</option>
+                            @foreach (var u in users)
+                            {
+                                <option value="@u.Id">@u.FullName (@u.Username)</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Cancellation Fields -->
+                <div id="sectionCancellation" class="hidden grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="sm:col-span-2">
+                        <label for="ReasonForCancellation" class="block text-[11px] font-mono font-bold uppercase text-slate-600 dark:text-stone-400 mb-1.5">
+                            Reason for Cancellation <span class="text-rose-500">*</span>
+                        </label>
+                        <input type="text" name="ReasonForCancellation" id="ReasonForCancellation" placeholder="Enter reason for cancellation..." disabled
+                               class="w-full h-[42px] px-4 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-xs font-mono font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600" />
+                    </div>
+                    <div>
+                        <label for="DateCancelled" class="block text-[11px] font-mono font-bold uppercase text-slate-600 dark:text-stone-400 mb-1.5">
+                            Date Cancelled <span class="text-rose-500">*</span>
+                        </label>
+                        <input type="date" name="DateCancelled" id="DateCancelled" value="@DateTime.Now.ToString("yyyy-MM-dd")" disabled
+                               class="w-full h-[42px] px-4 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-xs font-mono font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end pt-2">
+                <button type="submit" class="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white font-bold text-xs font-mono flex items-center gap-2 shadow-md shadow-emerald-600/20 transition-all cursor-pointer">
+                    <i data-lucide="save" class="w-4 h-4"></i>
+                    <span>Save Property Tagging</span>
+                </button>
+            </div>
+        </div>
+    </form>
+
+    <!-- Filter & Records Table Card -->
+    <div class="bg-white dark:bg-stone-900 rounded-3xl border border-slate-200 dark:border-stone-800 shadow-sm overflow-hidden">
+        <div class="p-4 sm:p-6 border-b border-slate-200 dark:border-stone-800 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div class="flex items-center gap-2.5">
+                <i data-lucide="list-checks" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                <h2 class="text-sm font-mono font-extrabold uppercase tracking-wider text-slate-800 dark:text-white">Tagged Property Records (@totalCount)</h2>
+            </div>
+            <form method="get" asp-action="Tagging" class="flex flex-wrap items-center gap-2.5 text-xs font-mono">
+                <div class="relative flex-1 min-w-[200px]">
+                    <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                    <input type="text" name="search" value="@search" placeholder="Search TDN, Owner, Doc No..."
+                           class="w-full h-[38px] pl-9 pr-3 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600" />
+                </div>
+                <select name="filterType" class="h-[38px] px-3 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white cursor-pointer">
+                    <option value="">All Types</option>
+                    <option value="@((int)PropertyTagType.Mortgage)" selected="@(filterType == PropertyTagType.Mortgage ? "selected" : null)">Mortgage</option>
+                    <option value="@((int)PropertyTagType.Bailbond)" selected="@(filterType == PropertyTagType.Bailbond ? "selected" : null)">Bailbond</option>
+                    <option value="@((int)PropertyTagType.Release)" selected="@(filterType == PropertyTagType.Release ? "selected" : null)">Release</option>
+                    <option value="@((int)PropertyTagType.Cancellation)" selected="@(filterType == PropertyTagType.Cancellation ? "selected" : null)">Cancellation</option>
+                </select>
+                <button type="submit" class="h-[38px] px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition-colors cursor-pointer">Filter</button>
+            </form>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs font-mono">
+                <thead class="bg-slate-100 dark:bg-stone-950 text-slate-600 dark:text-stone-400 border-b border-slate-200 dark:border-stone-800 font-bold">
+                    <tr>
+                        <th class="px-4 py-3.5">TDN &amp; PIN</th>
+                        <th class="px-4 py-3.5">OWNER</th>
+                        <th class="px-4 py-3.5 text-center">TAG TYPE</th>
+                        <th class="px-4 py-3.5">DETAILS</th>
+                        <th class="px-4 py-3.5 text-right">AMOUNT</th>
+                        <th class="px-4 py-3.5">DATE</th>
+                        <th class="px-4 py-3.5 text-center">ACTION</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-stone-800/60">
+                    @if (!Model.Any())
+                    {
+                        <tr>
+                            <td colspan="7" class="px-4 py-12 text-center text-slate-400 dark:text-stone-500">
+                                No property tagging records found.
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var item in Model)
+                        {
+                            var badgeClass = item.TagType switch
+                            {
+                                PropertyTagType.Mortgage => "bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300 border-amber-300 dark:border-amber-500/40",
+                                PropertyTagType.Bailbond => "bg-indigo-100 text-indigo-800 dark:bg-indigo-500/20 dark:text-indigo-300 border-indigo-300 dark:border-indigo-500/40",
+                                PropertyTagType.Release => "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 border-emerald-300 dark:border-emerald-500/40",
+                                _ => "bg-rose-100 text-rose-800 dark:bg-rose-500/20 dark:text-rose-300 border-rose-300 dark:border-rose-500/40"
+                            };
+                            <tr class="hover:bg-slate-50/80 dark:hover:bg-stone-800/50 transition-colors">
+                                <td class="px-4 py-3.5">
+                                    <div class="font-bold text-slate-900 dark:text-white">@item.TaxDeclarationNumber</div>
+                                    <div class="text-[10px] text-slate-400 dark:text-stone-500">@item.PropertyIndexNumber</div>
+                                </td>
+                                <td class="px-4 py-3.5 font-semibold text-slate-800 dark:text-stone-200">@item.OwnerName</td>
+                                <td class="px-4 py-3.5 text-center">
+                                    <span class="px-2.5 py-1 rounded-lg border text-[10px] font-bold uppercase @badgeClass">@item.TagType</span>
+                                </td>
+                                <td class="px-4 py-3.5 text-slate-700 dark:text-stone-300">
+                                    @if (item.TagType == PropertyTagType.Mortgage)
+                                    {
+                                        <span><strong class="text-slate-500 dark:text-stone-400">Is Mortgage To:</strong> @item.PartyName</span>
+                                    }
+                                    else if (item.TagType == PropertyTagType.Bailbond)
+                                    {
+                                        <span><strong class="text-slate-500 dark:text-stone-400">Is Bailbond To:</strong> @item.PartyName</span>
+                                    }
+                                    else if (item.TagType == PropertyTagType.Release)
+                                    {
+                                        <div><strong>Doc:</strong> @item.PerDocNo &bull; <strong>Page:</strong> @(item.PageNo ?? "—") &bull; <strong>Book:</strong> @(item.BookNo ?? "—") &bull; <strong>Series:</strong> @(item.SeriesOf ?? "—")</div>
+                                        <div class="text-[10px] text-slate-500 dark:text-stone-400"><strong>Posted By:</strong> @(item.PostedByName ?? "—")</div>
+                                    }
+                                    else
+                                    {
+                                        <span><strong class="text-slate-500 dark:text-stone-400">Reason:</strong> @item.ReasonForCancellation</span>
+                                    }
+                                </td>
+                                <td class="px-4 py-3.5 text-right font-bold text-slate-900 dark:text-white">
+                                    @(item.Amount.HasValue ? $"₱{item.Amount.Value:N2}" : "—")
+                                </td>
+                                <td class="px-4 py-3.5 text-slate-600 dark:text-stone-300">
+                                    @((item.TagType == PropertyTagType.Cancellation ? item.DateCancelled : item.TagDate)?.ToString("MMM dd, yyyy") ?? "—")
+                                </td>
+                                <td class="px-4 py-3.5 text-center">
+                                    <form asp-action="DeleteTagging" asp-route-id="@item.Id" method="post" onsubmit="return confirm('Delete this tagging record?');">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 text-[10px] font-bold transition-colors cursor-pointer">
+                                            <i data-lucide="trash-2" class="w-3 h-3"></i>
+                                            <span>Delete</span>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination Footer -->
+        <div class="p-4 sm:p-6 pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-200 dark:border-stone-800 text-xs font-mono">
+            <div class="text-slate-500 dark:text-stone-400 text-center sm:text-left">
+                Showing <span class="font-bold text-slate-900 dark:text-white">@showingStart</span> to
+                <span class="font-bold text-slate-900 dark:text-white">@showingEnd</span> of
+                <span class="font-bold text-slate-900 dark:text-white">@totalCount</span> entries
+            </div>
+            @if (totalPages > 1)
+            {
+                <div class="flex items-center gap-1.5 flex-wrap justify-center">
+                    @if (currentPage > 1)
+                    {
+                        <a asp-action="Tagging" asp-route-search="@search" asp-route-filterType="@((int?)filterType)" asp-route-page="@(currentPage - 1)" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-800 font-bold">Prev</a>
+                    }
+                    @for (int i = 1; i <= totalPages; i++)
+                    {
+                        if (i == currentPage)
+                        {
+                            <span class="px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold shadow-xs">@i</span>
+                        }
+                        else
+                        {
+                            <a asp-action="Tagging" asp-route-search="@search" asp-route-filterType="@((int?)filterType)" asp-route-page="@i" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-800 font-bold">@i</a>
+                        }
+                    }
+                    @if (currentPage < totalPages)
+                    {
+                        <a asp-action="Tagging" asp-route-search="@search" asp-route-filterType="@((int?)filterType)" asp-route-page="@(currentPage + 1)" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-800 font-bold">Next</a>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const tdnInput = document.getElementById('tdnSearchInput');
+            const tdIdInput = document.getElementById('TaxDeclarationId');
+            const dropdown = document.getElementById('tdnDropdown');
+            const emptyBox = document.getElementById('selectedTdEmpty');
+            const detailsBox = document.getElementById('selectedTdDetails');
+            const detailTdn = document.getElementById('detailTdn');
+            const detailOwner = document.getElementById('detailOwner');
+            const detailPin = document.getElementById('detailPin');
+            const detailKindStatus = document.getElementById('detailKindStatus');
+            const clearBtn = document.getElementById('clearTdnBtn');
+
+            let searchTimer = null;
+
+            async function fetchTdns(q) {
+                const res = await fetch(`/Assessment/SearchTdnsForTagging?q=${encodeURIComponent(q || '')}`);
+                if (!res.ok) return;
+                const items = await res.json();
+                if (!items.length) {
+                    dropdown.innerHTML = '<div class="px-4 py-3 text-xs font-mono text-slate-400">No matching TDN found.</div>';
+                    dropdown.classList.remove('hidden');
+                    return;
+                }
+                dropdown.innerHTML = items.map(item => `
+                    <button type="button" class="w-full text-left px-4 py-2.5 hover:bg-emerald-50 dark:hover:bg-stone-800 flex items-center justify-between gap-3 text-xs font-mono transition-colors cursor-pointer"
+                            data-id="${item.id}" data-tdn="${escapeHtml(item.tdn)}" data-owner="${escapeHtml(item.ownerName)}"
+                            data-pin="${escapeHtml(item.pin)}" data-kind="${escapeHtml(item.kind)}" data-status="${escapeHtml(item.status)}">
+                        <div>
+                            <div class="font-bold text-slate-900 dark:text-white">${escapeHtml(item.tdn)}</div>
+                            <div class="text-[11px] text-slate-500">${escapeHtml(item.ownerName)} • PIN: ${escapeHtml(item.pin)}</div>
+                        </div>
+                        <span class="px-2 py-0.5 rounded bg-slate-100 dark:bg-stone-800 text-[10px] font-bold text-slate-600 dark:text-stone-300 shrink-0">${escapeHtml(item.kind)} • ${escapeHtml(item.status)}</span>
+                    </button>
+                `).join('');
+                dropdown.classList.remove('hidden');
+            }
+
+            function escapeHtml(str) {
+                return (str || '').replace(/[&<>"']/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s]));
+            }
+
+            tdnInput.addEventListener('focus', () => fetchTdns(tdnInput.value));
+            tdnInput.addEventListener('input', () => {
+                clearTimeout(searchTimer);
+                searchTimer = setTimeout(() => fetchTdns(tdnInput.value), 200);
+            });
+
+            dropdown.addEventListener('click', (e) => {
+                const btn = e.target.closest('button[data-id]');
+                if (!btn) return;
+                tdIdInput.value = btn.dataset.id;
+                tdnInput.value = btn.dataset.tdn;
+                detailTdn.textContent = btn.dataset.tdn;
+                detailOwner.textContent = btn.dataset.owner;
+                detailPin.textContent = btn.dataset.pin || '—';
+                detailKindStatus.textContent = `${btn.dataset.kind} • ${btn.dataset.status}`;
+                emptyBox.classList.add('hidden');
+                detailsBox.classList.remove('hidden');
+                dropdown.classList.add('hidden');
+            });
+
+            clearBtn.addEventListener('click', () => {
+                tdIdInput.value = '';
+                tdnInput.value = '';
+                detailsBox.classList.add('hidden');
+                emptyBox.classList.remove('hidden');
+                tdnInput.focus();
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!dropdown.contains(e.target) && e.target !== tdnInput) {
+                    dropdown.classList.add('hidden');
+                }
+            });
+
+            // Tag Type switching
+            const tagTypeSelect = document.getElementById('TagType');
+            const activeTypePill = document.getElementById('activeTypePill');
+            const cancelWarning = document.getElementById('cancellationWarning');
+            const secMb = document.getElementById('sectionMortgageBailbond');
+            const secRel = document.getElementById('sectionRelease');
+            const secCan = document.getElementById('sectionCancellation');
+            const partyLabel = document.getElementById('partyLabel');
+
+            const mbInputs = [document.getElementById('PartyName'), document.getElementById('MbAmount'), document.getElementById('MbDate')];
+            const relInputs = [document.getElementById('RelDate'), document.getElementById('PerDocNo'), document.getElementById('PageNo'), document.getElementById('BookNo'), document.getElementById('SeriesOf'), document.getElementById('RelAmount'), document.getElementById('PostedByUserId')];
+            const canInputs = [document.getElementById('ReasonForCancellation'), document.getElementById('DateCancelled')];
+
+            const pillStyles = {
+                1: { text: 'Mortgage', cls: 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/40' },
+                2: { text: 'Bailbond', cls: 'bg-indigo-100 text-indigo-800 border-indigo-300 dark:bg-indigo-500/20 dark:text-indigo-300 dark:border-indigo-500/40' },
+                3: { text: 'Release', cls: 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/40' },
+                4: { text: 'Cancellation', cls: 'bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-500/20 dark:text-rose-300 dark:border-rose-500/40' }
+            };
+
+            function setTagType(typeVal) {
+                const isMb = typeVal === 1 || typeVal === 2;
+                const isRel = typeVal === 3;
+                const isCan = typeVal === 4;
+
+                secMb.classList.toggle('hidden', !isMb);
+                secRel.classList.toggle('hidden', !isRel);
+                secCan.classList.toggle('hidden', !isCan);
+                cancelWarning.classList.toggle('hidden', !isCan);
+
+                mbInputs.forEach(el => el.disabled = !isMb);
+                relInputs.forEach(el => el.disabled = !isRel);
+                canInputs.forEach(el => el.disabled = !isCan);
+
+                document.getElementById('MbDate').name = isMb ? 'TagDate' : '';
+                document.getElementById('MbAmount').name = isMb ? 'Amount' : '';
+                document.getElementById('RelDate').name = isRel ? 'TagDate' : '';
+                document.getElementById('RelAmount').name = isRel ? 'Amount' : '';
+
+                if (typeVal === 1) {
+                    partyLabel.innerHTML = 'Is Mortgage To <span class="text-rose-500">*</span>';
+                } else if (typeVal === 2) {
+                    partyLabel.innerHTML = 'Is Bailbond To <span class="text-rose-500">*</span>';
+                }
+
+                const pill = pillStyles[typeVal] || pillStyles[1];
+                activeTypePill.textContent = pill.text;
+                activeTypePill.className = `px-3 py-1 rounded-lg border text-[11px] font-mono font-bold uppercase ${pill.cls}`;
+            }
+
+            tagTypeSelect.addEventListener('change', () => setTagType(parseInt(tagTypeSelect.value, 10) || 1));
+            setTagType(parseInt(tagTypeSelect.value, 10) || 1);
+
+            document.getElementById('taggingForm').addEventListener('submit', (e) => {
+                if (!tdIdInput.value) {
+                    e.preventDefault();
+                    alert('Please select a Tax Declaration Number (TDN) first.');
+                    tdnInput.focus();
+                }
+            });
+        })();
+    </script>
+}

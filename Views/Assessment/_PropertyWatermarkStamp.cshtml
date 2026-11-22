@@ -1,0 +1,48 @@
+@model PropertyAssessmentApp.Models.TaxDeclaration
+@using PropertyAssessmentApp.Models
+@{
+    var latestTagging = ViewBag.LatestTagging as PropertyTagging;
+    string? stampText = null;
+    string? stampSub = null;
+    string stampColor = "text-rose-600/20 dark:text-rose-400/20 border-rose-600/25 dark:border-rose-400/25";
+
+    if (Model.IsCancelledAndSuperseded || Model.Status == AssessmentStatus.Cancelled || latestTagging?.TagType == PropertyTagType.Cancellation)
+    {
+        stampText = "CANCELLED";
+        var dt = Model.DateCancelled ?? latestTagging?.DateCancelled;
+        stampSub = dt.HasValue ? $"DATE CANCELLED: {dt.Value:MMM dd, yyyy}" : "OFFICE OF THE CITY ASSESSOR";
+        stampColor = "text-rose-600/20 dark:text-rose-400/20 border-rose-600/25 dark:border-rose-400/25";
+    }
+    else if (latestTagging?.TagType == PropertyTagType.Mortgage)
+    {
+        stampText = "MORTGAGED";
+        stampSub = !string.IsNullOrWhiteSpace(latestTagging.PartyName)
+            ? $"TO: {latestTagging.PartyName.ToUpperInvariant()}"
+            : "OFFICE OF THE CITY ASSESSOR";
+        stampColor = "text-amber-600/25 dark:text-amber-400/20 border-amber-600/30 dark:border-amber-400/25";
+    }
+    else if (latestTagging?.TagType == PropertyTagType.Bailbond)
+    {
+        stampText = "BAILBOND";
+        stampSub = !string.IsNullOrWhiteSpace(latestTagging.PartyName)
+            ? $"TO: {latestTagging.PartyName.ToUpperInvariant()}"
+            : "OFFICE OF THE CITY ASSESSOR";
+        stampColor = "text-indigo-600/20 dark:text-indigo-400/20 border-indigo-600/25 dark:border-indigo-400/25";
+    }
+}
+
+@if (!string.IsNullOrEmpty(stampText))
+{
+    <div class="pointer-events-none select-none absolute inset-x-0 top-0 z-10 flex items-start justify-center pt-24 sm:pt-32 overflow-hidden">
+        <div class="-rotate-18 border-[6px] rounded-2xl p-1.5 @stampColor">
+            <div class="border-2 rounded-xl px-8 py-3 text-center @stampColor">
+                <div class="text-4xl sm:text-6xl font-black tracking-[0.22em] uppercase leading-none">
+                    @stampText
+                </div>
+                <div class="mt-1.5 text-[10px] sm:text-xs font-extrabold tracking-[0.18em] uppercase">
+                    @stampSub
+                </div>
+            </div>
+        </div>
+    </div>
+}

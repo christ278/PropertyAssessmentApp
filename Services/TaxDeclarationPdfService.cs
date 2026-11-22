@@ -1,4 +1,6 @@
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using PropertyAssessmentApp.Data;
 using PropertyAssessmentApp.Models;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
@@ -26,10 +28,68 @@ public interface ITaxDeclarationPdfService
 
 public class TaxDeclarationPdfService : ITaxDeclarationPdfService
 {
+    private readonly ApplicationDbContext _context;
+
+    public TaxDeclarationPdfService(ApplicationDbContext context)
+    {
+        _context = context;
+    }
+
     private static readonly JsonSerializerOptions _jsonOpts = new()
     {
         PropertyNameCaseInsensitive = true
     };
+
+    private (string? Text, string ColorHex) GetWatermark(TaxDeclaration td)
+    {
+        if (td.IsCancelledAndSuperseded || td.Status == AssessmentStatus.Cancelled)
+        {
+            return ("CANCELLED", "#26DC2626");
+        }
+
+        if (td.Id != Guid.Empty)
+        {
+            var latestTag = _context.PropertyTaggings
+                .AsNoTracking()
+                .Where(t => t.TaxDeclarationId == td.Id)
+                .OrderByDescending(t => t.CreatedDate)
+                .Select(t => (PropertyTagType?)t.TagType)
+                .FirstOrDefault();
+
+            if (latestTag == PropertyTagType.Mortgage)
+                return ("MORTGAGED", "#26D97706");
+            if (latestTag == PropertyTagType.Bailbond)
+                return ("BAILBOND", "#264F46E5");
+            if (latestTag == PropertyTagType.Cancellation)
+                return ("CANCELLED", "#26DC2626");
+        }
+
+        return (null, "#26DC2626");
+    }
+
+    private void ApplyWatermark(PageDescriptor page, TaxDeclaration td)
+    {
+        var (text, colorHex) = GetWatermark(td);
+        if (!string.IsNullOrEmpty(text))
+        {
+            page.Background()
+                .AlignCenter()
+                .AlignMiddle()
+                .Rotate(-25)
+                .Border(4)
+                .BorderColor(colorHex)
+                .Padding(4)
+                .Border(1.5f)
+                .BorderColor(colorHex)
+                .PaddingHorizontal(24)
+                .PaddingVertical(10)
+                .Column(col =>
+                {
+                    col.Item().AlignCenter().Text(text).FontSize(54).ExtraBold().LetterSpacing(0.12f).FontColor(colorHex);
+                    col.Item().AlignCenter().Text("OFFICE OF THE CITY ASSESSOR • KORONADAL CITY").FontSize(10).Bold().LetterSpacing(0.1f).FontColor(colorHex);
+                });
+        }
+    }
 
     public byte[] GenerateTaxDeclarationPdf(TaxDeclaration td)
     {
@@ -57,6 +117,7 @@ public class TaxDeclarationPdfService : ITaxDeclarationPdfService
                     page.PageColor(Colors.White);
                     page.DefaultTextStyle(x => x.FontSize(8.5f).FontColor(Colors.Grey.Darken4));
 
+                    ApplyWatermark(page, td);
                     page.Header().Element(c => ComposeCertificateHeader(c, td, trackingNo, transactionLabel));
                     page.Content().Element(c => ComposeCertificateContent(c, td));
                     page.Footer().Element(c => ComposeFooter(c, td));
@@ -82,6 +143,7 @@ public class TaxDeclarationPdfService : ITaxDeclarationPdfService
                 page.PageColor(Colors.White);
                 page.DefaultTextStyle(x => x.FontSize(8f).FontColor(Colors.Grey.Darken4));
 
+                ApplyWatermark(page, td);
                 if (td.Kind == PropertyKind.Land)
                 {
                     page.Header().Element(c => ComposeLandAnnexIeHeader(c, td));

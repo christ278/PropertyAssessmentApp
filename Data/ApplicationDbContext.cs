@@ -13,6 +13,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<UserAccount> UserAccounts { get; set; } = null!;
     public DbSet<Owner> TaxpayerOwners { get; set; } = null!;
     public DbSet<TaxDeclaration> TaxDeclarations { get; set; } = null!;
+    public DbSet<PropertyTagging> PropertyTaggings { get; set; } = null!;
     public DbSet<OrderPayment> OrderPayments { get; set; } = null!;
     public DbSet<TaxMappingRequest> TaxMappingRequests { get; set; } = null!;
     public DbSet<TaxDeclarationRequest> TaxDeclarationRequests { get; set; } = null!;

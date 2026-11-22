@@ -103,6 +103,18 @@ public class AssessmentController : Controller
         int totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)safeLimit));
         if (safePage > totalPages) safePage = totalPages;
 
+        var pageIds = records.Select(r => r.Id).ToList();
+        var taggingsByTd = pageIds.Count == 0
+            ? new Dictionary<Guid, PropertyTagging>()
+            : _context.PropertyTaggings
+                .AsNoTracking()
+                .Where(t => pageIds.Contains(t.TaxDeclarationId))
+                .OrderByDescending(t => t.CreatedDate)
+                .ToList()
+                .GroupBy(t => t.TaxDeclarationId)
+                .ToDictionary(g => g.Key, g => g.First());
+
+        ViewBag.PropertyTaggings = taggingsByTd;
         ViewBag.Limit = safeLimit;
         ViewBag.Page = safePage;
         ViewBag.TotalCount = totalCount;
@@ -119,6 +131,11 @@ public class AssessmentController : Controller
         {
             return NotFound();
         }
+        ViewBag.LatestTagging = _context.PropertyTaggings
+            .AsNoTracking()
+            .Where(t => t.TaxDeclarationId == record.Id)
+            .OrderByDescending(t => t.CreatedDate)
+            .FirstOrDefault();
         return View(record);
     }
 
@@ -130,6 +147,11 @@ public class AssessmentController : Controller
         {
             return NotFound();
         }
+        ViewBag.LatestTagging = _context.PropertyTaggings
+            .AsNoTracking()
+            .Where(t => t.TaxDeclarationId == record.Id)
+            .OrderByDescending(t => t.CreatedDate)
+            .FirstOrDefault();
         return View(record);
     }
 
@@ -312,6 +334,11 @@ public class AssessmentController : Controller
         ViewBag.IsStandaloneFaas = true;
         ViewBag.ReturnUrl = Url.Action(nameof(Index));
         ViewBag.PartitionItem = MapTaxDeclarationToPartitionItem(record);
+        ViewBag.LatestTagging = _context.PropertyTaggings
+            .AsNoTracking()
+            .Where(t => t.TaxDeclarationId == record.Id)
+            .OrderByDescending(t => t.CreatedDate)
+            .FirstOrDefault();
         return View(record);
     }
 
@@ -1321,6 +1348,204 @@ public class AssessmentController : Controller
         {
             return Json(new { success = false, message = $"Import failed: {ex.Message}" });
         }
+    }
+
+    // =========================================================================
+    // PROPERTY TAGGING (MORTGAGE / BAILBOND / RELEASE / CANCELLATION)
+    // =========================================================================
+
+    [HttpGet]
+    public async Task<IActionResult> Tagging(Guid? tdId = null, PropertyTagType? filterType = null, string? search = null, int page = 1)
+    {
+        int safePage = page < 1 ? 1 : page;
+        const int pageSize = 15;
+
+        ViewBag.Users = await _context.UserAccounts
+            .AsNoTracking()
+            .Where(u => u.IsActive)
+            .OrderBy(u => u.FullName)
+            .Select(u => new { u.Id, u.FullName, u.Username })
+            .ToListAsync();
+
+        if (tdId.HasValue && tdId.Value != Guid.Empty)
+        {
+            ViewBag.SelectedTd = await _context.TaxDeclarations
+                .AsNoTracking()
+                .Where(t => t.Id == tdId.Value)
+                .Select(t => new
+                {
+                    t.Id,
+                    t.TaxDeclarationNumber,
+                    t.PropertyIndexNumber,
+                    t.OwnerName,
+                    Kind = t.Kind.ToString(),
+                    t.DistrictOrBarangay,
+                    Status = t.Status.ToString()
+                })
+                .FirstOrDefaultAsync();
+        }
+
+        var query = _context.PropertyTaggings.AsNoTracking().AsQueryable();
+        if (filterType.HasValue)
+        {
+            query = query.Where(x => x.TagType == filterType.Value);
+        }
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(x =>
+                x.TaxDeclarationNumber.Contains(term) ||
+                (x.PropertyIndexNumber != null && x.PropertyIndexNumber.Contains(term)) ||
+                (x.OwnerName != null && x.OwnerName.Contains(term)) ||
+                (x.PartyName != null && x.PartyName.Contains(term)) ||
+                (x.PerDocNo != null && x.PerDocNo.Contains(term)));
+        }
+
+        int totalCount = await query.CountAsync();
+        int totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)pageSize));
+        if (safePage > totalPages) safePage = totalPages;
+
+        var records = await query
+            .OrderByDescending(x => x.CreatedDate)
+            .Skip((safePage - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        ViewBag.FilterType = filterType;
+        ViewBag.Search = search;
+        ViewBag.Page = safePage;
+        ViewBag.TotalCount = totalCount;
+        ViewBag.TotalPages = totalPages;
+
+        ViewBag.MortgageCount = await _context.PropertyTaggings.CountAsync(x => x.TagType == PropertyTagType.Mortgage);
+        ViewBag.BailbondCount = await _context.PropertyTaggings.CountAsync(x => x.TagType == PropertyTagType.Bailbond);
+        ViewBag.ReleaseCount = await _context.PropertyTaggings.CountAsync(x => x.TagType == PropertyTagType.Release);
+        ViewBag.CancellationCount = await _context.PropertyTaggings.CountAsync(x => x.TagType == PropertyTagType.Cancellation);
+
+        return View(records);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> SearchTdnsForTagging(string? q = null)
+    {
+        var query = _context.TaxDeclarations.AsNoTracking().AsQueryable();
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var term = q.Trim();
+            query = query.Where(t =>
+                t.TaxDeclarationNumber.Contains(term) ||
+                t.PropertyIndexNumber.Contains(term) ||
+                t.OwnerName.Contains(term));
+        }
+
+        var results = await query
+            .OrderByDescending(t => t.Status == AssessmentStatus.Active)
+            .ThenBy(t => t.TaxDeclarationNumber)
+            .Take(30)
+            .Select(t => new
+            {
+                id = t.Id,
+                tdn = t.TaxDeclarationNumber,
+                pin = t.PropertyIndexNumber,
+                ownerName = t.OwnerName,
+                kind = t.Kind.ToString(),
+                barangay = t.DistrictOrBarangay,
+                status = t.Status.ToString()
+            })
+            .ToListAsync();
+
+        return Json(results);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveTagging(PropertyTagging input)
+    {
+        var td = await _context.TaxDeclarations.FirstOrDefaultAsync(t => t.Id == input.TaxDeclarationId);
+        if (td == null)
+        {
+            TempData["ErrorMessage"] = "Please select a valid Tax Declaration Number (TDN).";
+            return RedirectToAction(nameof(Tagging));
+        }
+
+        string? validationError = input.TagType switch
+        {
+            PropertyTagType.Mortgage when string.IsNullOrWhiteSpace(input.PartyName) => "Is Mortgage To is required.",
+            PropertyTagType.Bailbond when string.IsNullOrWhiteSpace(input.PartyName) => "Is Bailbond To is required.",
+            PropertyTagType.Mortgage or PropertyTagType.Bailbond when !input.Amount.HasValue || input.Amount.Value <= 0 => "Amount must be greater than zero.",
+            PropertyTagType.Mortgage or PropertyTagType.Bailbond when !input.TagDate.HasValue => "Date is required.",
+            PropertyTagType.Release when !input.TagDate.HasValue => "Release Date is required.",
+            PropertyTagType.Release when string.IsNullOrWhiteSpace(input.PerDocNo) => "Per Doc No. is required.",
+            PropertyTagType.Release when !input.PostedByUserId.HasValue || input.PostedByUserId == Guid.Empty => "Posted By user is required.",
+            PropertyTagType.Cancellation when string.IsNullOrWhiteSpace(input.ReasonForCancellation) => "Reason for Cancellation is required.",
+            PropertyTagType.Cancellation when !input.DateCancelled.HasValue => "Date Cancelled is required.",
+            _ => null
+        };
+
+        if (validationError != null)
+        {
+            TempData["ErrorMessage"] = validationError;
+            return RedirectToAction(nameof(Tagging), new { tdId = td.Id });
+        }
+
+        string? postedByName = null;
+        if (input.TagType == PropertyTagType.Release && input.PostedByUserId.HasValue)
+        {
+            var user = await _context.UserAccounts.AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == input.PostedByUserId.Value);
+            postedByName = user?.FullName ?? user?.Username;
+        }
+
+        var entity = new PropertyTagging
+        {
+            Id = Guid.NewGuid(),
+            TaxDeclarationId = td.Id,
+            TaxDeclarationNumber = td.TaxDeclarationNumber,
+            PropertyIndexNumber = td.PropertyIndexNumber,
+            OwnerName = td.OwnerName,
+            TagType = input.TagType,
+            PartyName = (input.TagType is PropertyTagType.Mortgage or PropertyTagType.Bailbond) ? input.PartyName?.Trim() : null,
+            Amount = (input.TagType is PropertyTagType.Mortgage or PropertyTagType.Bailbond or PropertyTagType.Release) ? input.Amount : null,
+            TagDate = (input.TagType is PropertyTagType.Mortgage or PropertyTagType.Bailbond or PropertyTagType.Release) ? input.TagDate : null,
+            PerDocNo = input.TagType == PropertyTagType.Release ? input.PerDocNo?.Trim() : null,
+            PageNo = input.TagType == PropertyTagType.Release ? input.PageNo?.Trim() : null,
+            BookNo = input.TagType == PropertyTagType.Release ? input.BookNo?.Trim() : null,
+            SeriesOf = input.TagType == PropertyTagType.Release ? input.SeriesOf?.Trim() : null,
+            PostedByUserId = input.TagType == PropertyTagType.Release ? input.PostedByUserId : null,
+            PostedByName = input.TagType == PropertyTagType.Release ? postedByName : null,
+            ReasonForCancellation = input.TagType == PropertyTagType.Cancellation ? input.ReasonForCancellation?.Trim() : null,
+            DateCancelled = input.TagType == PropertyTagType.Cancellation ? input.DateCancelled : null,
+            CreatedBy = User.Identity?.Name ?? "System",
+            CreatedDate = DateTime.Now
+        };
+
+        if (input.TagType == PropertyTagType.Cancellation)
+        {
+            td.Status = AssessmentStatus.Cancelled;
+            td.IsCancelledAndSuperseded = true;
+            td.CancellationReason = entity.ReasonForCancellation;
+            td.DateCancelled = entity.DateCancelled;
+        }
+
+        _context.PropertyTaggings.Add(entity);
+        await _context.SaveChangesAsync();
+
+        TempData["SuccessMessage"] = $"{entity.TagType} tagging saved for TDN {td.TaxDeclarationNumber}.";
+        return RedirectToAction(nameof(Tagging));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteTagging(Guid id)
+    {
+        var item = await _context.PropertyTaggings.FirstOrDefaultAsync(x => x.Id == id);
+        if (item != null)
+        {
+            _context.PropertyTaggings.Remove(item);
+            await _context.SaveChangesAsync();
+            TempData["SuccessMessage"] = $"Tagging record for TDN {item.TaxDeclarationNumber} deleted.";
+        }
+        return RedirectToAction(nameof(Tagging));
     }
 }
 

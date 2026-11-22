@@ -1,0 +1,148 @@
+@model PropertyAssessmentApp.Models.TaxDeclaration
+@using System.Text.Json
+@using PropertyAssessmentApp.Models
+
+@{
+    string Dash(string? v) => string.IsNullOrWhiteSpace(v) ? "—" : v.Trim();
+    string DateFmt(DateTime? d) => d.HasValue ? d.Value.ToString("MMM dd, yyyy") : "—";
+    string Money(decimal v) => $"₱{v:N2}";
+
+    JsonElement? ParseArray(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return null;
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                return doc.RootElement.Clone();
+        }
+        catch { }
+        return null;
+    }
+
+    string PropStr(JsonElement el, params string[] keys)
+    {
+        foreach (var k in keys)
+        {
+            if (el.TryGetProperty(k, out var val))
+            {
+                if (val.ValueKind == JsonValueKind.String) return val.GetString() ?? "";
+                if (val.ValueKind == JsonValueKind.Number) return val.ToString();
+            }
+        }
+        return "";
+    }
+
+    var photoJsonArr = ParseArray(Model.PropertyImagesJson);
+    var dbImages = Model.PropertyImages?.OrderBy(i => i.SortOrder).ToList() ?? new List<TDNPropertyImage>();
+}
+
+<!-- Effectivity & Back Taxes -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="p-5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-3">
+        <h3 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
+            <i data-lucide="calendar" class="w-4 h-4"></i> Effectivity, Taxability &amp; Back Taxes
+        </h3>
+        <div class="grid grid-cols-2 gap-3">
+            <div><span class="text-[10px] text-slate-400 block">EFFECTIVITY OF ASSESSMENT</span><strong class="text-slate-900 dark:text-white">@Dash(Model.EffectivityQuarter) @Model.EffectivityYear</strong></div>
+            <div><span class="text-[10px] text-slate-400 block">TAXABILITY / BASIS</span><strong class="text-slate-900 dark:text-white">@Dash(Model.Taxability) / @Dash(Model.AssessmentBasis)</strong></div>
+            <div><span class="text-[10px] text-slate-400 block">BACK TAXES (FROM - TO)</span><strong class="text-slate-900 dark:text-white">@(Model.BackTaxesYearFrom?.ToString() ?? "—") - @(Model.BackTaxesYearTo?.ToString() ?? "—")</strong></div>
+            <div><span class="text-[10px] text-slate-400 block">ANNUAL TAX DUE</span><strong class="text-amber-700 dark:text-amber-400">@Money(Model.AnnualTaxDue)</strong></div>
+        </div>
+    </div>
+
+    <div class="p-5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-3">
+        <h3 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
+            <i data-lucide="history" class="w-4 h-4"></i> Records of Superseded Assessment
+        </h3>
+        <div class="grid grid-cols-2 gap-3">
+            <div><span class="text-[10px] text-slate-400 block">PREVIOUS TD NO.</span><strong class="text-slate-900 dark:text-white">@Dash(Model.PreviousTdNo)</strong></div>
+            <div><span class="text-[10px] text-slate-400 block">PREVIOUS PIN</span><strong class="text-slate-900 dark:text-white">@Dash(Model.PreviousPin)</strong></div>
+            <div class="col-span-2"><span class="text-[10px] text-slate-400 block">PREVIOUS OWNER</span><strong class="text-slate-900 dark:text-white">@Dash(Model.PreviousOwner)</strong></div>
+            <div><span class="text-[10px] text-slate-400 block">PREVIOUS MARKET VALUE</span><strong class="text-slate-900 dark:text-white">@Money(Model.PreviousMarketValue)</strong></div>
+            <div><span class="text-[10px] text-slate-400 block">PREVIOUS ASSESSED VALUE</span><strong class="text-slate-900 dark:text-white">@Money(Model.PreviousAssessedValue)</strong></div>
+            <div class="col-span-2"><span class="text-[10px] text-slate-400 block">PREVIOUS EFFECTIVITY</span><strong class="text-slate-900 dark:text-white">@Dash(Model.PreviousEffectivity)</strong></div>
+        </div>
+    </div>
+</div>
+
+<!-- Memoranda & Signatories -->
+<div class="space-y-4">
+    <div class="p-4 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
+        <span class="text-[10px] text-slate-400 block mb-1">MEMORANDA</span>
+        <p class="text-slate-800 dark:text-stone-200 whitespace-pre-wrap">@Dash(Model.Memoranda)</p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
+            <span class="text-[10px] text-slate-400 block">APPRAISED BY</span>
+            <strong class="text-slate-900 dark:text-white block">@Dash(Model.AppraisedByName)</strong>
+            <span class="text-[11px] text-slate-500">Date: @DateFmt(Model.DateAppraised)</span>
+        </div>
+        <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
+            <span class="text-[10px] text-slate-400 block">ASSESSED BY</span>
+            <strong class="text-slate-900 dark:text-white block">@Dash(Model.AssessedByName)</strong>
+            <span class="text-[11px] text-slate-500">Date: @DateFmt(Model.DateAssessed)</span>
+        </div>
+        <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
+            <span class="text-[10px] text-slate-400 block">RECOMMENDING APPROVAL</span>
+            <strong class="text-slate-900 dark:text-white block">@Dash(Model.RecommendingApprovalName)</strong>
+            <span class="text-[11px] text-slate-500">Date: @DateFmt(Model.DateRecommended)</span>
+        </div>
+        <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
+            <span class="text-[10px] text-slate-400 block">APPROVED BY</span>
+            <strong class="text-slate-900 dark:text-white block">@Dash(Model.ApprovedByName)</strong>
+            <span class="text-[11px] text-slate-500">Date: @DateFmt(Model.DateApproved)</span>
+        </div>
+        <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
+            <span class="text-[10px] text-slate-400 block">ENTRY IN ASSESSMENT ROLL BY</span>
+            <strong class="text-slate-900 dark:text-white block">@Dash(Model.EntryInRollName) @(!string.IsNullOrWhiteSpace(Model.EntryInRollPosition) ? $"({Model.EntryInRollPosition})" : "")</strong>
+            <span class="text-[11px] text-slate-500">Date: @DateFmt(Model.EntryInRollDate)</span>
+        </div>
+        <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
+            <span class="text-[10px] text-slate-400 block">ENCODED BY</span>
+            <strong class="text-slate-900 dark:text-white block">@Dash(Model.EncodedByName)</strong>
+            <span class="text-[11px] text-slate-500">Date: @DateFmt(Model.DateEncoded)</span>
+        </div>
+    </div>
+</div>
+
+<!-- Field Inspection Photo Attachments -->
+<div class="space-y-3">
+    <h3 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
+        <i data-lucide="camera" class="w-4 h-4"></i> Field Inspection Photo Attachments
+    </h3>
+    @if (dbImages.Any())
+    {
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            @foreach (var img in dbImages)
+            {
+                <a href="@img.ImagePath" target="_blank" class="group relative aspect-square rounded-xl overflow-hidden border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-950 hover:border-emerald-600 transition-all">
+                    <img src="@img.ImagePath" alt="@img.OriginalFileName" class="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                    <div class="absolute inset-x-0 bottom-0 p-1.5 bg-slate-900/80 text-[10px] text-white truncate">@Dash(img.OriginalFileName)</div>
+                </a>
+            }
+        </div>
+    }
+    else if (photoJsonArr.HasValue && photoJsonArr.Value.GetArrayLength() > 0)
+    {
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            @foreach (var img in photoJsonArr.Value.EnumerateArray())
+            {
+                var url = PropStr(img, "fileUrl", "FileUrl", "imagePath", "ImagePath", "url");
+                var name = PropStr(img, "fileName", "FileName", "originalFileName", "OriginalFileName");
+                if (!string.IsNullOrWhiteSpace(url))
+                {
+                    <a href="@url" target="_blank" class="group relative aspect-square rounded-xl overflow-hidden border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-950 hover:border-emerald-600 transition-all">
+                        <img src="@url" alt="@name" class="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                        <div class="absolute inset-x-0 bottom-0 p-1.5 bg-slate-900/80 text-[10px] text-white truncate">@Dash(name)</div>
+                    </a>
+                }
+            }
+        </div>
+    }
+    else
+    {
+        <p class="text-slate-400 italic">No inspection photos uploaded.</p>
+    }
+</div>

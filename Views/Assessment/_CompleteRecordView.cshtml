@@ -160,72 +160,108 @@
         </button>
     </div>
 
-    <!-- TAB 1: FULL ENCODED DETAILS -->
-    <div id="tabEncodedDetails" class="space-y-6">
+    <!-- TAB 1: FULL ENCODED DETAILS (FORM-MIRRORED TABS PER KIND) -->
+    <div id="tabEncodedDetails" class="relative overflow-hidden bg-white dark:bg-stone-900 rounded-3xl border border-slate-200 dark:border-stone-800 shadow-sm p-6 space-y-6">
+        <partial name="_PropertyWatermarkStamp" model="Model" />
 
-        <!-- 1. Property Identification & Location -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-4">
-                <h2 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
-                    <i data-lucide="hash" class="w-4 h-4"></i> Property Identification &amp; Title Reference
-                </h2>
-                <div class="grid grid-cols-2 gap-3">
-                    <div><span class="text-[10px] text-slate-400 block">TDN NO.</span><strong class="text-slate-900 dark:text-white">@Dash(Model.TaxDeclarationNumber)</strong></div>
-                    <div><span class="text-[10px] text-slate-400 block">PROPERTY INDEX NO. (PIN)</span><strong class="text-slate-900 dark:text-white">@Dash(Model.PropertyIndexNumber)</strong></div>
-                    <div><span class="text-[10px] text-slate-400 block">ARP NO.</span><strong class="text-slate-900 dark:text-white">@Dash(Model.ARPNo)</strong></div>
-                    <div><span class="text-[10px] text-slate-400 block">CLASSIFICATION / ACTUAL USE</span><strong class="text-slate-900 dark:text-white">@Model.Classification / @Dash(Model.ActualUse)</strong></div>
-                    <div><span class="text-[10px] text-slate-400 block">TITLE / OCT / TCT NO.</span><strong class="text-slate-900 dark:text-white">@Dash(Model.TitleNo)</strong></div>
-                    <div><span class="text-[10px] text-slate-400 block">DATE REGISTERED</span><strong class="text-slate-900 dark:text-white">@DateFmt(Model.DateRegistered)</strong></div>
-                    <div><span class="text-[10px] text-slate-400 block">SURVEY NO. / CADASTRAL</span><strong class="text-slate-900 dark:text-white">@Dash(Model.SurveyNo) / @Dash(Model.CadastralSurveyNo)</strong></div>
-                    <div><span class="text-[10px] text-slate-400 block">LOT NO. / BLOCK NO.</span><strong class="text-slate-900 dark:text-white">@Dash(Model.LotNo) / @Dash(Model.BlockNo)</strong></div>
-                </div>
-            </div>
-
-            <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-4">
-                <h2 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
-                    <i data-lucide="map-pin" class="w-4 h-4"></i> Owner &amp; Property Location
-                </h2>
-                <div class="grid grid-cols-2 gap-3">
-                    <div class="col-span-2">
-                        <span class="text-[10px] text-slate-400 block">REGISTERED OWNER / DECLARANT (@roleBadge.ToUpper())</span>
-                        @if (string.IsNullOrWhiteSpace(Model.OwnerName) || Model.OwnerName.Trim().Equals("UNKNOWN OWNER", StringComparison.OrdinalIgnoreCase))
-                        {
-                            <span class="inline-flex items-center gap-1.5 mt-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
-                                <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i>
-                                Flagged: No Owner Recorded
-                            </span>
-                        }
-                        else
-                        {
-                            <strong class="text-slate-900 dark:text-white text-sm">@Dash(Model.OwnerName)</strong>
-                        }
-                    </div>
-                    <div><span class="text-[10px] text-slate-400 block">OWNER TIN</span><strong class="text-slate-900 dark:text-white">@Dash(Model.OwnerTin)</strong></div>
-                    <div><span class="text-[10px] text-slate-400 block">CONTACT / EMAIL</span><strong class="text-slate-900 dark:text-white">@Dash(Model.OwnerPhone) / @Dash(Model.OwnerEmail)</strong></div>
-                    <div class="col-span-2"><span class="text-[10px] text-slate-400 block">OWNER MAILING ADDRESS</span><strong class="text-slate-900 dark:text-white">@Dash(Model.OwnerAddress)</strong></div>
-                    <div><span class="text-[10px] text-slate-400 block">NO. / STREET</span><strong class="text-slate-900 dark:text-white">@Dash(Model.StreetNo)</strong></div>
-                    <div><span class="text-[10px] text-slate-400 block">BARANGAY</span><strong class="text-slate-900 dark:text-white">@Dash(Model.DistrictOrBarangay)</strong></div>
-                    <div><span class="text-[10px] text-slate-400 block">MUNICIPALITY / CITY</span><strong class="text-slate-900 dark:text-white">@Dash(Model.Municipality)</strong></div>
-                    <div><span class="text-[10px] text-slate-400 block">PROVINCE</span><strong class="text-slate-900 dark:text-white">@Dash(Model.ProvinceCity)</strong></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 2. Kind-Specific Encoded Details -->
         @if (Model.Kind == PropertyKind.Land)
         {
             var landRows = ParseArray(Model.LandAppraisalDetailsJson);
             var impRows = ParseArray(Model.LandImprovementsJson);
-            <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-5">
-                <h2 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
-                    <i data-lucide="map" class="w-4 h-4"></i> Land Appraisal, Improvements &amp; Boundaries
-                </h2>
 
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <div><span class="text-[10px] text-slate-400 block">NORTH BOUNDARY</span><strong class="text-slate-900 dark:text-white">@Dash(Model.BoundaryNorth)</strong></div>
-                    <div><span class="text-[10px] text-slate-400 block">EAST BOUNDARY</span><strong class="text-slate-900 dark:text-white">@Dash(Model.BoundaryEast)</strong></div>
-                    <div><span class="text-[10px] text-slate-400 block">SOUTH BOUNDARY</span><strong class="text-slate-900 dark:text-white">@Dash(Model.BoundarySouth)</strong></div>
-                    <div><span class="text-[10px] text-slate-400 block">WEST BOUNDARY</span><strong class="text-slate-900 dark:text-white">@Dash(Model.BoundaryWest)</strong></div>
+            <!-- Land Tab Bar (Matches Create/Edit Land Form) -->
+            <div class="flex items-center gap-2 overflow-x-auto border-b border-slate-200 dark:border-stone-800 pb-3 no-print">
+                <button type="button" onclick="switchViewTab('view-tab-1')" id="btn-view-tab-1" class="view-tab-btn px-4 py-2.5 rounded-xl text-xs font-bold transition-all bg-emerald-600 text-white shadow-sm flex items-center gap-2 shrink-0 cursor-pointer">
+                    <i data-lucide="hash" class="w-3.5 h-3.5"></i> 1. Cadastral &amp; Title Registration
+                </button>
+                <button type="button" onclick="switchViewTab('view-tab-2')" id="btn-view-tab-2" class="view-tab-btn px-4 py-2.5 rounded-xl text-xs font-bold transition-all bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-400 border border-slate-200 dark:border-stone-700 hover:bg-slate-200 dark:hover:bg-stone-700 flex items-center gap-2 shrink-0 cursor-pointer">
+                    <i data-lucide="map-pin" class="w-3.5 h-3.5"></i> 2. Location &amp; Boundaries
+                </button>
+                <button type="button" onclick="switchViewTab('view-tab-3')" id="btn-view-tab-3" class="view-tab-btn px-4 py-2.5 rounded-xl text-xs font-bold transition-all bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-400 border border-slate-200 dark:border-stone-700 hover:bg-slate-200 dark:hover:bg-stone-700 flex items-center gap-2 shrink-0 cursor-pointer">
+                    <i data-lucide="user" class="w-3.5 h-3.5"></i> 3. Owner &amp; Demographics
+                </button>
+                <button type="button" onclick="switchViewTab('view-tab-4')" id="btn-view-tab-4" class="view-tab-btn px-4 py-2.5 rounded-xl text-xs font-bold transition-all bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-400 border border-slate-200 dark:border-stone-700 hover:bg-slate-200 dark:hover:bg-stone-700 flex items-center gap-2 shrink-0 cursor-pointer">
+                    <i data-lucide="calculator" class="w-3.5 h-3.5"></i> 4. Valuation &amp; 4 Schedules
+                </button>
+                <button type="button" onclick="switchViewTab('view-tab-5')" id="btn-view-tab-5" class="view-tab-btn px-4 py-2.5 rounded-xl text-xs font-bold transition-all bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-400 border border-slate-200 dark:border-stone-700 hover:bg-slate-200 dark:hover:bg-stone-700 flex items-center gap-2 shrink-0 cursor-pointer">
+                    <i data-lucide="file-check" class="w-3.5 h-3.5"></i> 5. Effectivity, Notes &amp; Photos
+                </button>
+            </div>
+
+            <!-- LAND TAB 1: Cadastral & Title Registration -->
+            <div id="view-tab-1" class="view-tab-content space-y-5">
+                <h2 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
+                    <i data-lucide="hash" class="w-4 h-4"></i> Cadastral &amp; Title Registration
+                </h2>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div><span class="text-[10px] text-slate-400 block">TDN NO.</span><strong class="text-slate-900 dark:text-white">@Dash(Model.TaxDeclarationNumber)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">ARP NO.</span><strong class="text-slate-900 dark:text-white">@Dash(Model.ARPNo)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">PROPERTY INDEX NO. (PIN)</span><strong class="text-slate-900 dark:text-white">@Dash(Model.PropertyIndexNumber)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">TRANSACTION CODE</span><strong class="text-slate-900 dark:text-white">@Dash(Model.TransactionCode)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">TITLE / OCT / TCT NO.</span><strong class="text-slate-900 dark:text-white">@Dash(Model.TitleNo)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">DATE REGISTERED</span><strong class="text-slate-900 dark:text-white">@DateFmt(Model.DateRegistered)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">SURVEY NO. / CADASTRAL</span><strong class="text-slate-900 dark:text-white">@Dash(Model.SurveyNo) / @Dash(Model.CadastralSurveyNo)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">LOT NO. / BLOCK NO.</span><strong class="text-slate-900 dark:text-white">@Dash(Model.LotNo) / @Dash(Model.BlockNo)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">SECTION NO. / PARCEL NO.</span><strong class="text-slate-900 dark:text-white">@Dash(Model.SectionNo) / @Dash(Model.ParcelNo)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">TAXABILITY / BASIS</span><strong class="text-slate-900 dark:text-white">@Dash(Model.Taxability) / @Dash(Model.AssessmentBasis)</strong></div>
+                </div>
+            </div>
+
+            <!-- LAND TAB 2: Location & Boundaries -->
+            <div id="view-tab-2" class="view-tab-content space-y-5 hidden">
+                <h2 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
+                    <i data-lucide="map-pin" class="w-4 h-4"></i> Property Location &amp; Boundaries
+                </h2>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div><span class="text-[10px] text-slate-400 block">NO. / STREET</span><strong class="text-slate-900 dark:text-white">@Dash(Model.StreetNo)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">PUROK / ZONE</span><strong class="text-slate-900 dark:text-white">@Dash(Model.Purok)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">BARANGAY</span><strong class="text-slate-900 dark:text-white">@Dash(Model.DistrictOrBarangay)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">CITY / MUNICIPALITY</span><strong class="text-slate-900 dark:text-white">@Dash(Model.Municipality)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">PROVINCE</span><strong class="text-slate-900 dark:text-white">@Dash(Model.ProvinceCity)</strong></div>
+                </div>
+                <div class="p-4 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                    <div><span class="text-[10px] text-slate-400 block">NORTH BOUNDARY</span><strong class="text-slate-900 dark:text-white">@Dash(Model.BoundaryNorth)</strong><span class="block text-[10px] text-slate-500">@Dash(Model.Nremarks)</span></div>
+                    <div><span class="text-[10px] text-slate-400 block">EAST BOUNDARY</span><strong class="text-slate-900 dark:text-white">@Dash(Model.BoundaryEast)</strong><span class="block text-[10px] text-slate-500">@Dash(Model.Eremarks)</span></div>
+                    <div><span class="text-[10px] text-slate-400 block">SOUTH BOUNDARY</span><strong class="text-slate-900 dark:text-white">@Dash(Model.BoundarySouth)</strong><span class="block text-[10px] text-slate-500">@Dash(Model.Sremarks)</span></div>
+                    <div><span class="text-[10px] text-slate-400 block">WEST BOUNDARY</span><strong class="text-slate-900 dark:text-white">@Dash(Model.BoundaryWest)</strong><span class="block text-[10px] text-slate-500">@Dash(Model.Wremarks)</span></div>
+                </div>
+            </div>
+
+            <!-- LAND TAB 3: Owner & Demographics -->
+            <div id="view-tab-3" class="view-tab-content space-y-5 hidden">
+                <h2 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
+                    <i data-lucide="user" class="w-4 h-4"></i> Owner &amp; Administrator Demographics
+                </h2>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="col-span-2"><span class="text-[10px] text-slate-400 block">REGISTERED OWNER (@roleBadge.ToUpper())</span><strong class="text-slate-900 dark:text-white text-sm">@Dash(Model.OwnerName)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">OWNER TIN</span><strong class="text-slate-900 dark:text-white">@Dash(Model.OwnerTin)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">SEX / CIVIL STATUS</span><strong class="text-slate-900 dark:text-white">@Dash(Model.OwnerSex) / @Dash(Model.OwnerCivilStatus)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">CONTACT NO.</span><strong class="text-slate-900 dark:text-white">@Dash(Model.OwnerPhone)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">EMAIL</span><strong class="text-slate-900 dark:text-white">@Dash(Model.OwnerEmail)</strong></div>
+                    <div class="col-span-2"><span class="text-[10px] text-slate-400 block">OWNER MAILING ADDRESS</span><strong class="text-slate-900 dark:text-white">@Dash(Model.OwnerAddress)</strong></div>
+                </div>
+                <div class="p-4 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="col-span-2"><span class="text-[10px] text-slate-400 block">ADMINISTRATOR / BENEFICIAL USER</span><strong class="text-slate-900 dark:text-white">@Dash(Model.AdministratorName ?? Model.AdminPossessorName)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">ADMIN TIN</span><strong class="text-slate-900 dark:text-white">@Dash(Model.AdministratorTin ?? Model.AdminPossessorTin)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">ADMIN CONTACT</span><strong class="text-slate-900 dark:text-white">@Dash(Model.AdministratorContactNo ?? Model.AdminPossessorPhone)</strong></div>
+                    <div class="col-span-4"><span class="text-[10px] text-slate-400 block">ADMIN ADDRESS</span><strong class="text-slate-900 dark:text-white">@Dash(Model.AdministratorAddress ?? Model.AdminPossessorAddress)</strong></div>
+                </div>
+            </div>
+
+            <!-- LAND TAB 4: Valuation & 4 Schedules -->
+            <div id="view-tab-4" class="view-tab-content space-y-5 hidden">
+                <h2 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
+                    <i data-lucide="calculator" class="w-4 h-4"></i> Land Appraisal, Improvements &amp; Assessment Roll
+                </h2>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div><span class="text-[10px] text-slate-400 block">CLASSIFICATION</span><strong class="text-slate-900 dark:text-white">@Model.Classification</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">SUB-CLASS / ACTUAL USE</span><strong class="text-slate-900 dark:text-white">@Dash(Model.SubClassification) / @Dash(Model.ActualUse)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">TOTAL AREA (SQM)</span><strong class="text-slate-900 dark:text-white">@Model.AreaSqMeters.ToString("N2") sqm</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">UNIT VALUE</span><strong class="text-slate-900 dark:text-white">@Money(Model.UnitValue)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">MARKET VALUE</span><strong class="text-slate-900 dark:text-white">@Money(Model.MarketValue)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">ADJUSTED MARKET VALUE</span><strong class="text-slate-900 dark:text-white">@Money(Model.AdjustedMarketValue)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">ASSESSMENT LEVEL</span><strong class="text-slate-900 dark:text-white">@Model.AssessmentLevelPercent.ToString("0.##")%</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">ASSESSED VALUE</span><strong class="text-emerald-700 dark:text-emerald-400">@Money(Model.AssessedValue)</strong></div>
                 </div>
 
                 @if (landRows.HasValue && landRows.Value.GetArrayLength() > 0)
@@ -249,10 +285,7 @@
                                     var rowUnitStr = PropStr(row, "areaUnit", "AreaUnit");
                                     var rowUnit = PropDec(row, "unitValue", "UnitValue");
                                     var rowMv = PropDec(row, "baseMarketValue", "BaseMarketValue", "marketValue", "MarketValue");
-                                    if (rowMv <= 0 && rowArea > 0 && rowUnit > 0)
-                                    {
-                                        rowMv = Math.Round(rowArea * rowUnit, 2);
-                                    }
+                                    if (rowMv <= 0 && rowArea > 0 && rowUnit > 0) { rowMv = Math.Round(rowArea * rowUnit, 2); }
                                     <tr>
                                         <td class="px-3 py-2 font-bold">@Dash(PropStr(row, "classificationName", "ClassificationName", "classification", "Classification"))</td>
                                         <td class="px-3 py-2">@Dash(PropStr(row, "subClassName", "SubClassName", "subClass", "SubClass"))</td>
@@ -262,10 +295,7 @@
                                                 <span>@rowHas.ToString("0.####") has.</span>
                                                 <span class="block text-[10px] text-slate-400">(@rowArea.ToString("N2") sqm)</span>
                                             }
-                                            else
-                                            {
-                                                @rowArea.ToString("N2")
-                                            }
+                                            else { @rowArea.ToString("N2") }
                                         </td>
                                         <td class="px-3 py-2 text-right">@Money(rowUnit)</td>
                                         <td class="px-3 py-2 text-right font-bold">@Money(rowMv)</td>
@@ -322,10 +352,7 @@
                                     var impQty = PropDec(row, "qty", "Qty", "quantity", "Quantity");
                                     var impUnit = PropDec(row, "unitValue", "UnitValue");
                                     var impMv = PropDec(row, "baseMarketValue", "BaseMarketValue", "marketValue", "MarketValue");
-                                    if (impMv <= 0 && impQty > 0 && impUnit > 0)
-                                    {
-                                        impMv = Math.Round(impQty * impUnit, 2);
-                                    }
+                                    if (impMv <= 0 && impQty > 0 && impUnit > 0) { impMv = Math.Round(impQty * impUnit, 2); }
                                     <tr>
                                         <td class="px-3 py-2 font-bold">@Dash(PropStr(row, "typeDescription", "TypeDescription", "productClass", "ProductClass", "kind", "Kind"))</td>
                                         <td class="px-3 py-2 text-right">@impQty.ToString("N0")</td>
@@ -364,6 +391,11 @@
                     </div>
                 }
             </div>
+
+            <!-- LAND TAB 5: Effectivity, Notes & Photos -->
+            <div id="view-tab-5" class="view-tab-content space-y-6 hidden">
+                @await Html.PartialAsync("_ViewEffectivitySignatoriesPhotos", Model)
+            </div>
         }
         else if (Model.Kind == PropertyKind.Building)
         {
@@ -371,32 +403,69 @@
             var addlRows = ParseArray(Model.BuildingAdditionalItemsJson);
             var bldg = Model.BuildingDetails;
             var totalRcn = bldg != null && bldg.ReplacementCostNew > 0 ? bldg.ReplacementCostNew : (Model.BaseRcnValue + Model.BuildingTotalAdditionsValue);
-            <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-6">
+
+            <!-- Building Tab Bar (Matches Create/Edit Building Form) -->
+            <div class="flex items-center gap-2 overflow-x-auto border-b border-slate-200 dark:border-stone-800 pb-3 no-print">
+                <button type="button" onclick="switchViewTab('view-tab-1')" id="btn-view-tab-1" class="view-tab-btn px-4 py-2.5 rounded-xl text-xs font-bold transition-all bg-emerald-600 text-white shadow-sm flex items-center gap-2 shrink-0 cursor-pointer">
+                    <i data-lucide="building-2" class="w-3.5 h-3.5"></i> 1. Property Info, Taxpayer &amp; CCT
+                </button>
+                <button type="button" onclick="switchViewTab('view-tab-2')" id="btn-view-tab-2" class="view-tab-btn px-4 py-2.5 rounded-xl text-xs font-bold transition-all bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-400 border border-slate-200 dark:border-stone-700 hover:bg-slate-200 dark:hover:bg-stone-700 flex items-center gap-2 shrink-0 cursor-pointer">
+                    <i data-lucide="layers" class="w-3.5 h-3.5"></i> 2. Structural &amp; 17 Materials
+                </button>
+                <button type="button" onclick="switchViewTab('view-tab-3')" id="btn-view-tab-3" class="view-tab-btn px-4 py-2.5 rounded-xl text-xs font-bold transition-all bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-400 border border-slate-200 dark:border-stone-700 hover:bg-slate-200 dark:hover:bg-stone-700 flex items-center gap-2 shrink-0 cursor-pointer">
+                    <i data-lucide="calculator" class="w-3.5 h-3.5"></i> 3. Floors, Additions &amp; Valuation
+                </button>
+                <button type="button" onclick="switchViewTab('view-tab-4')" id="btn-view-tab-4" class="view-tab-btn px-4 py-2.5 rounded-xl text-xs font-bold transition-all bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-400 border border-slate-200 dark:border-stone-700 hover:bg-slate-200 dark:hover:bg-stone-700 flex items-center gap-2 shrink-0 cursor-pointer">
+                    <i data-lucide="file-check" class="w-3.5 h-3.5"></i> 4. Effectivity, Notes &amp; Photos
+                </button>
+            </div>
+
+            <!-- BUILDING TAB 1: Property Info, Taxpayer & CCT -->
+            <div id="view-tab-1" class="view-tab-content space-y-5">
                 <h2 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
-                    <i data-lucide="building-2" class="w-4 h-4"></i> Building Specifications, Land Reference &amp; 17 Structural Materials
+                    <i data-lucide="building-2" class="w-4 h-4"></i> Property Information, Taxpayer, Location &amp; Land Reference
                 </h2>
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <div><span class="text-[10px] text-slate-400 block">PROPERTY TYPE (ACCORDING TO USE)</span><strong class="text-slate-900 dark:text-white">@Dash(bldg?.BuildingUseType) @(!string.IsNullOrWhiteSpace(bldg?.OtherBuildingUseType) ? $"({bldg.OtherBuildingUseType})" : "")</strong></div>
-                    <div><span class="text-[10px] text-slate-400 block">BUILDING CLASSIFICATION</span><strong class="text-slate-900 dark:text-white">@Dash(Model.BuildingClassification)</strong></div>
-                    <div><span class="text-[10px] text-slate-400 block">STRUCTURAL TYPE</span><strong class="text-slate-900 dark:text-white">@Dash(Model.StructuralType)</strong></div>
-                    <div><span class="text-[10px] text-slate-400 block">STOREYS / TOTAL FLOOR AREA</span><strong class="text-slate-900 dark:text-white">@Model.NoOfStoreys storey(s) / @Model.TotalBuildingAreaSqm.ToString("N2") sqm</strong></div>
-                    <div><span class="text-[10px] text-slate-400 block">BUILDING PERMIT NO.</span><strong class="text-slate-900 dark:text-white">@Dash(Model.BuildingPermitNo)</strong></div>
-                    <div><span class="text-[10px] text-slate-400 block">OCCUPANCY PERMIT NO.</span><strong class="text-slate-900 dark:text-white">@Dash(Model.OccupancyPermitNo)</strong></div>
-                    <div><span class="text-[10px] text-slate-400 block">BUILDING AGE</span><strong class="text-slate-900 dark:text-white">@Model.BuildingAgeYears yr(s)</strong></div>
-                    <div><span class="text-[10px] text-slate-400 block">DATE CONSTRUCTED / COMPLETED / OCCUPIED</span><strong class="text-slate-900 dark:text-white">@DateFmt(Model.DateConstructed) / @DateFmt(Model.DateCompleted) / @DateFmt(Model.DateOccupied)</strong></div>
-                    @if (Model.IsCct)
-                    {
-                        <div><span class="text-[10px] text-slate-400 block">CCT TITLE NO.</span><strong class="text-slate-900 dark:text-white">@Dash(Model.CctTitleNo)</strong></div>
-                        <div><span class="text-[10px] text-slate-400 block">CCT DATE REGISTERED</span><strong class="text-slate-900 dark:text-white">@DateFmt(Model.CctDateRegistered)</strong></div>
-                        <div class="col-span-2"><span class="text-[10px] text-slate-400 block">OWNER REFLECTED IN CCT</span><strong class="text-slate-900 dark:text-white">@Dash(Model.OwnerNameReflectedInCct)</strong></div>
-                    }
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div><span class="text-[10px] text-slate-400 block">TDN NO.</span><strong class="text-slate-900 dark:text-white">@Dash(Model.TaxDeclarationNumber)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">ARP NO.</span><strong class="text-slate-900 dark:text-white">@Dash(Model.ARPNo)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">PROPERTY INDEX NO. (PIN)</span><strong class="text-slate-900 dark:text-white">@Dash(Model.PropertyIndexNumber)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">TRANSACTION CODE</span><strong class="text-slate-900 dark:text-white">@Dash(Model.TransactionCode)</strong></div>
+                    <div class="col-span-2"><span class="text-[10px] text-slate-400 block">REGISTERED OWNER (@roleBadge.ToUpper())</span><strong class="text-slate-900 dark:text-white">@Dash(Model.OwnerName)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">OWNER TIN</span><strong class="text-slate-900 dark:text-white">@Dash(Model.OwnerTin)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">CONTACT / EMAIL</span><strong class="text-slate-900 dark:text-white">@Dash(Model.OwnerPhone) / @Dash(Model.OwnerEmail)</strong></div>
+                    <div class="col-span-2"><span class="text-[10px] text-slate-400 block">OWNER ADDRESS</span><strong class="text-slate-900 dark:text-white">@Dash(Model.OwnerAddress)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">BARANGAY / STREET</span><strong class="text-slate-900 dark:text-white">@Dash(Model.DistrictOrBarangay) / @Dash(Model.StreetNo)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">CITY / PROVINCE</span><strong class="text-slate-900 dark:text-white">@Dash(Model.Municipality), @Dash(Model.ProvinceCity)</strong></div>
                     <div><span class="text-[10px] text-slate-400 block">LAND OWNER REFERENCE</span><strong class="text-slate-900 dark:text-white">@Dash(Model.LandOwnerName)</strong></div>
                     <div><span class="text-[10px] text-slate-400 block">LAND TDN / PIN</span><strong class="text-slate-900 dark:text-white">@Dash(Model.LandTdNo) / @Dash(Model.LandPin)</strong></div>
                     <div><span class="text-[10px] text-slate-400 block">LAND TITLE / SURVEY NO.</span><strong class="text-slate-900 dark:text-white">@Dash(bldg?.LandTitleNo) / @Dash(bldg?.LandSurveyNo)</strong></div>
                     <div><span class="text-[10px] text-slate-400 block">LAND LOT / BLOCK / AREA</span><strong class="text-slate-900 dark:text-white">@Dash(bldg?.LandLotNo) / @Dash(bldg?.LandBlockNo) / @(bldg?.LandAreaSqm > 0 ? $"{bldg.LandAreaSqm:N2} sqm" : "—")</strong></div>
                 </div>
+                @if (Model.IsCct)
+                {
+                    <div class="p-4 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div><span class="text-[10px] text-slate-400 block">CCT TITLE NO.</span><strong class="text-slate-900 dark:text-white">@Dash(Model.CctTitleNo)</strong></div>
+                        <div><span class="text-[10px] text-slate-400 block">CCT DATE REGISTERED</span><strong class="text-slate-900 dark:text-white">@DateFmt(Model.CctDateRegistered)</strong></div>
+                        <div class="col-span-2"><span class="text-[10px] text-slate-400 block">OWNER REFLECTED IN CCT</span><strong class="text-slate-900 dark:text-white">@Dash(Model.OwnerNameReflectedInCct)</strong></div>
+                    </div>
+                }
+            </div>
 
-                <!-- 17 Structural Materials -->
+            <!-- BUILDING TAB 2: Structural Characteristics & 17 Materials -->
+            <div id="view-tab-2" class="view-tab-content space-y-5 hidden">
+                <h2 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
+                    <i data-lucide="layers" class="w-4 h-4"></i> Structural Characteristics &amp; 17 Materials
+                </h2>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div><span class="text-[10px] text-slate-400 block">PROPERTY TYPE (USE)</span><strong class="text-slate-900 dark:text-white">@Dash(bldg?.BuildingUseType) @(!string.IsNullOrWhiteSpace(bldg?.OtherBuildingUseType) ? $"({bldg.OtherBuildingUseType})" : "")</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">BUILDING CLASSIFICATION</span><strong class="text-slate-900 dark:text-white">@Dash(Model.BuildingClassification)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">STRUCTURAL TYPE</span><strong class="text-slate-900 dark:text-white">@Dash(Model.StructuralType)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">STOREYS / FLOOR AREA</span><strong class="text-slate-900 dark:text-white">@Model.NoOfStoreys storey(s) / @Model.TotalBuildingAreaSqm.ToString("N2") sqm</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">BUILDING PERMIT NO.</span><strong class="text-slate-900 dark:text-white">@Dash(Model.BuildingPermitNo)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">OCCUPANCY PERMIT NO.</span><strong class="text-slate-900 dark:text-white">@Dash(Model.OccupancyPermitNo)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">BUILDING AGE</span><strong class="text-slate-900 dark:text-white">@Model.BuildingAgeYears yr(s)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">CONSTRUCTED / COMPLETED / OCCUPIED</span><strong class="text-slate-900 dark:text-white">@DateFmt(Model.DateConstructed) / @DateFmt(Model.DateCompleted) / @DateFmt(Model.DateOccupied)</strong></div>
+                </div>
                 <div class="p-4 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-3">
                     <div class="text-[11px] font-bold uppercase text-emerald-700 dark:text-emerald-400">17 Structural Materials</div>
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -419,8 +488,14 @@
                         <div><span class="text-[10px] text-slate-400 block">PLUMBING &amp; SEWER</span><strong class="text-slate-900 dark:text-white">@Dash(Model.PlumbingSewer)</strong></div>
                     </div>
                 </div>
+            </div>
 
-                <!-- Floor Levels & BUCC Rate Schedule -->
+            <!-- BUILDING TAB 3: Floor Levels, Additions & Valuation Matrix -->
+            <div id="view-tab-3" class="view-tab-content space-y-5 hidden">
+                <h2 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
+                    <i data-lucide="calculator" class="w-4 h-4"></i> Floor Levels, Additions &amp; Valuation Matrix
+                </h2>
+
                 <div class="space-y-2">
                     <div class="text-[11px] font-bold uppercase text-emerald-700 dark:text-emerald-400">Floor Levels &amp; BUCC Rate Schedule</div>
                     @if (floorRows.HasValue && floorRows.Value.GetArrayLength() > 0)
@@ -481,13 +556,9 @@
                             </table>
                         </div>
                     }
-                    else
-                    {
-                        <p class="text-slate-400 italic">No floor levels recorded.</p>
-                    }
+                    else { <p class="text-slate-400 italic">No floor levels recorded.</p> }
                 </div>
 
-                <!-- Additional Items & Improvements -->
                 <div class="space-y-2">
                     <div class="text-[11px] font-bold uppercase text-emerald-700 dark:text-emerald-400">Additional Items &amp; Improvements</div>
                     @if (addlRows.HasValue && addlRows.Value.GetArrayLength() > 0)
@@ -545,49 +616,78 @@
                             </table>
                         </div>
                     }
-                    else
-                    {
-                        <p class="text-slate-400 italic">No additional items or improvements recorded.</p>
-                    }
+                    else { <p class="text-slate-400 italic">No additional items recorded.</p> }
                 </div>
 
-                <!-- Depreciation & Final Assessed Value Roll -->
-                <div class="p-4 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 space-y-3">
-                    <div class="text-[11px] font-bold uppercase text-emerald-700 dark:text-emerald-400">Depreciation &amp; Final Assessed Value Roll</div>
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <div><span class="text-[10px] text-slate-400 block">BASE RCN</span><strong class="text-slate-900 dark:text-white">@Money(Model.BaseRcnValue)</strong></div>
-                        <div><span class="text-[10px] text-slate-400 block">TOTAL ADDITIONAL ITEMS</span><strong class="text-slate-900 dark:text-white">@Money(Model.BuildingTotalAdditionsValue)</strong></div>
-                        <div><span class="text-[10px] text-slate-400 block">TOTAL RCN (BASE + ADDITIONS)</span><strong class="text-slate-900 dark:text-white">@Money(totalRcn)</strong></div>
-                        <div><span class="text-[10px] text-slate-400 block">DEPRECIATION RATE (%)</span><strong class="text-rose-600 dark:text-rose-400">@Model.BuildingDepreciationPercent.ToString("0.##")%</strong></div>
-                        <div><span class="text-[10px] text-slate-400 block">ACCUMULATED DEPRECIATION</span><strong class="text-rose-600 dark:text-rose-400">@Money(Model.BuildingDepreciationAccumulated)</strong></div>
-                        <div><span class="text-[10px] text-slate-400 block">DEPRECIATED MARKET VALUE</span><strong class="text-slate-900 dark:text-white">@Money(Model.BuildingDepreciatedMarketValue > 0 ? Model.BuildingDepreciatedMarketValue : Model.MarketValue)</strong></div>
-                        <div><span class="text-[10px] text-slate-400 block">ASSESSMENT LEVEL (%)</span><strong class="text-slate-900 dark:text-white">@Model.AssessmentLevelPercent.ToString("0.##")%</strong></div>
-                        <div><span class="text-[10px] text-slate-400 block">FINAL ASSESSED VALUE</span><strong class="text-emerald-700 dark:text-emerald-400">@Money(Model.AssessedValue)</strong></div>
-                    </div>
+                <div class="p-4 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div><span class="text-[10px] text-slate-400 block">BASE RCN</span><strong class="text-slate-900 dark:text-white">@Money(Model.BaseRcnValue)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">TOTAL ADDITIONS</span><strong class="text-slate-900 dark:text-white">@Money(Model.BuildingTotalAdditionsValue)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">TOTAL RCN</span><strong class="text-slate-900 dark:text-white">@Money(totalRcn)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">DEPRECIATION (%)</span><strong class="text-rose-600 dark:text-rose-400">@Model.BuildingDepreciationPercent.ToString("0.##")% (@Money(Model.BuildingDepreciationAccumulated))</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">DEPRECIATED MARKET VALUE</span><strong class="text-slate-900 dark:text-white">@Money(Model.BuildingDepreciatedMarketValue > 0 ? Model.BuildingDepreciatedMarketValue : Model.MarketValue)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">ASSESSMENT LEVEL (%)</span><strong class="text-slate-900 dark:text-white">@Model.AssessmentLevelPercent.ToString("0.##")%</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">ASSESSED VALUE</span><strong class="text-emerald-700 dark:text-emerald-400">@Money(Model.AssessedValue)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">ANNUAL TAX DUE</span><strong class="text-amber-700 dark:text-amber-400">@Money(Model.AnnualTaxDue)</strong></div>
                 </div>
+            </div>
+
+            <!-- BUILDING TAB 4: Effectivity, Notes & Photos -->
+            <div id="view-tab-4" class="view-tab-content space-y-6 hidden">
+                @await Html.PartialAsync("_ViewEffectivitySignatoriesPhotos", Model)
             </div>
         }
         else if (Model.Kind == PropertyKind.Machinery)
         {
             var machRows = ParseArray(Model.MachineryAppraisalDetailsJson);
             var machRollRows = ParseArray(Model.MachineryPropertyAssessmentsJson);
-            <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-5">
+
+            <!-- Machinery Tab Bar (Matches Create/Edit Machinery Form) -->
+            <div class="flex items-center gap-2 overflow-x-auto border-b border-slate-200 dark:border-stone-800 pb-3 no-print">
+                <button type="button" onclick="switchViewTab('view-tab-1')" id="btn-view-tab-1" class="view-tab-btn px-4 py-2.5 rounded-xl text-xs font-bold transition-all bg-emerald-600 text-white shadow-sm flex items-center gap-2 shrink-0 cursor-pointer">
+                    <i data-lucide="cpu" class="w-3.5 h-3.5"></i> 1. Property Information, Owner &amp; Location
+                </button>
+                <button type="button" onclick="switchViewTab('view-tab-2')" id="btn-view-tab-2" class="view-tab-btn px-4 py-2.5 rounded-xl text-xs font-bold transition-all bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-400 border border-slate-200 dark:border-stone-700 hover:bg-slate-200 dark:hover:bg-stone-700 flex items-center gap-2 shrink-0 cursor-pointer">
+                    <i data-lucide="calculator" class="w-3.5 h-3.5"></i> 2. Property Appraisal &amp; Assessment Roll
+                </button>
+                <button type="button" onclick="switchViewTab('view-tab-3')" id="btn-view-tab-3" class="view-tab-btn px-4 py-2.5 rounded-xl text-xs font-bold transition-all bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-400 border border-slate-200 dark:border-stone-700 hover:bg-slate-200 dark:hover:bg-stone-700 flex items-center gap-2 shrink-0 cursor-pointer">
+                    <i data-lucide="file-check" class="w-3.5 h-3.5"></i> 3. Memoranda, Effectivity &amp; Photos
+                </button>
+            </div>
+
+            <!-- MACHINERY TAB 1: Property Info, Owner & Location -->
+            <div id="view-tab-1" class="view-tab-content space-y-5">
                 <h2 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
-                    <i data-lucide="cpu" class="w-4 h-4"></i> Machinery Registration, Land/Building Reference &amp; Appraisal Schedule
+                    <i data-lucide="cpu" class="w-4 h-4"></i> Machinery Registration, Owner, Location &amp; References
                 </h2>
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <div><span class="text-[10px] text-slate-400 block">MANUFACTURING ORIGIN</span><strong class="text-slate-900 dark:text-white">@(Model.IsLocallyManufactured ? "Local Manufacturer" : "Outside the Philippines (Imported)")</strong></div>
-                    <div><span class="text-[10px] text-slate-400 block">REGISTRATION NO. / DATE</span><strong class="text-slate-900 dark:text-white">@Dash(Model.MachineryRegNo) / @DateFmt(Model.MachineryDateRegistered ?? Model.DateRegistered)</strong></div>
-                    <div><span class="text-[10px] text-slate-400 block">IMPORTATION PERMIT / DATE</span><strong class="text-slate-900 dark:text-white">@Dash(Model.ImportationPermitNo) / @DateFmt(Model.ImportationDateIssued)</strong></div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div><span class="text-[10px] text-slate-400 block">TDN NO.</span><strong class="text-slate-900 dark:text-white">@Dash(Model.TaxDeclarationNumber)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">ARP NO.</span><strong class="text-slate-900 dark:text-white">@Dash(Model.ARPNo)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">PROPERTY INDEX NO. (PIN)</span><strong class="text-slate-900 dark:text-white">@Dash(Model.PropertyIndexNumber)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">TRANSACTION CODE</span><strong class="text-slate-900 dark:text-white">@Dash(Model.TransactionCode)</strong></div>
+                    <div class="col-span-2"><span class="text-[10px] text-slate-400 block">REGISTERED OWNER (@roleBadge.ToUpper())</span><strong class="text-slate-900 dark:text-white">@Dash(Model.OwnerName)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">OWNER TIN</span><strong class="text-slate-900 dark:text-white">@Dash(Model.OwnerTin)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">CONTACT / EMAIL</span><strong class="text-slate-900 dark:text-white">@Dash(Model.OwnerPhone) / @Dash(Model.OwnerEmail)</strong></div>
+                    <div class="col-span-2"><span class="text-[10px] text-slate-400 block">OWNER ADDRESS</span><strong class="text-slate-900 dark:text-white">@Dash(Model.OwnerAddress)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">BARANGAY / STREET</span><strong class="text-slate-900 dark:text-white">@Dash(Model.DistrictOrBarangay) / @Dash(Model.StreetNo)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">CITY / PROVINCE</span><strong class="text-slate-900 dark:text-white">@Dash(Model.Municipality), @Dash(Model.ProvinceCity)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">MANUFACTURING ORIGIN</span><strong class="text-slate-900 dark:text-white">@(Model.IsLocallyManufactured ? "Local Manufacturer" : "Imported")</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">REG. NO. / DATE</span><strong class="text-slate-900 dark:text-white">@Dash(Model.MachineryRegNo) / @DateFmt(Model.MachineryDateRegistered ?? Model.DateRegistered)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">IMPORT PERMIT / DATE</span><strong class="text-slate-900 dark:text-white">@Dash(Model.ImportationPermitNo) / @DateFmt(Model.ImportationDateIssued)</strong></div>
                     <div><span class="text-[10px] text-slate-400 block">COUNTRY OF ORIGIN</span><strong class="text-slate-900 dark:text-white">@Dash(Model.CountryOfOrigin)</strong></div>
                     <div><span class="text-[10px] text-slate-400 block">OR NO. / OR DATE</span><strong class="text-slate-900 dark:text-white">@Dash(Model.OrNo) / @DateFmt(Model.OrDate)</strong></div>
                     <div><span class="text-[10px] text-slate-400 block">ACQUISITION COST</span><strong class="text-slate-900 dark:text-white">@Money(Model.AcquisitionCost)</strong></div>
                     <div><span class="text-[10px] text-slate-400 block">SUPPLIER / SELLER</span><strong class="text-slate-900 dark:text-white">@Dash(Model.SupplierSeller)</strong></div>
                     <div><span class="text-[10px] text-slate-400 block">SUPPLIER ADDRESS</span><strong class="text-slate-900 dark:text-white">@Dash(Model.SupplierAddress)</strong></div>
-                    <div><span class="text-[10px] text-slate-400 block">LAND OWNER / TD NO. / PIN</span><strong class="text-slate-900 dark:text-white">@Dash(Model.LandOwnerName) (@Dash(Model.LandTdNo) / @Dash(Model.LandPin))</strong></div>
-                    <div><span class="text-[10px] text-slate-400 block">BUILDING OWNER / TD NO. / PIN</span><strong class="text-slate-900 dark:text-white">@Dash(Model.BuildingReferenceName) (@Dash(Model.BuildingTdNo) / @Dash(Model.BuildingPin))</strong></div>
+                    <div class="col-span-2"><span class="text-[10px] text-slate-400 block">LAND OWNER / TD NO. / PIN</span><strong class="text-slate-900 dark:text-white">@Dash(Model.LandOwnerName) (@Dash(Model.LandTdNo) / @Dash(Model.LandPin))</strong></div>
+                    <div class="col-span-2"><span class="text-[10px] text-slate-400 block">BUILDING OWNER / TD NO. / PIN</span><strong class="text-slate-900 dark:text-white">@Dash(Model.BuildingReferenceName) (@Dash(Model.BuildingTdNo) / @Dash(Model.BuildingPin))</strong></div>
                 </div>
+            </div>
 
+            <!-- MACHINERY TAB 2: Property Appraisal & Assessment Roll -->
+            <div id="view-tab-2" class="view-tab-content space-y-5 hidden">
+                <h2 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
+                    <i data-lucide="calculator" class="w-4 h-4"></i> Machinery Appraisal &amp; Assessment Roll
+                </h2>
                 @if (machRows.HasValue && machRows.Value.GetArrayLength() > 0)
                 {
                     <div class="overflow-x-auto rounded-2xl border border-slate-200 dark:border-stone-800">
@@ -616,7 +716,6 @@
                         </table>
                     </div>
                 }
-
                 @if (machRollRows.HasValue && machRollRows.Value.GetArrayLength() > 0)
                 {
                     <div class="overflow-x-auto rounded-2xl border border-slate-200 dark:border-stone-800">
@@ -643,130 +742,19 @@
                         </table>
                     </div>
                 }
+                <div class="p-4 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div><span class="text-[10px] text-slate-400 block">MARKET VALUE</span><strong class="text-slate-900 dark:text-white">@Money(Model.MarketValue)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">ASSESSMENT LEVEL (%)</span><strong class="text-slate-900 dark:text-white">@Model.AssessmentLevelPercent.ToString("0.##")%</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">ASSESSED VALUE</span><strong class="text-emerald-700 dark:text-emerald-400">@Money(Model.AssessedValue)</strong></div>
+                    <div><span class="text-[10px] text-slate-400 block">ANNUAL TAX DUE</span><strong class="text-amber-700 dark:text-amber-400">@Money(Model.AnnualTaxDue)</strong></div>
+                </div>
+            </div>
+
+            <!-- MACHINERY TAB 3: Memoranda, Effectivity & Photos -->
+            <div id="view-tab-3" class="view-tab-content space-y-6 hidden">
+                @await Html.PartialAsync("_ViewEffectivitySignatoriesPhotos", Model)
             </div>
         }
-
-        <!-- 3. Valuation, Effectivity & Records of Superseded Assessment -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-4">
-                <h2 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
-                    <i data-lucide="calculator" class="w-4 h-4"></i> Valuation, Taxability &amp; Effectivity
-                </h2>
-                <div class="grid grid-cols-2 gap-3">
-                    <div><span class="text-[10px] text-slate-400 block">MARKET VALUE</span><strong class="text-slate-900 dark:text-white">@Money(Model.MarketValue)</strong></div>
-                    <div><span class="text-[10px] text-slate-400 block">ADJUSTED MARKET VALUE</span><strong class="text-slate-900 dark:text-white">@Money(Model.AdjustedMarketValue)</strong></div>
-                    <div><span class="text-[10px] text-slate-400 block">ASSESSMENT LEVEL</span><strong class="text-slate-900 dark:text-white">@Model.AssessmentLevelPercent.ToString("0.##")%</strong></div>
-                    <div><span class="text-[10px] text-slate-400 block">ASSESSED VALUE</span><strong class="text-emerald-700 dark:text-emerald-400">@Money(Model.AssessedValue)</strong></div>
-                    <div><span class="text-[10px] text-slate-400 block">TAXABILITY / BASIS</span><strong class="text-slate-900 dark:text-white">@Dash(Model.Taxability) / @Dash(Model.AssessmentBasis)</strong></div>
-                    <div><span class="text-[10px] text-slate-400 block">EFFECTIVITY OF ASSESSMENT</span><strong class="text-slate-900 dark:text-white">@Dash(Model.EffectivityQuarter) @Model.EffectivityYear</strong></div>
-                    <div><span class="text-[10px] text-slate-400 block">BACK TAXES (FROM - TO)</span><strong class="text-slate-900 dark:text-white">@(Model.BackTaxesYearFrom?.ToString() ?? "—") - @(Model.BackTaxesYearTo?.ToString() ?? "—")</strong></div>
-                    <div><span class="text-[10px] text-slate-400 block">ANNUAL TAX DUE (BASIC + SEF)</span><strong class="text-amber-700 dark:text-amber-400">@Money(Model.AnnualTaxDue)</strong></div>
-                </div>
-            </div>
-
-            <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-4">
-                <h2 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
-                    <i data-lucide="history" class="w-4 h-4"></i> Records of Superseded Assessment
-                </h2>
-                <div class="grid grid-cols-2 gap-3">
-                    <div><span class="text-[10px] text-slate-400 block">PREVIOUS TD NO.</span><strong class="text-slate-900 dark:text-white">@Dash(Model.PreviousTdNo)</strong></div>
-                    <div><span class="text-[10px] text-slate-400 block">PREVIOUS PIN</span><strong class="text-slate-900 dark:text-white">@Dash(Model.PreviousPin)</strong></div>
-                    <div class="col-span-2"><span class="text-[10px] text-slate-400 block">PREVIOUS OWNER</span><strong class="text-slate-900 dark:text-white">@Dash(Model.PreviousOwner)</strong></div>
-                    <div><span class="text-[10px] text-slate-400 block">PREVIOUS MARKET VALUE</span><strong class="text-slate-900 dark:text-white">@Money(Model.PreviousMarketValue)</strong></div>
-                    <div><span class="text-[10px] text-slate-400 block">PREVIOUS ASSESSED VALUE</span><strong class="text-slate-900 dark:text-white">@Money(Model.PreviousAssessedValue)</strong></div>
-                    <div class="col-span-2"><span class="text-[10px] text-slate-400 block">EFFECTIVITY OF ASSESSMENT</span><strong class="text-slate-900 dark:text-white">@Dash(Model.PreviousEffectivity)</strong></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 4. Memoranda & Signatories -->
-        <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-5">
-            <h2 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
-                <i data-lucide="pen-tool" class="w-4 h-4"></i> Memoranda &amp; Signatories
-            </h2>
-
-            <div class="p-4 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
-                <span class="text-[10px] text-slate-400 block mb-1">MEMORANDA</span>
-                <p class="text-slate-800 dark:text-stone-200 whitespace-pre-wrap">@Dash(Model.Memoranda)</p>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
-                    <span class="text-[10px] text-slate-400 block">APPRAISED BY</span>
-                    <strong class="text-slate-900 dark:text-white block">@Dash(Model.AppraisedByName)</strong>
-                    <span class="text-[11px] text-slate-500">Date: @DateFmt(Model.DateAppraised)</span>
-                </div>
-                <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
-                    <span class="text-[10px] text-slate-400 block">ASSESSED BY</span>
-                    <strong class="text-slate-900 dark:text-white block">@Dash(Model.AssessedByName)</strong>
-                    <span class="text-[11px] text-slate-500">Date: @DateFmt(Model.DateAssessed)</span>
-                </div>
-                <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
-                    <span class="text-[10px] text-slate-400 block">RECOMMENDING APPROVAL</span>
-                    <strong class="text-slate-900 dark:text-white block">@Dash(Model.RecommendingApprovalName)</strong>
-                    <span class="text-[11px] text-slate-500">Date: @DateFmt(Model.DateRecommended)</span>
-                </div>
-                <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
-                    <span class="text-[10px] text-slate-400 block">APPROVED BY</span>
-                    <strong class="text-slate-900 dark:text-white block">@Dash(Model.ApprovedByName)</strong>
-                    <span class="text-[11px] text-slate-500">Date: @DateFmt(Model.DateApproved)</span>
-                </div>
-                <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
-                    <span class="text-[10px] text-slate-400 block">ENTRY IN ASSESSMENT ROLL BY</span>
-                    <strong class="text-slate-900 dark:text-white block">@Dash(Model.EntryInRollName) @(!string.IsNullOrWhiteSpace(Model.EntryInRollPosition) ? $"({Model.EntryInRollPosition})" : "")</strong>
-                    <span class="text-[11px] text-slate-500">Date: @DateFmt(Model.EntryInRollDate)</span>
-                </div>
-                <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800">
-                    <span class="text-[10px] text-slate-400 block">ENCODED BY</span>
-                    <strong class="text-slate-900 dark:text-white block">@Dash(Model.EncodedByName)</strong>
-                    <span class="text-[11px] text-slate-500">Date: @DateFmt(Model.DateEncoded)</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- 5. Field Inspection Photo Attachments -->
-        <div class="p-6 rounded-3xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 shadow-sm space-y-4">
-            <h2 class="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-2">
-                <i data-lucide="camera" class="w-4 h-4"></i> Field Inspection Photo Attachments
-            </h2>
-            @{
-                var photoJsonArr = ParseArray(Model.PropertyImagesJson);
-                var dbImages = Model.PropertyImages?.OrderBy(i => i.SortOrder).ToList() ?? new List<TDNPropertyImage>();
-            }
-            @if (dbImages.Any())
-            {
-                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                    @foreach (var img in dbImages)
-                    {
-                        <a href="@img.ImagePath" target="_blank" class="group relative aspect-square rounded-xl overflow-hidden border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-950 hover:border-emerald-600 transition-all">
-                            <img src="@img.ImagePath" alt="@img.OriginalFileName" class="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                            <div class="absolute inset-x-0 bottom-0 p-1.5 bg-slate-900/80 text-[10px] text-white truncate">@Dash(img.OriginalFileName)</div>
-                        </a>
-                    }
-                </div>
-            }
-            else if (photoJsonArr.HasValue && photoJsonArr.Value.GetArrayLength() > 0)
-            {
-                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                    @foreach (var img in photoJsonArr.Value.EnumerateArray())
-                    {
-                        var url = PropStr(img, "fileUrl", "FileUrl", "imagePath", "ImagePath", "url");
-                        var name = PropStr(img, "fileName", "FileName", "originalFileName", "OriginalFileName");
-                        if (!string.IsNullOrWhiteSpace(url))
-                        {
-                            <a href="@url" target="_blank" class="group relative aspect-square rounded-xl overflow-hidden border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-950 hover:border-emerald-600 transition-all">
-                                <img src="@url" alt="@name" class="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                                <div class="absolute inset-x-0 bottom-0 p-1.5 bg-slate-900/80 text-[10px] text-white truncate">@Dash(name)</div>
-                            </a>
-                        }
-                    }
-                </div>
-            }
-            else
-            {
-                <p class="text-slate-400 italic">No inspection photos uploaded.</p>
-            }
-        </div>
     </div>
 
     <!-- TAB 2: EMBEDDED QUESTPDF DOCUMENT VIEWER -->
@@ -806,5 +794,16 @@
             btnEnc.className = 'px-4 py-2.5 rounded-xl bg-emerald-600 text-white font-bold flex items-center gap-2 shadow-sm';
             btnPdf.className = 'px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-slate-700 dark:text-stone-300 font-bold flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-stone-800';
         }
+    }
+
+    function switchViewTab(tabId) {
+        document.querySelectorAll('.view-tab-content').forEach(el => el.classList.add('hidden'));
+        document.querySelectorAll('.view-tab-btn').forEach(btn => {
+            btn.className = 'view-tab-btn px-4 py-2.5 rounded-xl text-xs font-bold transition-all bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-400 border border-slate-200 dark:border-stone-700 hover:bg-slate-200 dark:hover:bg-stone-700 flex items-center gap-2 shrink-0 cursor-pointer';
+        });
+        const target = document.getElementById(tabId);
+        const btn = document.getElementById('btn-' + tabId);
+        if (target) target.classList.remove('hidden');
+        if (btn) btn.className = 'view-tab-btn px-4 py-2.5 rounded-xl text-xs font-bold transition-all bg-emerald-600 text-white shadow-sm flex items-center gap-2 shrink-0 cursor-pointer';
     }
 </script>

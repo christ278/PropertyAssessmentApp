@@ -13,6 +13,7 @@
     int totalPages = ViewBag.TotalPages is int tp ? tp : 1;
     int showingStart = totalCount == 0 ? 0 : ((currentPage - 1) * limit) + 1;
     int showingEnd = Math.Min(currentPage * limit, totalCount);
+    var taggingsByTd = ViewBag.PropertyTaggings as Dictionary<Guid, PropertyTagging> ?? new Dictionary<Guid, PropertyTagging>();
     bool canAccess = PermissionService.CanAccess(User, "Assessment");
     bool canPrintTd = PermissionService.CanAccess(User, "Assessment", "PrintPdf");
     bool canPrintTaxDec = PermissionService.CanAccess(User, "Assessment", "PrintTaxDeclaration");
@@ -222,31 +223,46 @@
                                     </span>
                                 </td>
                                 <td class="px-2 sm:px-4 py-3.5 text-center">
-                                    @if (item.IsCancelledAndSuperseded || item.Status == AssessmentStatus.Cancelled)
-                                    {
-                                        <span class="px-2.5 py-1 rounded-lg bg-rose-100 dark:bg-rose-500/20 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-500/40 text-[10px] font-bold uppercase" title="Cancelled &amp; Superseded by: @(item.SupersededByTdns ?? "New lot TDs")">Cancelled &amp; Superseded</span>
-                                    }
-                                    else
-                                    {
-                                        @switch (item.Status)
+                                    <div class="flex flex-col items-center gap-1">
+                                        @if (item.IsCancelledAndSuperseded || item.Status == AssessmentStatus.Cancelled)
                                         {
-                                            case AssessmentStatus.Active:
-                                                <span class="px-2.5 py-1 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/40 text-[10px] font-bold uppercase">Active</span>
-                                                break;
-                                            case AssessmentStatus.Pending:
-                                                <span class="px-2.5 py-1 rounded-lg bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-500/40 text-[10px] font-bold uppercase">Pending Approval</span>
-                                                break;
-                                            case AssessmentStatus.UnderReassessment:
-                                                <span class="px-2.5 py-1 rounded-lg bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40 text-[10px] font-bold uppercase">Re-assessing</span>
-                                                break;
-                                            case AssessmentStatus.PendingAppeal:
-                                                <span class="px-2.5 py-1 rounded-lg bg-rose-100 dark:bg-rose-500/20 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-500/40 text-[10px] font-bold uppercase">Pending Appeal</span>
-                                                break;
-                                            default:
-                                                <span class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-400 text-[10px] font-bold">@item.Status</span>
-                                                break;
+                                            <span class="px-2.5 py-1 rounded-lg bg-rose-100 dark:bg-rose-500/20 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-500/40 text-[10px] font-bold uppercase" title="Cancelled &amp; Superseded by: @(item.SupersededByTdns ?? "New lot TDs")">Cancelled &amp; Superseded</span>
                                         }
-                                    }
+                                        else
+                                        {
+                                            @switch (item.Status)
+                                            {
+                                                case AssessmentStatus.Active:
+                                                    <span class="px-2.5 py-1 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/40 text-[10px] font-bold uppercase">Active</span>
+                                                    break;
+                                                case AssessmentStatus.Pending:
+                                                    <span class="px-2.5 py-1 rounded-lg bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-500/40 text-[10px] font-bold uppercase">Pending Approval</span>
+                                                    break;
+                                                case AssessmentStatus.UnderReassessment:
+                                                    <span class="px-2.5 py-1 rounded-lg bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40 text-[10px] font-bold uppercase">Re-assessing</span>
+                                                    break;
+                                                case AssessmentStatus.PendingAppeal:
+                                                    <span class="px-2.5 py-1 rounded-lg bg-rose-100 dark:bg-rose-500/20 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-500/40 text-[10px] font-bold uppercase">Pending Appeal</span>
+                                                    break;
+                                                default:
+                                                    <span class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-400 text-[10px] font-bold">@item.Status</span>
+                                                    break;
+                                            }
+                                        }
+                                        @if (taggingsByTd.TryGetValue(item.Id, out var latestTag))
+                                        {
+                                            var (tagLabel, tagClasses, tagTitle) = latestTag.TagType switch
+                                            {
+                                                PropertyTagType.Mortgage => ("Mortgaged", "bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300 border-amber-300 dark:border-amber-500/40", $"Mortgaged to {latestTag.PartyName} ({(latestTag.Amount.HasValue ? $"₱{latestTag.Amount.Value:N2}" : "")})"),
+                                                PropertyTagType.Bailbond => ("Bailbond", "bg-indigo-100 text-indigo-800 dark:bg-indigo-500/20 dark:text-indigo-300 border-indigo-300 dark:border-indigo-500/40", $"Bailbond to {latestTag.PartyName} ({(latestTag.Amount.HasValue ? $"₱{latestTag.Amount.Value:N2}" : "")})"),
+                                                PropertyTagType.Release => ("Released", "bg-teal-100 text-teal-800 dark:bg-teal-500/20 dark:text-teal-300 border-teal-300 dark:border-teal-500/40", $"Released Per Doc No. {latestTag.PerDocNo}"),
+                                                _ => ("Cancelled Tag", "bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300 border-rose-200 dark:border-rose-500/30", $"Reason: {latestTag.ReasonForCancellation}")
+                                            };
+                                            <span class="px-2 py-0.5 rounded-md border text-[9px] font-bold uppercase @tagClasses" title="@tagTitle">
+                                                @tagLabel
+                                            </span>
+                                        }
+                                    </div>
                                 </td>
                                 <td class="px-2 sm:px-4 py-3.5 text-center relative">
                                     @if (canAccess)
