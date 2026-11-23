@@ -12,6 +12,13 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - City Assessor Portal</title>
+    <link rel="icon" type="image/png" href="~/images/branding/OldFairTrackLogo.png" asp-append-version="true" />
+    <link rel="manifest" href="~/manifest.webmanifest" />
+    <meta name="theme-color" content="#059669" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="FairTrack" />
+    <link rel="apple-touch-icon" href="~/images/pwa/icon-192.png" />
     
     <script>
         if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -787,6 +794,7 @@
             if (window.lucide) lucide.createIcons();
         }
     </script>
+    <script src="~/js/pwa-register.js" asp-append-version="true"></script>
 </body>
 </html>
 

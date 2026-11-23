@@ -139,6 +139,7 @@ var contentTypeProvider = new FileExtensionContentTypeProvider();
 contentTypeProvider.Mappings[".woff2"] = "font/woff2";
 contentTypeProvider.Mappings[".woff"] = "font/woff";
 contentTypeProvider.Mappings[".ttf"] = "font/ttf";
+contentTypeProvider.Mappings[".webmanifest"] = "application/manifest+json";
 app.UseStaticFiles(new StaticFileOptions
 {
     ContentTypeProvider = contentTypeProvider,

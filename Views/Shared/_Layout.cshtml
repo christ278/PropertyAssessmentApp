@@ -5,6 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - City Assessor Portal</title>
     <link rel="icon" type="image/png" href="~/images/branding/OldFairTrackLogo.png" asp-append-version="true" />
+    <link rel="manifest" href="~/manifest.webmanifest" />
+    <meta name="theme-color" content="#059669" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="FairTrack" />
+    <link rel="apple-touch-icon" href="~/images/pwa/icon-192.png" />
     
     <!-- Theme & Nav Layout Initialization script to avoid flicker -->
     <script>
@@ -951,6 +957,18 @@
                                         </button>
                                     </div>
                                 </div>
+
+                                <!-- INSTALL PWA APP (shown when browser supports install prompt) -->
+                                <button type="button" id="btnInstallPwa" onclick="installFairTrackPwa()" class="hidden p-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-between transition-all text-left">
+                                    <div class="flex items-center gap-2 min-w-0">
+                                        <i data-lucide="download" class="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0"></i>
+                                        <div class="min-w-0">
+                                            <span class="text-xs font-bold text-emerald-800 dark:text-emerald-200 block truncate">Install App</span>
+                                            <span class="text-[10px] text-emerald-600 dark:text-emerald-400 block truncate">Add FairTrack to device</span>
+                                        </div>
+                                    </div>
+                                    <span class="text-[10px] font-mono font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-600 text-white shrink-0">PWA</span>
+                                </button>
 
                                 <!-- ACTION 4: DARK MODE TOGGLE -->
                                 <button type="button" onclick="toggleTheme()" class="p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-stone-800/60 dark:hover:bg-stone-800 border border-slate-200/60 dark:border-stone-700/60 flex items-center justify-between transition-all text-left">
@@ -2082,5 +2100,6 @@
 
         updateToggleBtnText();
     </script>
+    <script src="~/js/pwa-register.js" asp-append-version="true"></script>
 </body>
 </html>
