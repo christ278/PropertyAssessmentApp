@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using PropertyAssessmentApp.Models;
 
 namespace PropertyAssessmentApp.Services;
@@ -10,6 +10,7 @@ public interface ITaxDeclarationRequestService
     TaxDeclarationRequest? GetByTrackingNumber(string trackingNo);
     void Add(TaxDeclarationRequest request, IFormFile? fileUpload, string? webRootPath = null);
     void Update(TaxDeclarationRequest request, IFormFile? fileUpload, string? webRootPath = null);
+    void SyncPropertyTaggingOnApproval(TaxDeclarationRequest request, string? approvedBy = null);
     void Delete(Guid id);
     string GetConfiguredStorageDirectory(string? webRootPath = null);
     int GetTotalCount();

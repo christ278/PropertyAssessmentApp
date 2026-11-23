@@ -40,11 +40,11 @@ public class TaxDeclarationPdfService : ITaxDeclarationPdfService
         PropertyNameCaseInsensitive = true
     };
 
-    private (string? Text, string ColorHex) GetWatermark(TaxDeclaration td)
+    private (string? StampText, string? MarginText, string StampColorHex, string MarginColorHex) GetWatermark(TaxDeclaration td)
     {
         if (td.IsCancelledAndSuperseded || td.Status == AssessmentStatus.Cancelled)
         {
-            return ("CANCELLED", "#26DC2626");
+            return ("CANCELLED", "CANCELLED", "#26DC2626", "#991B1B");
         }
 
         if (td.Id != Guid.Empty)
@@ -57,38 +57,61 @@ public class TaxDeclarationPdfService : ITaxDeclarationPdfService
                 .FirstOrDefault();
 
             if (latestTag == PropertyTagType.Mortgage)
-                return ("MORTGAGED", "#26D97706");
+                return ("MORTGAGED", "MORTGAGE", "#26D97706", "#991B1B");
             if (latestTag == PropertyTagType.Bailbond)
-                return ("BAILBOND", "#264F46E5");
+                return ("BAILBOND", "BAILBOND", "#264F46E5", "#3730A3");
+            if (latestTag == PropertyTagType.Release)
+                return (null, "RELEASED", "#260D9488", "#0F766E");
             if (latestTag == PropertyTagType.Cancellation)
-                return ("CANCELLED", "#26DC2626");
+                return ("CANCELLED", "CANCELLED", "#26DC2626", "#991B1B");
         }
 
-        return (null, "#26DC2626");
+        return (null, null, "#26DC2626", "#991B1B");
     }
 
     private void ApplyWatermark(PageDescriptor page, TaxDeclaration td)
     {
-        var (text, colorHex) = GetWatermark(td);
-        if (!string.IsNullOrEmpty(text))
+        var (stampText, marginText, stampColorHex, marginColorHex) = GetWatermark(td);
+        if (string.IsNullOrEmpty(stampText) && string.IsNullOrEmpty(marginText))
+            return;
+
+        page.Background().Layers(layers =>
         {
-            page.Background()
-                .AlignCenter()
-                .AlignMiddle()
-                .Rotate(-25)
-                .Border(4)
-                .BorderColor(colorHex)
-                .Padding(4)
-                .Border(1.5f)
-                .BorderColor(colorHex)
-                .PaddingHorizontal(24)
-                .PaddingVertical(10)
-                .Column(col =>
-                {
-                    col.Item().AlignCenter().Text(text).FontSize(54).ExtraBold().LetterSpacing(0.12f).FontColor(colorHex);
-                    col.Item().AlignCenter().Text("OFFICE OF THE CITY ASSESSOR • KORONADAL CITY").FontSize(10).Bold().LetterSpacing(0.1f).FontColor(colorHex);
-                });
-        }
+            var primary = layers.PrimaryLayer();
+            if (!string.IsNullOrEmpty(stampText))
+            {
+                primary
+                    .AlignCenter()
+                    .AlignMiddle()
+                    .Rotate(-25)
+                    .Border(3.5f)
+                    .BorderColor(stampColorHex)
+                    .Padding(4)
+                    .Border(1.2f)
+                    .BorderColor(stampColorHex)
+                    .PaddingHorizontal(20)
+                    .PaddingVertical(8)
+                    .Column(col =>
+                    {
+                        col.Item().AlignCenter().Text(stampText).FontSize(42).ExtraBold().LetterSpacing(0.12f).FontColor(stampColorHex);
+                        col.Item().AlignCenter().Text("OFFICE OF THE CITY ASSESSOR • KORONADAL CITY").FontSize(9).Bold().LetterSpacing(0.08f).FontColor(stampColorHex);
+                    });
+            }
+
+            if (!string.IsNullOrEmpty(marginText))
+            {
+                layers.Layer()
+                    .PaddingLeft(6)
+                    .AlignLeft()
+                    .AlignMiddle()
+                    .RotateLeft()
+                    .Text(marginText)
+                    .FontSize(14)
+                    .ExtraBold()
+                    .LetterSpacing(0.14f)
+                    .FontColor(marginColorHex);
+            }
+        });
     }
 
     public byte[] GenerateTaxDeclarationPdf(TaxDeclaration td)

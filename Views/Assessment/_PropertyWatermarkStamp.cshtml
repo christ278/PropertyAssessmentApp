@@ -33,13 +33,13 @@
 
 @if (!string.IsNullOrEmpty(stampText))
 {
-    <div class="pointer-events-none select-none absolute inset-x-0 top-0 z-10 flex items-start justify-center pt-24 sm:pt-32 overflow-hidden">
-        <div class="-rotate-18 border-[6px] rounded-2xl p-1.5 @stampColor">
-            <div class="border-2 rounded-xl px-8 py-3 text-center @stampColor">
-                <div class="text-4xl sm:text-6xl font-black tracking-[0.22em] uppercase leading-none">
+    <div class="pointer-events-none select-none absolute inset-x-0 top-0 z-10 flex items-start justify-center pt-36 sm:pt-48 overflow-hidden">
+        <div class="-rotate-18 border-[6px] rounded-2xl p-1.5 min-w-[320px] sm:min-w-[540px] md:min-w-[660px] @stampColor">
+            <div class="border-2 rounded-xl px-12 sm:px-20 py-4 text-center @stampColor">
+                <div class="text-4xl sm:text-6xl md:text-7xl font-black tracking-[0.28em] uppercase leading-none">
                     @stampText
                 </div>
-                <div class="mt-1.5 text-[10px] sm:text-xs font-extrabold tracking-[0.18em] uppercase">
+                <div class="mt-2 text-[10px] sm:text-xs font-extrabold tracking-[0.2em] uppercase">
                     @stampSub
                 </div>
             </div>

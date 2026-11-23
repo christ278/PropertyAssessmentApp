@@ -17,6 +17,7 @@
     int bailbondCount = ViewBag.BailbondCount is int bc ? bc : 0;
     int releaseCount = ViewBag.ReleaseCount is int rc ? rc : 0;
     int cancellationCount = ViewBag.CancellationCount is int cc ? cc : 0;
+    var taggingLogs = ViewBag.TaggingLogs as IEnumerable<PropertyTaggingLog> ?? Enumerable.Empty<PropertyTaggingLog>();
 }
 
 <div class="space-y-8">
@@ -440,6 +441,62 @@
                     }
                 </div>
             }
+        </div>
+    </div>
+
+    <!-- Property Tagging Audit Logs -->
+    <div class="bg-white dark:bg-stone-900 rounded-3xl border border-slate-200 dark:border-stone-800 shadow-sm overflow-hidden">
+        <div class="p-4 sm:p-6 border-b border-slate-200 dark:border-stone-800 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2.5">
+                <i data-lucide="history" class="w-4 h-4 text-sky-600 dark:text-sky-400"></i>
+                <h2 class="text-sm font-mono font-extrabold uppercase tracking-wider text-slate-800 dark:text-white">Property Tagging Audit Logs (Latest 50)</h2>
+            </div>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs font-mono">
+                <thead class="bg-slate-100 dark:bg-stone-950 text-slate-600 dark:text-stone-400 border-b border-slate-200 dark:border-stone-800 font-bold">
+                    <tr>
+                        <th class="px-4 py-3">DATE / TIME</th>
+                        <th class="px-4 py-3">TDN &amp; OWNER</th>
+                        <th class="px-4 py-3">ACTION</th>
+                        <th class="px-4 py-3">TAG TYPE</th>
+                        <th class="px-4 py-3">DETAILS</th>
+                        <th class="px-4 py-3">SOURCE</th>
+                        <th class="px-4 py-3">PERFORMED BY</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-stone-800/60">
+                    @if (!taggingLogs.Any())
+                    {
+                        <tr>
+                            <td colspan="7" class="px-4 py-8 text-center text-slate-400 dark:text-stone-500">No tagging audit logs yet.</td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var log in taggingLogs)
+                        {
+                            var actionBadge = log.Action.StartsWith("Removed") || log.Action == "Deleted"
+                                ? "bg-rose-100 text-rose-800 dark:bg-rose-500/20 dark:text-rose-300 border-rose-300 dark:border-rose-500/40"
+                                : "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 border-emerald-300 dark:border-emerald-500/40";
+                            <tr class="hover:bg-slate-50/80 dark:hover:bg-stone-800/50">
+                                <td class="px-4 py-3 text-slate-600 dark:text-stone-300 whitespace-nowrap">@log.Timestamp.ToString("MMM dd, yyyy hh:mm tt")</td>
+                                <td class="px-4 py-3">
+                                    <div class="font-bold text-slate-900 dark:text-white">@log.TaxDeclarationNumber</div>
+                                    <div class="text-[10px] text-slate-400">@log.OwnerName</div>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <span class="px-2 py-0.5 rounded-md border text-[10px] font-bold uppercase @actionBadge">@log.Action</span>
+                                </td>
+                                <td class="px-4 py-3 font-bold text-slate-700 dark:text-stone-300">@log.TagType</td>
+                                <td class="px-4 py-3 text-slate-600 dark:text-stone-300">@log.Details</td>
+                                <td class="px-4 py-3 text-slate-600 dark:text-stone-300">@log.Source</td>
+                                <td class="px-4 py-3 font-semibold text-slate-800 dark:text-stone-200">@(log.PerformedBy ?? "System")</td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
         </div>
     </div>
 </div>

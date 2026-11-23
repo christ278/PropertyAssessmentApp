@@ -1422,6 +1422,21 @@ public class AssessmentController : Controller
         ViewBag.ReleaseCount = await _context.PropertyTaggings.CountAsync(x => x.TagType == PropertyTagType.Release);
         ViewBag.CancellationCount = await _context.PropertyTaggings.CountAsync(x => x.TagType == PropertyTagType.Cancellation);
 
+        var logsQuery = _context.PropertyTaggingLogs.AsNoTracking().AsQueryable();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            logsQuery = logsQuery.Where(l =>
+                l.TaxDeclarationNumber.Contains(term) ||
+                (l.OwnerName != null && l.OwnerName.Contains(term)) ||
+                (l.Details != null && l.Details.Contains(term)) ||
+                l.Source.Contains(term));
+        }
+        ViewBag.TaggingLogs = await logsQuery
+            .OrderByDescending(l => l.Timestamp)
+            .Take(50)
+            .ToListAsync();
+
         return View(records);
     }
 
@@ -1528,6 +1543,26 @@ public class AssessmentController : Controller
         }
 
         _context.PropertyTaggings.Add(entity);
+        _context.PropertyTaggingLogs.Add(new PropertyTaggingLog
+        {
+            Id = Guid.NewGuid(),
+            TaxDeclarationId = td.Id,
+            TaxDeclarationNumber = td.TaxDeclarationNumber,
+            PropertyIndexNumber = td.PropertyIndexNumber,
+            OwnerName = td.OwnerName,
+            TagType = entity.TagType.ToString(),
+            Action = "Tagged",
+            Details = entity.TagType switch
+            {
+                PropertyTagType.Mortgage => $"Is Mortgage To: {entity.PartyName} | Amount: ₱{entity.Amount:N2}",
+                PropertyTagType.Bailbond => $"Is Bailbond To: {entity.PartyName} | Amount: ₱{entity.Amount:N2}",
+                PropertyTagType.Release => $"Per Doc No.: {entity.PerDocNo} | Posted By: {entity.PostedByName}",
+                _ => $"Reason: {entity.ReasonForCancellation}"
+            },
+            Source = "Property Tagging Form",
+            PerformedBy = entity.CreatedBy,
+            Timestamp = DateTime.Now
+        });
         await _context.SaveChangesAsync();
 
         TempData["SuccessMessage"] = $"{entity.TagType} tagging saved for TDN {td.TaxDeclarationNumber}.";
@@ -1541,6 +1576,20 @@ public class AssessmentController : Controller
         var item = await _context.PropertyTaggings.FirstOrDefaultAsync(x => x.Id == id);
         if (item != null)
         {
+            _context.PropertyTaggingLogs.Add(new PropertyTaggingLog
+            {
+                Id = Guid.NewGuid(),
+                TaxDeclarationId = item.TaxDeclarationId,
+                TaxDeclarationNumber = item.TaxDeclarationNumber,
+                PropertyIndexNumber = item.PropertyIndexNumber,
+                OwnerName = item.OwnerName,
+                TagType = item.TagType.ToString(),
+                Action = "Deleted",
+                Details = item.PartyName ?? item.PerDocNo ?? item.ReasonForCancellation,
+                Source = "Property Tagging Form",
+                PerformedBy = User.Identity?.Name ?? "System",
+                Timestamp = DateTime.Now
+            });
             _context.PropertyTaggings.Remove(item);
             await _context.SaveChangesAsync();
             TempData["SuccessMessage"] = $"Tagging record for TDN {item.TaxDeclarationNumber} deleted.";

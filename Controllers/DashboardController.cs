@@ -665,11 +665,11 @@ public class DashboardController : Controller
         }
         else
         {
-            taxableRatio = 100m;
+            taxableRatio = 0m;
             exemptRatio = 0m;
         }
 
-        int periodTxCount = allTds.Count(t =>
+        int periodTxCount = activeTds.Count(t =>
         {
             var dt = t.DateApproved ?? t.DateEncoded ?? t.DateAssessed;
             return dt >= startDate && dt <= endDate;
@@ -679,7 +679,7 @@ public class DashboardController : Controller
             .AsNoTracking()
             .Count(l => l.Timestamp >= startDate && l.Timestamp <= endDate);
 
-        int totalTransactionsCount = Math.Max(periodTxCount + workflowLogCount, allTds.Count);
+        int totalTransactionsCount = activeTds.Count == 0 ? 0 : Math.Max(periodTxCount + workflowLogCount, activeTds.Count);
 
         // RPU Breakdown
         int landCount = activeTds.Count(t => t.Kind == PropertyKind.Land);
@@ -689,48 +689,38 @@ public class DashboardController : Controller
 
         if (activeTds.Count == 0)
         {
-            var baselineResponse = new ExecutiveAnalyticsResponseDto
+            return new ExecutiveAnalyticsResponseDto
             {
                 Kpis = new ExecutiveKpiMetricsDto
                 {
-                    TotalRpus = 76000,
-                    TotalRpusComparisonText = "↑ 2.35% vs. 2025 (74,256)",
-                    TotalAssessmentRollValue = 5127638.72m,
-                    TotalMarketValue = 28919507.10m,
-                    TotalActiveDeclarations = 196,
-                    ProcessedTransactionsCount = 230,
-                    TransactionsComparisonText = "↑ 14.4% vs. 2025 (201)",
-                    TaxableRatioPct = 100.0m,
+                    TotalRpus = 0,
+                    TotalRpusComparisonText = "No approved property records",
+                    TotalAssessmentRollValue = 0m,
+                    TotalMarketValue = 0m,
+                    TotalActiveDeclarations = 0,
+                    ProcessedTransactionsCount = 0,
+                    TransactionsComparisonText = "No transactions recorded",
+                    TaxableRatioPct = 0.0m,
                     ExemptRatioPct = 0.0m,
-                    TotalTaxableAssessedValue = 5127638.72m,
+                    TotalTaxableAssessedValue = 0.0m,
                     TotalExemptAssessedValue = 0.0m
                 },
                 RpuDistribution = new RpuDistributionDto
                 {
-                    TotalRpus = 77610,
-                    LandCount = 55532,
-                    LandPct = 71.6m,
-                    BuildingCount = 21502,
-                    BuildingPct = 27.7m,
-                    MachineryCount = 576,
-                    MachineryPct = 0.7m
+                    TotalRpus = 0,
+                    LandCount = 0,
+                    LandPct = 0m,
+                    BuildingCount = 0,
+                    BuildingPct = 0m,
+                    MachineryCount = 0,
+                    MachineryPct = 0m
                 },
-                ActualUseDistributions = new List<ActualUseDistributionDto>
-                {
-                    new() { ActualUseName = "Residential", ParcelCount = 40011, TotalAssessedValue = 2699320.18m, Percentage = 52.6m },
-                    new() { ActualUseName = "Agricultural", ParcelCount = 13921, TotalAssessedValue = 942781.07m, Percentage = 18.4m },
-                    new() { ActualUseName = "Commercial", ParcelCount = 7420, TotalAssessedValue = 498371.55m, Percentage = 9.7m },
-                    new() { ActualUseName = "Industrial", ParcelCount = 5778, TotalAssessedValue = 389245.90m, Percentage = 7.6m },
-                    new() { ActualUseName = "Institutional", ParcelCount = 4583, TotalAssessedValue = 301217.35m, Percentage = 5.9m },
-                    new() { ActualUseName = "Others", ParcelCount = 5897, TotalAssessedValue = 296702.67m, Percentage = 5.8m }
-                },
+                ActualUseDistributions = new List<ActualUseDistributionDto>(),
                 ClassificationSummary = BuildClassificationRollSummary(activeTds),
-                AssessmentRollPage = GetFilteredAssessmentRollPage(filter, allTds),
-                AvailableSections = new List<string> { "001", "002", "003", "004", "005", "006", "007", "008", "009", "010", "027" },
-                FilterSummary = $"Period: {startDate:MMM dd, yyyy} to {endDate:MMM dd, yyyy} | Total Records: 286,347"
+                AssessmentRollPage = GetFilteredAssessmentRollPage(filter, activeTds),
+                AvailableSections = new List<string>(),
+                FilterSummary = $"Period: {startDate:MMM dd, yyyy} to {endDate:MMM dd, yyyy} | Total Records: 0"
             };
-
-            return baselineResponse;
         }
 
         var response = new ExecutiveAnalyticsResponseDto
@@ -738,12 +728,12 @@ public class DashboardController : Controller
             Kpis = new ExecutiveKpiMetricsDto
             {
                 TotalRpus = activeTds.Count,
-                TotalRpusComparisonText = "↑ 2.35% vs. 2025",
+                TotalRpusComparisonText = $"Approved Active RPUs ({activeTds.Count:N0})",
                 TotalAssessmentRollValue = totalAssessedVal,
                 TotalMarketValue = totalMarketVal,
                 TotalActiveDeclarations = totalActiveCount,
                 ProcessedTransactionsCount = totalTransactionsCount,
-                TransactionsComparisonText = "↑ 14.4% vs. 2025",
+                TransactionsComparisonText = $"Period & Workflow Total ({totalTransactionsCount:N0})",
                 TaxableRatioPct = taxableRatio,
                 ExemptRatioPct = exemptRatio,
                 TotalTaxableAssessedValue = taxableAssessedVal,
@@ -760,8 +750,8 @@ public class DashboardController : Controller
                 MachineryPct = Math.Round(((decimal)machCount / totalRpuDivisor) * 100m, 1)
             },
             ClassificationSummary = BuildClassificationRollSummary(activeTds),
-            AssessmentRollPage = GetFilteredAssessmentRollPage(filter, allTds),
-            AvailableSections = allTds.Select(ResolveSection).Where(s => !string.IsNullOrWhiteSpace(s) && s != "-").Distinct().OrderBy(s => s).ToList()
+            AssessmentRollPage = GetFilteredAssessmentRollPage(filter, activeTds),
+            AvailableSections = activeTds.Select(ResolveSection).Where(s => !string.IsNullOrWhiteSpace(s) && s != "-").Distinct().OrderBy(s => s).ToList()
         };
 
         if (!response.AvailableSections.Any())
@@ -775,7 +765,7 @@ public class DashboardController : Controller
             DateTime mStart = new DateTime(now.Year, now.Month, 1).AddMonths(-i);
             DateTime mEnd = mStart.AddMonths(1).AddTicks(-1);
 
-            var mTds = allTds.Where(t =>
+            var mTds = activeTds.Where(t =>
             {
                 var dt = t.DateApproved ?? t.DateEncoded ?? t.DateAssessed;
                 return dt >= mStart && dt <= mEnd;
@@ -790,8 +780,8 @@ public class DashboardController : Controller
         }
 
         // 3. Transaction Distribution (by TransactionCode: DC, TR, SD, CS, RC, PC/RA, etc.)
-        int totalMatching = Math.Max(1, allTds.Count);
-        var txGroups = allTds
+        int totalMatching = Math.Max(1, activeTds.Count);
+        var txGroups = activeTds
             .GroupBy(t => NormalizeTransactionCode(t.TransactionCode))
             .Select(g => new
             {
@@ -977,14 +967,20 @@ public class DashboardController : Controller
 
     private static string ResolveAnalyticsActualUse(TaxDeclaration td)
     {
-        if (!string.IsNullOrWhiteSpace(td.ActualUse))
+        string? rawUse = td.Kind == PropertyKind.Building
+            ? (!string.IsNullOrWhiteSpace(td.BuildingDetails?.BuildingUseType) ? td.BuildingDetails.BuildingUseType : td.Classification.ToString())
+            : (!string.IsNullOrWhiteSpace(td.ActualUse) ? td.ActualUse : td.Classification.ToString());
+
+        if (!string.IsNullOrWhiteSpace(rawUse))
         {
-            var u = td.ActualUse.Trim();
+            var u = rawUse.Trim();
             if (u.Contains("RES", StringComparison.OrdinalIgnoreCase)) return "Residential";
             if (u.Contains("COM", StringComparison.OrdinalIgnoreCase)) return "Commercial";
             if (u.Contains("IND", StringComparison.OrdinalIgnoreCase)) return "Industrial";
             if (u.Contains("AGR", StringComparison.OrdinalIgnoreCase)) return "Agricultural";
             if (u.Contains("SPE", StringComparison.OrdinalIgnoreCase)) return "Special";
+            if (u.Contains("TIM", StringComparison.OrdinalIgnoreCase)) return "Timberland";
+            if (u.Contains("INS", StringComparison.OrdinalIgnoreCase)) return "Institutional";
             return u;
         }
 
@@ -1072,60 +1068,8 @@ public class DashboardController : Controller
 
         if (activeTds == null || activeTds.Count == 0)
         {
-            // Authoritative baseline matching official RPTA Executive Assessment Analytics image
-            summary.TaxableRows = new List<ClassificationRollRowDto>
-            {
-                new() { PropertyClassification = "RESIDENTIAL", LandAreaSqm = 22693850.06m, RpuLand = 34141, RpuBldg = 17547, RpuMach = 20, TotalRpu = 51708, MarketValue = 4994875394.11m, AssessedValue = 748708684.19m },
-                new() { PropertyClassification = "AGRICULTURAL", LandAreaSqm = 169578749.60m, RpuLand = 17586, RpuBldg = 226, RpuMach = 12, TotalRpu = 17824, MarketValue = 2507628704.89m, AssessedValue = 376208178.07m },
-                new() { PropertyClassification = "COMMERCIAL", LandAreaSqm = 1892695.21m, RpuLand = 1631, RpuBldg = 2529, RpuMach = 436, TotalRpu = 4596, MarketValue = 2785873648.10m, AssessedValue = 552541122.92m },
-                new() { PropertyClassification = "INDUSTRIAL", LandAreaSqm = 1090758.00m, RpuLand = 101, RpuBldg = 133, RpuMach = 51, TotalRpu = 285, MarketValue = 813758075.00m, AssessedValue = 162751648.20m },
-                new() { PropertyClassification = "TIMBERLAND", LandAreaSqm = 0.00m, RpuLand = 0, RpuBldg = 0, RpuMach = 0, TotalRpu = 0, MarketValue = 0.00m, AssessedValue = 0.00m },
-                new() { PropertyClassification = "CULTURAL", LandAreaSqm = 0.00m, RpuLand = 0, RpuBldg = 1, RpuMach = 0, TotalRpu = 1, MarketValue = 0.00m, AssessedValue = 0.00m },
-                new() { PropertyClassification = "HOSPITAL", LandAreaSqm = 24806.00m, RpuLand = 11, RpuBldg = 31, RpuMach = 13, TotalRpu = 55, MarketValue = 33908420.00m, AssessedValue = 3390844.40m },
-                new() { PropertyClassification = "SCIENTIFIC", LandAreaSqm = 32500.00m, RpuLand = 1, RpuBldg = 0, RpuMach = 0, TotalRpu = 1, MarketValue = 5323500.00m, AssessedValue = 532550.00m },
-                new() { PropertyClassification = "RECREATIONAL", LandAreaSqm = 1000.00m, RpuLand = 0, RpuBldg = 5, RpuMach = 0, TotalRpu = 5, MarketValue = 286000.00m, AssessedValue = 28600.00m },
-                new() { PropertyClassification = "OTHERS", LandAreaSqm = 21212.50m, RpuLand = 4, RpuBldg = 18, RpuMach = 0, TotalRpu = 22, MarketValue = 47792403.00m, AssessedValue = 9538072.10m },
-                new() { PropertyClassification = "Local Water District", LandAreaSqm = 2474.00m, RpuLand = 6, RpuBldg = 29, RpuMach = 0, TotalRpu = 35, MarketValue = 1230559.20m, AssessedValue = 123055.92m }
-            };
-
-            summary.TaxableTotals = new ClassificationRollRowDto
-            {
-                PropertyClassification = "Total Taxable Properties",
-                LandAreaSqm = 195338045.37m,
-                RpuLand = 53481,
-                RpuBldg = 20519,
-                RpuMach = 533,
-                TotalRpu = 74533,
-                MarketValue = 11173676704.30m,
-                AssessedValue = 1853822535.72m
-            };
-
-            summary.ExemptRows = new List<ClassificationRollRowDto>
-            {
-                new() { PropertyClassification = "GOVERNMENT", LandAreaSqm = 20695915.92m, RpuLand = 1923, RpuBldg = 776, RpuMach = 41, TotalRpu = 2740, MarketValue = 4856796024.95m, AssessedValue = 749950821.35m },
-                new() { PropertyClassification = "RELIGIOUS", LandAreaSqm = 331043.55m, RpuLand = 128, RpuBldg = 205, RpuMach = 2, TotalRpu = 335, MarketValue = 113624433.93m, AssessedValue = 19065664.60m },
-                new() { PropertyClassification = "CHARITABLE", LandAreaSqm = 1071.00m, RpuLand = 0, RpuBldg = 2, RpuMach = 2, TotalRpu = 4, MarketValue = 465706.80m, AssessedValue = 69856.02m }
-            };
-
-            summary.ExemptTotals = new ClassificationRollRowDto
-            {
-                PropertyClassification = "Total Exempted Properties",
-                LandAreaSqm = 21028030.47m,
-                RpuLand = 2051,
-                RpuBldg = 983,
-                RpuMach = 45,
-                TotalRpu = 3079,
-                MarketValue = 4970886165.68m,
-                AssessedValue = 769086341.97m
-            };
-
-            summary.TotalLandAreaSqm = 216366075.84m;
-            summary.TotalProperties = 77610;
-            summary.TaxablePropertiesCount = 74533;
-            summary.ExemptPropertiesCount = 3079;
-            summary.TaxablePropertiesPct = 96.0m;
-            summary.ExemptPropertiesPct = 4.0m;
-
+            summary.TaxableTotals = new ClassificationRollRowDto { PropertyClassification = "Total Taxable Properties" };
+            summary.ExemptTotals = new ClassificationRollRowDto { PropertyClassification = "Total Exempted Properties" };
             return summary;
         }
 
@@ -1311,6 +1255,9 @@ public class DashboardController : Controller
             .Include(t => t.LandDetails)
             .Include(t => t.MachineryDetails)
             .AsNoTracking()
+            .Where(t => t.Status == AssessmentStatus.Active && !t.IsCancelledAndSuperseded)
+            .ToList()
+            .Where(t => !CastTdGenerator.IsUnapprovedCastTd(t.TaxDeclarationNumber))
             .ToList();
 
         // 1. Assessment Year
@@ -1370,89 +1317,13 @@ public class DashboardController : Controller
 
         if (totalCount == 0)
         {
-            const int totalOfficialRollRecords = 286347;
-            int baselineTotalPages = (int)Math.Ceiling((double)totalOfficialRollRecords / pageSize);
-
-            // Filter baseline records if search or section/brgy was provided
-            var filteredBaseline = OfficialBaselineRollRecords.AsEnumerable();
-            if (!string.IsNullOrWhiteSpace(search))
-            {
-                filteredBaseline = filteredBaseline.Where(r =>
-                    r.TdNo.ToLower().Contains(search) ||
-                    r.OwnerName.ToLower().Contains(search) ||
-                    r.PreviousPin.ToLower().Contains(search) ||
-                    r.TitleNo.ToLower().Contains(search));
-            }
-            if (!string.IsNullOrWhiteSpace(sec) && sec != "0" && !sec.Equals("ALL", StringComparison.OrdinalIgnoreCase))
-            {
-                filteredBaseline = filteredBaseline.Where(r => r.Section.Equals(sec, StringComparison.OrdinalIgnoreCase));
-            }
-            if (!string.IsNullOrWhiteSpace(brgy) && brgy != "0" && !brgy.Equals("ALL", StringComparison.OrdinalIgnoreCase))
-            {
-                filteredBaseline = filteredBaseline.Where(r => r.TdNo.Contains("-" + brgy + "-") || r.OwnerAddress.Contains(brgy, StringComparison.OrdinalIgnoreCase));
-            }
-
-            var baseList = filteredBaseline.ToList();
-            var resultItems = new List<AssessmentRollDetailedRecordDto>();
-
-            int startIdx = (page - 1) * pageSize;
-            for (int i = 0; i < pageSize; i++)
-            {
-                int currentIdx = startIdx + i;
-                if (currentIdx >= totalOfficialRollRecords) break;
-
-                if (currentIdx < OfficialBaselineRollRecords.Count && baseList.Count > currentIdx)
-                {
-                    resultItems.Add(baseList[currentIdx]);
-                }
-                else
-                {
-                    int seed = currentIdx + 1;
-                    int parcelIndex = 4 + seed;
-                    string sectionPadded = !string.IsNullOrWhiteSpace(sec) && sec != "0" ? sec : "008";
-                    string brgyCode = !string.IsNullOrWhiteSpace(brgy) && brgy != "0" ? brgy : "0006";
-                    string tdSeq = (1944 + seed).ToString("D5");
-                    string parcelStr = $"027-{parcelIndex:D3}";
-                    string pinStr = $"187-00-{brgyCode}-{parcelStr}-0000";
-
-                    resultItems.Add(new AssessmentRollDetailedRecordDto
-                    {
-                        TdNo = $"11-{brgyCode}-{tdSeq}",
-                        PreviousTdNo = seed % 3 == 0 ? $"11-{brgyCode}-{(1790 + seed):D5}" : "-",
-                        Section = sectionPadded,
-                        ParcelNo = parcelStr,
-                        OwnerName = (seed % 4 == 0) ? "BENOSA, JARED G." : (seed % 3 == 0 ? "BENOSA, ISIDRO DOLOR" : (seed % 2 == 0 ? "BENOSA, DARREN G." : "BENOSA, ANTONIO")),
-                        OwnerAddress = "Purok Riverside, Brgy. Avancena",
-                        PrevOwner = (seed % 3 == 0) ? "BENOSA, ANTONIO" : "-",
-                        CadNo = "187",
-                        SurveyNo = seed % 2 == 0 ? "S-1235" : "S-1234",
-                        TitleNo = $"T-{56789 + seed}",
-                        PreviousPin = pinStr,
-                        Classification = "Residential",
-                        Kind = "Land",
-                        ActualUse = "Residential",
-                        AreaSqm = 4800.00m,
-                        MarketValue = 4000000.00m,
-                        AssessedValue = 480000.00m,
-                        BldgCount = 0,
-                        MachCount = 0,
-                        Memoranda = "-",
-                        EffectivityDate = "Nov 3, 2026"
-                    });
-                }
-            }
-
-            int computedTotal = (!string.IsNullOrWhiteSpace(search) || (!string.IsNullOrWhiteSpace(sec) && sec != "0") || (!string.IsNullOrWhiteSpace(brgy) && brgy != "0"))
-                ? Math.Max(baseList.Count, 1250)
-                : totalOfficialRollRecords;
-
             return new AssessmentRollPagedResponseDto
             {
-                Records = resultItems,
-                TotalRecords = computedTotal,
-                Page = page,
+                Records = new List<AssessmentRollDetailedRecordDto>(),
+                TotalRecords = 0,
+                Page = 1,
                 PageSize = pageSize,
-                TotalPages = Math.Max(1, (int)Math.Ceiling((double)computedTotal / pageSize))
+                TotalPages = 1
             };
         }
 

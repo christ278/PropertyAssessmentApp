@@ -462,6 +462,7 @@ public class DocumentWorkflowService : IDocumentWorkflowService
                 _tdService.Update(item, null, "");
                 if (!wasApproved && item.Status == RequestStatus.Approved)
                 {
+                    _tdService.SyncPropertyTaggingOnApproval(item, forwardedByName);
                     shouldSendApprovalSms = true;
                     smsContactNo = item.ContactNo;
                     smsOwnerName = item.OwnerName;

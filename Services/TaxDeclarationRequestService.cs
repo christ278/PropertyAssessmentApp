@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using PropertyAssessmentApp.Data;
 using PropertyAssessmentApp.Models;
@@ -72,6 +72,7 @@ public class TaxDeclarationRequestService : ITaxDeclarationRequestService
         var existing = GetById(request.Id);
         if (existing != null)
         {
+            bool newlyApproved = existing.Status != RequestStatus.Approved && request.Status == RequestStatus.Approved;
             existing.UpdatedDate = DateTime.Now;
             existing.Status = request.Status;
             existing.OwnerName = request.OwnerName;
@@ -109,7 +110,150 @@ public class TaxDeclarationRequestService : ITaxDeclarationRequestService
             }
 
             _context.SaveChanges();
+
+            if (newlyApproved)
+            {
+                SyncPropertyTaggingOnApproval(existing);
+            }
         }
+    }
+
+    public void SyncPropertyTaggingOnApproval(TaxDeclarationRequest request, string? approvedBy = null)
+    {
+        if (!request.CertCancellationAnnotation && !request.CertAnnotationBailBond && !request.CertAnnotationMortgages)
+        {
+            return;
+        }
+
+        TaxDeclaration? td = null;
+        if (request.TaxDeclarationId.HasValue && request.TaxDeclarationId.Value != Guid.Empty)
+        {
+            td = _context.TaxDeclarations.FirstOrDefault(t => t.Id == request.TaxDeclarationId.Value);
+        }
+        if (td == null && !string.IsNullOrWhiteSpace(request.TaxDeclarationNumber))
+        {
+            var tdn = request.TaxDeclarationNumber.Trim();
+            td = _context.TaxDeclarations.FirstOrDefault(t => t.TaxDeclarationNumber == tdn);
+        }
+        if (td == null)
+        {
+            return;
+        }
+
+        if (request.CertCancellationAnnotation)
+        {
+            var existingTags = _context.PropertyTaggings
+                .Where(x => x.TaxDeclarationId == td.Id)
+                .ToList();
+            if (existingTags.Any())
+            {
+                var removedTypes = string.Join(", ", existingTags.Select(t => t.TagType.ToString()).Distinct());
+                _context.PropertyTaggings.RemoveRange(existingTags);
+                _context.PropertyTaggingLogs.Add(new PropertyTaggingLog
+                {
+                    Id = Guid.NewGuid(),
+                    TaxDeclarationId = td.Id,
+                    TaxDeclarationNumber = td.TaxDeclarationNumber,
+                    PropertyIndexNumber = td.PropertyIndexNumber,
+                    OwnerName = td.OwnerName,
+                    TagType = removedTypes,
+                    Action = "Removed (Cancellation of Annotation)",
+                    Details = $"Removed {existingTags.Count} tag(s) upon approval of TD Request {request.TrackingNumber}.",
+                    Source = $"Tax Declaration Request ({request.TrackingNumber})",
+                    PerformedBy = !string.IsNullOrWhiteSpace(approvedBy) ? approvedBy.Trim() : (request.RequesterName ?? "Workflow Approval"),
+                    Timestamp = DateTime.Now
+                });
+            }
+            else
+            {
+                _context.PropertyTaggingLogs.Add(new PropertyTaggingLog
+                {
+                    Id = Guid.NewGuid(),
+                    TaxDeclarationId = td.Id,
+                    TaxDeclarationNumber = td.TaxDeclarationNumber,
+                    PropertyIndexNumber = td.PropertyIndexNumber,
+                    OwnerName = td.OwnerName,
+                    TagType = "CancellationOfAnnotation",
+                    Action = "Removed (Cancellation of Annotation)",
+                    Details = $"Cancellation of Annotation approved on TD Request {request.TrackingNumber} (no active tag found).",
+                    Source = $"Tax Declaration Request ({request.TrackingNumber})",
+                    PerformedBy = !string.IsNullOrWhiteSpace(approvedBy) ? approvedBy.Trim() : (request.RequesterName ?? "Workflow Approval"),
+                    Timestamp = DateTime.Now
+                });
+            }
+        }
+
+        var party = !string.IsNullOrWhiteSpace(request.RequesterName)
+            ? request.RequesterName.Trim()
+            : $"TD Request {request.TrackingNumber}";
+        decimal? amt = request.TotalFeesAmount > 0 ? request.TotalFeesAmount : null;
+        var createdBy = !string.IsNullOrWhiteSpace(approvedBy) ? approvedBy.Trim() : (request.RequesterName ?? "Workflow Approval");
+
+        if (request.CertAnnotationBailBond)
+        {
+            _context.PropertyTaggings.Add(new PropertyTagging
+            {
+                Id = Guid.NewGuid(),
+                TaxDeclarationId = td.Id,
+                TaxDeclarationNumber = td.TaxDeclarationNumber,
+                PropertyIndexNumber = td.PropertyIndexNumber,
+                OwnerName = td.OwnerName,
+                TagType = PropertyTagType.Bailbond,
+                PartyName = party,
+                Amount = amt,
+                TagDate = DateTime.Now,
+                CreatedBy = createdBy,
+                CreatedDate = DateTime.Now
+            });
+            _context.PropertyTaggingLogs.Add(new PropertyTaggingLog
+            {
+                Id = Guid.NewGuid(),
+                TaxDeclarationId = td.Id,
+                TaxDeclarationNumber = td.TaxDeclarationNumber,
+                PropertyIndexNumber = td.PropertyIndexNumber,
+                OwnerName = td.OwnerName,
+                TagType = PropertyTagType.Bailbond.ToString(),
+                Action = "Tagged",
+                Details = $"Annotation of Bail Bond | Party: {party}",
+                Source = $"Tax Declaration Request ({request.TrackingNumber})",
+                PerformedBy = createdBy,
+                Timestamp = DateTime.Now
+            });
+        }
+
+        if (request.CertAnnotationMortgages)
+        {
+            _context.PropertyTaggings.Add(new PropertyTagging
+            {
+                Id = Guid.NewGuid(),
+                TaxDeclarationId = td.Id,
+                TaxDeclarationNumber = td.TaxDeclarationNumber,
+                PropertyIndexNumber = td.PropertyIndexNumber,
+                OwnerName = td.OwnerName,
+                TagType = PropertyTagType.Mortgage,
+                PartyName = party,
+                Amount = amt,
+                TagDate = DateTime.Now,
+                CreatedBy = createdBy,
+                CreatedDate = DateTime.Now
+            });
+            _context.PropertyTaggingLogs.Add(new PropertyTaggingLog
+            {
+                Id = Guid.NewGuid(),
+                TaxDeclarationId = td.Id,
+                TaxDeclarationNumber = td.TaxDeclarationNumber,
+                PropertyIndexNumber = td.PropertyIndexNumber,
+                OwnerName = td.OwnerName,
+                TagType = PropertyTagType.Mortgage.ToString(),
+                Action = "Tagged",
+                Details = $"Annotation of Mortgages | Party: {party}",
+                Source = $"Tax Declaration Request ({request.TrackingNumber})",
+                PerformedBy = createdBy,
+                Timestamp = DateTime.Now
+            });
+        }
+
+        _context.SaveChanges();
     }
 
     public void Delete(Guid id)

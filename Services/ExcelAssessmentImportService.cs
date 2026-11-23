@@ -488,6 +488,15 @@ public class ExcelAssessmentImportService : IExcelAssessmentImportService
 
             _assessmentService.SyncChildEntities(td);
 
+            var resolvedActualUse = string.IsNullOrWhiteSpace(r.ActualUse)
+                ? classification.ToString().ToUpperInvariant()
+                : r.ActualUse.Trim();
+            td.ActualUse = resolvedActualUse;
+            if (td.Kind == PropertyKind.Building && td.BuildingDetails != null && string.IsNullOrWhiteSpace(td.BuildingDetails.BuildingUseType))
+            {
+                td.BuildingDetails.BuildingUseType = resolvedActualUse;
+            }
+
             if (kind == PropertyKind.Building && td.BuildingDetails != null && r.LotRefAreaSqm > 0)
             {
                 td.BuildingDetails.LandAreaSqm = r.LotRefAreaSqm;
@@ -588,7 +597,6 @@ public class ExcelAssessmentImportService : IExcelAssessmentImportService
                         mother.SupersededByTdns = updatedSup;
                         mother.Status = AssessmentStatus.Cancelled;
                         mother.IsCancelledAndSuperseded = true;
-                        assessmentService.SyncChildEntities(mother);
                         bridged++;
                     }
                 }
@@ -603,7 +611,6 @@ public class ExcelAssessmentImportService : IExcelAssessmentImportService
                     if (!string.Equals(nextChild.PreviousTdNo, updatedPrev, StringComparison.OrdinalIgnoreCase))
                     {
                         nextChild.PreviousTdNo = updatedPrev;
-                        assessmentService.SyncChildEntities(nextChild);
                         bridged++;
                     }
                 }
