@@ -40,76 +40,112 @@ public class TaxDeclarationPdfService : ITaxDeclarationPdfService
         PropertyNameCaseInsensitive = true
     };
 
-    private (string? StampText, string? MarginText, string StampColorHex, string MarginColorHex) GetWatermark(TaxDeclaration td)
+    private (PropertyTagging? Tagging, bool IsCancelled, string StampColorHex) GetWatermark(TaxDeclaration td)
     {
-        if (td.IsCancelledAndSuperseded || td.Status == AssessmentStatus.Cancelled)
-        {
-            return ("CANCELLED", "CANCELLED", "#26DC2626", "#991B1B");
-        }
-
+        PropertyTagging? latestTag = null;
         if (td.Id != Guid.Empty)
         {
-            var latestTag = _context.PropertyTaggings
+            latestTag = _context.PropertyTaggings
                 .AsNoTracking()
                 .Where(t => t.TaxDeclarationId == td.Id)
                 .OrderByDescending(t => t.CreatedDate)
-                .Select(t => (PropertyTagType?)t.TagType)
                 .FirstOrDefault();
-
-            if (latestTag == PropertyTagType.Mortgage)
-                return ("MORTGAGED", "MORTGAGE", "#26D97706", "#991B1B");
-            if (latestTag == PropertyTagType.Bailbond)
-                return ("BAILBOND", "BAILBOND", "#264F46E5", "#3730A3");
-            if (latestTag == PropertyTagType.Release)
-                return (null, "RELEASED", "#260D9488", "#0F766E");
-            if (latestTag == PropertyTagType.Cancellation)
-                return ("CANCELLED", "CANCELLED", "#26DC2626", "#991B1B");
         }
 
-        return (null, null, "#26DC2626", "#991B1B");
+        if (td.IsCancelledAndSuperseded || td.Status == AssessmentStatus.Cancelled || latestTag?.TagType == PropertyTagType.Cancellation)
+        {
+            return (latestTag, true, "#30DC2626");
+        }
+
+        if (latestTag?.TagType == PropertyTagType.Mortgage)
+            return (latestTag, false, "#30B45309");
+        if (latestTag?.TagType == PropertyTagType.Bailbond)
+            return (latestTag, false, "#304338CA");
+        if (latestTag?.TagType == PropertyTagType.Release)
+            return (latestTag, false, "#300F766E");
+
+        return (null, false, "#30DC2626");
     }
 
     private void ApplyWatermark(PageDescriptor page, TaxDeclaration td)
     {
-        var (stampText, marginText, stampColorHex, marginColorHex) = GetWatermark(td);
-        if (string.IsNullOrEmpty(stampText) && string.IsNullOrEmpty(marginText))
+        var (tag, isCancelled, stampColorHex) = GetWatermark(td);
+        if (!isCancelled && tag == null)
             return;
+
+        string tdNo = string.IsNullOrWhiteSpace(td.TaxDeclarationNumber) ? "____________" : td.TaxDeclarationNumber;
+        string amtText = tag?.Amount.HasValue == true ? $"P {tag.Amount.Value:N2}" : "____________";
+        string dateText = tag?.TagDate.HasValue == true ? tag.TagDate.Value.ToString("MMM dd, yyyy") : "____________";
 
         page.Background().Layers(layers =>
         {
-            var primary = layers.PrimaryLayer();
-            if (!string.IsNullOrEmpty(stampText))
-            {
-                primary
-                    .AlignCenter()
-                    .AlignMiddle()
-                    .Rotate(-25)
-                    .Border(3.5f)
-                    .BorderColor(stampColorHex)
-                    .Padding(4)
-                    .Border(1.2f)
-                    .BorderColor(stampColorHex)
-                    .PaddingHorizontal(20)
-                    .PaddingVertical(8)
-                    .Column(col =>
-                    {
-                        col.Item().AlignCenter().Text(stampText).FontSize(42).ExtraBold().LetterSpacing(0.12f).FontColor(stampColorHex);
-                        col.Item().AlignCenter().Text("OFFICE OF THE CITY ASSESSOR • KORONADAL CITY").FontSize(9).Bold().LetterSpacing(0.08f).FontColor(stampColorHex);
-                    });
-            }
+            var stampContainer = layers.PrimaryLayer()
+                .AlignCenter()
+                .AlignMiddle()
+                .Rotate(-14)
+                .Width(360)
+                .Border(3)
+                .BorderColor(stampColorHex)
+                .Padding(3)
+                .Border(1)
+                .BorderColor(stampColorHex)
+                .PaddingHorizontal(14)
+                .PaddingVertical(8);
 
-            if (!string.IsNullOrEmpty(marginText))
+            if (isCancelled)
             {
-                layers.Layer()
-                    .PaddingLeft(6)
-                    .AlignLeft()
-                    .AlignMiddle()
-                    .RotateLeft()
-                    .Text(marginText)
-                    .FontSize(14)
-                    .ExtraBold()
-                    .LetterSpacing(0.14f)
-                    .FontColor(marginColorHex);
+                var dtCancel = td.DateCancelled ?? tag?.DateCancelled;
+                var reason = !string.IsNullOrWhiteSpace(td.CancellationReason) ? td.CancellationReason : (tag?.ReasonForCancellation ?? "Cancelled & Superseded");
+                stampContainer.Column(col =>
+                {
+                    col.Item().AlignCenter().Text("CANCELLED").FontSize(34).ExtraBold().LetterSpacing(0.14f).FontColor(stampColorHex);
+                    col.Item().AlignCenter().Text($"(T.D.) {tdNo}").FontSize(9).Bold().FontColor(stampColorHex);
+                    col.Item().AlignCenter().Text($"REASON: {reason.ToUpperInvariant()}").FontSize(8).Bold().FontColor(stampColorHex);
+                    col.Item().AlignCenter().Text($"DATE CANCELLED: {(dtCancel.HasValue ? dtCancel.Value.ToString("MMM dd, yyyy") : "____________")}").FontSize(8).Bold().FontColor(stampColorHex);
+                });
+            }
+            else if (tag!.TagType == PropertyTagType.Mortgage || tag.TagType == PropertyTagType.Bailbond)
+            {
+                var actionPhrase = tag.TagType == PropertyTagType.Mortgage ? "IS MORTGAGED TO:" : "IS BAILBOND TO:";
+                var party = !string.IsNullOrWhiteSpace(tag.PartyName) ? tag.PartyName.ToUpperInvariant() : "PNB, DBP, LBP";
+                stampContainer.Column(col =>
+                {
+                    col.Spacing(2);
+                    col.Item().BorderBottom(1).BorderColor(stampColorHex).PaddingBottom(2).AlignCenter()
+                        .Text("PROPERTY DESCRIBED UNDER THIS ASSESSMENT").FontSize(9.5f).ExtraBold().FontColor(stampColorHex);
+                    col.Item().Text($"(T.D.) {tdNo}").FontSize(9).Bold().FontColor(stampColorHex);
+                    col.Item().Text($"{actionPhrase} {party}").FontSize(9.5f).ExtraBold().FontColor(stampColorHex);
+                    col.Item().Row(r =>
+                    {
+                        r.RelativeItem().Text($"AMOUNT: {amtText} PESOS").FontSize(8.5f).Bold().FontColor(stampColorHex);
+                        r.AutoItem().Text($"DATE: {dateText}").FontSize(8.5f).Bold().FontColor(stampColorHex);
+                    });
+                });
+            }
+            else if (tag.TagType == PropertyTagType.Release)
+            {
+                stampContainer.Column(col =>
+                {
+                    col.Spacing(2);
+                    col.Item().BorderBottom(1).BorderColor(stampColorHex).PaddingBottom(2).AlignCenter()
+                        .Text("RELEASED OF MORTGAGE").FontSize(12).ExtraBold().LetterSpacing(0.1f).FontColor(stampColorHex);
+                    col.Item().Row(r =>
+                    {
+                        r.RelativeItem().Text($"DATE: {dateText}").FontSize(8.5f).Bold().FontColor(stampColorHex);
+                        r.RelativeItem().Text($"PER DOC NO.: {tag.PerDocNo ?? "________"}").FontSize(8.5f).Bold().FontColor(stampColorHex);
+                    });
+                    col.Item().Row(r =>
+                    {
+                        r.RelativeItem().Text($"PAGE NO.: {tag.PageNo ?? "________"}").FontSize(8.5f).Bold().FontColor(stampColorHex);
+                        r.RelativeItem().Text($"BOOK NO.: {tag.BookNo ?? "________"}").FontSize(8.5f).Bold().FontColor(stampColorHex);
+                    });
+                    col.Item().Row(r =>
+                    {
+                        r.RelativeItem().Text($"SERIES OF: {tag.SeriesOf ?? "________"}").FontSize(8.5f).Bold().FontColor(stampColorHex);
+                        r.RelativeItem().Text($"AMOUNT: {amtText}").FontSize(8.5f).Bold().FontColor(stampColorHex);
+                    });
+                    col.Item().Text($"POSTED BY: {(tag.PostedByName ?? "____________________").ToUpperInvariant()}").FontSize(8.5f).ExtraBold().FontColor(stampColorHex);
+                });
             }
         });
     }
