@@ -393,7 +393,7 @@
                     <i data-lucide="bar-chart-2" class="w-4 h-4 text-cyan-600"></i>
                     <span>Breakdown per Actual Use</span>
                 </div>
-                <p class="text-[11px] text-slate-400 dark:text-stone-500">Distribution of assessed value by Property actual use</p>
+                <p class="text-[11px] text-slate-400 dark:text-stone-500">Distribution of RPU count by Property actual use</p>
             </div>
 
             <div class="flex items-center gap-2 my-auto">
@@ -983,7 +983,7 @@
             document.getElementById("tfootActualUseAv").innerText = formatNumber(sumAv);
 
             const optionsActual = {
-                series: list.map(x => x.totalAssessedValue || 1),
+                series: list.map(x => x.parcelCount || 0),
                 labels: list.map(x => x.actualUseName),
                 chart: { type: "donut", height: 150, fontFamily: "inherit" },
                 colors: ["#006766", "#0070ba", "#f59e0b", "#8b5cf6", "#06b6d4", "#ec4899"],
@@ -997,16 +997,21 @@
                                 value: {
                                     fontSize: "10px",
                                     fontWeight: 700,
-                                    formatter: (val) => "PHP " + (val >= 1000000 ? (val/1000000).toFixed(1) + "M" : val)
+                                    formatter: (val) => `${Number(val || 0).toLocaleString()} RPU`
                                 },
                                 total: {
                                     show: true,
-                                    label: "Assessed Value",
+                                    label: "Total RPU",
                                     fontSize: "9px",
-                                    formatter: () => formatPHP(totalAv)
+                                    formatter: () => totalCount.toLocaleString()
                                 }
                             }
                         }
+                    }
+                },
+                tooltip: {
+                    y: {
+                        formatter: (val) => `${Number(val || 0).toLocaleString()} RPU`
                     }
                 },
                 legend: { show: false },
