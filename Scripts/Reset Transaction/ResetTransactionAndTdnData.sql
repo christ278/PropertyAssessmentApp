@@ -20,12 +20,11 @@ BEGIN TRY
     DELETE FROM [PropertyTaggingLogs];
     DELETE FROM [PropertyTaggings];
 
-    -- 2. Workflow, Notification, Transfer, Billing & Report Logs
+    -- 2. Workflow, Notification, Transfer & Billing Logs
     DELETE FROM [DocumentForwardingLogs];
     DELETE FROM [SmsNotificationLogs];
     DELETE FROM [DataTransferLogs];
     DELETE FROM [OrderPayments];
-    DELETE FROM [RPTReports];
 
     -- 3. Transaction Requests
     DELETE FROM [PropertyAssessmentRequests];

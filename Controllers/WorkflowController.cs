@@ -586,8 +586,23 @@ public class WorkflowController : Controller
         var senderName = string.IsNullOrWhiteSpace(forwardedByName) ? userInfo.userName : forwardedByName;
         var senderRole = string.IsNullOrWhiteSpace(role) ? userInfo.userRole : role;
 
-        // If action is "For Approval" or user is Non-Regular employee, tag it For Approval and return to pool
-        if (actionTaken == "For Approval" || (!userInfo.isRegularEmployee && !userInfo.isSuperAdminOrHead))
+        bool isExemptFromJoRestriction = string.Equals(requestType, "TaxMappingRequest", StringComparison.OrdinalIgnoreCase)
+                                      || string.Equals(requestType, "LandHoldingRequest", StringComparison.OrdinalIgnoreCase)
+                                      || string.Equals(requestType, "TaxDeclarationRequest", StringComparison.OrdinalIgnoreCase);
+
+        bool isReceivingStage = false;
+        if (!userInfo.isRegularEmployee && !userInfo.isSuperAdminOrHead && !isExemptFromJoRestriction)
+        {
+            var currentStage = _context.DocumentForwardingLogs
+                .Where(l => l.RequestId == requestId)
+                .OrderByDescending(l => l.Timestamp)
+                .Select(l => (WorkflowStage?)l.ToStage)
+                .FirstOrDefault() ?? WorkflowStage.ClerkReceiving;
+            isReceivingStage = currentStage == WorkflowStage.ClerkReceiving;
+        }
+
+        // If action is "For Approval" or user is Non-Regular employee at Division 1 Receiving (Stage 1), tag it For Approval and return to pool
+        if (actionTaken == "For Approval" || (!userInfo.isRegularEmployee && !userInfo.isSuperAdminOrHead && !isExemptFromJoRestriction && isReceivingStage))
         {
             _workflowService.TagDocumentForApproval(requestId, requestType, division, userInfo.userId, senderName, senderRole, remarks);
             TempData["SuccessMessage"] = "Transaction has been flagged 'For Approval' and returned to the shared department pool.";

@@ -377,7 +377,15 @@
                                             </button>
 
                                             <div class="workflow-action-dropdown hidden fixed z-50 w-64 rounded-2xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-700 shadow-xl py-1.5 text-left">
-                                                @if (isRegularStaff)
+                                                @{
+                                                    bool isRestrictedJoStage = !isRegularStaff
+                                                        && item.CurrentStage == WorkflowStage.ClerkReceiving
+                                                        && !string.Equals(item.RequestType, "TaxMappingRequest", StringComparison.OrdinalIgnoreCase)
+                                                        && !string.Equals(item.RequestType, "LandHoldingRequest", StringComparison.OrdinalIgnoreCase)
+                                                        && !string.Equals(item.RequestType, "TaxDeclarationRequest", StringComparison.OrdinalIgnoreCase);
+                                                    bool canForwardDirectly = !isRestrictedJoStage;
+                                                }
+                                                @if (canForwardDirectly)
                                                 {
                                                     <button type="button"
                                                             onclick="closeAllWorkflowActionMenus(); openForwardModal('@item.RequestId', '@item.RequestType', '@item.TrackingNumber', '@((int)item.CurrentStage)', '@((int)item.Division)', '@(item.ORNumber ?? "")', '@(item.ORDateIssued?.ToString("yyyy-MM-dd") ?? "")')"
