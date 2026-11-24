@@ -2,7 +2,8 @@ import React, { createContext, useState, useEffect } from 'react';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MobileApi } from '../api/mobileApi';
-import { DEFAULT_BASE_URL, setOnUnauthorizedCallback } from '../api/apiClient';
+import { setOnUnauthorizedCallback } from '../api/apiClient';
+import { API_CONFIG, DEFAULT_BASE_URL } from '../constants/config';
 
 export const AuthContext = createContext();
 
@@ -25,9 +26,10 @@ export const AuthProvider = ({ children }) => {
       if (savedUrl) {
         const isInvalidMobileUrl =
           savedUrl.includes('188.180.241.183') ||
+          savedUrl.includes('192.168.50.9') ||
           (Platform.OS !== 'web' &&
             (savedUrl.includes('localhost') || savedUrl.includes('10.0.2.2') || savedUrl.includes(':56018'))) ||
-          (Platform.OS === 'web' && !savedUrl.includes('localhost') && !savedUrl.includes('127.0.0.1'));
+          (Platform.OS === 'web' && !savedUrl.includes('localhost') && !savedUrl.includes('127.0.0.1') && !savedUrl.includes(API_CONFIG.DOMAIN));
         if (isInvalidMobileUrl) {
           setServerUrl(DEFAULT_BASE_URL);
           await AsyncStorage.setItem('@fairtrack_server_url', DEFAULT_BASE_URL);
@@ -115,37 +117,11 @@ export const AuthProvider = ({ children }) => {
           return { success: true, offline: true };
         }
 
-        // Fallback if no cached account exists yet (e.g. server was stopped before first online cache)
-        const rawLastUser = await AsyncStorage.getItem('@fairtrack_last_user');
-        const lastUser = rawLastUser ? JSON.parse(rawLastUser) : null;
-
-        const offlineUser =
-          lastUser && lastUser.username && lastUser.username.toLowerCase() === userKey
-            ? lastUser
-            : {
-                uid: `offline-${userKey}`,
-                username: cleanUsername,
-                name: userKey === 'admin' ? 'System Administrator' : cleanUsername,
-                roleId: 1,
-                divisionId: 1,
-                isAdmin: userKey === 'admin',
-                divisionName: 'Appraisal & Assessment Division (Offline Mode)'
-              };
-
-        const offlineToken = `offline-token-${Date.now()}`;
-        accounts[userKey] = {
-          password: cleanPassword,
-          user: offlineUser,
-          token: offlineToken,
-          updatedAt: new Date().toISOString()
+        // If the user has never logged in online on this device, reject access
+        return {
+          success: false,
+          message: 'Unable to connect to server. To log in offline, this account must have signed in on this device while connected at least once.'
         };
-        await AsyncStorage.setItem('@fairtrack_offline_accounts', JSON.stringify(accounts));
-        await AsyncStorage.setItem('@fairtrack_jwt_token', offlineToken);
-        await AsyncStorage.setItem('@fairtrack_user', JSON.stringify(offlineUser));
-
-        setToken(offlineToken);
-        setUser(offlineUser);
-        return { success: true, offline: true };
       } catch (offlineErr) {
         const message = err.message || 'Unable to connect to server.';
         return { success: false, message };

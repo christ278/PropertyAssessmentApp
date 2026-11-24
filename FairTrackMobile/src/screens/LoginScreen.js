@@ -18,6 +18,7 @@ import { AuthContext } from '../context/AuthContext';
 import { COLORS, SHADOWS } from '../constants/theme';
 import { useTheme } from '../context/ThemeContext';
 import { ActionModal } from '../components/ActionModal';
+import { API_CONFIG, DEFAULT_BASE_URL } from '../constants/config';
 
 export const LoginScreen = () => {
   const { isDarkMode, colors, shadows } = useTheme();
@@ -26,6 +27,7 @@ export const LoginScreen = () => {
   const { login, serverUrl, updateServerUrl } = useContext(AuthContext);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Server Settings Modal
@@ -156,8 +158,21 @@ export const LoginScreen = () => {
                 placeholderTextColor={colors.placeholder}
                 value={password}
                 onChangeText={setPassword}
-                secureTextEntry
+                secureTextEntry={!showPassword}
               />
+              <TouchableOpacity
+                onPress={() => setShowPassword((prev) => !prev)}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                style={styles.eyeBtn}
+                accessibilityRole="button"
+                accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+              >
+                <Ionicons
+                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                  size={20}
+                  color={colors.textMuted}
+                />
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -198,37 +213,28 @@ export const LoginScreen = () => {
               ]}
               value={tempUrl}
               onChangeText={setTempUrl}
-              placeholder="http://192.168.50.9:5156"
+              placeholder={DEFAULT_BASE_URL}
               placeholderTextColor={colors.placeholder}
               autoCapitalize="none"
               autoCorrect={false}
             />
 
             <View style={styles.quickUrls}>
-              <TouchableOpacity
-                style={[styles.quickTag, { backgroundColor: colors.primaryLight }]}
-                onPress={() => setTempUrl('http://192.168.1.243:5156')}
-              >
-                <Text style={[styles.quickTagText, { color: colors.primary }]}>
-                  LAN Wi-Fi (192.168.1.243:5156)
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.quickTag, { marginTop: 6, backgroundColor: colors.primaryLight }]}
-                onPress={() => setTempUrl('http://192.168.50.9:5156')}
-              >
-                <Text style={[styles.quickTagText, { color: colors.primary }]}>
-                  LAN Wi-Fi Alt (192.168.50.9:5156)
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.quickTag, { marginTop: 6, backgroundColor: colors.primaryLight }]}
-                onPress={() => setTempUrl('http://10.0.2.2:5156')}
-              >
-                <Text style={[styles.quickTagText, { color: colors.primary }]}>
-                  Android Emulator (10.0.2.2:5156)
-                </Text>
-              </TouchableOpacity>
+              {API_CONFIG.PRESET_URLS.map((preset, index) => (
+                <TouchableOpacity
+                  key={preset.id}
+                  style={[
+                    styles.quickTag,
+                    { backgroundColor: colors.primaryLight },
+                    index > 0 && { marginTop: 6 }
+                  ]}
+                  onPress={() => setTempUrl(preset.url)}
+                >
+                  <Text style={[styles.quickTagText, { color: colors.primary }]}>
+                    {preset.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
 
             <View style={styles.modalButtons}>
@@ -381,6 +387,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: COLORS.textDark,
     fontWeight: '600'
+  },
+  eyeBtn: {
+    padding: 6,
+    marginLeft: 4,
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   loginBtn: {
     backgroundColor: COLORS.primary,

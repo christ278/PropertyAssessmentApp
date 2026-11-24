@@ -1,27 +1,9 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform, NativeModules } from 'react-native';
+import { API_CONFIG, DEFAULT_BASE_URL } from '../constants/config';
 
-// Automatically detect the Metro bundler host IP on physical devices when running in Expo Go
-const getLanBaseUrl = () => {
-  try {
-    const scriptURL = NativeModules?.SourceCode?.scriptURL;
-    if (scriptURL) {
-      const match = scriptURL.match(/^https?:\/\/([^:/]+):/);
-      if (match && match[1] && match[1] !== 'localhost' && match[1] !== '127.0.0.1') {
-        return `http://${match[1]}:5156`;
-      }
-    }
-  } catch (e) {
-    // Fallback below
-  }
-  return 'http://192.168.50.9:5156';
-};
-
-// Default to localhost for web, or the PC's LAN IP for mobile devices
-export const DEFAULT_BASE_URL = Platform.OS === 'web'
-  ? 'http://localhost:5156'
-  : getLanBaseUrl();
+export { DEFAULT_BASE_URL };
 
 export const resolveServerUrl = async (path) => {
   if (!path) return '';
@@ -70,10 +52,10 @@ apiClient.interceptors.request.use(async (config) => {
     const savedUrl = await AsyncStorage.getItem('@fairtrack_server_url');
     if (savedUrl) {
       const cleanBase = savedUrl.trim().replace(/\/+$/, '');
-      // Avoid using localhost or 56018 on physical mobile devices if previously cached
+      // Avoid using localhost, 56018, or old stale LAN IPs on physical mobile devices if previously cached
       const isInvalidMobileUrl =
         Platform.OS !== 'web' &&
-        (cleanBase.includes('localhost') || cleanBase.includes('10.0.2.2') || cleanBase.includes(':56018'));
+        (cleanBase.includes('localhost') || cleanBase.includes('10.0.2.2') || cleanBase.includes(':56018') || cleanBase.includes('192.168.50.9'));
 
       config.baseURL = (isInvalidMobileUrl ? DEFAULT_BASE_URL : cleanBase) + '/';
       if (config.url && config.url.startsWith('/')) {
@@ -109,9 +91,14 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    // Never auto-relogin or intercept logout requests
-    if (originalRequest && originalRequest.url && originalRequest.url.includes('logout')) {
-      return Promise.resolve({ data: { success: true } });
+    // Never intercept login or logout requests
+    if (originalRequest && originalRequest.url) {
+      if (originalRequest.url.includes('logout')) {
+        return Promise.resolve({ data: { success: true } });
+      }
+      if (originalRequest.url.includes('login')) {
+        return Promise.reject(error);
+      }
     }
     if (error.response && error.response.status === 401 && originalRequest && !originalRequest._retried) {
       originalRequest._retried = true;
