@@ -165,7 +165,7 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
 
                         var partitionPIN = !string.IsNullOrWhiteSpace(p.PIN) 
                             ? p.PIN 
-                            : (refTd != null ? $"{refTd.PropertyIndexNumber}-{p.PartitionIndex}" : $"{partitionArpNo}");
+                            : (refTd != null ? $"{refTd.PropertyIndexNumber}-{p.PartitionIndex}" : string.Empty);
 
                         var effectiveOwnerName = !string.IsNullOrWhiteSpace(p.NewOwnerName) ? p.NewOwnerName : request.NewOwnerName;
                         var effectiveOwnerTin = !string.IsNullOrWhiteSpace(p.OwnerTIN) ? p.OwnerTIN : (request.OwnerTIN ?? string.Empty);
@@ -1080,7 +1080,7 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
                 ? conf.PIN 
                 : ((isTransferTx || isReclassTx) && refTd != null 
                     ? refTd.PropertyIndexNumber 
-                    : (refTd != null ? $"{refTd.PropertyIndexNumber}-{letterSuffix}" : partitionArpNo));
+                    : (refTd != null ? $"{refTd.PropertyIndexNumber}-{letterSuffix}" : string.Empty));
 
             var dividedArea = conf != null && conf.AreaSqMeters > 0 ? conf.AreaSqMeters : (refTd != null && partitionCount > 1 
                 ? Math.Round(refTd.AreaSqMeters / partitionCount, 2) 

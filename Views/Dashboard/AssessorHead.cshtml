@@ -1,6 +1,6 @@
-﻿@model PropertyAssessmentApp.Models.DashboardViewModel
+@model PropertyAssessmentApp.Models.DashboardViewModel
 @{
-    ViewData["Title"] = "Assessor Head Dashboard";
+    ViewData["Title"] = "Transaction Dashboard";
     bool hasDateFilter = Model.StartDate.HasValue || Model.EndDate.HasValue;
     string dateRangeTitle;
     if (Model.StartDate.HasValue && Model.EndDate.HasValue)

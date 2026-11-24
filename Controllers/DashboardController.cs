@@ -73,7 +73,7 @@ public class DashboardController : Controller
     {
         var allItems = GetAllItems();
         var items = FilterByDate(allItems, startDate, endDate);
-        var model = BuildBase("Assessor Head Dashboard", "Office-wide property assessment summary, request trends and today's transactions", nameof(AssessorHead), startDate, endDate);
+        var model = BuildBase("Transaction Dashboard", "Office-wide property assessment summary, request trends and today's transactions", nameof(AssessorHead), startDate, endDate);
         Fill(model, items, startDate, endDate);
         FillPropertyCounts(model, startDate, endDate);
         FillTodayTransactions(model, allItems, startDate, endDate);
