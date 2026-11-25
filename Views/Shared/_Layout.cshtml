@@ -174,7 +174,7 @@
     bool isAssessmentActive = currentController is "Assessment" or "Owner" or "PropertyAssessmentRequest" or "RequestForInspection";
     bool isRequestsActive = currentController is "PropertyAssessmentRequest" or "RequestForInspection" or "LandHoldingRequest" or "TaxDeclarationRequest" or "TaxMapping" or "RPTReport";
     bool isSidebarRequestsActive = currentController is "LandHoldingRequest" or "TaxDeclarationRequest" or "TaxMapping" or "RPTReport";
-    bool isSettingsActive = currentController is "OrderPayment" or "UserAccount" or "UserRole" or "FileLocation" or "DataTransferUtility" || (currentController == "Workflow" && currentAction == "Settings");
+    bool isSettingsActive = currentController is "OrderPayment" or "UserAccount" or "UserRole" or "FileLocation" or "DataTransferUtility" or "LandReference" || (currentController == "Workflow" && currentAction == "Settings");
     var userPerms = PermissionService.GetUserPermissionSummary(User);
 
     // Dynamic Module Permission Flags
@@ -208,9 +208,10 @@
     bool canUserRole = PermissionService.CanAccess(User, "UserRole");
     bool canRolePermissions = PermissionService.CanAccess(User, "UserRole", "Permissions");
     bool canWorkflowSettings = PermissionService.CanAccess(User, "Workflow", "Settings");
+    bool canLandReference = PermissionService.CanAccess(User, "LandReference");
     bool canFileLocation = PermissionService.CanAccess(User, "FileLocation");
     bool canDataTransfer = PermissionService.CanAccess(User, "DataTransferUtility");
-    bool showSettingsGroup = canOrderPayment || canUserAccount || canUserRole || canRolePermissions || canWorkflowSettings || canFileLocation || canDataTransfer;
+    bool showSettingsGroup = canOrderPayment || canUserAccount || canUserRole || canRolePermissions || canWorkflowSettings || canLandReference || canFileLocation || canDataTransfer;
 }
 <body class="bg-slate-50 dark:bg-till-950 text-slate-900 dark:text-stone-100 font-sans antialiased flex min-h-screen overflow-x-hidden selection:bg-emerald-500 selection:text-white transition-colors duration-200">
 
@@ -515,6 +516,14 @@
                             <a asp-controller="Workflow" asp-action="Calendar" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold text-xs transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "Workflow" && currentAction == "Calendar" ? "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold" : "text-slate-600 dark:text-stone-400 hover:text-emerald-700 dark:hover:text-emerald-400")">
                                 <i data-lucide="calendar-clock" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
                                 <span>Office Hours &amp; Holidays</span>
+                            </a>
+                        }
+
+                        @if (canLandReference)
+                        {
+                            <a asp-controller="LandReference" asp-action="Index" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold text-xs transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "LandReference" ? "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold" : "text-slate-600 dark:text-stone-400 hover:text-emerald-700 dark:hover:text-emerald-400")">
+                                <i data-lucide="sliders" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
+                                <span>Land Reference Tables</span>
                             </a>
                         }
 
@@ -1034,7 +1043,7 @@
                                         }
 
                                         <!-- Section 2: Configurations -->
-                                        @if (canWorkflowSettings || canFileLocation)
+                                        @if (canWorkflowSettings || canLandReference || canFileLocation)
                                         {
                                             <div class="space-y-1">
                                                 <div class="px-2 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-stone-500">Configurations</div>
@@ -1052,6 +1061,16 @@
                                                         <div>
                                                             <div class="font-bold">Office Hours &amp; Holidays</div>
                                                             <div class="text-[10px] text-slate-500 dark:text-stone-400">Citizen's Charter SLA calendar</div>
+                                                        </div>
+                                                    </a>
+                                                }
+                                                @if (canLandReference)
+                                                {
+                                                    <a asp-controller="LandReference" asp-action="Index" class="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all hover:bg-emerald-50 dark:hover:bg-stone-800/80 @(currentController == "LandReference" ? "bg-emerald-50 text-emerald-700 dark:bg-stone-800 dark:text-emerald-400 font-bold ring-1 ring-emerald-500/20" : "text-slate-700 dark:text-stone-300")">
+                                                        <i data-lucide="sliders" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                                                        <div>
+                                                            <div class="font-bold">Land Reference Tables</div>
+                                                            <div class="text-[10px] text-slate-500 dark:text-stone-400">Valuation schedules &amp; rates</div>
                                                         </div>
                                                     </a>
                                                 }

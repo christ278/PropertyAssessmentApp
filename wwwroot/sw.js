@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fairtrack-pwa-v1';
+const CACHE_NAME = 'fairtrack-pwa-v2';
 const PRECACHE_URLS = [
     '/offline.html',
     '/images/pwa/icon-192.png',

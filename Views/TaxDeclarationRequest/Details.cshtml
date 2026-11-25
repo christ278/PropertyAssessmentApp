@@ -1,4 +1,4 @@
-﻿@model PropertyAssessmentApp.Models.TaxDeclarationRequest
+@model PropertyAssessmentApp.Models.TaxDeclarationRequest
 @using System.Text.Json
 
 @{
@@ -18,10 +18,7 @@
     
     <!-- Action Header Bar -->
     <div class="flex items-center justify-between">
-        <a asp-action="Index" class="px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 hover:bg-slate-50 dark:hover:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold border border-slate-200 dark:border-stone-800 shadow-sm flex items-center gap-2">
-            <i data-lucide="arrow-left" class="w-4 h-4"></i>
-            Back to Directory
-        </a>
+        <partial name="_DetailsBackButton" model='(Url.Action("Index") ?? "/TaxDeclarationRequest", "Back to Directory", "px-4 py-2.5 rounded-xl bg-white dark:bg-stone-900 hover:bg-slate-50 dark:hover:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold border border-slate-200 dark:border-stone-800 shadow-sm flex items-center gap-2")' />
         <div class="flex items-center gap-3">
             <a asp-action="Edit" asp-route-id="@Model.Id" class="px-5 py-2.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold flex items-center gap-2 shadow-sm">
                 <i data-lucide="edit" class="w-4 h-4"></i>

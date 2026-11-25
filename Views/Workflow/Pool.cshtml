@@ -364,13 +364,14 @@
 
                                             <!-- Details Deep Link -->
                                             @{
+                                                string currentPoolReturnUrl = Context.Request.Path + Context.Request.QueryString;
                                                 string detailsUrl = item.RequestType switch
                                                 {
-                                                    "TaxDeclarationRequest" => Url.Action("Details", "TaxDeclarationRequest", new { id = item.RequestId }) ?? "#",
-                                                    "LandHoldingRequest" => Url.Action("Details", "LandHoldingRequest", new { id = item.RequestId }) ?? "#",
-                                                    "TaxMappingRequest" => Url.Action("Details", "TaxMapping", new { id = item.RequestId }) ?? "#",
-                                                    "PropertyAssessmentRequest" => Url.Action("Details", "PropertyAssessmentRequest", new { id = item.RequestId }) ?? "#",
-                                                    "RequestForInspection" => Url.Action("Details", "RequestForInspection", new { id = item.RequestId }) ?? "#",
+                                                    "TaxDeclarationRequest" => Url.Action("Details", "TaxDeclarationRequest", new { id = item.RequestId, returnUrl = currentPoolReturnUrl }) ?? "#",
+                                                    "LandHoldingRequest" => Url.Action("Details", "LandHoldingRequest", new { id = item.RequestId, returnUrl = currentPoolReturnUrl }) ?? "#",
+                                                    "TaxMappingRequest" => Url.Action("Details", "TaxMapping", new { id = item.RequestId, returnUrl = currentPoolReturnUrl }) ?? "#",
+                                                    "PropertyAssessmentRequest" => Url.Action("Details", "PropertyAssessmentRequest", new { id = item.RequestId, returnUrl = currentPoolReturnUrl }) ?? "#",
+                                                    "RequestForInspection" => Url.Action("Details", "RequestForInspection", new { id = item.RequestId, returnUrl = currentPoolReturnUrl }) ?? "#",
                                                     _ => "#"
                                                 };
                                             }

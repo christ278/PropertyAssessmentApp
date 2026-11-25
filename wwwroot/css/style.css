@@ -46,22 +46,36 @@ body, .font-sans, .font-mono, .font-serif, input, select, textarea, button, tabl
     box-shadow: 0 10px 25px -5px rgba(5, 150, 105, 0.12), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }
 
-/* Searchable Select (Tom Select) Custom Styling for Dark & Light Mode */
+/* Searchable Select (Tom Select / Choices) Custom Styling matching Login Input */
 .ts-control {
-    background-color: transparent !important;
-    border-color: #cbd5e1 !important;
+    background-color: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
     border-radius: 0.75rem !important;
-    padding: 0.625rem 1rem !important;
+    min-height: 44px !important;
+    padding: 0.625rem 0.875rem !important;
     font-family: inherit !important;
-    font-size: 0.75rem !important;
-    font-weight: 700 !important;
+    font-size: 0.8125rem !important;
+    font-weight: 500 !important;
     color: #0f172a !important;
     box-shadow: none !important;
+    transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+.ts-wrapper.focus .ts-control,
+.ts-wrapper.input-active .ts-control {
+    background-color: #ffffff !important;
+    border-color: #10b981 !important;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15) !important;
 }
 .dark .ts-control {
-    background-color: #030202 !important;
-    border-color: #262626 !important;
+    background-color: #0c0a09 !important;
+    border-color: #292524 !important;
     color: #ffffff !important;
+}
+.dark .ts-wrapper.focus .ts-control,
+.dark .ts-wrapper.input-active .ts-control {
+    background-color: #1c1917 !important;
+    border-color: #10b981 !important;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2) !important;
 }
 .dark .ts-control input {
     color: #ffffff !important;
@@ -360,4 +374,155 @@ select:-webkit-autofill:focus {
     position: relative !important;
     pointer-events: none !important;
     opacity: 0.85 !important;
+}
+
+/* -------------------------------------------------------------------------- */
+/* GLOBAL FORM INPUTS & SELECT2 DESIGN (MATCHING LOGIN INPUT STYLE)           */
+/* -------------------------------------------------------------------------- */
+main input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not(.ts-control input):not(.select2-search__field),
+main select:not(.table-limit-select):not(.select2-hidden-accessible),
+main textarea {
+    background-color: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    color: #0f172a;
+    transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+main input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]):not([type="submit"]):not([type="button"]):not([type="reset"])::placeholder,
+main textarea::placeholder {
+    color: #94a3b8;
+}
+
+main input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not(.ts-control input):not(.select2-search__field):focus,
+main select:not(.table-limit-select):not(.select2-hidden-accessible):focus,
+main textarea:focus {
+    background-color: #ffffff;
+    border-color: #10b981 !important;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15) !important;
+    outline: none !important;
+}
+
+.dark main input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not(.ts-control input):not(.select2-search__field),
+.dark main select:not(.table-limit-select):not(.select2-hidden-accessible),
+.dark main textarea {
+    background-color: #0c0a09;
+    border-color: #292524;
+    color: #f5f5f4;
+}
+
+.dark main input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not(.ts-control input):not(.select2-search__field):focus,
+.dark main select:not(.table-limit-select):not(.select2-hidden-accessible):focus,
+.dark main textarea:focus {
+    background-color: #1c1917;
+    border-color: #10b981 !important;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2) !important;
+}
+
+/* Select2 Styling matching Login Input */
+.select2-container--default .select2-selection--single,
+.select2-container--default .select2-selection--multiple {
+    background-color: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 0.75rem !important;
+    min-height: 44px !important;
+    transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.select2-container--default .select2-selection--single {
+    display: flex !important;
+    align-items: center !important;
+    padding: 0 2rem 0 0.75rem !important;
+}
+
+.select2-container--default .select2-selection--single .select2-selection__rendered {
+    color: #0f172a !important;
+    font-size: 0.8125rem !important;
+    font-weight: 500 !important;
+    padding-left: 0 !important;
+    line-height: 1.4 !important;
+}
+
+.select2-container--default .select2-selection--single .select2-selection__placeholder {
+    color: #94a3b8 !important;
+}
+
+.select2-container--default .select2-selection--single .select2-selection__arrow {
+    height: 100% !important;
+    right: 0.65rem !important;
+}
+
+.select2-container--default.select2-container--open .select2-selection--single,
+.select2-container--default.select2-container--focus .select2-selection--single,
+.select2-container--default.select2-container--open .select2-selection--multiple,
+.select2-container--default.select2-container--focus .select2-selection--multiple {
+    background-color: #ffffff !important;
+    border-color: #10b981 !important;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15) !important;
+    outline: none !important;
+}
+
+.select2-dropdown {
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 0.75rem !important;
+    box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.12) !important;
+    overflow: hidden !important;
+    font-size: 0.8125rem !important;
+}
+
+.select2-search--dropdown {
+    padding: 0.5rem !important;
+}
+
+.select2-container--default .select2-search--dropdown .select2-search__field {
+    background-color: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 0.625rem !important;
+    padding: 0.45rem 0.75rem !important;
+    color: #0f172a !important;
+    font-size: 0.8125rem !important;
+}
+
+.select2-container--default .select2-search--dropdown .select2-search__field:focus {
+    background-color: #ffffff !important;
+    border-color: #10b981 !important;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15) !important;
+    outline: none !important;
+}
+
+.select2-container--default .select2-results__option--highlighted[aria-selected],
+.select2-container--default .select2-results__option--highlighted[data-selected] {
+    background-color: #10b981 !important;
+    color: #ffffff !important;
+}
+
+.dark .select2-container--default .select2-selection--single,
+.dark .select2-container--default .select2-selection--multiple {
+    background-color: #0c0a09 !important;
+    border-color: #292524 !important;
+}
+
+.dark .select2-container--default .select2-selection--single .select2-selection__rendered {
+    color: #f5f5f4 !important;
+}
+
+.dark .select2-container--default.select2-container--open .select2-selection--single,
+.dark .select2-container--default.select2-container--focus .select2-selection--single,
+.dark .select2-container--default.select2-container--open .select2-selection--multiple,
+.dark .select2-container--default.select2-container--focus .select2-selection--multiple {
+    background-color: #1c1917 !important;
+    border-color: #10b981 !important;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2) !important;
+}
+
+.dark .select2-dropdown {
+    background-color: #0c0a09 !important;
+    border-color: #292524 !important;
+    color: #f5f5f4 !important;
+}
+
+.dark .select2-container--default .select2-search--dropdown .select2-search__field {
+    background-color: #1c1917 !important;
+    border-color: #292524 !important;
+    color: #f5f5f4 !important;
 }

@@ -41,9 +41,7 @@
                 <i data-lucide="edit" class="w-4 h-4"></i>
                 <span>Edit Request</span>
             </a>
-            <a asp-action="Index" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold hover:bg-slate-200 transition-all">
-                Back to List
-            </a>
+            <partial name="_DetailsBackButton" model='(Url.Action("Index") ?? "/PropertyAssessmentRequest", "Back to List", "px-4 py-2 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold hover:bg-slate-200 transition-all inline-flex items-center gap-1.5")' />
         </div>
     </div>
 
@@ -140,12 +138,7 @@
         </div>
 
         @{
-            List<PropertyAssessmentApp.Models.AssessmentPartitionItem> savedPartitions = new();
-            if (!string.IsNullOrWhiteSpace(Model.GeneratedPartitionsJson))
-            {
-                try { savedPartitions = System.Text.Json.JsonSerializer.Deserialize<List<PropertyAssessmentApp.Models.AssessmentPartitionItem>>(Model.GeneratedPartitionsJson) ?? new(); }
-                catch {}
-            }
+            var savedPartitions = PropertyAssessmentApp.Services.PartitionJsonHelper.ParseList(Model.GeneratedPartitionsJson);
         }
 
         @if (savedPartitions.Any())
@@ -220,7 +213,7 @@
                                         </span>
                                     </td>
                                     <td class="px-4 py-3 align-middle text-center">
-                                        <a asp-action="EditPartition" asp-route-requestId="@Model.Id" asp-route-index="@pIdx" asp-route-returnUrl="@Url.Action("Details", new { id = Model.Id })" class="inline-flex p-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition-colors" title="Edit Full CAST Appraisal (Pencil)">
+                                        <a asp-action="EditPartition" asp-route-requestId="@Model.Id" asp-route-index="@pIdx" asp-route-returnUrl="@Url.Action("Details", new { id = Model.Id, returnUrl = Context.Request.Query["returnUrl"].ToString() })" class="inline-flex p-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition-colors" title="Edit Full CAST Appraisal (Pencil)">
                                             <i data-lucide="pencil" class="w-4 h-4"></i>
                                         </a>
                                     </td>

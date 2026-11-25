@@ -42,9 +42,7 @@
                 <i data-lucide="edit" class="w-4 h-4"></i>
                 <span>Edit Request</span>
             </a>
-            <a asp-action="Index" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold hover:bg-slate-200 transition-all">
-                Back to List
-            </a>
+            <partial name="_DetailsBackButton" model='(Url.Action("Index") ?? "/RequestForInspection", "Back to List", "px-4 py-2 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold hover:bg-slate-200 transition-all inline-flex items-center gap-1.5")' />
         </div>
     </div>
 

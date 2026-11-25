@@ -352,13 +352,14 @@
                                     }
                                     else
                                     {
+                                        string currentListReturnUrl = Context.Request.Path + Context.Request.QueryString;
                                         string detailsUrl = item.RequestType switch
                                         {
-                                            "TaxDeclarationRequest" => Url.Action("Details", "TaxDeclarationRequest", new { id = item.RequestId }) ?? "#",
-                                            "LandHoldingRequest" => Url.Action("Details", "LandHoldingRequest", new { id = item.RequestId }) ?? "#",
-                                            "TaxMappingRequest" => Url.Action("Details", "TaxMapping", new { id = item.RequestId }) ?? "#",
-                                            "PropertyAssessmentRequest" => Url.Action("Details", "PropertyAssessmentRequest", new { id = item.RequestId }) ?? "#",
-                                            "RequestForInspection" => Url.Action("Details", "RequestForInspection", new { id = item.RequestId }) ?? "#",
+                                            "TaxDeclarationRequest" => Url.Action("Details", "TaxDeclarationRequest", new { id = item.RequestId, returnUrl = currentListReturnUrl }) ?? "#",
+                                            "LandHoldingRequest" => Url.Action("Details", "LandHoldingRequest", new { id = item.RequestId, returnUrl = currentListReturnUrl }) ?? "#",
+                                            "TaxMappingRequest" => Url.Action("Details", "TaxMapping", new { id = item.RequestId, returnUrl = currentListReturnUrl }) ?? "#",
+                                            "PropertyAssessmentRequest" => Url.Action("Details", "PropertyAssessmentRequest", new { id = item.RequestId, returnUrl = currentListReturnUrl }) ?? "#",
+                                            "RequestForInspection" => Url.Action("Details", "RequestForInspection", new { id = item.RequestId, returnUrl = currentListReturnUrl }) ?? "#",
                                             _ => "#"
                                         };
                                         bool isReleasingStage = (int)item.CurrentStage == 10 ||

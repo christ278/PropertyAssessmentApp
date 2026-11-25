@@ -1,0 +1,808 @@
+@model PropertyAssessmentApp.Models.LandReferenceSettingsViewModel
+@{
+    ViewData["Title"] = "Land Reference Settings";
+    var tab = Model.ActiveTab;
+}
+
+<div class="space-y-8">
+    <!-- Page Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <div class="inline-flex items-center gap-2 text-xs font-mono text-emerald-700 dark:text-emerald-400 font-bold mb-1">
+                <i data-lucide="sliders" class="w-4 h-4"></i>
+                <span>File Maintenance &bull; Valuation Schedules</span>
+            </div>
+            <h1 class="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                Land Reference Settings
+            </h1>
+            <p class="text-slate-500 dark:text-stone-400 text-sm">
+                Manage classifications, sub-class unit values, actual uses, assessment levels, adjustments, and improvement types. Records are deactivated instead of deleted.
+            </p>
+        </div>
+
+        <button type="button" onclick="openModalForActiveTab()"
+                class="px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-till-950 font-bold text-xs font-mono flex items-center gap-2 shadow-md shadow-emerald-600/20 transition-all cursor-pointer shrink-0">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            <span>Add New Record</span>
+        </button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex flex-wrap gap-2 p-1.5 rounded-2xl bg-slate-100 dark:bg-stone-900 border border-slate-200 dark:border-stone-800">
+        @{
+            var tabs = new (string Key, string Label, string Icon, int Count)[]
+            {
+                ("classification", "Classifications", "tag", Model.Classifications.Count),
+                ("subclass", "Sub-Classifications", "layers", Model.SubClassifications.Count),
+                ("actualuse", "Actual Uses", "building-2", Model.ActualUses.Count),
+                ("assessmentlevel", "Assessment Levels", "percent", Model.AssessmentLevels.Count),
+                ("adjustment", "Adjustment Factors", "trending-up", Model.AdjustmentFactors.Count),
+                ("improvement", "Improvement Types", "trees", Model.ImprovementTypes.Count)
+            };
+        }
+        @foreach (var t in tabs)
+        {
+            bool active = tab == t.Key;
+            <a asp-action="Index" asp-route-tab="@t.Key" asp-route-status="@Model.StatusFilter" asp-route-search="@Model.Search"
+               class="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all @(active ? "bg-white dark:bg-stone-800 text-emerald-700 dark:text-emerald-400 shadow-xs ring-1 ring-emerald-500/20" : "text-slate-600 dark:text-stone-400 hover:text-slate-900 dark:hover:text-white")">
+                <i data-lucide="@t.Icon" class="w-3.5 h-3.5"></i>
+                <span>@t.Label</span>
+                <span class="px-1.5 py-0.5 rounded-md text-[10px] font-mono @(active ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300" : "bg-slate-200/80 dark:bg-stone-800 text-slate-600 dark:text-stone-400")">
+                    @t.Count
+                </span>
+            </a>
+        }
+    </div>
+
+    <!-- Search & Filter Controls (Matching UserAccount Directory) -->
+    <form method="get" asp-action="Index" class="flex flex-wrap items-center justify-between gap-4 bg-white dark:bg-stone-900 p-4 rounded-2xl border border-slate-200 dark:border-stone-800 shadow-sm font-mono text-xs">
+        <input type="hidden" name="tab" value="@tab" />
+        <div class="flex items-center gap-2 flex-1 min-w-[240px]">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 dark:text-stone-400 shrink-0"></i>
+            <input type="text" name="search" value="@Model.Search" placeholder="Search code, name, or description..."
+                   class="w-full bg-slate-50 dark:bg-stone-950 px-4 py-2 rounded-xl border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600" />
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3">
+            <div class="flex items-center gap-2 bg-slate-50 dark:bg-stone-800 px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-700 shadow-xs shrink-0">
+                <span class="limit-label text-[10px] text-slate-500 dark:text-emerald-400 font-semibold uppercase">Limit:</span>
+                <select data-target="landRefTableCard" class="table-limit-select bg-transparent font-semibold text-slate-900 dark:text-white focus:outline-none cursor-pointer">
+                    <option value="5" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">5</option>
+                    <option value="10" selected class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">10</option>
+                    <option value="25" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">25</option>
+                    <option value="50" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">50</option>
+                    <option value="100" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">100</option>
+                </select>
+            </div>
+
+            <select name="status" class="bg-slate-50 dark:bg-stone-950 text-slate-900 dark:text-white px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800" onchange="this.form.submit()">
+                <option value="all" selected="@(Model.StatusFilter == "all")">All Status</option>
+                <option value="active" selected="@(Model.StatusFilter == "active")">Active Only</option>
+                <option value="inactive" selected="@(Model.StatusFilter == "inactive")">Inactive Only</option>
+            </select>
+
+            <button type="submit" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-till-950 font-bold cursor-pointer">Filter</button>
+            <a asp-action="Index" asp-route-tab="@tab" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-300 hover:text-slate-900 dark:hover:text-white" title="Reset Filters"><i data-lucide="rotate-ccw" class="w-4 h-4"></i></a>
+        </div>
+    </form>
+
+    <!-- Paginated Reference Table Card -->
+    <div id="landRefTableCard" class="bg-white dark:bg-stone-900 rounded-3xl border border-slate-200 dark:border-stone-800 shadow-sm paginated-table-card">
+        <div class="overflow-x-auto min-h-[260px] pb-4 rounded-3xl">
+            @if (tab == "classification")
+            {
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-50 dark:bg-stone-950 border-b border-slate-200 dark:border-stone-800 text-[11px] font-mono uppercase text-slate-500">
+                        <tr>
+                            <th class="px-4 py-3">Code</th>
+                            <th class="px-4 py-3">Classification Name</th>
+                            <th class="px-4 py-3">Prefix</th>
+                            <th class="px-4 py-3 text-center">Ranking</th>
+                            <th class="px-4 py-3 text-center">Sort Order</th>
+                            <th class="px-4 py-3 text-center">Status</th>
+                            <th class="px-4 py-3 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-stone-800">
+                        @foreach (var item in Model.Classifications)
+                        {
+                            <tr class="hover:bg-slate-50/70 dark:hover:bg-stone-800/40 @(item.IsActive ? "" : "opacity-60")">
+                                <td class="px-4 py-3 font-mono font-bold text-slate-900 dark:text-white">@item.ClassificationCode</td>
+                                <td class="px-4 py-3 font-semibold text-slate-800 dark:text-stone-200">@item.ClassificationName</td>
+                                <td class="px-4 py-3 font-mono text-slate-500">@(item.Prefix ?? "-")</td>
+                                <td class="px-4 py-3 text-center font-mono">@(item.Ranking?.ToString() ?? "-")</td>
+                                <td class="px-4 py-3 text-center font-mono">@item.SortOrder</td>
+                                <td class="px-4 py-3 text-center">
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase @(item.IsActive ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300" : "bg-slate-200 text-slate-600 dark:bg-stone-800 dark:text-stone-400")">
+                                        @(item.IsActive ? "Active" : "Inactive")
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    <div class="inline-flex items-center gap-1.5">
+                                        <button type="button" onclick='editClassification(@item.Id, @Html.Raw(System.Text.Json.JsonSerializer.Serialize(item.ClassificationCode)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(item.ClassificationName)), @(item.Ranking?.ToString() ?? "null"), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(item.Prefix ?? "")), @item.SortOrder, @(item.IsActive ? "true" : "false"))'
+                                                class="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-slate-700 dark:text-stone-200 font-bold text-[11px] cursor-pointer">Edit</button>
+                                        <form asp-action="ToggleClassificationStatus" method="post" class="inline">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@item.Id" />
+                                            <input type="hidden" name="status" value="@Model.StatusFilter" />
+                                            <input type="hidden" name="search" value="@Model.Search" />
+                                            <button type="submit" class="px-2.5 py-1.5 rounded-lg font-bold text-[11px] cursor-pointer @(item.IsActive ? "bg-amber-50 hover:bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300" : "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300")">
+                                                @(item.IsActive ? "Set Inactive" : "Activate")
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else if (tab == "subclass")
+            {
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-50 dark:bg-stone-950 border-b border-slate-200 dark:border-stone-800 text-[11px] font-mono uppercase text-slate-500">
+                        <tr>
+                            <th class="px-4 py-3">Classification</th>
+                            <th class="px-4 py-3">Sub-Class</th>
+                            <th class="px-4 py-3 text-right">Unit Value (PHP)</th>
+                            <th class="px-4 py-3 text-center">Revision Year</th>
+                            <th class="px-4 py-3 text-center">Status</th>
+                            <th class="px-4 py-3 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-stone-800">
+                        @foreach (var item in Model.SubClassifications)
+                        {
+                            var clsName = Model.ClassificationNames.GetValueOrDefault(item.ClassificationId) ?? $"#{item.ClassificationId}";
+                            <tr class="hover:bg-slate-50/70 dark:hover:bg-stone-800/40 @(item.IsActive ? "" : "opacity-60")">
+                                <td class="px-4 py-3 font-semibold text-slate-700 dark:text-stone-300">@clsName</td>
+                                <td class="px-4 py-3 font-bold text-slate-900 dark:text-white">@item.SubClass</td>
+                                <td class="px-4 py-3 text-right font-mono font-bold text-emerald-700 dark:text-emerald-400">@item.UnitValue.ToString("N2")</td>
+                                <td class="px-4 py-3 text-center font-mono">@item.RevisionYear</td>
+                                <td class="px-4 py-3 text-center">
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase @(item.IsActive ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300" : "bg-slate-200 text-slate-600 dark:bg-stone-800 dark:text-stone-400")">
+                                        @(item.IsActive ? "Active" : "Inactive")
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    <div class="inline-flex items-center gap-1.5">
+                                        <button type="button" onclick='editSubClass(@item.Id, @item.ClassificationId, @Html.Raw(System.Text.Json.JsonSerializer.Serialize(item.SubClass)), @item.UnitValue.ToString(System.Globalization.CultureInfo.InvariantCulture), @item.RevisionYear, @(item.IsActive ? "true" : "false"))'
+                                                class="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-slate-700 dark:text-stone-200 font-bold text-[11px] cursor-pointer">Edit</button>
+                                        <form asp-action="ToggleSubClassificationStatus" method="post" class="inline">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@item.Id" />
+                                            <input type="hidden" name="status" value="@Model.StatusFilter" />
+                                            <input type="hidden" name="search" value="@Model.Search" />
+                                            <button type="submit" class="px-2.5 py-1.5 rounded-lg font-bold text-[11px] cursor-pointer @(item.IsActive ? "bg-amber-50 hover:bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300" : "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300")">
+                                                @(item.IsActive ? "Set Inactive" : "Activate")
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else if (tab == "actualuse")
+            {
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-50 dark:bg-stone-950 border-b border-slate-200 dark:border-stone-800 text-[11px] font-mono uppercase text-slate-500">
+                        <tr>
+                            <th class="px-4 py-3">Code</th>
+                            <th class="px-4 py-3">Actual Use Name</th>
+                            <th class="px-4 py-3 text-center">Tax Exempt</th>
+                            <th class="px-4 py-3 text-center">Rank</th>
+                            <th class="px-4 py-3 text-center">Status</th>
+                            <th class="px-4 py-3 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-stone-800">
+                        @foreach (var item in Model.ActualUses)
+                        {
+                            <tr class="hover:bg-slate-50/70 dark:hover:bg-stone-800/40 @(item.IsActive ? "" : "opacity-60")">
+                                <td class="px-4 py-3 font-mono font-bold text-slate-900 dark:text-white">@item.ActualUseCode</td>
+                                <td class="px-4 py-3 font-semibold text-slate-800 dark:text-stone-200">@item.ActualUseName</td>
+                                <td class="px-4 py-3 text-center">
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold @(item.IsTaxExempt ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-600")">
+                                        @(item.IsTaxExempt ? "Exempt" : "Taxable")
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 text-center font-mono">@(item.Rank?.ToString() ?? "-")</td>
+                                <td class="px-4 py-3 text-center">
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase @(item.IsActive ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300" : "bg-slate-200 text-slate-600 dark:bg-stone-800 dark:text-stone-400")">
+                                        @(item.IsActive ? "Active" : "Inactive")
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    <div class="inline-flex items-center gap-1.5">
+                                        <button type="button" onclick='editActualUse(@item.Id, @Html.Raw(System.Text.Json.JsonSerializer.Serialize(item.ActualUseCode)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(item.ActualUseName)), @(item.IsTaxExempt ? "true" : "false"), @(item.Rank?.ToString() ?? "null"), @(item.IsActive ? "true" : "false"))'
+                                                class="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-slate-700 dark:text-stone-200 font-bold text-[11px] cursor-pointer">Edit</button>
+                                        <form asp-action="ToggleActualUseStatus" method="post" class="inline">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@item.Id" />
+                                            <input type="hidden" name="status" value="@Model.StatusFilter" />
+                                            <input type="hidden" name="search" value="@Model.Search" />
+                                            <button type="submit" class="px-2.5 py-1.5 rounded-lg font-bold text-[11px] cursor-pointer @(item.IsActive ? "bg-amber-50 hover:bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300" : "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300")">
+                                                @(item.IsActive ? "Set Inactive" : "Activate")
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else if (tab == "assessmentlevel")
+            {
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-50 dark:bg-stone-950 border-b border-slate-200 dark:border-stone-800 text-[11px] font-mono uppercase text-slate-500">
+                        <tr>
+                            <th class="px-4 py-3">Actual Use Name</th>
+                            <th class="px-4 py-3 text-right">Assessment Level (%)</th>
+                            <th class="px-4 py-3 text-center">Revision Year</th>
+                            <th class="px-4 py-3 text-center">Status</th>
+                            <th class="px-4 py-3 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-stone-800">
+                        @foreach (var item in Model.AssessmentLevels)
+                        {
+                            <tr class="hover:bg-slate-50/70 dark:hover:bg-stone-800/40 @(item.IsActive ? "" : "opacity-60")">
+                                <td class="px-4 py-3 font-bold text-slate-900 dark:text-white">@item.ActualUseName</td>
+                                <td class="px-4 py-3 text-right font-mono font-bold text-emerald-700 dark:text-emerald-400">@item.AssessmentLevel.ToString("N2")%</td>
+                                <td class="px-4 py-3 text-center font-mono">@item.RevisionYear</td>
+                                <td class="px-4 py-3 text-center">
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase @(item.IsActive ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300" : "bg-slate-200 text-slate-600 dark:bg-stone-800 dark:text-stone-400")">
+                                        @(item.IsActive ? "Active" : "Inactive")
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    <div class="inline-flex items-center gap-1.5">
+                                        <button type="button" onclick='editAssessmentLevel(@item.Id, @(item.ActualUseId?.ToString() ?? "null"), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(item.ActualUseName)), @item.AssessmentLevel.ToString(System.Globalization.CultureInfo.InvariantCulture), @item.RevisionYear, @(item.IsActive ? "true" : "false"))'
+                                                class="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-slate-700 dark:text-stone-200 font-bold text-[11px] cursor-pointer">Edit</button>
+                                        <form asp-action="ToggleAssessmentLevelStatus" method="post" class="inline">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@item.Id" />
+                                            <input type="hidden" name="status" value="@Model.StatusFilter" />
+                                            <input type="hidden" name="search" value="@Model.Search" />
+                                            <button type="submit" class="px-2.5 py-1.5 rounded-lg font-bold text-[11px] cursor-pointer @(item.IsActive ? "bg-amber-50 hover:bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300" : "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300")">
+                                                @(item.IsActive ? "Set Inactive" : "Activate")
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else if (tab == "adjustment")
+            {
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-50 dark:bg-stone-950 border-b border-slate-200 dark:border-stone-800 text-[11px] font-mono uppercase text-slate-500">
+                        <tr>
+                            <th class="px-4 py-3">Description</th>
+                            <th class="px-4 py-3">Distance</th>
+                            <th class="px-4 py-3 text-right">Adjustment (%)</th>
+                            <th class="px-4 py-3 text-center">Revision Year</th>
+                            <th class="px-4 py-3 text-center">Status</th>
+                            <th class="px-4 py-3 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-stone-800">
+                        @foreach (var item in Model.AdjustmentFactors)
+                        {
+                            <tr class="hover:bg-slate-50/70 dark:hover:bg-stone-800/40 @(item.IsActive ? "" : "opacity-60")">
+                                <td class="px-4 py-3 font-bold text-slate-900 dark:text-white">@item.Description</td>
+                                <td class="px-4 py-3 text-slate-600 dark:text-stone-400">@(item.Distance ?? "-")</td>
+                                <td class="px-4 py-3 text-right font-mono font-bold text-emerald-700 dark:text-emerald-400">@item.AdjustmentPercent.ToString("N2")%</td>
+                                <td class="px-4 py-3 text-center font-mono">@item.RevisionYear</td>
+                                <td class="px-4 py-3 text-center">
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase @(item.IsActive ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300" : "bg-slate-200 text-slate-600 dark:bg-stone-800 dark:text-stone-400")">
+                                        @(item.IsActive ? "Active" : "Inactive")
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    <div class="inline-flex items-center gap-1.5">
+                                        <button type="button" onclick='editAdjustment(@item.Id, @Html.Raw(System.Text.Json.JsonSerializer.Serialize(item.Description)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(item.Distance ?? "")), @item.AdjustmentPercent.ToString(System.Globalization.CultureInfo.InvariantCulture), @item.RevisionYear, @(item.IsActive ? "true" : "false"))'
+                                                class="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-slate-700 dark:text-stone-200 font-bold text-[11px] cursor-pointer">Edit</button>
+                                        <form asp-action="ToggleAdjustmentFactorStatus" method="post" class="inline">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@item.Id" />
+                                            <input type="hidden" name="status" value="@Model.StatusFilter" />
+                                            <input type="hidden" name="search" value="@Model.Search" />
+                                            <button type="submit" class="px-2.5 py-1.5 rounded-lg font-bold text-[11px] cursor-pointer @(item.IsActive ? "bg-amber-50 hover:bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300" : "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300")">
+                                                @(item.IsActive ? "Set Inactive" : "Activate")
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else if (tab == "improvement")
+            {
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-50 dark:bg-stone-950 border-b border-slate-200 dark:border-stone-800 text-[11px] font-mono uppercase text-slate-500">
+                        <tr>
+                            <th class="px-4 py-3">Code</th>
+                            <th class="px-4 py-3">Description</th>
+                            <th class="px-4 py-3">Kind</th>
+                            <th class="px-4 py-3 text-right">Base Value</th>
+                            <th class="px-4 py-3 text-right">Assess. Level</th>
+                            <th class="px-4 py-3 text-center">Year</th>
+                            <th class="px-4 py-3 text-center">Status</th>
+                            <th class="px-4 py-3 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-stone-800">
+                        @foreach (var item in Model.ImprovementTypes)
+                        {
+                            <tr class="hover:bg-slate-50/70 dark:hover:bg-stone-800/40 @(item.IsActive ? "" : "opacity-60")">
+                                <td class="px-4 py-3 font-mono font-bold text-slate-900 dark:text-white">@item.TypeCode</td>
+                                <td class="px-4 py-3 font-semibold text-slate-800 dark:text-stone-200">@item.TypeDescription</td>
+                                <td class="px-4 py-3 font-mono text-slate-600 dark:text-stone-400">@item.Kind</td>
+                                <td class="px-4 py-3 text-right font-mono font-bold text-emerald-700 dark:text-emerald-400">@item.BaseValue.ToString("N2")</td>
+                                <td class="px-4 py-3 text-right font-mono">@item.AssessmentLevel.ToString("N2")%</td>
+                                <td class="px-4 py-3 text-center font-mono">@item.RevisionYear</td>
+                                <td class="px-4 py-3 text-center">
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase @(item.IsActive ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300" : "bg-slate-200 text-slate-600 dark:bg-stone-800 dark:text-stone-400")">
+                                        @(item.IsActive ? "Active" : "Inactive")
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    <div class="inline-flex items-center gap-1.5">
+                                        <button type="button" onclick='editImprovement(@item.Id, @Html.Raw(System.Text.Json.JsonSerializer.Serialize(item.TypeCode)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(item.TypeDescription)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(item.Kind)), @item.BaseValue.ToString(System.Globalization.CultureInfo.InvariantCulture), @item.AssessmentLevel.ToString(System.Globalization.CultureInfo.InvariantCulture), @item.RevisionYear, @(item.IsActive ? "true" : "false"))'
+                                                class="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-slate-700 dark:text-stone-200 font-bold text-[11px] cursor-pointer">Edit</button>
+                                        <form asp-action="ToggleImprovementTypeStatus" method="post" class="inline">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@item.Id" />
+                                            <input type="hidden" name="status" value="@Model.StatusFilter" />
+                                            <input type="hidden" name="search" value="@Model.Search" />
+                                            <button type="submit" class="px-2.5 py-1.5 rounded-lg font-bold text-[11px] cursor-pointer @(item.IsActive ? "bg-amber-50 hover:bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300" : "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300")">
+                                                @(item.IsActive ? "Set Inactive" : "Activate")
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+
+        <!-- Pagination Controls (Matching UserAccount Directory) -->
+        @{
+            int totalTabRows = tab switch
+            {
+                "subclass" => Model.SubClassifications.Count,
+                "actualuse" => Model.ActualUses.Count,
+                "assessmentlevel" => Model.AssessmentLevels.Count,
+                "adjustment" => Model.AdjustmentFactors.Count,
+                "improvement" => Model.ImprovementTypes.Count,
+                _ => Model.Classifications.Count
+            };
+        }
+        <div class="table-pagination-footer p-4 sm:p-6 pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-200 dark:border-stone-800 text-xs font-mono">
+            <div class="text-slate-500 dark:text-stone-400 text-center sm:text-left">
+                Showing <span class="font-bold text-slate-900 dark:text-white table-showing-start">@(totalTabRows == 0 ? 0 : 1)</span> to 
+                <span class="font-bold text-slate-900 dark:text-white table-showing-end">@Math.Min(10, totalTabRows)</span> of 
+                <span class="font-bold text-slate-900 dark:text-white table-total-count">@totalTabRows</span> entries
+            </div>
+            <div class="flex items-center gap-1.5 flex-wrap justify-center table-pagination-buttons">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 1. Classification Modal -->
+<div id="modal-classification" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+    <div class="bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl">
+        <div class="flex items-center justify-between">
+            <h3 id="clsModalTitle" class="text-base font-extrabold text-slate-900 dark:text-white">Add Classification</h3>
+            <button type="button" onclick="closeModals()" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+        <form asp-action="SaveClassification" method="post" class="space-y-3 text-xs">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" id="clsId" value="0" />
+            <div>
+                <label class="block font-bold uppercase text-slate-600 dark:text-stone-400 mb-1">Code *</label>
+                <input type="text" name="classificationCode" id="clsCode" class="w-full px-3.5 py-2.5" required />
+            </div>
+            <div>
+                <label class="block font-bold uppercase text-slate-600 dark:text-stone-400 mb-1">Name *</label>
+                <input type="text" name="classificationName" id="clsName" class="w-full px-3.5 py-2.5" required />
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+                <div>
+                    <label class="block font-bold uppercase text-slate-600 dark:text-stone-400 mb-1">Prefix</label>
+                    <input type="text" name="prefix" id="clsPrefix" class="w-full px-3.5 py-2.5" />
+                </div>
+                <div>
+                    <label class="block font-bold uppercase text-slate-600 dark:text-stone-400 mb-1">Ranking</label>
+                    <input type="number" name="ranking" id="clsRanking" class="w-full px-3.5 py-2.5" />
+                </div>
+                <div>
+                    <label class="block font-bold uppercase text-slate-600 dark:text-stone-400 mb-1">Sort Order</label>
+                    <input type="number" name="sortOrder" id="clsSort" value="1" class="w-full px-3.5 py-2.5" />
+                </div>
+            </div>
+            <label class="flex items-center gap-2 font-semibold text-slate-700 dark:text-stone-300 pt-1">
+                <input type="checkbox" name="isActive" id="clsActive" value="true" checked class="rounded text-emerald-600" />
+                <span>Active</span>
+            </label>
+            <div class="flex justify-end gap-2 pt-2">
+                <button type="button" onclick="closeModals()" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold">Cancel</button>
+                <button type="submit" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 2. Sub-Classification Modal -->
+<div id="modal-subclass" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+    <div class="bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl">
+        <div class="flex items-center justify-between">
+            <h3 id="subModalTitle" class="text-base font-extrabold text-slate-900 dark:text-white">Add Sub-Classification</h3>
+            <button type="button" onclick="closeModals()" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+        <form asp-action="SaveSubClassification" method="post" class="space-y-3 text-xs">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" id="subId" value="0" />
+            <div>
+                <label class="block font-bold uppercase text-slate-600 dark:text-stone-400 mb-1">Classification *</label>
+                <select name="classificationId" id="subClassId" class="w-full px-3.5 py-2.5" required>
+                    @foreach (var kv in Model.ClassificationNames)
+                    {
+                        <option value="@kv.Key">@kv.Value</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label class="block font-bold uppercase text-slate-600 dark:text-stone-400 mb-1">Sub-Class *</label>
+                <input type="text" name="subClass" id="subName" class="w-full px-3.5 py-2.5" required />
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="block font-bold uppercase text-slate-600 dark:text-stone-400 mb-1">Unit Value (PHP) *</label>
+                    <input type="number" step="0.01" name="unitValue" id="subUnitVal" class="w-full px-3.5 py-2.5" required />
+                </div>
+                <div>
+                    <label class="block font-bold uppercase text-slate-600 dark:text-stone-400 mb-1">Revision Year</label>
+                    <input type="number" name="revisionYear" id="subYear" value="2011" class="w-full px-3.5 py-2.5" />
+                </div>
+            </div>
+            <label class="flex items-center gap-2 font-semibold text-slate-700 dark:text-stone-300 pt-1">
+                <input type="checkbox" name="isActive" id="subActive" value="true" checked class="rounded text-emerald-600" />
+                <span>Active</span>
+            </label>
+            <div class="flex justify-end gap-2 pt-2">
+                <button type="button" onclick="closeModals()" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold">Cancel</button>
+                <button type="submit" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 3. Actual Use Modal -->
+<div id="modal-actualuse" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+    <div class="bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl">
+        <div class="flex items-center justify-between">
+            <h3 id="auModalTitle" class="text-base font-extrabold text-slate-900 dark:text-white">Add Actual Use</h3>
+            <button type="button" onclick="closeModals()" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+        <form asp-action="SaveActualUse" method="post" class="space-y-3 text-xs">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" id="auId" value="0" />
+            <div>
+                <label class="block font-bold uppercase text-slate-600 dark:text-stone-400 mb-1">Actual Use Code *</label>
+                <input type="text" name="actualUseCode" id="auCode" class="w-full px-3.5 py-2.5" required />
+            </div>
+            <div>
+                <label class="block font-bold uppercase text-slate-600 dark:text-stone-400 mb-1">Actual Use Name *</label>
+                <input type="text" name="actualUseName" id="auName" class="w-full px-3.5 py-2.5" required />
+            </div>
+            <div>
+                <label class="block font-bold uppercase text-slate-600 dark:text-stone-400 mb-1">Rank</label>
+                <input type="number" name="rank" id="auRank" class="w-full px-3.5 py-2.5" />
+            </div>
+            <div class="flex items-center gap-5 pt-1">
+                <label class="flex items-center gap-2 font-semibold text-slate-700 dark:text-stone-300">
+                    <input type="checkbox" name="isTaxExempt" id="auExempt" value="true" class="rounded text-emerald-600" />
+                    <span>Tax Exempt</span>
+                </label>
+                <label class="flex items-center gap-2 font-semibold text-slate-700 dark:text-stone-300">
+                    <input type="checkbox" name="isActive" id="auActive" value="true" checked class="rounded text-emerald-600" />
+                    <span>Active</span>
+                </label>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button type="button" onclick="closeModals()" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold">Cancel</button>
+                <button type="submit" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 4. Assessment Level Modal -->
+<div id="modal-assessmentlevel" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+    <div class="bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl">
+        <div class="flex items-center justify-between">
+            <h3 id="alModalTitle" class="text-base font-extrabold text-slate-900 dark:text-white">Add Assessment Level</h3>
+            <button type="button" onclick="closeModals()" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+        <form asp-action="SaveAssessmentLevel" method="post" class="space-y-3 text-xs">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" id="alId" value="0" />
+            <div>
+                <label class="block font-bold uppercase text-slate-600 dark:text-stone-400 mb-1">Linked Actual Use</label>
+                <select name="actualUseId" id="alActualUseId" class="w-full px-3.5 py-2.5" onchange="if(this.selectedIndex > 0) document.getElementById('alActualUseName').value = this.options[this.selectedIndex].text;">
+                    <option value="">-- Optional / Custom --</option>
+                    @foreach (var kv in Model.ActualUseNames)
+                    {
+                        <option value="@kv.Key">@kv.Value</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label class="block font-bold uppercase text-slate-600 dark:text-stone-400 mb-1">Actual Use Name *</label>
+                <input type="text" name="actualUseName" id="alActualUseName" class="w-full px-3.5 py-2.5" required />
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="block font-bold uppercase text-slate-600 dark:text-stone-400 mb-1">Level (%) *</label>
+                    <input type="number" step="0.01" name="assessmentLevel" id="alLevel" class="w-full px-3.5 py-2.5" required />
+                </div>
+                <div>
+                    <label class="block font-bold uppercase text-slate-600 dark:text-stone-400 mb-1">Revision Year</label>
+                    <input type="number" name="revisionYear" id="alYear" value="2011" class="w-full px-3.5 py-2.5" />
+                </div>
+            </div>
+            <label class="flex items-center gap-2 font-semibold text-slate-700 dark:text-stone-300 pt-1">
+                <input type="checkbox" name="isActive" id="alActive" value="true" checked class="rounded text-emerald-600" />
+                <span>Active</span>
+            </label>
+            <div class="flex justify-end gap-2 pt-2">
+                <button type="button" onclick="closeModals()" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold">Cancel</button>
+                <button type="submit" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 5. Adjustment Factor Modal -->
+<div id="modal-adjustment" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+    <div class="bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl">
+        <div class="flex items-center justify-between">
+            <h3 id="adjModalTitle" class="text-base font-extrabold text-slate-900 dark:text-white">Add Adjustment Factor</h3>
+            <button type="button" onclick="closeModals()" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+        <form asp-action="SaveAdjustmentFactor" method="post" class="space-y-3 text-xs">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" id="adjId" value="0" />
+            <div>
+                <label class="block font-bold uppercase text-slate-600 dark:text-stone-400 mb-1">Description *</label>
+                <input type="text" name="description" id="adjDesc" class="w-full px-3.5 py-2.5" required />
+            </div>
+            <div>
+                <label class="block font-bold uppercase text-slate-600 dark:text-stone-400 mb-1">Distance</label>
+                <input type="text" name="distance" id="adjDist" class="w-full px-3.5 py-2.5" />
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="block font-bold uppercase text-slate-600 dark:text-stone-400 mb-1">Adjustment (%) *</label>
+                    <input type="number" step="0.01" name="adjustmentPercent" id="adjPct" class="w-full px-3.5 py-2.5" required />
+                </div>
+                <div>
+                    <label class="block font-bold uppercase text-slate-600 dark:text-stone-400 mb-1">Revision Year</label>
+                    <input type="number" name="revisionYear" id="adjYear" value="2011" class="w-full px-3.5 py-2.5" />
+                </div>
+            </div>
+            <label class="flex items-center gap-2 font-semibold text-slate-700 dark:text-stone-300 pt-1">
+                <input type="checkbox" name="isActive" id="adjActive" value="true" checked class="rounded text-emerald-600" />
+                <span>Active</span>
+            </label>
+            <div class="flex justify-end gap-2 pt-2">
+                <button type="button" onclick="closeModals()" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold">Cancel</button>
+                <button type="submit" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 6. Improvement Type Modal -->
+<div id="modal-improvement" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+    <div class="bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl">
+        <div class="flex items-center justify-between">
+            <h3 id="impModalTitle" class="text-base font-extrabold text-slate-900 dark:text-white">Add Improvement Type</h3>
+            <button type="button" onclick="closeModals()" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+        <form asp-action="SaveImprovementType" method="post" class="space-y-3 text-xs">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" id="impId" value="0" />
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="block font-bold uppercase text-slate-600 dark:text-stone-400 mb-1">Type Code *</label>
+                    <input type="text" name="typeCode" id="impCode" class="w-full px-3.5 py-2.5" required />
+                </div>
+                <div>
+                    <label class="block font-bold uppercase text-slate-600 dark:text-stone-400 mb-1">Kind</label>
+                    <input type="text" name="kind" id="impKind" value="FRUIT BEARING" class="w-full px-3.5 py-2.5" />
+                </div>
+            </div>
+            <div>
+                <label class="block font-bold uppercase text-slate-600 dark:text-stone-400 mb-1">Description *</label>
+                <input type="text" name="typeDescription" id="impDesc" class="w-full px-3.5 py-2.5" required />
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+                <div>
+                    <label class="block font-bold uppercase text-slate-600 dark:text-stone-400 mb-1">Base Value</label>
+                    <input type="number" step="0.01" name="baseValue" id="impBaseVal" value="50.00" class="w-full px-3.5 py-2.5" />
+                </div>
+                <div>
+                    <label class="block font-bold uppercase text-slate-600 dark:text-stone-400 mb-1">Level (%)</label>
+                    <input type="number" step="0.01" name="assessmentLevel" id="impLevel" value="40.00" class="w-full px-3.5 py-2.5" />
+                </div>
+                <div>
+                    <label class="block font-bold uppercase text-slate-600 dark:text-stone-400 mb-1">Year</label>
+                    <input type="number" name="revisionYear" id="impYear" value="2011" class="w-full px-3.5 py-2.5" />
+                </div>
+            </div>
+            <label class="flex items-center gap-2 font-semibold text-slate-700 dark:text-stone-300 pt-1">
+                <input type="checkbox" name="isActive" id="impActive" value="true" checked class="rounded text-emerald-600" />
+                <span>Active</span>
+            </label>
+            <div class="flex justify-end gap-2 pt-2">
+                <button type="button" onclick="closeModals()" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 font-bold">Cancel</button>
+                <button type="submit" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    const activeTabKey = '@tab';
+
+    function closeModals() {
+        document.querySelectorAll('[id^="modal-"]').forEach(m => m.classList.add('hidden'));
+    }
+
+    function openModalForActiveTab() {
+        closeModals();
+        if (activeTabKey === 'classification') {
+            document.getElementById('clsModalTitle').innerText = 'Add Classification';
+            document.getElementById('clsId').value = '0';
+            document.getElementById('clsCode').value = '';
+            document.getElementById('clsName').value = '';
+            document.getElementById('clsPrefix').value = '';
+            document.getElementById('clsRanking').value = '';
+            document.getElementById('clsSort').value = '1';
+            document.getElementById('clsActive').checked = true;
+        } else if (activeTabKey === 'subclass') {
+            document.getElementById('subModalTitle').innerText = 'Add Sub-Classification';
+            document.getElementById('subId').value = '0';
+            document.getElementById('subName').value = '';
+            document.getElementById('subUnitVal').value = '';
+            document.getElementById('subYear').value = '2011';
+            document.getElementById('subActive').checked = true;
+        } else if (activeTabKey === 'actualuse') {
+            document.getElementById('auModalTitle').innerText = 'Add Actual Use';
+            document.getElementById('auId').value = '0';
+            document.getElementById('auCode').value = '';
+            document.getElementById('auName').value = '';
+            document.getElementById('auRank').value = '';
+            document.getElementById('auExempt').checked = false;
+            document.getElementById('auActive').checked = true;
+        } else if (activeTabKey === 'assessmentlevel') {
+            document.getElementById('alModalTitle').innerText = 'Add Assessment Level';
+            document.getElementById('alId').value = '0';
+            document.getElementById('alActualUseId').value = '';
+            document.getElementById('alActualUseName').value = '';
+            document.getElementById('alLevel').value = '';
+            document.getElementById('alYear').value = '2011';
+            document.getElementById('alActive').checked = true;
+        } else if (activeTabKey === 'adjustment') {
+            document.getElementById('adjModalTitle').innerText = 'Add Adjustment Factor';
+            document.getElementById('adjId').value = '0';
+            document.getElementById('adjDesc').value = '';
+            document.getElementById('adjDist').value = '';
+            document.getElementById('adjPct').value = '';
+            document.getElementById('adjYear').value = '2011';
+            document.getElementById('adjActive').checked = true;
+        } else if (activeTabKey === 'improvement') {
+            document.getElementById('impModalTitle').innerText = 'Add Improvement Type';
+            document.getElementById('impId').value = '0';
+            document.getElementById('impCode').value = '';
+            document.getElementById('impKind').value = 'FRUIT BEARING';
+            document.getElementById('impDesc').value = '';
+            document.getElementById('impBaseVal').value = '50.00';
+            document.getElementById('impLevel').value = '40.00';
+            document.getElementById('impYear').value = '2011';
+            document.getElementById('impActive').checked = true;
+        }
+        const modal = document.getElementById('modal-' + activeTabKey);
+        if (modal) modal.classList.remove('hidden');
+    }
+
+    function editClassification(id, code, name, ranking, prefix, sort, active) {
+        closeModals();
+        document.getElementById('clsModalTitle').innerText = 'Edit Classification';
+        document.getElementById('clsId').value = id;
+        document.getElementById('clsCode').value = code || '';
+        document.getElementById('clsName').value = name || '';
+        document.getElementById('clsRanking').value = ranking ?? '';
+        document.getElementById('clsPrefix').value = prefix || '';
+        document.getElementById('clsSort').value = sort ?? 1;
+        document.getElementById('clsActive').checked = !!active;
+        document.getElementById('modal-classification').classList.remove('hidden');
+    }
+
+    function editSubClass(id, clsId, name, unitVal, year, active) {
+        closeModals();
+        document.getElementById('subModalTitle').innerText = 'Edit Sub-Classification';
+        document.getElementById('subId').value = id;
+        document.getElementById('subClassId').value = clsId;
+        document.getElementById('subName').value = name || '';
+        document.getElementById('subUnitVal').value = unitVal;
+        document.getElementById('subYear').value = year;
+        document.getElementById('subActive').checked = !!active;
+        document.getElementById('modal-subclass').classList.remove('hidden');
+    }
+
+    function editActualUse(id, code, name, exempt, rank, active) {
+        closeModals();
+        document.getElementById('auModalTitle').innerText = 'Edit Actual Use';
+        document.getElementById('auId').value = id;
+        document.getElementById('auCode').value = code || '';
+        document.getElementById('auName').value = name || '';
+        document.getElementById('auExempt').checked = !!exempt;
+        document.getElementById('auRank').value = rank ?? '';
+        document.getElementById('auActive').checked = !!active;
+        document.getElementById('modal-actualuse').classList.remove('hidden');
+    }
+
+    function editAssessmentLevel(id, auId, auName, level, year, active) {
+        closeModals();
+        document.getElementById('alModalTitle').innerText = 'Edit Assessment Level';
+        document.getElementById('alId').value = id;
+        document.getElementById('alActualUseId').value = auId ?? '';
+        document.getElementById('alActualUseName').value = auName || '';
+        document.getElementById('alLevel').value = level;
+        document.getElementById('alYear').value = year;
+        document.getElementById('alActive').checked = !!active;
+        document.getElementById('modal-assessmentlevel').classList.remove('hidden');
+    }
+
+    function editAdjustment(id, desc, dist, pct, year, active) {
+        closeModals();
+        document.getElementById('adjModalTitle').innerText = 'Edit Adjustment Factor';
+        document.getElementById('adjId').value = id;
+        document.getElementById('adjDesc').value = desc || '';
+        document.getElementById('adjDist').value = dist || '';
+        document.getElementById('adjPct').value = pct;
+        document.getElementById('adjYear').value = year;
+        document.getElementById('adjActive').checked = !!active;
+        document.getElementById('modal-adjustment').classList.remove('hidden');
+    }
+
+    function editImprovement(id, code, desc, kind, baseVal, level, year, active) {
+        closeModals();
+        document.getElementById('impModalTitle').innerText = 'Edit Improvement Type';
+        document.getElementById('impId').value = id;
+        document.getElementById('impCode').value = code || '';
+        document.getElementById('impDesc').value = desc || '';
+        document.getElementById('impKind').value = kind || 'FRUIT BEARING';
+        document.getElementById('impBaseVal').value = baseVal;
+        document.getElementById('impLevel').value = level;
+        document.getElementById('impYear').value = year;
+        document.getElementById('impActive').checked = !!active;
+        document.getElementById('modal-improvement').classList.remove('hidden');
+    }
+</script>
+}

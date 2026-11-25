@@ -200,10 +200,42 @@ public class UserRoleService : IUserRoleService
             }
         }
 
+        if (!_context.SystemModules.Any(m => m.ModuleCode == "LAND_REFERENCE"))
+        {
+            _context.SystemModules.Add(new SystemModule
+            {
+                ModuleCode = "LAND_REFERENCE",
+                ModuleName = "Land Reference Settings (Valuation Schedules)",
+                Category = "System Administration",
+                ControllerName = "LandReference",
+                ActionName = "Index",
+                Icon = "sliders",
+                SortOrder = 32,
+                IsActive = true
+            });
+        }
+
         _context.SaveChanges();
 
+        var landRefMod = _context.SystemModules.FirstOrDefault(m => m.ModuleCode == "LAND_REFERENCE");
         var printTdMod = _context.SystemModules.FirstOrDefault(m => m.ModuleCode == "ASSESSMENT_PRINT_TD");
         var adminRole = _context.UserRoleSettings.FirstOrDefault(r => r.RoleName == "System Administrator");
+        if (landRefMod != null && adminRole != null &&
+            !_context.RoleModulePermissions.Any(p => p.RoleId == adminRole.Id && p.ModuleId == landRefMod.ModuleId))
+        {
+            _context.RoleModulePermissions.Add(new RoleModulePermission
+            {
+                RoleId = adminRole.Id,
+                ModuleId = landRefMod.ModuleId,
+                CanView = true,
+                CanCreate = true,
+                CanEdit = true,
+                CanDelete = true,
+                CanApprove = true,
+                UpdatedDate = DateTime.Now
+            });
+            _context.SaveChanges();
+        }
         if (printTdMod != null && adminRole != null &&
             !_context.RoleModulePermissions.Any(p => p.RoleId == adminRole.Id && p.ModuleId == printTdMod.ModuleId))
         {

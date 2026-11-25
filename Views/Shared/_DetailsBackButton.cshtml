@@ -1,0 +1,46 @@
+@model (string FallbackUrl, string Label, string CssClass)
+@{
+    string returnUrl = Context.Request.Query["returnUrl"].ToString();
+    string targetUrl = string.Empty;
+
+    if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
+    {
+        targetUrl = returnUrl;
+    }
+    else
+    {
+        var referer = Context.Request.Headers["Referer"].ToString();
+        if (!string.IsNullOrWhiteSpace(referer) && Uri.TryCreate(referer, UriKind.Absolute, out var refUri))
+        {
+            if (string.Equals(refUri.Host, Context.Request.Host.Host, StringComparison.OrdinalIgnoreCase))
+            {
+                var p = refUri.AbsolutePath;
+                if (!p.Contains("/Details", StringComparison.OrdinalIgnoreCase)
+                    && !p.Contains("/Edit", StringComparison.OrdinalIgnoreCase)
+                    && !p.Contains("/SavePartition", StringComparison.OrdinalIgnoreCase))
+                {
+                    targetUrl = refUri.PathAndQuery;
+                }
+            }
+        }
+    }
+
+    if (string.IsNullOrWhiteSpace(targetUrl))
+    {
+        targetUrl = Model.FallbackUrl;
+    }
+
+    string displayLabel = Model.Label;
+    if (targetUrl.Contains("/Workflow/MyTransactions", StringComparison.OrdinalIgnoreCase))
+    {
+        displayLabel = "Back to My Transactions";
+    }
+    else if (targetUrl.Contains("/Workflow/Pool", StringComparison.OrdinalIgnoreCase))
+    {
+        displayLabel = "Back to Pool";
+    }
+}
+<a href="@targetUrl" class="@Model.CssClass">
+    <i data-lucide="arrow-left" class="w-4 h-4"></i>
+    <span>@displayLabel</span>
+</a>
