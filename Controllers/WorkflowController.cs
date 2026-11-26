@@ -238,6 +238,22 @@ public class WorkflowController : Controller
             .OrderBy(s => s.TransactionStatusId)
             .ToList();
 
+        bool canAssignDiv1 = _permissionService.CanAccess(User, "Workflow", "AssignDiv1");
+        bool canAssignDiv2 = _permissionService.CanAccess(User, "Workflow", "AssignDiv2");
+        bool canAssignDiv3 = _permissionService.CanAccess(User, "Workflow", "AssignDiv3");
+        bool canAssignFromPool = canAssignDiv1 || canAssignDiv2 || canAssignDiv3;
+
+        ViewBag.CanAssignDiv1 = canAssignDiv1;
+        ViewBag.CanAssignDiv2 = canAssignDiv2;
+        ViewBag.CanAssignDiv3 = canAssignDiv3;
+        ViewBag.CanAssignFromPool = canAssignFromPool;
+        ViewBag.AssignableUsers = canAssignFromPool
+            ? _context.UserAccounts
+                .Where(u => u.IsActive)
+                .OrderBy(u => u.FullName)
+                .ToList()
+            : new List<UserAccount>();
+
         return View(queue);
     }
 
@@ -486,6 +502,46 @@ public class WorkflowController : Controller
 
         // Once claimed from Pool, route directly to the user's My Transactions form
         return RedirectToAction(nameof(MyTransactions), new { divisionId = (int)division });
+    }
+
+    // POST: /Workflow/Assign
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Assign(Guid requestId, string requestType, DivisionType division, Guid targetUserId, string? returnUrl = null)
+    {
+        var fallbackUrl = Url.Action(nameof(Pool), new { divisionId = (int)division })!;
+        string divAction = (int)division switch
+        {
+            1 => "AssignDiv1",
+            2 => "AssignDiv2",
+            3 => "AssignDiv3",
+            _ => "Assign"
+        };
+        if (!_permissionService.CanAccess(User, "Workflow", divAction))
+        {
+            TempData["ErrorMessage"] = $"Access Denied: Your role does not have permission to assign Division {(int)division} pool transactions.";
+            return Redirect(!string.IsNullOrWhiteSpace(returnUrl) ? returnUrl : fallbackUrl);
+        }
+
+        var targetUser = _context.UserAccounts.FirstOrDefault(u => u.Id == targetUserId && u.IsActive);
+        if (targetUser == null)
+        {
+            TempData["ErrorMessage"] = "Please select a valid active user to assign this transaction to.";
+            return Redirect(!string.IsNullOrWhiteSpace(returnUrl) ? returnUrl : fallbackUrl);
+        }
+
+        bool success = _workflowService.ClaimDocument(requestId, requestType, targetUser.Id, targetUser.FullName);
+        if (success)
+        {
+            TempData["SuccessMessage"] = $"Transaction assigned to {targetUser.FullName} (@{targetUser.Username})! It has been moved to their 'My Transactions' workspace.";
+            await _workflowNotifier.NotifyTransactionClaimedAsync(requestId, requestType, (int)division, targetUser.FullName, targetUser.Id);
+        }
+        else
+        {
+            TempData["ErrorMessage"] = "Notice: This transaction has already been claimed or assigned to another staff member.";
+        }
+
+        return Redirect(!string.IsNullOrWhiteSpace(returnUrl) ? returnUrl : fallbackUrl);
     }
 
     // POST: /Workflow/Release

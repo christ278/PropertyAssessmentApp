@@ -3,6 +3,8 @@
 @using PropertyAssessmentApp.Services
 @inject PropertyAssessmentApp.Services.IPermissionService PermissionService
 
+@await Html.PartialAsync("_Select2Style")
+
 @{
     ViewData["Title"] = "Pool Transactions";
     var divisionId = ViewBag.DivisionId as int?;
@@ -350,37 +352,76 @@
                                     }
                                     else
                                     {
-                                        <div class="flex items-center justify-center gap-1.5 flex-wrap">
-                                            <!-- Claim Button -->
-                                            <form asp-action="Claim" method="post" class="inline">
-                                                <input type="hidden" name="requestId" value="@item.RequestId" />
-                                                <input type="hidden" name="requestType" value="@item.RequestType" />
-                                                <input type="hidden" name="division" value="@item.Division" />
-                                                <button type="submit" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] flex items-center gap-1 shadow-xs transition-all" title="Claim and checkout this transaction to your personal workspace">
-                                                    <i data-lucide="hand" class="w-3.5 h-3.5"></i>
-                                                    Claim
+                                        bool canAssignItem = (int)item.Division switch
+                                        {
+                                            1 => ViewBag.CanAssignDiv1 == true,
+                                            2 => ViewBag.CanAssignDiv2 == true,
+                                            3 => ViewBag.CanAssignDiv3 == true,
+                                            _ => ViewBag.CanAssignFromPool == true
+                                        };
+                                        string currentPoolReturnUrl = Context.Request.Path + Context.Request.QueryString;
+                                        string detailsUrl = item.RequestType switch
+                                        {
+                                            "TaxDeclarationRequest" => Url.Action("Details", "TaxDeclarationRequest", new { id = item.RequestId, returnUrl = currentPoolReturnUrl }) ?? "#",
+                                            "LandHoldingRequest" => Url.Action("Details", "LandHoldingRequest", new { id = item.RequestId, returnUrl = currentPoolReturnUrl }) ?? "#",
+                                            "TaxMappingRequest" => Url.Action("Details", "TaxMapping", new { id = item.RequestId, returnUrl = currentPoolReturnUrl }) ?? "#",
+                                            "PropertyAssessmentRequest" => Url.Action("Details", "PropertyAssessmentRequest", new { id = item.RequestId, returnUrl = currentPoolReturnUrl }) ?? "#",
+                                            "RequestForInspection" => Url.Action("Details", "RequestForInspection", new { id = item.RequestId, returnUrl = currentPoolReturnUrl }) ?? "#",
+                                            _ => "#"
+                                        };
+
+                                        if (canAssignItem)
+                                        {
+                                            <div class="relative inline-block text-left pool-action-dropdown">
+                                                <button type="button"
+                                                        onclick="togglePoolActionMenu(this, event)"
+                                                        class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-slate-700 dark:text-stone-200 border border-slate-200 dark:border-stone-700 transition-all cursor-pointer"
+                                                        title="Actions">
+                                                    <i data-lucide="more-vertical" class="w-4 h-4"></i>
                                                 </button>
-                                            </form>
+                                                <div class="pool-action-menu hidden fixed z-50 w-44 rounded-2xl bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-700 shadow-xl py-1.5 text-left">
+                                                    <form asp-action="Claim" method="post" class="block">
+                                                        <input type="hidden" name="requestId" value="@item.RequestId" />
+                                                        <input type="hidden" name="requestType" value="@item.RequestType" />
+                                                        <input type="hidden" name="division" value="@item.Division" />
+                                                        <button type="submit" class="w-full px-3.5 py-2 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 flex items-center gap-2 cursor-pointer">
+                                                            <i data-lucide="hand" class="w-3.5 h-3.5"></i>
+                                                            Claim
+                                                        </button>
+                                                    </form>
+                                                    <button type="button"
+                                                            onclick="closeAllPoolActionMenus(); openAssignPoolModal('@item.RequestId', '@item.RequestType', '@((int)item.Division)', '@System.Text.Encodings.Web.JavaScriptEncoder.Default.Encode(item.TrackingNumber)')"
+                                                            class="w-full px-3.5 py-2 text-xs font-semibold text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 flex items-center gap-2 cursor-pointer">
+                                                        <i data-lucide="user-plus" class="w-3.5 h-3.5"></i>
+                                                        Assign
+                                                    </button>
+                                                    <a href="@detailsUrl" class="w-full px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-stone-300 hover:bg-slate-100 dark:hover:bg-stone-800 flex items-center gap-2">
+                                                        <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+                                                        Details
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <div class="flex items-center justify-center gap-1.5 flex-wrap">
+                                                <!-- Claim Button -->
+                                                <form asp-action="Claim" method="post" class="inline">
+                                                    <input type="hidden" name="requestId" value="@item.RequestId" />
+                                                    <input type="hidden" name="requestType" value="@item.RequestType" />
+                                                    <input type="hidden" name="division" value="@item.Division" />
+                                                    <button type="submit" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] flex items-center gap-1 shadow-xs transition-all" title="Claim and checkout this transaction to your personal workspace">
+                                                        <i data-lucide="hand" class="w-3.5 h-3.5"></i>
+                                                        Claim
+                                                    </button>
+                                                </form>
 
-                                            <!-- Details Deep Link -->
-                                            @{
-                                                string currentPoolReturnUrl = Context.Request.Path + Context.Request.QueryString;
-                                                string detailsUrl = item.RequestType switch
-                                                {
-                                                    "TaxDeclarationRequest" => Url.Action("Details", "TaxDeclarationRequest", new { id = item.RequestId, returnUrl = currentPoolReturnUrl }) ?? "#",
-                                                    "LandHoldingRequest" => Url.Action("Details", "LandHoldingRequest", new { id = item.RequestId, returnUrl = currentPoolReturnUrl }) ?? "#",
-                                                    "TaxMappingRequest" => Url.Action("Details", "TaxMapping", new { id = item.RequestId, returnUrl = currentPoolReturnUrl }) ?? "#",
-                                                    "PropertyAssessmentRequest" => Url.Action("Details", "PropertyAssessmentRequest", new { id = item.RequestId, returnUrl = currentPoolReturnUrl }) ?? "#",
-                                                    "RequestForInspection" => Url.Action("Details", "RequestForInspection", new { id = item.RequestId, returnUrl = currentPoolReturnUrl }) ?? "#",
-                                                    _ => "#"
-                                                };
-                                            }
-
-                                            <a href="@detailsUrl" class="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-slate-700 dark:text-stone-300 font-bold text-[10px] flex items-center gap-1 border border-slate-200 dark:border-stone-700" title="Open Document Details">
-                                                <i data-lucide="eye" class="w-3.5 h-3.5"></i>
-                                                Details
-                                            </a>
-                                        </div>
+                                                <a href="@detailsUrl" class="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-slate-700 dark:text-stone-300 font-bold text-[10px] flex items-center gap-1 border border-slate-200 dark:border-stone-700" title="Open Document Details">
+                                                    <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+                                                    Details
+                                                </a>
+                                            </div>
+                                        }
                                     }
                                 </td>
                             </tr>
@@ -402,6 +443,110 @@
         </div>
     </div>
 </div>
+
+@if (ViewBag.CanAssignFromPool == true)
+{
+    var assignableUsers = ViewBag.AssignableUsers as List<PropertyAssessmentApp.Models.UserAccount> ?? new List<PropertyAssessmentApp.Models.UserAccount>();
+    <div id="assignPoolModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+        <div class="bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div class="p-5 border-b border-slate-200 dark:border-stone-800 flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                        <i data-lucide="user-plus" class="w-4 h-4 text-indigo-600"></i>
+                        Assign Pool Transaction
+                    </h3>
+                    <p id="assignModalTracking" class="text-xs font-mono text-slate-500 mt-0.5"></p>
+                </div>
+                <button type="button" onclick="document.getElementById('assignPoolModal').classList.add('hidden')" class="p-2 rounded-xl text-slate-400 hover:text-slate-700 cursor-pointer">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <form asp-action="Assign" method="post" class="p-5 space-y-4">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="requestId" id="assignRequestId" />
+                <input type="hidden" name="requestType" id="assignRequestType" />
+                <input type="hidden" name="division" id="assignDivision" />
+                <input type="hidden" name="returnUrl" value="@(Context.Request.Path + Context.Request.QueryString)" />
+
+                <div>
+                    <label for="assignTargetUserId" class="block text-xs font-mono font-bold uppercase text-slate-600 dark:text-stone-400 mb-1.5">
+                        Select Target User
+                    </label>
+                    <select name="targetUserId" id="assignTargetUserId" required class="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-stone-950 border border-slate-200 dark:border-stone-800 text-xs font-mono text-slate-900 dark:text-white">
+                        <option value="">-- Select Staff Member --</option>
+                        @foreach (var u in assignableUsers)
+                        {
+                            <option value="@u.Id">@u.FullName (@@u.Username) — @(!string.IsNullOrWhiteSpace(u.WorkflowRoleName) ? u.WorkflowRoleName : u.Role.ToString())</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-2">
+                    <button type="button" onclick="document.getElementById('assignPoolModal').classList.add('hidden')" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 text-xs font-bold cursor-pointer">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold cursor-pointer">
+                        Assign Transaction
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <script>
+        let assignUserSelect2Init = false;
+        function closeAllPoolActionMenus() {
+            document.querySelectorAll('.pool-action-menu').forEach(m => m.classList.add('hidden'));
+        }
+        function togglePoolActionMenu(btn, e) {
+            e.stopPropagation();
+            const menu = btn.parentElement.querySelector('.pool-action-menu');
+            const wasHidden = menu.classList.contains('hidden');
+            closeAllPoolActionMenus();
+            if (wasHidden) {
+                const rect = btn.getBoundingClientRect();
+                menu.classList.remove('hidden');
+                const menuW = menu.offsetWidth || 176;
+                const menuH = menu.offsetHeight || 120;
+                const left = Math.max(8, Math.min(window.innerWidth - menuW - 8, rect.right - menuW));
+                const top = (rect.bottom + menuH + 8 > window.innerHeight)
+                    ? Math.max(8, rect.top - menuH - 6)
+                    : (rect.bottom + 6);
+                menu.style.left = left + 'px';
+                menu.style.top = top + 'px';
+            }
+        }
+        document.addEventListener('click', closeAllPoolActionMenus);
+        window.addEventListener('scroll', closeAllPoolActionMenus, true);
+        function ensureAssignSelect2() {
+            if (typeof $ !== 'undefined' && $.fn && $.fn.select2) {
+                const $sel = $('#assignTargetUserId');
+                if (!assignUserSelect2Init) {
+                    $sel.select2({
+                        dropdownParent: $('#assignPoolModal'),
+                        width: '100%',
+                        placeholder: '-- Search & Select Staff Member --',
+                        allowClear: true
+                    });
+                    assignUserSelect2Init = true;
+                }
+            }
+        }
+
+        function openAssignPoolModal(requestId, requestType, division, trackingNo) {
+            document.getElementById('assignRequestId').value = requestId;
+            document.getElementById('assignRequestType').value = requestType;
+            document.getElementById('assignDivision').value = division;
+            document.getElementById('assignModalTracking').innerText = 'Transaction: ' + (trackingNo || requestId);
+            document.getElementById('assignPoolModal').classList.remove('hidden');
+            ensureAssignSelect2();
+            if (typeof $ !== 'undefined' && $('#assignTargetUserId').data('select2')) {
+                $('#assignTargetUserId').val('').trigger('change');
+            } else {
+                document.getElementById('assignTargetUserId').value = '';
+            }
+        }
+    </script>
+}
 
 @section Scripts {
     <script>

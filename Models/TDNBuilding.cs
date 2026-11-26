@@ -205,7 +205,7 @@ public class TDNBuilding
     public decimal MarketValue { get; set; }
 
     [Display(Name = "Assessment Level (%)")]
-    public decimal AssessmentLevelPercent { get; set; } = 20m;
+    public decimal AssessmentLevelPercent { get; set; }
 
     [Display(Name = "Assessed Value (AV)")]
     public decimal AssessedValue { get; set; }

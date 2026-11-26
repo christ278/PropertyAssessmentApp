@@ -73,7 +73,10 @@ BEGIN TRY
         (19, 'DASHBOARD_USER',      'Staff Dashboard (Ordinary Users)',         'Dashboards',                  'Dashboard',                'Staff',          'layout-dashboard', 1,  1),
         (20, 'DASHBOARD_HEAD',      'Assessor Head Dashboard',                  'Dashboards',                  'Dashboard',                'AssessorHead',   'gauge',            2,  1),
         (21, 'DASHBOARD_ADMIN',     'System Owner Dashboard (Super Admin)',     'Dashboards',                  'Dashboard',                'SystemOwner',    'server-cog',       3,  1),
-        (22, 'ASSESSMENT_PRINT',    'Print Tax Declaration (Records Printout)', 'FAAS & Transaction Requests', 'Assessment',               'PrintPdf',       'printer',          13, 1);
+        (22, 'ASSESSMENT_PRINT',    'Print Tax Declaration (Records Printout)', 'FAAS & Transaction Requests', 'Assessment',               'PrintPdf',       'printer',          13, 1),
+        (23, 'POOL_ASSIGN_DIV1',    'Assign Pool Transactions (Division 1)',    'Transaction Workflows',       'Workflow',                 'AssignDiv1',     'user-plus',        26, 1),
+        (24, 'POOL_ASSIGN_DIV2',    'Assign Pool Transactions (Division 2)',    'Transaction Workflows',       'Workflow',                 'AssignDiv2',     'user-plus',        27, 1),
+        (25, 'POOL_ASSIGN_DIV3',    'Assign Pool Transactions (Division 3)',    'Transaction Workflows',       'Workflow',                 'AssignDiv3',     'user-plus',        28, 1);
 
     -- Enable IDENTITY_INSERT so predetermined ModuleId values are retained
     SET IDENTITY_INSERT [dbo].[SystemModule] ON;

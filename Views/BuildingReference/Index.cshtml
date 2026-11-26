@@ -1,0 +1,607 @@
+@using PropertyAssessmentApp.Models
+@using PropertyAssessmentApp.Controllers
+@{
+    ViewData["Title"] = "Building Reference Tables (BUCC, Depreciation & Assessment Levels)";
+    var activeTab = ViewBag.ActiveTab as string ?? "classification";
+    var search = ViewBag.Search as string ?? "";
+
+    var classifications = ViewBag.Classifications as List<BuildingClassification> ?? new List<BuildingClassification>();
+    var structureRates = ViewBag.StructureRates as List<BuildingStructureRate> ?? new List<BuildingStructureRate>();
+    var structuralTypes = ViewBag.StructuralTypes as List<BuildingStructuralType> ?? new List<BuildingStructuralType>();
+    var buildingTypes = ViewBag.BuildingTypes as List<BuildingType> ?? new List<BuildingType>();
+    var assessmentLevels = ViewBag.AssessmentLevels as List<BuildingAssessmentLevel> ?? new List<BuildingAssessmentLevel>();
+    var depreciations = ViewBag.Depreciations as List<BuildingDepreciation> ?? new List<BuildingDepreciation>();
+    var additionalItems = ViewBag.AdditionalItems as List<BuildingAdditionalItem> ?? new List<BuildingAdditionalItem>();
+
+    var stMap = structuralTypes.ToDictionary(s => s.Id, s => $"{s.StructuralCode} — {s.StructuralDescription}");
+    var btMap = buildingTypes.ToDictionary(b => b.Id, b => $"{b.BuildingTypeCode} — {b.BuildingTypeDescription}");
+}
+
+<div class="space-y-6 font-mono text-xs">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <div class="inline-flex items-center gap-2 text-xs font-mono text-emerald-700 dark:text-emerald-400 font-bold mb-1">
+                <i data-lucide="building-2" class="w-4 h-4"></i>
+                <span>Building Appraisal &amp; Valuation Schedules</span>
+            </div>
+            <h1 class="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Building Reference Tables</h1>
+            <p class="text-slate-500 dark:text-stone-400 text-sm">Manage Building Classifications, BUCC Structure Rates, Assessment Levels, Depreciation Schedules, and Additional Items.</p>
+        </div>
+
+        <button type="button" onclick="openAddModalForTab('@activeTab')" class="px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-2 shadow-md shadow-emerald-600/20 cursor-pointer">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            <span>Add Record</span>
+        </button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex flex-wrap items-center gap-2 border-b border-slate-200 dark:border-stone-800 pb-3">
+        @{
+            var tabs = new[]
+            {
+                new { Key = "classification", Label = "Classifications", Count = classifications.Count },
+                new { Key = "bucc", Label = "BUCC Structure Rates", Count = structureRates.Count },
+                new { Key = "assessmentlevel", Label = "Assessment Levels", Count = assessmentLevels.Count },
+                new { Key = "depreciation", Label = "Depreciation Schedule", Count = depreciations.Count },
+                new { Key = "additionalitem", Label = "Additional Items", Count = additionalItems.Count }
+            };
+        }
+        @foreach (var t in tabs)
+        {
+            bool isAct = activeTab == t.Key;
+            <a asp-action="Index" asp-route-tab="@t.Key" asp-route-search="@search"
+               class="px-4 py-2 rounded-xl font-bold transition-all flex items-center gap-2 @(isAct ? "bg-emerald-600 text-white shadow-sm" : "bg-white dark:bg-stone-900 text-slate-600 dark:text-stone-300 border border-slate-200 dark:border-stone-800 hover:bg-slate-50")">
+                <span>@t.Label</span>
+                <span class="px-1.5 py-0.5 rounded-md text-[10px] @(isAct ? "bg-white/20 text-white" : "bg-slate-100 dark:bg-stone-800 text-slate-500")">@t.Count</span>
+            </a>
+        }
+    </div>
+
+    <!-- Search Bar & Limit -->
+    <form method="get" asp-action="Index" class="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-stone-900 p-4 rounded-2xl border border-slate-200 dark:border-stone-800 shadow-sm">
+        <input type="hidden" name="tab" value="@activeTab" />
+        <div class="flex items-center gap-2 flex-1 min-w-[220px]">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400"></i>
+            <input type="text" name="search" value="@search" placeholder="Search current Building Reference tab..." class="w-full bg-slate-50 dark:bg-stone-950 px-4 py-2 rounded-xl border border-slate-200 dark:border-stone-800 text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600" />
+        </div>
+        <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 bg-slate-50 dark:bg-stone-800 px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-700 shadow-xs shrink-0">
+                <span class="limit-label text-[10px] text-slate-500 dark:text-emerald-400 font-semibold uppercase">Limit:</span>
+                <select data-target="bldgRefTableCard" class="table-limit-select !border-0 !shadow-none !ring-0 !p-0 bg-transparent font-semibold text-slate-900 dark:text-white focus:outline-none cursor-pointer" style="border: none !important; box-shadow: none !important;">
+                    <option value="5" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">5</option>
+                    <option value="10" selected class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">10</option>
+                    <option value="25" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">25</option>
+                    <option value="50" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">50</option>
+                    <option value="100" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">100</option>
+                </select>
+            </div>
+            <button type="submit" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold cursor-pointer">Search</button>
+            <a asp-action="Index" asp-route-tab="@activeTab" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-300"><i data-lucide="rotate-ccw" class="w-4 h-4"></i></a>
+        </div>
+    </form>
+
+    <!-- Table Card -->
+    <div id="bldgRefTableCard" class="bg-white dark:bg-stone-900 rounded-3xl border border-slate-200 dark:border-stone-800 shadow-sm overflow-hidden paginated-table-card">
+        <div class="overflow-x-auto min-h-[260px]">
+            @if (activeTab == "classification")
+            {
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-100 dark:bg-stone-950 text-slate-600 dark:text-stone-400 font-bold border-b border-slate-200 dark:border-stone-800">
+                        <tr>
+                            <th class="px-4 py-3">CODE</th>
+                            <th class="px-4 py-3">CLASSIFICATION NAME</th>
+                            <th class="px-4 py-3">DEFAULT STRUCTURAL</th>
+                            <th class="px-4 py-3 text-right">DEFAULT BUCC (₱)</th>
+                            <th class="px-4 py-3 text-center">SORT</th>
+                            <th class="px-4 py-3 text-center">STATUS</th>
+                            <th class="px-4 py-3 text-center">ACTIONS</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-stone-800">
+                        @if (!classifications.Any())
+                        {
+                            <tr class="no-records-row"><td colspan="7" class="text-center py-8 text-slate-400">No search data found.</td></tr>
+                        }
+                        else
+                        {
+                        @foreach (var item in classifications)
+                        {
+                            <tr class="hover:bg-slate-50 dark:hover:bg-stone-800/40">
+                                <td class="px-4 py-3 font-bold">@item.ClassificationCode</td>
+                                <td class="px-4 py-3 font-bold text-slate-900 dark:text-white">@item.ClassificationName</td>
+                                <td class="px-4 py-3">@(item.StructuralTypeDefault ?? "-")</td>
+                                <td class="px-4 py-3 text-right font-bold text-emerald-700 dark:text-emerald-400">₱@item.DefaultUnitConstructionCost.ToString("N2")</td>
+                                <td class="px-4 py-3 text-center">@item.SortOrder</td>
+                                <td class="px-4 py-3 text-center">
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold @(item.IsActive ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500")">@(item.IsActive ? "Active" : "Inactive")</span>
+                                </td>
+                                <td class="px-4 py-3 text-center whitespace-nowrap">
+                                    <button type="button" onclick='editClassification(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(item)))' class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-emerald-50 text-slate-700 font-bold cursor-pointer">Edit</button>
+                                    <form asp-action="DeleteClassification" method="post" class="inline" onsubmit="return confirm('Delete this classification?');">
+                                        <input type="hidden" name="id" value="@item.Id" />
+                                        <button type="submit" class="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold cursor-pointer">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                        }
+                    </tbody>
+                </table>
+            }
+            else if (activeTab == "bucc")
+            {
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-100 dark:bg-stone-950 text-slate-600 dark:text-stone-400 font-bold border-b border-slate-200 dark:border-stone-800">
+                        <tr>
+                            <th class="px-4 py-3">STRUCTURAL TYPE</th>
+                            <th class="px-4 py-3">BUILDING TYPE</th>
+                            <th class="px-4 py-3 text-right">MIN RATE (₱/SQ.M.)</th>
+                            <th class="px-4 py-3 text-right">MAX RATE (₱/SQ.M.)</th>
+                            <th class="px-4 py-3 text-center">REVISION YEAR</th>
+                            <th class="px-4 py-3 text-center">ACTIONS</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-stone-800">
+                        @if (!structureRates.Any())
+                        {
+                            <tr class="no-records-row"><td colspan="6" class="text-center py-8 text-slate-400">No search data found.</td></tr>
+                        }
+                        else
+                        {
+                        @foreach (var item in structureRates)
+                        {
+                            <tr class="hover:bg-slate-50 dark:hover:bg-stone-800/40">
+                                <td class="px-4 py-3 font-bold">@(stMap.TryGetValue(item.BuildingStructuralTypeId, out var st) ? st : $"Type #{item.BuildingStructuralTypeId}")</td>
+                                <td class="px-4 py-3">@(btMap.TryGetValue(item.BuildingTypeId, out var bt) ? bt : $"Bldg #{item.BuildingTypeId}")</td>
+                                <td class="px-4 py-3 text-right font-bold text-emerald-700 dark:text-emerald-400">₱@item.MinRate.ToString("N2")</td>
+                                <td class="px-4 py-3 text-right font-bold text-sky-700 dark:text-sky-400">₱@item.MaxRate.ToString("N2")</td>
+                                <td class="px-4 py-3 text-center">@item.RevisionYear</td>
+                                <td class="px-4 py-3 text-center whitespace-nowrap">
+                                    <button type="button" onclick='editStructureRate(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(item)))' class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-emerald-50 text-slate-700 font-bold cursor-pointer">Edit</button>
+                                    <form asp-action="DeleteStructureRate" method="post" class="inline" onsubmit="return confirm('Delete this BUCC rate?');">
+                                        <input type="hidden" name="id" value="@item.Id" />
+                                        <button type="submit" class="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold cursor-pointer">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                        }
+                    </tbody>
+                </table>
+            }
+            else if (activeTab == "assessmentlevel")
+            {
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-100 dark:bg-stone-950 text-slate-600 dark:text-stone-400 font-bold border-b border-slate-200 dark:border-stone-800">
+                        <tr>
+                            <th class="px-4 py-3">ACTUAL USE</th>
+                            <th class="px-4 py-3 text-right">LOWER BOUND (₱)</th>
+                            <th class="px-4 py-3 text-right">UPPER BOUND (₱)</th>
+                            <th class="px-4 py-3 text-right">ASSESSMENT LEVEL (%)</th>
+                            <th class="px-4 py-3 text-center">REVISION YEAR</th>
+                            <th class="px-4 py-3 text-center">ACTIONS</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-stone-800">
+                        @if (!assessmentLevels.Any())
+                        {
+                            <tr class="no-records-row"><td colspan="6" class="text-center py-8 text-slate-400">No search data found.</td></tr>
+                        }
+                        else
+                        {
+                        @foreach (var item in assessmentLevels)
+                        {
+                            <tr class="hover:bg-slate-50 dark:hover:bg-stone-800/40">
+                                <td class="px-4 py-3 font-bold">@BuildingReferenceController.ActualUseLabel(item.ActualUseId)</td>
+                                <td class="px-4 py-3 text-right">₱@item.LowerBound.ToString("N2")</td>
+                                <td class="px-4 py-3 text-right">₱@item.UpperBound.ToString("N2")</td>
+                                <td class="px-4 py-3 text-right font-bold text-emerald-700 dark:text-emerald-400">@item.AssessmentLevel.ToString("N2")%</td>
+                                <td class="px-4 py-3 text-center">@item.RevisionYear</td>
+                                <td class="px-4 py-3 text-center whitespace-nowrap">
+                                    <button type="button" onclick='editAssessmentLevel(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(item)))' class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-emerald-50 text-slate-700 font-bold cursor-pointer">Edit</button>
+                                    <form asp-action="DeleteAssessmentLevel" method="post" class="inline" onsubmit="return confirm('Delete this assessment level bracket?');">
+                                        <input type="hidden" name="id" value="@item.Id" />
+                                        <button type="submit" class="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold cursor-pointer">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                        }
+                    </tbody>
+                </table>
+            }
+            else if (activeTab == "depreciation")
+            {
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-100 dark:bg-stone-950 text-slate-600 dark:text-stone-400 font-bold border-b border-slate-200 dark:border-stone-800">
+                        <tr>
+                            <th class="px-4 py-3">TYPE CODE</th>
+                            <th class="px-4 py-3">ACTUAL USE</th>
+                            <th class="px-4 py-3">MAINTENANCE</th>
+                            <th class="px-4 py-3 text-center">AGE RANGE (YRS)</th>
+                            <th class="px-4 py-3 text-right">DEPRECIATED (%)</th>
+                            <th class="px-4 py-3 text-center">ACTIONS</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-stone-800">
+                        @if (!depreciations.Any())
+                        {
+                            <tr class="no-records-row"><td colspan="6" class="text-center py-8 text-slate-400">No search data found.</td></tr>
+                        }
+                        else
+                        {
+                        @foreach (var item in depreciations)
+                        {
+                            <tr class="hover:bg-slate-50 dark:hover:bg-stone-800/40">
+                                <td class="px-4 py-3 font-bold">@item.TypeCode</td>
+                                <td class="px-4 py-3">@BuildingReferenceController.ActualUseLabel(item.ActualUseId)</td>
+                                <td class="px-4 py-3">@item.DegreeOfMaintenance</td>
+                                <td class="px-4 py-3 text-center">@item.AgeLowerBound – @item.AgeUpperBound</td>
+                                <td class="px-4 py-3 text-right font-bold text-rose-600 dark:text-rose-400">@item.PercentDepreciated.ToString("N2")%</td>
+                                <td class="px-4 py-3 text-center whitespace-nowrap">
+                                    <button type="button" onclick='editDepreciation(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(item)))' class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-emerald-50 text-slate-700 font-bold cursor-pointer">Edit</button>
+                                    <form asp-action="DeleteDepreciation" method="post" class="inline" onsubmit="return confirm('Delete this depreciation rule?');">
+                                        <input type="hidden" name="id" value="@item.Id" />
+                                        <button type="submit" class="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold cursor-pointer">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                        }
+                    </tbody>
+                </table>
+            }
+            else if (activeTab == "additionalitem")
+            {
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-100 dark:bg-stone-950 text-slate-600 dark:text-stone-400 font-bold border-b border-slate-200 dark:border-stone-800">
+                        <tr>
+                            <th class="px-4 py-3">DESCRIPTION</th>
+                            <th class="px-4 py-3 text-right">% UNIT VALUE</th>
+                            <th class="px-4 py-3 text-right">COST / SQ.M. (₱)</th>
+                            <th class="px-4 py-3 text-right">EXCESS SQ.M.</th>
+                            <th class="px-4 py-3 text-right">EXCESS %</th>
+                            <th class="px-4 py-3 text-center">STATUS</th>
+                            <th class="px-4 py-3 text-center">ACTIONS</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-stone-800">
+                        @if (!additionalItems.Any())
+                        {
+                            <tr class="no-records-row"><td colspan="7" class="text-center py-8 text-slate-400">No search data found.</td></tr>
+                        }
+                        else
+                        {
+                        @foreach (var item in additionalItems)
+                        {
+                            <tr class="hover:bg-slate-50 dark:hover:bg-stone-800/40">
+                                <td class="px-4 py-3 font-bold text-slate-900 dark:text-white">@item.AdditionalItemDescription</td>
+                                <td class="px-4 py-3 text-right">@item.PercentUnitValue.ToString("N2")%</td>
+                                <td class="px-4 py-3 text-right font-bold text-emerald-700 dark:text-emerald-400">₱@item.CostPerSQM.ToString("N2")</td>
+                                <td class="px-4 py-3 text-right">@item.ExcessSQM.ToString("N2")</td>
+                                <td class="px-4 py-3 text-right">@item.ExcessPercentage.ToString("N2")%</td>
+                                <td class="px-4 py-3 text-center">
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold @(item.IsActive ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500")">@(item.IsActive ? "Active" : "Inactive")</span>
+                                </td>
+                                <td class="px-4 py-3 text-center whitespace-nowrap">
+                                    <button type="button" onclick='editAdditionalItem(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(item)))' class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-emerald-50 text-slate-700 font-bold cursor-pointer">Edit</button>
+                                    <form asp-action="DeleteAdditionalItem" method="post" class="inline" onsubmit="return confirm('Delete this additional item?');">
+                                        <input type="hidden" name="id" value="@item.Id" />
+                                        <button type="submit" class="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold cursor-pointer">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+        @{
+            int totalTabRows = activeTab switch
+            {
+                "bucc" => structureRates.Count,
+                "assessmentlevel" => assessmentLevels.Count,
+                "depreciation" => depreciations.Count,
+                "additionalitem" => additionalItems.Count,
+                _ => classifications.Count
+            };
+        }
+        <div class="table-pagination-footer p-4 sm:p-6 pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-200 dark:border-stone-800 text-xs font-mono">
+            <div class="text-slate-500 dark:text-stone-400 text-center sm:text-left">
+                Showing <span class="font-bold text-slate-900 dark:text-white table-showing-start">@(totalTabRows == 0 ? 0 : 1)</span> to
+                <span class="font-bold text-slate-900 dark:text-white table-showing-end">@Math.Min(10, totalTabRows)</span> of
+                <span class="font-bold text-slate-900 dark:text-white table-total-count">@totalTabRows</span> entries
+            </div>
+            <div class="flex items-center gap-1.5 flex-wrap justify-center table-pagination-buttons"></div>
+        </div>
+    </div>
+</div>
+
+<!-- 1. Modal: Building Classification -->
+<div id="modalClassification" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+    <div class="bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 rounded-3xl w-full max-w-lg p-6 space-y-4 shadow-2xl">
+        <div class="flex items-center justify-between border-b border-slate-200 dark:border-stone-800 pb-3">
+            <h3 class="text-base font-extrabold">Building Classification</h3>
+            <button type="button" onclick="closeBldgRefModals()" class="text-slate-400 hover:text-slate-700 cursor-pointer"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+        <form asp-action="SaveClassification" method="post" class="space-y-3">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" id="cls_id" value="0" />
+            <div class="grid grid-cols-2 gap-3">
+                <div><label class="block font-bold mb-1">Code</label><input type="text" name="classificationCode" id="cls_code" required class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-950" /></div>
+                <div><label class="block font-bold mb-1">Sort Order</label><input type="number" name="sortOrder" id="cls_sort" value="1" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-950" /></div>
+            </div>
+            <div><label class="block font-bold mb-1">Classification Name</label><input type="text" name="classificationName" id="cls_name" required class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-950" /></div>
+            <div class="grid grid-cols-2 gap-3">
+                <div><label class="block font-bold mb-1">Default Structural</label><input type="text" name="structuralTypeDefault" id="cls_struct" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-950" /></div>
+                <div><label class="block font-bold mb-1">Default BUCC (₱)</label><input type="number" step="0.01" name="defaultUnitConstructionCost" id="cls_cost" value="0" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-950" /></div>
+            </div>
+            <div><label class="block font-bold mb-1">Description</label><input type="text" name="description" id="cls_desc" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-950" /></div>
+            <label class="inline-flex items-center gap-2 font-bold"><input type="checkbox" name="isActive" id="cls_active" value="true" checked /> Active</label>
+            <div class="flex justify-end gap-2 pt-2">
+                <button type="button" onclick="closeBldgRefModals()" class="px-4 py-2 rounded-xl bg-slate-100 font-bold cursor-pointer">Cancel</button>
+                <button type="submit" class="px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold cursor-pointer">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 2. Modal: BUCC Structure Rate -->
+<div id="modalBucc" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+    <div class="bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 rounded-3xl w-full max-w-lg p-6 space-y-4 shadow-2xl">
+        <div class="flex items-center justify-between border-b border-slate-200 dark:border-stone-800 pb-3">
+            <h3 class="text-base font-extrabold">BUCC Structure Rate</h3>
+            <button type="button" onclick="closeBldgRefModals()" class="text-slate-400 hover:text-slate-700 cursor-pointer"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+        <form asp-action="SaveStructureRate" method="post" class="space-y-3">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" id="bucc_id" value="0" />
+            <div>
+                <label class="block font-bold mb-1">Structural Type</label>
+                <select name="buildingStructuralTypeId" id="bucc_st" required class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-950">
+                    @foreach (var s in structuralTypes) { <option value="@s.Id">@s.StructuralCode — @s.StructuralDescription</option> }
+                </select>
+            </div>
+            <div>
+                <label class="block font-bold mb-1">Building Type</label>
+                <select name="buildingTypeId" id="bucc_bt" required class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-950">
+                    @foreach (var b in buildingTypes) { <option value="@b.Id">@b.BuildingTypeCode — @b.BuildingTypeDescription</option> }
+                </select>
+            </div>
+            <div class="grid grid-cols-3 gap-3">
+                <div><label class="block font-bold mb-1">Min Rate (₱)</label><input type="number" step="0.01" name="minRate" id="bucc_min" value="0" required class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-950" /></div>
+                <div><label class="block font-bold mb-1">Max Rate (₱)</label><input type="number" step="0.01" name="maxRate" id="bucc_max" value="0" required class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-950" /></div>
+                <div><label class="block font-bold mb-1">Revision Year</label><input type="number" name="revisionYear" id="bucc_year" value="2011" required class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-950" /></div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button type="button" onclick="closeBldgRefModals()" class="px-4 py-2 rounded-xl bg-slate-100 font-bold cursor-pointer">Cancel</button>
+                <button type="submit" class="px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold cursor-pointer">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 3. Modal: Building Assessment Level -->
+<div id="modalAssessmentLevel" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+    <div class="bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 rounded-3xl w-full max-w-lg p-6 space-y-4 shadow-2xl">
+        <div class="flex items-center justify-between border-b border-slate-200 dark:border-stone-800 pb-3">
+            <h3 class="text-base font-extrabold">Building Assessment Level Bracket</h3>
+            <button type="button" onclick="closeBldgRefModals()" class="text-slate-400 hover:text-slate-700 cursor-pointer"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+        <form asp-action="SaveAssessmentLevel" method="post" class="space-y-3">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" id="al_id" value="0" />
+            <div>
+                <label class="block font-bold mb-1">Actual Use</label>
+                <select name="actualUseId" id="al_use" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-950">
+                    <option value="1">RESIDENTIAL</option>
+                    <option value="4">COMMERCIAL</option>
+                    <option value="6">INDUSTRIAL</option>
+                    <option value="17">AGRICULTURAL</option>
+                    <option value="10">SPECIAL / CULTURAL</option>
+                </select>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div><label class="block font-bold mb-1">Lower Bound (₱)</label><input type="number" step="0.01" name="lowerBound" id="al_low" value="0" required class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-950" /></div>
+                <div><label class="block font-bold mb-1">Upper Bound (₱)</label><input type="number" step="0.01" name="upperBound" id="al_high" value="0" required class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-950" /></div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div><label class="block font-bold mb-1">Assessment Level (%)</label><input type="number" step="0.01" name="assessmentLevel" id="al_pct" value="0" required class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-950" /></div>
+                <div><label class="block font-bold mb-1">Revision Year</label><input type="number" name="revisionYear" id="al_year" value="2011" required class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-950" /></div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button type="button" onclick="closeBldgRefModals()" class="px-4 py-2 rounded-xl bg-slate-100 font-bold cursor-pointer">Cancel</button>
+                <button type="submit" class="px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold cursor-pointer">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 4. Modal: Depreciation Rule -->
+<div id="modalDepreciation" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+    <div class="bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 rounded-3xl w-full max-w-lg p-6 space-y-4 shadow-2xl">
+        <div class="flex items-center justify-between border-b border-slate-200 dark:border-stone-800 pb-3">
+            <h3 class="text-base font-extrabold">Building Depreciation Rule</h3>
+            <button type="button" onclick="closeBldgRefModals()" class="text-slate-400 hover:text-slate-700 cursor-pointer"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+        <form asp-action="SaveDepreciation" method="post" class="space-y-3">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" id="dep_id" value="0" />
+            <div class="grid grid-cols-3 gap-3">
+                <div><label class="block font-bold mb-1">Type Code</label><input type="text" name="typeCode" id="dep_code" placeholder="I-A" required class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-950" /></div>
+                <div>
+                    <label class="block font-bold mb-1">Actual Use</label>
+                    <select name="actualUseId" id="dep_use" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-950">
+                        <option value="1">RESIDENTIAL</option>
+                        <option value="4">COMMERCIAL</option>
+                        <option value="6">INDUSTRIAL</option>
+                        <option value="17">AGRICULTURAL</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block font-bold mb-1">Maintenance</label>
+                    <select name="degreeOfMaintenance" id="dep_maint" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-950">
+                        <option value="GOOD">GOOD</option>
+                        <option value="AVERAGE">AVERAGE</option>
+                        <option value="POOR">POOR</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-3 gap-3">
+                <div><label class="block font-bold mb-1">Age From</label><input type="number" name="ageLowerBound" id="dep_low" value="0" required class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-950" /></div>
+                <div><label class="block font-bold mb-1">Age To</label><input type="number" name="ageUpperBound" id="dep_high" value="5" required class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-950" /></div>
+                <div><label class="block font-bold mb-1">Depreciated (%)</label><input type="number" step="0.01" name="percentDepreciated" id="dep_pct" value="0" required class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-950" /></div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button type="button" onclick="closeBldgRefModals()" class="px-4 py-2 rounded-xl bg-slate-100 font-bold cursor-pointer">Cancel</button>
+                <button type="submit" class="px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold cursor-pointer">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 5. Modal: Additional Item -->
+<div id="modalAdditionalItem" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+    <div class="bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 rounded-3xl w-full max-w-lg p-6 space-y-4 shadow-2xl">
+        <div class="flex items-center justify-between border-b border-slate-200 dark:border-stone-800 pb-3">
+            <h3 class="text-base font-extrabold">Building Additional Item</h3>
+            <button type="button" onclick="closeBldgRefModals()" class="text-slate-400 hover:text-slate-700 cursor-pointer"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+        <form asp-action="SaveAdditionalItem" method="post" class="space-y-3">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" id="add_id" value="0" />
+            <div><label class="block font-bold mb-1">Description</label><input type="text" name="additionalItemDescription" id="add_desc" required class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-950" /></div>
+            <div class="grid grid-cols-2 gap-3">
+                <div><label class="block font-bold mb-1">% Unit Value</label><input type="number" step="0.01" name="percentUnitValue" id="add_pct" value="0" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-950" /></div>
+                <div><label class="block font-bold mb-1">Cost / sq.m. (₱)</label><input type="number" step="0.01" name="costPerSQM" id="add_cost" value="0" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-950" /></div>
+            </div>
+            <div class="grid grid-cols-3 gap-3">
+                <div><label class="block font-bold mb-1">Excess sq.m.</label><input type="number" step="0.01" name="excessSQM" id="add_exsqm" value="0" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-950" /></div>
+                <div><label class="block font-bold mb-1">Excess %</label><input type="number" step="0.01" name="excessPercentage" id="add_expct" value="0" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-950" /></div>
+                <div><label class="block font-bold mb-1">Sort Order</label><input type="number" name="sortOrder" id="add_sort" value="1" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-950" /></div>
+            </div>
+            <label class="inline-flex items-center gap-2 font-bold"><input type="checkbox" name="isActive" id="add_active" value="true" checked /> Active</label>
+            <div class="flex justify-end gap-2 pt-2">
+                <button type="button" onclick="closeBldgRefModals()" class="px-4 py-2 rounded-xl bg-slate-100 font-bold cursor-pointer">Cancel</button>
+                <button type="submit" class="px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold cursor-pointer">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    function closeBldgRefModals() {
+        ['modalClassification', 'modalBucc', 'modalAssessmentLevel', 'modalDepreciation', 'modalAdditionalItem'].forEach(id => {
+            document.getElementById(id)?.classList.add('hidden');
+        });
+    }
+
+    function openAddModalForTab(tab) {
+        closeBldgRefModals();
+        if (tab === 'classification') {
+            document.getElementById('cls_id').value = 0;
+            document.getElementById('cls_code').value = '';
+            document.getElementById('cls_name').value = '';
+            document.getElementById('cls_struct').value = '';
+            document.getElementById('cls_cost').value = 0;
+            document.getElementById('cls_desc').value = '';
+            document.getElementById('cls_sort').value = 1;
+            document.getElementById('cls_active').checked = true;
+            document.getElementById('modalClassification').classList.remove('hidden');
+        } else if (tab === 'bucc') {
+            document.getElementById('bucc_id').value = 0;
+            document.getElementById('bucc_min').value = 0;
+            document.getElementById('bucc_max').value = 0;
+            document.getElementById('bucc_year').value = 2011;
+            document.getElementById('modalBucc').classList.remove('hidden');
+        } else if (tab === 'assessmentlevel') {
+            document.getElementById('al_id').value = 0;
+            document.getElementById('al_low').value = 0;
+            document.getElementById('al_high').value = 0;
+            document.getElementById('al_pct').value = 0;
+            document.getElementById('al_year').value = 2011;
+            document.getElementById('modalAssessmentLevel').classList.remove('hidden');
+        } else if (tab === 'depreciation') {
+            document.getElementById('dep_id').value = 0;
+            document.getElementById('dep_code').value = '';
+            document.getElementById('dep_low').value = 0;
+            document.getElementById('dep_high').value = 5;
+            document.getElementById('dep_pct').value = 0;
+            document.getElementById('modalDepreciation').classList.remove('hidden');
+        } else if (tab === 'additionalitem') {
+            document.getElementById('add_id').value = 0;
+            document.getElementById('add_desc').value = '';
+            document.getElementById('add_pct').value = 0;
+            document.getElementById('add_cost').value = 0;
+            document.getElementById('add_exsqm').value = 0;
+            document.getElementById('add_expct').value = 0;
+            document.getElementById('add_sort').value = 1;
+            document.getElementById('add_active').checked = true;
+            document.getElementById('modalAdditionalItem').classList.remove('hidden');
+        }
+    }
+
+    function editClassification(item) {
+        closeBldgRefModals();
+        document.getElementById('cls_id').value = item.Id;
+        document.getElementById('cls_code').value = item.ClassificationCode || '';
+        document.getElementById('cls_name').value = item.ClassificationName || '';
+        document.getElementById('cls_struct').value = item.StructuralTypeDefault || '';
+        document.getElementById('cls_cost').value = item.DefaultUnitConstructionCost || 0;
+        document.getElementById('cls_desc').value = item.Description || '';
+        document.getElementById('cls_sort').value = item.SortOrder || 1;
+        document.getElementById('cls_active').checked = !!item.IsActive;
+        document.getElementById('modalClassification').classList.remove('hidden');
+    }
+
+    function editStructureRate(item) {
+        closeBldgRefModals();
+        document.getElementById('bucc_id').value = item.Id;
+        document.getElementById('bucc_st').value = item.BuildingStructuralTypeId;
+        document.getElementById('bucc_bt').value = item.BuildingTypeId;
+        document.getElementById('bucc_min').value = item.MinRate;
+        document.getElementById('bucc_max').value = item.MaxRate;
+        document.getElementById('bucc_year').value = item.RevisionYear;
+        document.getElementById('modalBucc').classList.remove('hidden');
+    }
+
+    function editAssessmentLevel(item) {
+        closeBldgRefModals();
+        document.getElementById('al_id').value = item.Id;
+        document.getElementById('al_use').value = item.ActualUseId;
+        document.getElementById('al_low').value = item.LowerBound;
+        document.getElementById('al_high').value = item.UpperBound;
+        document.getElementById('al_pct').value = item.AssessmentLevel;
+        document.getElementById('al_year').value = item.RevisionYear;
+        document.getElementById('modalAssessmentLevel').classList.remove('hidden');
+    }
+
+    function editDepreciation(item) {
+        closeBldgRefModals();
+        document.getElementById('dep_id').value = item.Id;
+        document.getElementById('dep_code').value = item.TypeCode || '';
+        document.getElementById('dep_use').value = item.ActualUseId;
+        document.getElementById('dep_maint').value = item.DegreeOfMaintenance || 'AVERAGE';
+        document.getElementById('dep_low').value = item.AgeLowerBound;
+        document.getElementById('dep_high').value = item.AgeUpperBound;
+        document.getElementById('dep_pct').value = item.PercentDepreciated;
+        document.getElementById('modalDepreciation').classList.remove('hidden');
+    }
+
+    function editAdditionalItem(item) {
+        closeBldgRefModals();
+        document.getElementById('add_id').value = item.Id;
+        document.getElementById('add_desc').value = item.AdditionalItemDescription || '';
+        document.getElementById('add_pct').value = item.PercentUnitValue || 0;
+        document.getElementById('add_cost').value = item.CostPerSQM || 0;
+        document.getElementById('add_exsqm').value = item.ExcessSQM || 0;
+        document.getElementById('add_expct').value = item.ExcessPercentage || 0;
+        document.getElementById('add_sort').value = item.SortOrder || 1;
+        document.getElementById('add_active').checked = !!item.IsActive;
+        document.getElementById('modalAdditionalItem').classList.remove('hidden');
+    }
+</script>
+}

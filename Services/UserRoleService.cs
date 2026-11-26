@@ -215,6 +215,21 @@ public class UserRoleService : IUserRoleService
             });
         }
 
+        if (!_context.SystemModules.Any(m => m.ModuleCode == "BUILDING_REFERENCE"))
+        {
+            _context.SystemModules.Add(new SystemModule
+            {
+                ModuleCode = "BUILDING_REFERENCE",
+                ModuleName = "Building Reference Settings (BUCC & Depreciation)",
+                Category = "System Administration",
+                ControllerName = "BuildingReference",
+                ActionName = "Index",
+                Icon = "building-2",
+                SortOrder = 33,
+                IsActive = true
+            });
+        }
+
         if (!_context.SystemModules.Any(m => m.ModuleCode == "AUDIT_LOGS"))
         {
             _context.SystemModules.Add(new SystemModule
@@ -245,12 +260,77 @@ public class UserRoleService : IUserRoleService
             });
         }
 
+        foreach (var obsoleteCode in new[] { "POOL_ASSIGN", "POOL_ASSIGN_ALL" })
+        {
+            var oldPoolAssign = _context.SystemModules.FirstOrDefault(m => m.ModuleCode == obsoleteCode);
+            if (oldPoolAssign != null && oldPoolAssign.IsActive)
+            {
+                oldPoolAssign.IsActive = false;
+            }
+        }
+
+        var poolCategory = _context.SystemModules
+            .Where(m => m.ModuleCode == "POOL_TRANSACTIONS")
+            .Select(m => m.Category)
+            .FirstOrDefault() ?? "Workflow & Queues";
+
+        var poolAssignModules = new[]
+        {
+            new { Code = "POOL_ASSIGN_DIV1", Name = "Assign Pool Transactions (Division 1)", Action = "AssignDiv1", Sort = 26 },
+            new { Code = "POOL_ASSIGN_DIV2", Name = "Assign Pool Transactions (Division 2)", Action = "AssignDiv2", Sort = 27 },
+            new { Code = "POOL_ASSIGN_DIV3", Name = "Assign Pool Transactions (Division 3)", Action = "AssignDiv3", Sort = 28 }
+        };
+
+        foreach (var pam in poolAssignModules)
+        {
+            if (!_context.SystemModules.Any(m => m.ModuleCode == pam.Code))
+            {
+                _context.SystemModules.Add(new SystemModule
+                {
+                    ModuleCode = pam.Code,
+                    ModuleName = pam.Name,
+                    Category = poolCategory,
+                    ControllerName = "Workflow",
+                    ActionName = pam.Action,
+                    Icon = "user-plus",
+                    SortOrder = pam.Sort,
+                    IsActive = true
+                });
+            }
+        }
+
         _context.SaveChanges();
 
         var landRefMod = _context.SystemModules.FirstOrDefault(m => m.ModuleCode == "LAND_REFERENCE");
         var auditLogMod = _context.SystemModules.FirstOrDefault(m => m.ModuleCode == "AUDIT_LOGS");
+        var poolAssignDivMods = _context.SystemModules
+            .Where(m => m.ModuleCode == "POOL_ASSIGN_DIV1" || m.ModuleCode == "POOL_ASSIGN_DIV2" || m.ModuleCode == "POOL_ASSIGN_DIV3")
+            .ToList();
         var printTdMod = _context.SystemModules.FirstOrDefault(m => m.ModuleCode == "ASSESSMENT_PRINT_TD");
         var adminRole = _context.UserRoleSettings.FirstOrDefault(r => r.RoleName == "System Administrator");
+        if (adminRole != null)
+        {
+            bool addedAdminPoolAssign = false;
+            foreach (var pam in poolAssignDivMods)
+            {
+                if (!_context.RoleModulePermissions.Any(p => p.RoleId == adminRole.Id && p.ModuleId == pam.ModuleId))
+                {
+                    _context.RoleModulePermissions.Add(new RoleModulePermission
+                    {
+                        RoleId = adminRole.Id,
+                        ModuleId = pam.ModuleId,
+                        CanView = true,
+                        CanCreate = true,
+                        CanEdit = true,
+                        CanDelete = true,
+                        CanApprove = true,
+                        UpdatedDate = DateTime.Now
+                    });
+                    addedAdminPoolAssign = true;
+                }
+            }
+            if (addedAdminPoolAssign) _context.SaveChanges();
+        }
         if (auditLogMod != null && adminRole != null &&
             !_context.RoleModulePermissions.Any(p => p.RoleId == adminRole.Id && p.ModuleId == auditLogMod.ModuleId))
         {
@@ -274,6 +354,23 @@ public class UserRoleService : IUserRoleService
             {
                 RoleId = adminRole.Id,
                 ModuleId = landRefMod.ModuleId,
+                CanView = true,
+                CanCreate = true,
+                CanEdit = true,
+                CanDelete = true,
+                CanApprove = true,
+                UpdatedDate = DateTime.Now
+            });
+            _context.SaveChanges();
+        }
+        var bldgRefMod = _context.SystemModules.FirstOrDefault(m => m.ModuleCode == "BUILDING_REFERENCE");
+        if (bldgRefMod != null && adminRole != null &&
+            !_context.RoleModulePermissions.Any(p => p.RoleId == adminRole.Id && p.ModuleId == bldgRefMod.ModuleId))
+        {
+            _context.RoleModulePermissions.Add(new RoleModulePermission
+            {
+                RoleId = adminRole.Id,
+                ModuleId = bldgRefMod.ModuleId,
                 CanView = true,
                 CanCreate = true,
                 CanEdit = true,

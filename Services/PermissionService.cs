@@ -158,6 +158,22 @@ public class PermissionService : IPermissionService
                 return hasPoolAccess;
             }
 
+            // Assign from Pool to Specific User actions (Division 1, Division 2, Division 3):
+            if (actionName != null && actionName.StartsWith("Assign", StringComparison.OrdinalIgnoreCase))
+            {
+                bool HasCode(string code)
+                {
+                    var m = _context.SystemModules.FirstOrDefault(x => x.ModuleCode == code);
+                    return m != null && HasModuleRecordAccess(roleSetting.Id, m.ModuleId);
+                }
+
+                if (actionName.Equals("AssignDiv1", StringComparison.OrdinalIgnoreCase)) return HasCode("POOL_ASSIGN_DIV1");
+                if (actionName.Equals("AssignDiv2", StringComparison.OrdinalIgnoreCase)) return HasCode("POOL_ASSIGN_DIV2");
+                if (actionName.Equals("AssignDiv3", StringComparison.OrdinalIgnoreCase)) return HasCode("POOL_ASSIGN_DIV3");
+
+                return HasCode("POOL_ASSIGN_DIV1") || HasCode("POOL_ASSIGN_DIV2") || HasCode("POOL_ASSIGN_DIV3");
+            }
+
             // Other workflow actions (Forward, Defer, Release, History, Index)
             return hasMyAccess || hasPoolAccess;
         }
@@ -511,6 +527,22 @@ public class PermissionService : IPermissionService
             if (actionName != null && actionName.Equals("Settings", StringComparison.OrdinalIgnoreCase))
             {
                 return _context.SystemModules.FirstOrDefault(m => m.ModuleCode == "WORKFLOW_SETTINGS");
+            }
+            if (actionName != null && actionName.Equals("AssignDiv1", StringComparison.OrdinalIgnoreCase))
+            {
+                return _context.SystemModules.FirstOrDefault(m => m.ModuleCode == "POOL_ASSIGN_DIV1");
+            }
+            if (actionName != null && actionName.Equals("AssignDiv2", StringComparison.OrdinalIgnoreCase))
+            {
+                return _context.SystemModules.FirstOrDefault(m => m.ModuleCode == "POOL_ASSIGN_DIV2");
+            }
+            if (actionName != null && actionName.Equals("AssignDiv3", StringComparison.OrdinalIgnoreCase))
+            {
+                return _context.SystemModules.FirstOrDefault(m => m.ModuleCode == "POOL_ASSIGN_DIV3");
+            }
+            if (actionName != null && actionName.Equals("Assign", StringComparison.OrdinalIgnoreCase))
+            {
+                return _context.SystemModules.FirstOrDefault(m => m.ModuleCode == "POOL_ASSIGN_DIV1");
             }
             return null;
         }

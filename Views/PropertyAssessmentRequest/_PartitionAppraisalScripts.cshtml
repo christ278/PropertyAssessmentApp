@@ -1693,29 +1693,9 @@
     }
 
     function calculateLocalUnitCostFallback(structuralType, bldgClass, rateMode) {
-        let baseRate = 12500;
-        if (bldgClass.includes("Class A") || bldgClass.includes("I-A")) baseRate = 15000;
-        else if (bldgClass.includes("Class B") || bldgClass.includes("I-B")) baseRate = 12500;
-        else if (bldgClass.includes("Class C") || bldgClass.includes("II-A")) baseRate = 9800;
-        else if (bldgClass.includes("Class D") || bldgClass.includes("III-A")) baseRate = 6500;
-        else if (bldgClass.includes("Class E") || bldgClass.includes("IV-A")) baseRate = 3500;
-        else if (bldgClass.includes("Commercial") || bldgClass.includes("COM")) baseRate = 16500;
-        else if (bldgClass.includes("Industrial") || bldgClass.includes("IND")) baseRate = 12000;
-
-        let factor = 1.0;
-        const st = (structuralType || "").toUpperCase();
-        if (st.includes("TYPE V") || st.includes("CLASS E") || st.startsWith("V")) factor = 0.30;
-        else if (st.includes("TYPE IV") || st.includes("CLASS D") || st.startsWith("IV")) factor = 0.50;
-        else if (st.includes("TYPE III") || st.includes("CLASS C") || st.startsWith("III")) factor = 0.70;
-        else if (st.includes("TYPE II") || st.includes("CLASS B") || st.startsWith("II")) factor = 0.85;
-
-        let finalRate = baseRate * factor;
-        if (rateMode === "Max") finalRate *= 1.10;
-
-        finalRate = Math.round(finalRate * 100) / 100;
-        $('#modalFloorUnitCost').val(finalRate.toFixed(2));
-        $('#unitCostAutoBadge').text(`AUTO: ₱${finalRate.toLocaleString('en-US', { minimumFractionDigits: 2 })}`)
-            .removeClass('text-amber-500').addClass('text-emerald-600');
+        $('#modalFloorUnitCost').val('0.00');
+        $('#unitCostAutoBadge').text('NO SCHEDULE — ENTER RATE')
+            .removeClass('text-emerald-600').addClass('text-amber-500');
     }
 
     function openAddFloorModal() {
@@ -2082,7 +2062,7 @@
         $('#inputMarketValue').val(finalMarketVal.toFixed(2));
 
         const rawAssessLvl = parseFloat($('#inputAssessLevel').val());
-        const assessLevel = isNaN(rawAssessLvl) ? 20 : rawAssessLvl;
+        const assessLevel = isNaN(rawAssessLvl) ? 0 : rawAssessLvl;
         updateAssessedValueAndTaxes(finalMarketVal, assessLevel);
 
         $('#kpiBaseRcn').text('₱' + baseRcn.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
@@ -2715,7 +2695,7 @@
         updatedPartition.unitValue = parseFloat($('#inputUnitValue').val()) || 0;
         updatedPartition.marketValue = parseFloat($('#inputMarketValue').val()) || 0;
         const bldgAssessVal = parseFloat($('#inputAssessLevel').val());
-        const bldgAssessLevel = isNaN(bldgAssessVal) ? 20 : bldgAssessVal;
+        const bldgAssessLevel = isNaN(bldgAssessVal) ? 0 : bldgAssessVal;
         updatedPartition.assessmentLevelPercent = bldgAssessLevel;
         updatedPartition.assessmentLevel = bldgAssessLevel;
         updatedPartition.assessedValue = parseFloat($('#inputAssessedValue').val()) || 0;
