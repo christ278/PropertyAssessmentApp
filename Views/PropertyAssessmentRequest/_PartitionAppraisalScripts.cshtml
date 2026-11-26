@@ -1698,6 +1698,32 @@
             .removeClass('text-emerald-600').addClass('text-amber-500');
     }
 
+    function initAddFloorModalSelect2() {
+        if (typeof $ === 'undefined' || typeof $.fn.select2 === 'undefined') return;
+        const $modal = $('#addFloorModal');
+        if (!$modal.length) return;
+
+        const configs = [
+            { selector: '#modalFloorLevel', placeholder: 'Search & select Floor / Level...' },
+            { selector: '#modalFloorBuildingClass', placeholder: 'Search & select Building Classification...' },
+            { selector: '#modalFloorRateMode', placeholder: 'Select Rate Mode...' }
+        ];
+
+        configs.forEach(cfg => {
+            const $el = $(cfg.selector);
+            if (!$el.length) return;
+            if ($el.hasClass('select2-hidden-accessible')) {
+                $el.select2('destroy');
+            }
+            $el.select2({
+                width: '100%',
+                dropdownParent: $modal,
+                placeholder: cfg.placeholder,
+                allowClear: false
+            });
+        });
+    }
+
     function openAddFloorModal() {
         const structuralType = $('select[name="StructuralType"]').val();
         if (!structuralType && window.toastr) {
@@ -1717,9 +1743,9 @@
         $('#modalFloorArea').val('');
         $('#modalFloorDesc').val('');
 
-        fetchModalFloorUnitCost();
-
         $('#addFloorModal').removeClass('hidden');
+        initAddFloorModalSelect2();
+        fetchModalFloorUnitCost();
         if (window.lucide) lucide.createIcons();
     }
 
@@ -1882,12 +1908,30 @@
         }
     }
 
+    function initAddAdditionModalSelect2() {
+        if (typeof $ === 'undefined' || typeof $.fn.select2 === 'undefined') return;
+        const $modal = $('#addAdditionModal');
+        const $el = $('#modalAddItemSelect');
+        if (!$modal.length || !$el.length) return;
+
+        if ($el.hasClass('select2-hidden-accessible')) {
+            $el.select2('destroy');
+        }
+        $el.select2({
+            width: '100%',
+            dropdownParent: $modal,
+            placeholder: '-- Search & Select Additional Item --',
+            allowClear: false
+        });
+    }
+
     function openAddAdditionModal() {
-        $('#modalAddItemSelect').val('');
+        $('#modalAddItemSelect').val('').trigger('change.select2');
         $('#modalAddItemArea').val('1');
         $('#modalAddItemRate').val('0.00');
         $('#modalAddItemPercent').val('100');
         $('#addAdditionModal').removeClass('hidden');
+        initAddAdditionModalSelect2();
         if (window.lucide) lucide.createIcons();
     }
 
@@ -3430,7 +3474,7 @@
         $('#selectBuildingClassification').on('change', function () {
             const bldgVal = $(this).val();
             if (bldgVal && !$('#modalFloorBuildingClass').val()) {
-                $('#modalFloorBuildingClass').val(bldgVal);
+                $('#modalFloorBuildingClass').val(bldgVal).trigger('change.select2');
             }
         });
 
