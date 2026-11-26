@@ -539,8 +539,10 @@ public class PropertyAssessmentRequestController : Controller
                 {
                     var refProps = _context.TaxDeclarations.AsNoTracking()
                         .Include(t => t.LandDetails)
+                        .Include(t => t.BuildingDetails)
                         .Where(t => refIds.Contains(t.Id))
                         .ToList();
+                    ViewBag.RefTotalArea = refProps.Sum(t => t.AreaSqMeters);
                     var tdList = refProps.Select(t => t.TaxDeclarationNumber).Where(s => !string.IsNullOrWhiteSpace(s)).Distinct().ToList();
                     if (tdList.Count > 0)
                     {
@@ -580,6 +582,7 @@ public class PropertyAssessmentRequestController : Controller
                 try
                 {
                     var list = ParsePartitionList(partitionsJson);
+                    ViewBag.OtherPartitionsArea = list.Where((_, i) => i != index).Sum(GetPartitionAreaSqm);
                     if (list.Count > 0)
                     {
                         ViewBag.TotalChildLots = list.Count.ToString();
@@ -966,6 +969,32 @@ public class PropertyAssessmentRequestController : Controller
                     {
                         list.Add(item);
                     }
+
+                    if (string.Equals(req.TransactionTypeCode, "SD", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var refIds = new List<Guid>();
+                        if (!string.IsNullOrWhiteSpace(req.SelectedRefPropertyIdsJson))
+                        {
+                            try
+                            {
+                                refIds = System.Text.Json.JsonSerializer.Deserialize<List<Guid>>(req.SelectedRefPropertyIdsJson) ?? new();
+                            }
+                            catch { }
+                        }
+                        if (req.RefTaxDeclarationId.HasValue && !refIds.Contains(req.RefTaxDeclarationId.Value))
+                        {
+                            refIds.Add(req.RefTaxDeclarationId.Value);
+                        }
+
+                        var refTotalArea = GetReferencePropertiesTotalArea(refIds);
+                        var partitionsTotalArea = list.Sum(GetPartitionAreaSqm);
+                        if (refTotalArea > 0 && partitionsTotalArea > refTotalArea + 0.0001m)
+                        {
+                            TempData["ErrorMessage"] = $"Subdivision total partition area ({partitionsTotalArea:N2} sq.m.) cannot exceed the reference property area ({refTotalArea:N2} sq.m.).";
+                            return RedirectToAction(nameof(EditPartition), new { requestId = req.Id, index, returnUrl, kind = item.Kind });
+                        }
+                    }
+
                     req.GeneratedPartitionsJson = System.Text.Json.JsonSerializer.Serialize(list, _jsonOptions);
                     _rpaService.Update(req, null, null);
                     TempData["SuccessMessage"] = $"Partition {item.SystemGeneratedTDN} ({item.PartitionIndex}) appraisal updated successfully!";
@@ -1438,6 +1467,40 @@ public class PropertyAssessmentRequestController : Controller
         }
     }
 
+    private decimal GetReferencePropertiesTotalArea(List<Guid> selectedIds)
+    {
+        if (selectedIds == null || selectedIds.Count == 0) return 0m;
+        var distinctIds = selectedIds.Distinct().ToList();
+        var props = _context.TaxDeclarations
+            .Include(t => t.LandDetails)
+            .Include(t => t.BuildingDetails)
+            .AsNoTracking()
+            .Where(t => distinctIds.Contains(t.Id))
+            .ToList();
+        return props.Sum(t => t.AreaSqMeters);
+    }
+
+    private static decimal GetPartitionAreaSqm(AssessmentPartitionItem p)
+    {
+        if (p == null) return 0m;
+        if (!string.IsNullOrWhiteSpace(p.LandAppraisalDetailsJson) && p.LandAppraisalDetailsJson.TrimStart().StartsWith('['))
+        {
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(p.LandAppraisalDetailsJson);
+                decimal sum = 0m;
+                foreach (var el in doc.RootElement.EnumerateArray())
+                {
+                    if (el.TryGetProperty("AreaSQM", out var a1) && a1.TryGetDecimal(out var d1)) sum += d1;
+                    else if (el.TryGetProperty("areaSQM", out var a2) && a2.TryGetDecimal(out var d2)) sum += d2;
+                }
+                if (sum > 0m) return sum;
+            }
+            catch { }
+        }
+        return p.AreaSqMeters;
+    }
+
     private void ValidateAssessmentRequest(PropertyAssessmentRequest request)
     {
         void CheckText(string key, string? value, string label, int maxLen,
@@ -1541,18 +1604,29 @@ public class PropertyAssessmentRequestController : Controller
         if (isSubdivision)
         {
             var partitionCount = request.Partitions;
+            List<AssessmentPartitionItem>? sdParts = null;
             if (!string.IsNullOrWhiteSpace(request.GeneratedPartitionsJson))
             {
                 try
                 {
-                    var parts = ParsePartitionList(request.GeneratedPartitionsJson);
-                    if (parts != null && parts.Count > 0) partitionCount = parts.Count;
+                    sdParts = ParsePartitionList(request.GeneratedPartitionsJson);
+                    if (sdParts != null && sdParts.Count > 0) partitionCount = sdParts.Count;
                 }
                 catch { }
             }
             if (partitionCount < 2)
             {
                 ModelState.AddModelError(nameof(request.Partitions), "Subdivision (SD) · Segregation of Land requires at least 2 segregated lot partitions.");
+            }
+            if (selectedIds.Count > 0 && sdParts != null && sdParts.Count > 0)
+            {
+                var refTotalArea = GetReferencePropertiesTotalArea(selectedIds);
+                var partitionsTotalArea = sdParts.Sum(GetPartitionAreaSqm);
+                if (refTotalArea > 0 && partitionsTotalArea > refTotalArea + 0.0001m)
+                {
+                    ModelState.AddModelError(nameof(request.GeneratedPartitionsJson),
+                        $"Subdivision total partition area ({partitionsTotalArea:N2} sq.m.) cannot exceed the reference property area ({refTotalArea:N2} sq.m.).");
+                }
             }
         }
         if (isConsolidation)

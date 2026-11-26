@@ -2596,6 +2596,18 @@
             toastr.info(`Added Lot ${idx + 1}-${letter} to partition register.`);
         }
 
+        function getSubdivisionAreaValidation() {
+            const txCode = (document.querySelector('[name="TransactionTypeCode"]')?.value || '').trim().toUpperCase();
+            if (txCode !== 'SD') return { valid: true, totalArea: 0, refArea: 0 };
+
+            const refArea = (typeof selectedPropertyIds !== 'undefined' && Array.isArray(selectedPropertyIds) && typeof referencePropertiesData !== 'undefined')
+                ? selectedPropertyIds.reduce((acc, id) => acc + (parseFloat(referencePropertiesData[id]?.area ?? referencePropertiesData[id]?.areaSqMeters) || 0), 0)
+                : 0;
+            const totalArea = generatedPartitions.reduce((acc, p) => acc + (parseFloat(p.areaSqMeters) || 0), 0);
+            const valid = !(refArea > 0 && totalArea > refArea + 0.0001);
+            return { valid, totalArea, refArea };
+        }
+
         function updatePartitionsFootTotals() {
             let totalArea = 0;
             let totalMV = 0;
@@ -2607,18 +2619,41 @@
                 totalAV += parseFloat(p.assessedValue) || 0;
             });
 
+            const areaCheck = getSubdivisionAreaValidation();
+
             const footSummary = document.getElementById('footPartitionSummary');
             if (footSummary) {
-                footSummary.textContent = `Total Partitions: ${generatedPartitions.length} lot(s)`;
+                footSummary.innerHTML = areaCheck.valid
+                    ? `Total Partitions: ${generatedPartitions.length} lot(s)`
+                    : `Total Partitions: ${generatedPartitions.length} lot(s) <span class="ml-2 px-2 py-0.5 rounded bg-rose-100 text-rose-700 font-bold text-[10px]">Exceeds Ref. Area (${areaCheck.refArea.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} sq.m.)</span>`;
             }
 
             const footArea = document.getElementById('footTotalArea');
-            if (footArea) footArea.textContent = totalArea.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            if (footArea) {
+                footArea.textContent = totalArea.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                footArea.classList.toggle('text-rose-600', !areaCheck.valid);
+                footArea.classList.toggle('dark:text-rose-400', !areaCheck.valid);
+            }
             const footMV = document.getElementById('footTotalMarketValue');
             if (footMV) footMV.textContent = `₱${totalMV.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
             const footAV = document.getElementById('footTotalAssessedValue');
             if (footAV) footAV.textContent = `₱${totalAV.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
         }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.querySelector('form[asp-action="Create"], form');
+            if (form) {
+                form.addEventListener('submit', function (e) {
+                    const areaCheck = getSubdivisionAreaValidation();
+                    if (!areaCheck.valid) {
+                        e.preventDefault();
+                        const msg = `Subdivision total partition area (${areaCheck.totalArea.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} sq.m.) cannot exceed the reference property area (${areaCheck.refArea.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} sq.m.).`;
+                        if (window.toastr) toastr.error(msg);
+                        else alert(msg);
+                    }
+                });
+            }
+        });
 
         function serializePartitions() {
             const json = JSON.stringify(generatedPartitions);
@@ -2673,6 +2708,9 @@
                 status: document.querySelector('select[name="Status"]')?.value,
                 kind: document.getElementById('kindSelect')?.value || (generatedPartitions[0]?.kind ?? 'Land'),
                 selectedPropertyIds: selectedPropertyIds,
+                refTotalArea: (typeof selectedPropertyIds !== 'undefined' && Array.isArray(selectedPropertyIds) && typeof referencePropertiesData !== 'undefined')
+                    ? selectedPropertyIds.reduce((acc, id) => acc + (parseFloat(referencePropertiesData[id]?.area ?? referencePropertiesData[id]?.areaSqMeters) || 0), 0)
+                    : 0,
                 partitions: generatedPartitions,
                 feesJson: document.getElementById('RequestedDocumentsJson')?.value,
                 totalFees: document.getElementById('TotalFeesAmount')?.value

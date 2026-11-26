@@ -296,7 +296,42 @@
                 recomputeLandClassRow(row);
             });
 
-            areaInput.addEventListener('input', () => recomputeLandClassRow(row));
+            const enforceSubdivisionRowLimit = (clampValue) => {
+                const sdCtx = getSubdivisionAreaContext();
+                if (!sdCtx.isSubdivision || sdCtx.refTotalArea <= 0) return;
+
+                let otherRowsInPartition = 0;
+                document.querySelectorAll('.land-class-row').forEach(r => {
+                    if (r !== row) otherRowsInPartition += parseFloat(r.getAttribute('data-area')) || 0;
+                });
+                const maxForRow = Math.max(0, Math.round((sdCtx.refTotalArea - sdCtx.otherPartitionsArea - otherRowsInPartition) * 10000) / 10000);
+                areaInput.setAttribute('max', maxForRow);
+
+                const entered = parseFloat(areaInput.value) || 0;
+                if (entered > maxForRow + 0.0001) {
+                    if (clampValue) {
+                        areaInput.value = maxForRow;
+                        recomputeLandClassRow(row);
+                        areaInput.classList.remove('border-rose-500', 'ring-2', 'ring-rose-500/30');
+                    } else {
+                        areaInput.classList.add('border-rose-500', 'ring-2', 'ring-rose-500/30');
+                    }
+                    const msg = `Subdivision limit: Maximum allowed area for this partition is ${maxForRow.toFixed(2)} sq.m. (Reference: ${sdCtx.refTotalArea.toFixed(2)} sq.m., Other partitions: ${sdCtx.otherPartitionsArea.toFixed(2)} sq.m.).`;
+                    if (clampValue) {
+                        if (window.toastr) toastr.error(msg);
+                        else alert(msg);
+                    }
+                } else {
+                    areaInput.classList.remove('border-rose-500', 'ring-2', 'ring-rose-500/30');
+                }
+            };
+
+            areaInput.addEventListener('input', () => {
+                recomputeLandClassRow(row);
+                enforceSubdivisionRowLimit(false);
+            });
+            areaInput.addEventListener('blur', () => enforceSubdivisionRowLimit(true));
+            areaInput.addEventListener('change', () => enforceSubdivisionRowLimit(true));
 
             updateSubClasses(selSubClassId);
             recomputeLandClassRow(row);
@@ -637,6 +672,35 @@
             }
         }
 
+        function getSubdivisionAreaContext() {
+            const isEditFromDb = '@(ViewBag.RequestId != null ? "true" : "false")' === 'true';
+            if (isEditFromDb) {
+                const txCode = '@(ViewBag.TransactionTypeCode as string ?? "")'.trim().toUpperCase();
+                const refTotalArea = parseFloat('@(ViewBag.RefTotalArea is decimal rta ? rta.ToString(System.Globalization.CultureInfo.InvariantCulture) : "0")') || 0;
+                const otherPartitionsArea = parseFloat('@(ViewBag.OtherPartitionsArea is decimal opa ? opa.ToString(System.Globalization.CultureInfo.InvariantCulture) : "0")') || 0;
+                return { isSubdivision: txCode === 'SD', refTotalArea, otherPartitionsArea };
+            }
+            try {
+                const savedDraft = sessionStorage.getItem('propertyAssessmentRequest_draft');
+                if (savedDraft) {
+                    const draftObj = JSON.parse(savedDraft);
+                    const txCode = (draftObj.txCode || '').trim().toUpperCase();
+                    const refTotalArea = parseFloat(draftObj.refTotalArea) || 0;
+                    const pIdx = @(ViewBag.PartitionIndex is int pi ? pi : 0);
+                    let otherPartitionsArea = 0;
+                    if (Array.isArray(draftObj.partitions)) {
+                        draftObj.partitions.forEach((p, idx) => {
+                            if (idx !== pIdx) {
+                                otherPartitionsArea += parseFloat(p.areaSqMeters || p.area) || 0;
+                            }
+                        });
+                    }
+                    return { isSubdivision: txCode === 'SD', refTotalArea, otherPartitionsArea };
+                }
+            } catch (e) { }
+            return { isSubdivision: false, refTotalArea: 0, otherPartitionsArea: 0 };
+        }
+
         function recomputeAllLandValuation() {
             let totalArea = 0;
             let totalBaseMv = 0;
@@ -663,7 +727,19 @@
             });
 
             const dispArea = document.getElementById('displayTotalLandArea');
-            if (dispArea) dispArea.textContent = `${totalArea.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} sq.m.`;
+            if (dispArea) {
+                const sdCtx = getSubdivisionAreaContext();
+                const combinedArea = sdCtx.otherPartitionsArea + totalArea;
+                const exceeds = sdCtx.isSubdivision && sdCtx.refTotalArea > 0 && combinedArea > sdCtx.refTotalArea + 0.0001;
+                const maxAllowed = Math.max(0, sdCtx.refTotalArea - sdCtx.otherPartitionsArea);
+                dispArea.textContent = exceeds
+                    ? `${totalArea.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} sq.m. (Exceeds max ${maxAllowed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} sq.m. / Ref: ${sdCtx.refTotalArea.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} sq.m.)`
+                    : `${totalArea.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} sq.m.`;
+                dispArea.classList.toggle('text-rose-600', exceeds);
+                dispArea.classList.toggle('dark:text-rose-400', exceeds);
+                dispArea.classList.toggle('text-emerald-600', !exceeds);
+                dispArea.classList.toggle('dark:text-emerald-400', !exceeds);
+            }
             const dispBaseMv = document.getElementById('displayTotalBaseMarketValue');
             if (dispBaseMv) dispBaseMv.textContent = `₱${totalBaseMv.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -2630,6 +2706,19 @@
                 document.querySelectorAll('.land-class-row').forEach(r => {
                     totalLandArea += parseFloat(r.getAttribute('data-area')) || 0;
                 });
+
+                const sdCtx = getSubdivisionAreaContext();
+                if (sdCtx.isSubdivision && sdCtx.refTotalArea > 0) {
+                    const combinedArea = sdCtx.otherPartitionsArea + totalLandArea;
+                    if (combinedArea > sdCtx.refTotalArea + 0.0001) {
+                        const maxAllowed = Math.max(0, sdCtx.refTotalArea - sdCtx.otherPartitionsArea);
+                        const msg = `Subdivision area exceeded: this partition (${totalLandArea.toFixed(2)} sq.m.) + other partitions (${sdCtx.otherPartitionsArea.toFixed(2)} sq.m.) = ${combinedArea.toFixed(2)} sq.m., which exceeds the reference land area (${sdCtx.refTotalArea.toFixed(2)} sq.m.). Maximum allowed for this partition is ${maxAllowed.toFixed(2)} sq.m.`;
+                        if (window.toastr) toastr.error(msg);
+                        else alert(msg);
+                        return;
+                    }
+                }
+
                 updatedPartition.areaSqMeters = totalLandArea;
                 updatedPartition.area = totalLandArea;
 
