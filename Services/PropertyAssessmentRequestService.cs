@@ -392,8 +392,11 @@ public class PropertyAssessmentRequestService : IPropertyAssessmentRequestServic
             }
             else if (string.IsNullOrWhiteSpace(existing.TransactionNo))
             {
-                existing.TransactionNo = $"TX-{existing.RequestDate:yyyyMMdd}-{new Random().Next(100, 999)}";
+                existing.TransactionNo = !string.IsNullOrWhiteSpace(existing.TrackingNumber)
+                    ? existing.TrackingNumber
+                    : $"TX-{existing.RequestDate:yyyyMMdd}-{new Random().Next(100, 999)}";
             }
+            existing.TrackingNumber = existing.TransactionNo;
             if (!string.IsNullOrWhiteSpace(request.GeneratedPartitionsJson))
             {
                 try

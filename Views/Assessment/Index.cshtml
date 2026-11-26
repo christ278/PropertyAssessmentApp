@@ -7,6 +7,10 @@
     var search = ViewBag.Search as string ?? "";
     var selectedKind = ViewBag.Kind as PropertyKind?;
     var selectedStatus = (ViewBag.Status as string ?? "").Trim().ToLowerInvariant();
+    var selectedBarangay = (ViewBag.Barangay as string ?? "").Trim();
+    var barangays = ViewBag.Barangays as List<string> ?? new List<string>();
+    var selectedActualUse = (ViewBag.ActualUse as string ?? "").Trim();
+    var actualUses = ViewBag.ActualUses as List<string> ?? new List<string>();
     int limit = ViewBag.Limit is int l ? l : 10;
     int currentPage = ViewBag.Page is int p ? p : 1;
     int totalCount = ViewBag.TotalCount is int tc ? tc : Model.Count();
@@ -101,7 +105,7 @@
         <div class="flex flex-wrap items-center gap-3">
             <div class="flex items-center gap-2 bg-slate-50 dark:bg-stone-800 px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-700 shadow-xs shrink-0">
                 <span class="limit-label text-[10px] text-slate-500 dark:text-emerald-400 font-semibold uppercase">Limit:</span>
-                <select name="limit" onchange="this.form.submit()" class="bg-transparent font-semibold text-slate-900 dark:text-white focus:outline-none cursor-pointer">
+                <select name="limit" onchange="this.form.submit()" class="!border-0 !shadow-none !ring-0 !p-0 bg-transparent font-semibold text-slate-900 dark:text-white focus:outline-none cursor-pointer" style="border: none !important; box-shadow: none !important;">
                     <option value="5" selected="@(limit == 5 ? "selected" : null)" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">5</option>
                     <option value="10" selected="@(limit == 10 ? "selected" : null)" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">10</option>
                     <option value="25" selected="@(limit == 25 ? "selected" : null)" class="bg-white dark:bg-stone-900 text-slate-900 dark:text-white">25</option>
@@ -115,6 +119,22 @@
                 <option value="@((int)PropertyKind.Land)" selected="@(selectedKind == PropertyKind.Land ? "selected" : null)">Land</option>
                 <option value="@((int)PropertyKind.Building)" selected="@(selectedKind == PropertyKind.Building ? "selected" : null)">Building</option>
                 <option value="@((int)PropertyKind.Machinery)" selected="@(selectedKind == PropertyKind.Machinery ? "selected" : null)">Machinery</option>
+            </select>
+
+            <select name="barangay" class="bg-slate-50 dark:bg-stone-950 text-slate-900 dark:text-white px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800 max-w-[200px]">
+                <option value="">All Barangays</option>
+                @foreach (var brgy in barangays)
+                {
+                    <option value="@brgy" selected="@(string.Equals(selectedBarangay, brgy, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@brgy</option>
+                }
+            </select>
+
+            <select name="actualUse" class="bg-slate-50 dark:bg-stone-950 text-slate-900 dark:text-white px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800 max-w-[200px]">
+                <option value="">All Actual Uses</option>
+                @foreach (var au in actualUses)
+                {
+                    <option value="@au" selected="@(string.Equals(selectedActualUse, au, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@au</option>
+                }
             </select>
 
             <select name="status" class="bg-slate-50 dark:bg-stone-950 text-slate-900 dark:text-white px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-800">
@@ -336,11 +356,11 @@
                 <div class="flex items-center gap-1.5 flex-wrap justify-center">
                     @if (currentPage > 1)
                     {
-                        <a asp-action="Index" asp-route-search="@search" asp-route-kind="@((int?)selectedKind)" asp-route-status="@selectedStatus" asp-route-limit="@limit" asp-route-page="@(currentPage - 1)" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-slate-700 dark:text-stone-200 hover:bg-slate-50 dark:hover:bg-stone-700 font-bold">Prev</a>
+                        <a asp-action="Index" asp-route-search="@search" asp-route-kind="@((int?)selectedKind)" asp-route-status="@selectedStatus" asp-route-barangay="@selectedBarangay" asp-route-actualUse="@selectedActualUse" asp-route-limit="@limit" asp-route-page="@(currentPage - 1)" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-slate-700 dark:text-stone-200 hover:bg-slate-50 dark:hover:bg-stone-700 font-bold">Prev</a>
                     }
                     @if (startPage > 1)
                     {
-                        <a asp-action="Index" asp-route-search="@search" asp-route-kind="@((int?)selectedKind)" asp-route-status="@selectedStatus" asp-route-limit="@limit" asp-route-page="1" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-slate-700 dark:text-stone-200 hover:bg-slate-50 dark:hover:bg-stone-700 font-bold">1</a>
+                        <a asp-action="Index" asp-route-search="@search" asp-route-kind="@((int?)selectedKind)" asp-route-status="@selectedStatus" asp-route-barangay="@selectedBarangay" asp-route-actualUse="@selectedActualUse" asp-route-limit="@limit" asp-route-page="1" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-slate-700 dark:text-stone-200 hover:bg-slate-50 dark:hover:bg-stone-700 font-bold">1</a>
                         @if (startPage > 2)
                         {
                             <span class="px-1.5 text-slate-400">...</span>
@@ -354,7 +374,7 @@
                         }
                         else
                         {
-                            <a asp-action="Index" asp-route-search="@search" asp-route-kind="@((int?)selectedKind)" asp-route-status="@selectedStatus" asp-route-limit="@limit" asp-route-page="@i" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-slate-700 dark:text-stone-200 hover:bg-slate-50 dark:hover:bg-stone-700 font-bold">@i</a>
+                            <a asp-action="Index" asp-route-search="@search" asp-route-kind="@((int?)selectedKind)" asp-route-status="@selectedStatus" asp-route-barangay="@selectedBarangay" asp-route-actualUse="@selectedActualUse" asp-route-limit="@limit" asp-route-page="@i" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-slate-700 dark:text-stone-200 hover:bg-slate-50 dark:hover:bg-stone-700 font-bold">@i</a>
                         }
                     }
                     @if (endPage < totalPages)
@@ -363,11 +383,11 @@
                         {
                             <span class="px-1.5 text-slate-400">...</span>
                         }
-                        <a asp-action="Index" asp-route-search="@search" asp-route-kind="@((int?)selectedKind)" asp-route-status="@selectedStatus" asp-route-limit="@limit" asp-route-page="@totalPages" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-slate-700 dark:text-stone-200 hover:bg-slate-50 dark:hover:bg-stone-700 font-bold">@totalPages</a>
+                        <a asp-action="Index" asp-route-search="@search" asp-route-kind="@((int?)selectedKind)" asp-route-status="@selectedStatus" asp-route-barangay="@selectedBarangay" asp-route-actualUse="@selectedActualUse" asp-route-limit="@limit" asp-route-page="@totalPages" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-slate-700 dark:text-stone-200 hover:bg-slate-50 dark:hover:bg-stone-700 font-bold">@totalPages</a>
                     }
                     @if (currentPage < totalPages)
                     {
-                        <a asp-action="Index" asp-route-search="@search" asp-route-kind="@((int?)selectedKind)" asp-route-status="@selectedStatus" asp-route-limit="@limit" asp-route-page="@(currentPage + 1)" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-slate-700 dark:text-stone-200 hover:bg-slate-50 dark:hover:bg-stone-700 font-bold">Next</a>
+                        <a asp-action="Index" asp-route-search="@search" asp-route-kind="@((int?)selectedKind)" asp-route-status="@selectedStatus" asp-route-barangay="@selectedBarangay" asp-route-actualUse="@selectedActualUse" asp-route-limit="@limit" asp-route-page="@(currentPage + 1)" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-slate-700 dark:text-stone-200 hover:bg-slate-50 dark:hover:bg-stone-700 font-bold">Next</a>
                     }
                 </div>
             }

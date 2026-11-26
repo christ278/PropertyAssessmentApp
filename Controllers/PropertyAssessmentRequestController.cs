@@ -268,15 +268,11 @@ public class PropertyAssessmentRequestController : Controller
         if (string.IsNullOrWhiteSpace(request.TransactionNo))
         {
             var now = DateTime.Now;
-            request.TransactionNo = $"TX-{now:yyyyMMdd}-{new Random().Next(100, 999)}";
+            request.TransactionNo = !string.IsNullOrWhiteSpace(request.TrackingNumber)
+                ? request.TrackingNumber
+                : $"TX-{now:yyyyMMdd}-{new Random().Next(100, 999)}";
         }
-
-        if (string.IsNullOrWhiteSpace(request.TrackingNumber))
-        {
-            request.TrackingNumber = !string.IsNullOrWhiteSpace(request.TransactionNo)
-                ? request.TransactionNo
-                : $"RPA-{DateTime.Now:yyyyMMdd}-{new Random().Next(1000, 9999)}";
-        }
+        request.TrackingNumber = request.TransactionNo;
         ModelState.Remove(nameof(request.TrackingNumber));
 
         SyncKindFromPartitions(request);
@@ -399,15 +395,11 @@ public class PropertyAssessmentRequestController : Controller
         if (string.IsNullOrWhiteSpace(request.TransactionNo))
         {
             var now = DateTime.Now;
-            request.TransactionNo = $"TX-{now:yyyyMMdd}-{new Random().Next(100, 999)}";
+            request.TransactionNo = !string.IsNullOrWhiteSpace(request.TrackingNumber)
+                ? request.TrackingNumber
+                : $"TX-{now:yyyyMMdd}-{new Random().Next(100, 999)}";
         }
-
-        if (string.IsNullOrWhiteSpace(request.TrackingNumber))
-        {
-            request.TrackingNumber = !string.IsNullOrWhiteSpace(request.TransactionNo)
-                ? request.TransactionNo
-                : $"RPA-{DateTime.Now:yyyyMMdd}-{new Random().Next(1000, 9999)}";
-        }
+        request.TrackingNumber = request.TransactionNo;
         ModelState.Remove(nameof(request.TrackingNumber));
 
         SyncKindFromPartitions(request);

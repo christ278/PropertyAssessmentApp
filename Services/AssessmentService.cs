@@ -16,7 +16,7 @@ public class AssessmentService : IAssessmentService
         _context = context;
     }
 
-    private IQueryable<TaxDeclaration> BuildFilteredQuery(string? search, PropertyKind? kind, string? status)
+    private IQueryable<TaxDeclaration> BuildFilteredQuery(string? search, PropertyKind? kind, string? status, string? barangay = null, string? actualUse = null)
     {
         IQueryable<TaxDeclaration> query = _context.TaxDeclarations
             .Include(t => t.BuildingDetails)
@@ -31,12 +31,31 @@ public class AssessmentService : IAssessmentService
                                   || r.PropertyIndexNumber.Contains(term)
                                   || r.OwnerName.Contains(term)
                                   || (r.BuildingDetails != null && r.BuildingDetails.DistrictOrBarangay != null && r.BuildingDetails.DistrictOrBarangay.Contains(term))
-                                  || (r.LandDetails != null && r.LandDetails.DistrictOrBarangay != null && r.LandDetails.DistrictOrBarangay.Contains(term)));
+                                  || (r.LandDetails != null && r.LandDetails.DistrictOrBarangay != null && r.LandDetails.DistrictOrBarangay.Contains(term))
+                                  || (r.MachineryDetails != null && r.MachineryDetails.DistrictOrBarangay != null && r.MachineryDetails.DistrictOrBarangay.Contains(term)));
         }
 
         if (kind.HasValue)
         {
             query = query.Where(r => r.Kind == kind.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(barangay))
+        {
+            var brgy = barangay.Trim();
+            query = query.Where(r =>
+                (r.BuildingDetails != null && r.BuildingDetails.DistrictOrBarangay == brgy)
+                || (r.LandDetails != null && r.LandDetails.DistrictOrBarangay == brgy)
+                || (r.MachineryDetails != null && r.MachineryDetails.DistrictOrBarangay == brgy));
+        }
+
+        if (!string.IsNullOrWhiteSpace(actualUse))
+        {
+            var au = actualUse.Trim();
+            query = query.Where(r =>
+                (r.LandDetails != null && r.LandDetails.ActualUse != null && r.LandDetails.ActualUse.Contains(au))
+                || (r.MachineryDetails != null && r.MachineryDetails.ActualUse != null && r.MachineryDetails.ActualUse.Contains(au))
+                || (r.BuildingDetails != null && r.BuildingDetails.BuildingUseType != null && r.BuildingDetails.BuildingUseType.Contains(au)));
         }
 
         if (!string.IsNullOrWhiteSpace(status))
@@ -67,17 +86,17 @@ public class AssessmentService : IAssessmentService
         return query.OrderByDescending(r => r.DateAssessed);
     }
 
-    public IEnumerable<TaxDeclaration> GetAll(string? search = null, PropertyKind? kind = null, string? status = null)
+    public IEnumerable<TaxDeclaration> GetAll(string? search = null, PropertyKind? kind = null, string? status = null, string? barangay = null, string? actualUse = null)
     {
-        return BuildFilteredQuery(search, kind, status).ToList();
+        return BuildFilteredQuery(search, kind, status, barangay, actualUse).ToList();
     }
 
-    public (List<TaxDeclaration> Items, int TotalCount) GetPaged(string? search = null, PropertyKind? kind = null, string? status = null, int page = 1, int limit = 10)
+    public (List<TaxDeclaration> Items, int TotalCount) GetPaged(string? search = null, PropertyKind? kind = null, string? status = null, string? barangay = null, string? actualUse = null, int page = 1, int limit = 10)
     {
         int safeLimit = limit <= 0 ? 10 : Math.Min(limit, 100);
         int safePage = page < 1 ? 1 : page;
 
-        var query = BuildFilteredQuery(search, kind, status);
+        var query = BuildFilteredQuery(search, kind, status, barangay, actualUse);
         int totalCount = query.Count();
         int totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)safeLimit));
         if (safePage > totalPages) safePage = totalPages;

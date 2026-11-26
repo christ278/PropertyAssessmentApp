@@ -61,10 +61,10 @@ public class TDNLand
     public PropertyClassification Classification { get; set; } = PropertyClassification.Residential;
     public string? SubClassification { get; set; } = "First Class Residential";
     public string? ActualUse { get; set; } = "Residential Use";
-    public decimal AreaSqMeters { get; set; } = 150m;
+    public decimal AreaSqMeters { get; set; }
     public decimal AreaHectares => AreaSqMeters / 10000m;
-    public decimal UnitValue { get; set; } = 3500m;
-    public decimal MarketValue { get; set; } = 525000m;
+    public decimal UnitValue { get; set; }
+    public decimal MarketValue { get; set; }
 
     // Improvements
     public string? ImprovementType { get; set; } = "Fence / Pavement";
@@ -77,14 +77,14 @@ public class TDNLand
     public string? AdjustmentFactor { get; set; } = "Location & Elevation";
     public decimal PercentAdjustment { get; set; }
     public decimal ValueAdjustment { get; set; }
-    public decimal AdjustedMarketValue { get; set; } = 525000m;
+    public decimal AdjustedMarketValue { get; set; }
 
     // Assessment Roll & Taxes
     public decimal AssessmentLevelPercent { get; set; } = 20m;
-    public decimal AssessedValue { get; set; } = 105000m;
+    public decimal AssessedValue { get; set; }
     public decimal BasicTaxRate { get; set; } = 2.0m;
     public decimal SefTaxRate { get; set; } = 1.0m;
-    public decimal AnnualTaxDue { get; set; } = 3150m;
+    public decimal AnnualTaxDue { get; set; }
 
     // Effectivity & Taxability
     public int EffectivityYear { get; set; } = DateTime.Now.Year;

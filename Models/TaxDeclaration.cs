@@ -1023,9 +1023,9 @@ public class TaxDeclaration
     [NotMapped] public string SubClassification { get => LandDetails?.SubClassification ?? _subClassification ?? "First Class Residential"; set { _subClassification = value; if (LandDetails != null) LandDetails.SubClassification = value; } }
     private string? _subClassification;
     [NotMapped] public decimal AreaSqMeters { get => BuildingDetails?.TotalFloorArea ?? LandDetails?.AreaSqMeters ?? _areaSqMeters; set { _areaSqMeters = value; if (BuildingDetails != null) BuildingDetails.TotalFloorArea = value; if (LandDetails != null) LandDetails.AreaSqMeters = value; } }
-    private decimal _areaSqMeters = 150m;
+    private decimal _areaSqMeters;
     [NotMapped] public decimal UnitValue { get => LandDetails?.UnitValue ?? _unitValue; set { _unitValue = value; if (LandDetails != null) LandDetails.UnitValue = value; } }
-    private decimal _unitValue = 3500m;
+    private decimal _unitValue;
 
     [NotMapped]
     public decimal MarketValue
@@ -1050,7 +1050,7 @@ public class TaxDeclaration
             }
         }
     }
-    private decimal _marketValue = 525000m;
+    private decimal _marketValue;
 
     [NotMapped] public string ImprovementType { get => LandDetails?.ImprovementType ?? _impType ?? "Fence / Pavement"; set { _impType = value; if (LandDetails != null) LandDetails.ImprovementType = value; } }
     private string? _impType;

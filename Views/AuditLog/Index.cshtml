@@ -1,0 +1,375 @@
+@model IEnumerable<PropertyAssessmentApp.Models.AuditLog>
+@{
+    ViewData["Title"] = "System Audit Logs";
+    var entityNames = ViewBag.EntityNames as List<string> ?? new List<string>();
+    var selectedEntity = ViewBag.SelectedEntity as string ?? "";
+    var selectedAction = ViewBag.SelectedAction as string ?? "";
+    var search = ViewBag.Search as string ?? "";
+    var dateFrom = ViewBag.DateFrom as string ?? "";
+    var dateTo = ViewBag.DateTo as string ?? "";
+    int totalRows = Model.Count();
+}
+
+<div class="space-y-8">
+    <!-- Page Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <div class="inline-flex items-center gap-2 text-xs font-mono text-emerald-700 dark:text-emerald-400 font-bold mb-1">
+                <i data-lucide="history" class="w-4 h-4"></i>
+                <span>System Administration &bull; @(ViewBag.IsSelfLogsOnly == true ? "My Activity Trail (Self Logs)" : "All Users Activity Trail")</span>
+            </div>
+            <h1 class="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">System Audit Logs</h1>
+            <p class="text-slate-500 dark:text-stone-400 text-sm">
+                Tracks created, updated, and deleted records across all requests and entities with user, timestamp, and field-level value diffs (latest 500 entries).
+            </p>
+        </div>
+    </div>
+
+    <!-- Search & Filter Controls -->
+    <form method="get" asp-action="Index" class="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-stone-900 p-4 rounded-2xl border border-slate-200 dark:border-stone-800 shadow-sm font-mono text-xs">
+        <div class="flex items-center gap-2 flex-1 min-w-[220px]">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 shrink-0"></i>
+            <input type="text" name="search" value="@search" placeholder="Search user, record ID, field, or value..." class="w-full px-3.5 py-2" />
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2.5">
+            <div class="flex items-center gap-2 bg-slate-50 dark:bg-stone-800 px-3 py-2 rounded-xl border border-slate-200 dark:border-stone-700 shrink-0">
+                <span class="limit-label text-[10px] text-slate-500 dark:text-emerald-400 font-semibold uppercase">Limit:</span>
+                <select data-target="auditLogTableCard" class="table-limit-select bg-transparent font-semibold text-slate-900 dark:text-white focus:outline-none cursor-pointer">
+                    <option value="10" selected>10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+            </div>
+
+            <select name="entity" class="px-3 py-2">
+                <option value="">All Modules / Entities</option>
+                @foreach (var e in entityNames)
+                {
+                    <option value="@e" selected="@(selectedEntity == e)">@e</option>
+                }
+            </select>
+
+            <select name="actionType" class="px-3 py-2">
+                <option value="">All Actions</option>
+                <option value="Created" selected="@(selectedAction == "Created")">Created</option>
+                <option value="Updated" selected="@(selectedAction == "Updated")">Updated</option>
+                <option value="Deleted" selected="@(selectedAction == "Deleted")">Deleted</option>
+            </select>
+
+            <input type="date" name="dateFrom" value="@dateFrom" class="px-3 py-2" title="From Date" />
+            <input type="date" name="dateTo" value="@dateTo" class="px-3 py-2" title="To Date" />
+
+            <button type="submit" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold cursor-pointer">Filter</button>
+            <a asp-action="Index" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-stone-800 text-slate-600 dark:text-stone-300" title="Reset"><i data-lucide="rotate-ccw" class="w-4 h-4"></i></a>
+        </div>
+    </form>
+
+    <!-- Paginated Audit Table -->
+    <div id="auditLogTableCard" class="bg-white dark:bg-stone-900 rounded-3xl border border-slate-200 dark:border-stone-800 shadow-sm paginated-table-card">
+        <div class="overflow-x-auto min-h-[260px] pb-4 rounded-3xl">
+            <table class="w-full text-left text-xs font-mono">
+                <thead class="bg-slate-100 dark:bg-stone-950 text-slate-600 dark:text-stone-400 border-b border-slate-200 dark:border-stone-800 font-bold">
+                    <tr>
+                        <th class="px-4 py-3.5">TIMESTAMP</th>
+                        <th class="px-4 py-3.5">USER</th>
+                        <th class="px-4 py-3.5">ACTION</th>
+                        <th class="px-4 py-3.5">MODULE / ENTITY</th>
+                        <th class="px-4 py-3.5">TRANSACTION NO. / REF</th>
+                        <th class="px-4 py-3.5">CHANGED FIELDS</th>
+                        <th class="px-4 py-3.5 text-center">DETAILS</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-stone-800/60">
+                    @if (!Model.Any())
+                    {
+                        <tr class="no-records-row">
+                            <td colspan="7" class="text-center py-8 text-slate-400">
+                                No audit log entries found matching your filter criteria.
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        var createdSnapshots = Model
+                            .Where(x => x.Action == "Created" && !string.IsNullOrWhiteSpace(x.NewValuesJson))
+                            .GroupBy(x => $"{x.EntityName}|{x.RecordId}")
+                            .ToDictionary(g => g.Key, g => g.OrderBy(x => x.ChangedAt).First().NewValuesJson!);
+
+                        @foreach (var log in Model)
+                        {
+                            string actionBadge = log.Action == "Created"
+                                ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-500/20 dark:text-emerald-300"
+                                : log.Action == "Updated"
+                                    ? "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-500/20 dark:text-amber-300"
+                                    : "bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-500/20 dark:text-rose-300";
+
+                            string colsSummary = "-";
+                            if (!string.IsNullOrWhiteSpace(log.ChangedColumnsJson))
+                            {
+                                try
+                                {
+                                    var arr = System.Text.Json.JsonSerializer.Deserialize<List<string>>(log.ChangedColumnsJson);
+                                    if (arr != null && arr.Count > 0)
+                                    {
+                                        colsSummary = arr.Count <= 4 ? string.Join(", ", arr) : $"{string.Join(", ", arr.Take(4))} (+{arr.Count - 4} more)";
+                                    }
+                                }
+                                catch { colsSummary = log.ChangedColumnsJson; }
+                            }
+                            else if (log.Action == "Created")
+                            {
+                                colsSummary = "Initial record snapshot";
+                            }
+
+                            <tr class="hover:bg-slate-50/80 dark:hover:bg-stone-800/50 transition-all">
+                                <td class="px-4 py-3 whitespace-nowrap text-slate-600 dark:text-stone-300">
+                                    <div>@log.ChangedAt.ToString("MMM dd, yyyy")</div>
+                                    <div class="text-[10px] text-slate-400">@log.ChangedAt.ToString("hh:mm:ss tt")</div>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <div class="font-bold text-slate-900 dark:text-white">@(log.ChangedByName ?? log.ChangedBy ?? "System")</div>
+                                    <div class="text-[10px] text-slate-400">@@@((log.ChangedBy ?? "system")) @(string.IsNullOrWhiteSpace(log.IpAddress) ? "" : $"• {log.IpAddress}")</div>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <span class="px-2.5 py-1 rounded-lg border text-[10px] font-bold uppercase @actionBadge">@log.Action</span>
+                                </td>
+                                <td class="px-4 py-3 font-bold text-slate-800 dark:text-stone-200">@log.EntityName</td>
+                                <td class="px-4 py-3 font-bold text-emerald-700 dark:text-emerald-400 text-[11px] max-w-[220px] truncate" title="@log.RecordId">@log.RecordId</td>
+                                <td class="px-4 py-3 text-slate-600 dark:text-stone-400 text-[11px] max-w-[260px] truncate" title="@colsSummary">@colsSummary</td>
+                                <td class="px-4 py-3 text-center whitespace-nowrap">
+                                    <div class="inline-flex items-center gap-1.5">
+                                        <button type="button"
+                                                onclick='openAuditDiffModal(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(log.EntityName)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(log.Action)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(log.RecordId)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(log.ChangedByName ?? log.ChangedBy ?? "System")), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(log.ChangedAt.ToString("MMM dd, yyyy hh:mm:ss tt"))), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(log.OldValuesJson ?? "{}")), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(log.NewValuesJson ?? "{}")))'
+                                                class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-emerald-50 dark:bg-stone-800 dark:hover:bg-emerald-950/40 text-slate-700 hover:text-emerald-700 dark:text-stone-200 font-bold text-[11px] border border-slate-200 dark:border-stone-700 cursor-pointer">
+                                            View Snapshot
+                                        </button>
+                                        @if (log.Action == "Updated" && createdSnapshots.TryGetValue($"{log.EntityName}|{log.RecordId}", out var createdSnapshotJson))
+                                        {
+                                            <button type="button"
+                                                    onclick='openAuditDiffModal(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(log.EntityName)), "Created vs Updated", @Html.Raw(System.Text.Json.JsonSerializer.Serialize(log.RecordId)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(log.ChangedByName ?? log.ChangedBy ?? "System")), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(log.ChangedAt.ToString("MMM dd, yyyy hh:mm:ss tt"))), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(createdSnapshotJson)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(log.NewValuesJson ?? "{}")))'
+                                                    title="Compare initial Created snapshot against this Updated snapshot"
+                                                    class="px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/50 text-amber-800 dark:text-amber-300 font-bold text-[11px] border border-amber-300 dark:border-amber-700 cursor-pointer">
+                                                vs Created
+                                            </button>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="table-pagination-footer p-4 sm:p-6 pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-200 dark:border-stone-800 text-xs font-mono">
+            <div class="text-slate-500 dark:text-stone-400">
+                Showing <span class="font-bold text-slate-900 dark:text-white table-showing-start">@(totalRows == 0 ? 0 : 1)</span> to
+                <span class="font-bold text-slate-900 dark:text-white table-showing-end">@Math.Min(10, totalRows)</span> of
+                <span class="font-bold text-slate-900 dark:text-white table-total-count">@totalRows</span> entries
+            </div>
+            <div class="flex items-center gap-1.5 flex-wrap justify-center table-pagination-buttons"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Audit Snapshot Modal -->
+<div id="auditDiffModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+    <div class="bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 rounded-3xl w-full max-w-5xl max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
+        <div class="p-5 border-b border-slate-200 dark:border-stone-800 flex items-center justify-between">
+            <div>
+                <h3 id="auditModalTitle" class="text-base font-extrabold text-slate-900 dark:text-white">Transaction Snapshot</h3>
+                <p id="auditModalMeta" class="text-xs font-mono text-slate-500 mt-0.5"></p>
+            </div>
+            <div class="flex items-center gap-2">
+                <button type="button" onclick="switchAuditTab('fields')" id="tabBtnAuditFields" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 text-white cursor-pointer">Fields &amp; Diffs</button>
+                <button type="button" onclick="switchAuditTab('json')" id="tabBtnAuditJson" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 cursor-pointer">Latest JSON</button>
+                <button type="button" onclick="document.getElementById('auditDiffModal').classList.add('hidden')" class="p-2 rounded-xl text-slate-400 hover:text-slate-700 cursor-pointer">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </div>
+        <div class="p-5 overflow-y-auto flex-1">
+            <div id="auditTabFields" class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <span id="auditDiffSummary" class="text-[11px] font-mono text-slate-500"></span>
+                    <label class="inline-flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-stone-300 cursor-pointer select-none">
+                        <input type="checkbox" id="auditOnlyChangedToggle" onchange="filterAuditDiffRows()" class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+                        Show Changed Fields Only
+                    </label>
+                </div>
+                <table class="w-full text-left text-xs font-mono border border-slate-200 dark:border-stone-800 rounded-xl overflow-hidden">
+                    <thead class="bg-slate-100 dark:bg-stone-950 text-slate-600 dark:text-stone-400 font-bold">
+                        <tr>
+                            <th class="px-3 py-2.5 w-1/4">FIELD</th>
+                            <th class="px-3 py-2.5 w-3/8">PREVIOUS VALUE</th>
+                            <th class="px-3 py-2.5 w-3/8">LATEST SAVED VALUE</th>
+                        </tr>
+                    </thead>
+                    <tbody id="auditDiffBody" class="divide-y divide-slate-100 dark:divide-stone-800"></tbody>
+                </table>
+            </div>
+            <div id="auditTabJson" class="hidden space-y-2">
+                <div class="flex justify-end">
+                    <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('auditJsonPre').innerText)" class="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-stone-800 text-xs font-bold text-slate-700 dark:text-stone-200 hover:bg-emerald-50 cursor-pointer">
+                        Copy JSON Snapshot
+                    </button>
+                </div>
+                <pre id="auditJsonPre" class="p-4 rounded-2xl bg-slate-950 text-emerald-300 text-[11px] font-mono overflow-x-auto leading-relaxed"></pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    function switchAuditTab(tab) {
+        const isJson = tab === 'json';
+        document.getElementById('auditTabFields').classList.toggle('hidden', isJson);
+        document.getElementById('auditTabJson').classList.toggle('hidden', !isJson);
+        document.getElementById('tabBtnAuditFields').className = isJson
+            ? 'px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 cursor-pointer'
+            : 'px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 text-white cursor-pointer';
+        document.getElementById('tabBtnAuditJson').className = isJson
+            ? 'px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 text-white cursor-pointer'
+            : 'px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-stone-300 cursor-pointer';
+    }
+
+    function openAuditDiffModal(entity, action, recordId, user, timestamp, oldJson, newJson) {
+        document.getElementById('auditModalTitle').innerText = `${action}: ${entity} (${recordId})`;
+        document.getElementById('auditModalMeta').innerText = `By ${user} on ${timestamp}`;
+
+        let oldObj = {}, newObj = {};
+        try { oldObj = JSON.parse(oldJson || '{}') || {}; } catch {}
+        try { newObj = JSON.parse(newJson || '{}') || {}; } catch {}
+
+        // Pretty JSON snapshot (expanding nested GeneratedPartitionsJson if present)
+        const snapshotClone = { ...newObj };
+        if (typeof snapshotClone.GeneratedPartitionsJson === 'string' && snapshotClone.GeneratedPartitionsJson.trim().startsWith('[')) {
+            try { snapshotClone.GeneratedPartitionsJson = JSON.parse(snapshotClone.GeneratedPartitionsJson); } catch {}
+        }
+        document.getElementById('auditJsonPre').innerText = JSON.stringify(snapshotClone, null, 2);
+
+        const keys = Array.from(new Set([...Object.keys(oldObj), ...Object.keys(newObj)]));
+        const tbody = document.getElementById('auditDiffBody');
+
+        const formatAuditCell = (val, exists) => {
+            if (!exists || val === null || val === undefined) return '<span class="text-slate-400">—</span>';
+            let parsedObj = null;
+            if (typeof val === 'object') {
+                parsedObj = val;
+            } else if (typeof val === 'string') {
+                const t = val.trim();
+                if (t.startsWith('[') || t.startsWith('{')) {
+                    try { parsedObj = JSON.parse(t); } catch {}
+                }
+            }
+            if (parsedObj !== null && typeof parsedObj === 'object') {
+                return `<pre class="whitespace-pre-wrap text-[11px] leading-relaxed bg-slate-950/5 dark:bg-stone-950 p-2.5 rounded-lg max-h-72 overflow-y-auto">${escapeHtml(JSON.stringify(parsedObj, null, 2))}</pre>`;
+            }
+            return escapeHtml(String(val));
+        };
+
+        const parseMaybeJson = (v) => {
+            if (v && typeof v === 'object') return v;
+            if (typeof v === 'string') {
+                const t = v.trim();
+                if (t.startsWith('[') || t.startsWith('{')) {
+                    try { return JSON.parse(t); } catch {}
+                }
+            }
+            return null;
+        };
+
+        const valuesEqual = (a, b) => {
+            if (a === b) return true;
+            if ((a === null || a === undefined || a === '') && (b === null || b === undefined || b === '')) return true;
+            const pa = parseMaybeJson(a);
+            const pb = parseMaybeJson(b);
+            if (pa !== null && pb !== null) return JSON.stringify(pa) === JSON.stringify(pb);
+            return String(a ?? '') === String(b ?? '');
+        };
+
+        // Build partition-by-partition diff rows when GeneratedPartitionsJson exists
+        const partitionDiffRows = [];
+        const oldParts = parseMaybeJson(oldObj.GeneratedPartitionsJson);
+        const newParts = parseMaybeJson(newObj.GeneratedPartitionsJson);
+        if (Object.keys(oldObj).length > 0 && (Array.isArray(oldParts) || Array.isArray(newParts))) {
+            const oArr = Array.isArray(oldParts) ? oldParts : [];
+            const nArr = Array.isArray(newParts) ? newParts : [];
+            const maxP = Math.max(oArr.length, nArr.length);
+            for (let i = 0; i < maxP; i++) {
+                const op = oArr[i] || {};
+                const np = nArr[i] || {};
+                const label = np.PartitionIndex || op.PartitionIndex || String.fromCharCode(65 + i);
+                const pKeys = Array.from(new Set([...Object.keys(op), ...Object.keys(np)]));
+                pKeys.forEach(pk => {
+                    const hasO = Object.prototype.hasOwnProperty.call(op, pk);
+                    const hasN = Object.prototype.hasOwnProperty.call(np, pk);
+                    if (!valuesEqual(op[pk], np[pk])) {
+                        partitionDiffRows.push({
+                            key: `Partition ${label} • ${pk}`,
+                            oldVal: op[pk],
+                            hasOld: hasO,
+                            newVal: np[pk],
+                            hasNew: hasN,
+                            changed: true
+                        });
+                    }
+                });
+            }
+        }
+
+        if (keys.length === 0 && partitionDiffRows.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" class="px-3 py-6 text-center text-slate-400">No field details recorded.</td></tr>';
+            document.getElementById('auditDiffSummary').innerText = '';
+        } else {
+            const allRows = [
+                ...partitionDiffRows,
+                ...keys.map(k => {
+                    const hasOld = Object.prototype.hasOwnProperty.call(oldObj, k);
+                    const hasNew = Object.prototype.hasOwnProperty.call(newObj, k);
+                    const isChanged = Object.keys(oldObj).length > 0 && !valuesEqual(oldObj[k], newObj[k]);
+                    return { key: k, oldVal: oldObj[k], hasOld, newVal: newObj[k], hasNew, changed: isChanged };
+                })
+            ];
+
+            const changedCount = allRows.filter(r => r.changed).length;
+            document.getElementById('auditDiffSummary').innerText =
+                Object.keys(oldObj).length > 0
+                    ? `${changedCount} changed field(s) out of ${allRows.length} total`
+                    : `${allRows.length} field(s) in initial snapshot`;
+
+            tbody.innerHTML = allRows.map(r => {
+                const rowHighlight = r.changed ? 'bg-amber-50/60 dark:bg-amber-950/20' : '';
+                return `<tr data-changed="${r.changed ? 'true' : 'false'}" class="audit-diff-row hover:bg-slate-50 dark:hover:bg-stone-800/40 ${rowHighlight}">
+                    <td class="px-3 py-2 font-bold text-slate-800 dark:text-stone-200 align-top">${escapeHtml(r.key)}</td>
+                    <td class="px-3 py-2 text-rose-700 dark:text-rose-400 break-all align-top">${formatAuditCell(r.oldVal, r.hasOld)}</td>
+                    <td class="px-3 py-2 text-emerald-700 dark:text-emerald-400 break-all align-top">${formatAuditCell(r.newVal, r.hasNew)}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        const toggle = document.getElementById('auditOnlyChangedToggle');
+        if (toggle) {
+            toggle.checked = Object.keys(oldObj).length > 0 && partitionDiffRows.length > 0;
+            filterAuditDiffRows();
+        }
+
+        switchAuditTab('fields');
+        document.getElementById('auditDiffModal').classList.remove('hidden');
+    }
+
+    function filterAuditDiffRows() {
+        const onlyChanged = document.getElementById('auditOnlyChangedToggle')?.checked;
+        document.querySelectorAll('#auditDiffBody .audit-diff-row').forEach(tr => {
+            if (!onlyChanged) {
+                tr.classList.remove('hidden');
+            } else {
+                tr.classList.toggle('hidden', tr.getAttribute('data-changed') !== 'true');
+            }
+        });
+    }
+</script>
+}

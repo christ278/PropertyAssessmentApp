@@ -214,9 +214,9 @@
             const selClassId = data ? (data.ClassificationId || data.classificationId || 1) : 1;
             const selSubClassId = data ? (data.SubClassId || data.subClassId || 1) : 1;
             const selActualUse = data ? (data.ActualUseName || data.actualUseName || 'RESIDENTIAL') : 'RESIDENTIAL';
-            const area = data ? (data.AreaSQM || data.areaSQM || data.areaSqMeters || 150) : 150;
-            const unitVal = data ? (data.UnitValue || data.unitValue || 520) : 520;
-            const marketVal = data ? (data.MarketValue || data.marketValue || (area * unitVal)) : (area * unitVal);
+            const area = data ? (data.AreaSQM ?? data.areaSQM ?? data.areaSqMeters ?? 0) : 0;
+            const unitVal = data ? (data.UnitValue ?? data.unitValue ?? 0) : 0;
+            const marketVal = data ? (data.MarketValue ?? data.marketValue ?? (area * unitVal)) : (area * unitVal);
 
             row.innerHTML = `
                 <td class="p-2.5">
@@ -236,8 +236,9 @@
                 <td class="p-2.5 text-right">
                     <input type="number" step="0.01" class="w-24 px-2 py-1.5 rounded-lg bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-right text-xs area-input" value="${area}" />
                 </td>
-                <td class="p-2.5 text-right">
-                    <input type="number" step="0.01" class="w-24 px-2 py-1.5 rounded-lg bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-right text-xs unitval-input font-bold" value="${unitVal}" />
+                <td class="p-2.5 text-right font-mono font-bold text-slate-700 dark:text-stone-300">
+                    <span class="unitval-label">₱${Number(unitVal || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <input type="hidden" class="unitval-input" value="${unitVal}" />
                 </td>
                 <td class="p-2.5 text-right font-mono font-bold text-slate-900 dark:text-white mv-cell">
                     ₱${marketVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -254,18 +255,31 @@
             const classSelect = row.querySelector('.class-dropdown');
             const subClassSelect = row.querySelector('.subclass-dropdown');
             const unitValInput = row.querySelector('.unitval-input');
+            const unitValLabel = row.querySelector('.unitval-label');
             const areaInput = row.querySelector('.area-input');
+
+            const setUnitValDisplay = (val) => {
+                const num = parseFloat(val) || 0;
+                unitValInput.value = num;
+                if (unitValLabel) {
+                    unitValLabel.textContent = `₱${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                }
+            };
 
             function updateSubClasses(selectedSubId = null) {
                 const classId = classSelect.value;
                 const subs = window.landSubClassifications.filter(s => s.ClassificationId == classId);
                 if (subs.length > 0) {
                     subClassSelect.innerHTML = subs.map(s => `<option value="${s.Id}" data-unitval="${s.UnitValue}" ${(selectedSubId && s.Id == selectedSubId) ? 'selected' : ''}>${s.SubClass} (₱${s.UnitValue.toLocaleString()})</option>`).join('');
-                    if (!selectedSubId) {
-                        unitValInput.value = subs[0].UnitValue;
+                    const matched = (selectedSubId && subs.find(s => s.Id == selectedSubId)) || subs[0];
+                    if (!selectedSubId || !(parseFloat(unitValInput.value) > 0)) {
+                        setUnitValDisplay(matched.UnitValue);
+                    } else {
+                        setUnitValDisplay(unitValInput.value);
                     }
                 } else {
                     subClassSelect.innerHTML = `<option value="">Standard Base</option>`;
+                    if (!selectedSubId) setUnitValDisplay(0);
                 }
             }
 
@@ -277,13 +291,12 @@
             subClassSelect.addEventListener('change', function () {
                 const opt = this.options[this.selectedIndex];
                 if (opt && opt.getAttribute('data-unitval')) {
-                    unitValInput.value = opt.getAttribute('data-unitval');
+                    setUnitValDisplay(opt.getAttribute('data-unitval'));
                 }
                 recomputeLandClassRow(row);
             });
 
             areaInput.addEventListener('input', () => recomputeLandClassRow(row));
-            unitValInput.addEventListener('input', () => recomputeLandClassRow(row));
 
             updateSubClasses(selSubClassId);
             recomputeLandClassRow(row);
@@ -386,9 +399,22 @@
             row.className = 'hover:bg-slate-50 dark:hover:bg-stone-800/40 transition-colors land-adj-row';
 
             const selClass = data ? (data.ClassificationName || data.classificationName || 'RESIDENTIAL') : 'RESIDENTIAL';
-            const baseMv = data ? (data.BaseMarketValue || data.baseMarketValue || 78000) : 78000;
-            const selAdjId = data ? (data.AdjustmentFactorId || data.adjustmentFactorId || 1) : 1;
-            const pct = data ? (data.PercentAdjustment || data.percentAdjustment || 0) : 0;
+            let baseMv = data ? (data.BaseMarketValue ?? data.baseMarketValue ?? 0) : 0;
+            if (!data) {
+                let matchedMv = 0;
+                document.querySelectorAll('.land-class-row').forEach(r => {
+                    const sel = r.querySelector('.class-dropdown');
+                    const cName = sel?.options[sel.selectedIndex]?.text || '';
+                    if (cName.toUpperCase() === selClass.toUpperCase()) {
+                        matchedMv += parseFloat(r.getAttribute('data-mv')) || 0;
+                    }
+                });
+                baseMv = matchedMv;
+            }
+            const selAdjId = data ? (data.AdjustmentFactorId || data.adjustmentFactorId || (window.landAdjustments?.[0]?.Id ?? 1)) : (window.landAdjustments?.[0]?.Id ?? 1);
+            const matchedFactor = (window.landAdjustments || []).find(j => j.Id == selAdjId) || (window.landAdjustments || [])[0];
+            const hasSavedPct = data && ((data.PercentAdjustment !== undefined && data.PercentAdjustment !== null) || (data.percentAdjustment !== undefined && data.percentAdjustment !== null));
+            const pct = hasSavedPct ? (data.PercentAdjustment ?? data.percentAdjustment) : (matchedFactor ? matchedFactor.AdjustmentPercent : 0);
             const valAdj = data ? (data.ValueAdjustment || data.valueAdjustment || (baseMv * (pct / 100))) : (baseMv * (pct / 100));
             const adjMv = data ? (data.AdjustedMarketValue || data.adjustedMarketValue || (baseMv + valAdj)) : (baseMv + valAdj);
 
@@ -396,16 +422,18 @@
                 <td class="p-2.5">
                     <input type="text" class="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-bold adj-class-input text-xs" value="${selClass}" />
                 </td>
-                <td class="p-2.5 text-right">
-                    <input type="number" step="0.01" class="w-28 px-2 py-1.5 rounded-lg bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-right text-xs adj-basemv-input font-bold" value="${baseMv}" />
+                <td class="p-2.5 text-right font-mono font-bold text-slate-700 dark:text-stone-300">
+                    <span class="adj-basemv-label">₱${Number(baseMv || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <input type="hidden" class="adj-basemv-input" value="${baseMv}" />
                 </td>
                 <td class="p-2.5">
                     <select class="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-medium adj-factor-dropdown text-xs cursor-pointer">
                         ${window.landAdjustments.map(j => `<option value="${j.Id}" data-pct="${j.AdjustmentPercent}" ${j.Id == selAdjId ? 'selected' : ''}>${j.Description} (${j.AdjustmentPercent >= 0 ? '+' : ''}${j.AdjustmentPercent}%)</option>`).join('')}
                     </select>
                 </td>
-                <td class="p-2.5 text-right">
-                    <input type="number" step="0.01" class="w-20 px-2 py-1.5 rounded-lg bg-white dark:bg-stone-900 border border-slate-200 dark:border-stone-800 font-mono text-right text-xs adj-pct-input font-bold" value="${pct}" />
+                <td class="p-2.5 text-right font-mono font-bold text-slate-700 dark:text-stone-300">
+                    <span class="adj-pct-label">${Number(pct || 0)}%</span>
+                    <input type="hidden" class="adj-pct-input" value="${pct}" />
                 </td>
                 <td class="p-2.5 text-right font-mono font-bold text-slate-600 dark:text-stone-300 adj-val-cell">
                     ₱${valAdj.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -434,16 +462,21 @@
                 recomputeLandAdjRow(row);
             });
 
-            baseMvInput.addEventListener('input', () => recomputeLandAdjRow(row));
-            pctInput.addEventListener('input', () => recomputeLandAdjRow(row));
-
             recomputeLandAdjRow(row);
             if (window.lucide) lucide.createIcons();
         }
 
-        function recomputeLandAdjRow(row) {
+        function updateLandAdjRowValues(row) {
             const baseMv = parseFloat(row.querySelector('.adj-basemv-input').value) || 0;
+            const baseMvLabel = row.querySelector('.adj-basemv-label');
+            if (baseMvLabel) {
+                baseMvLabel.textContent = `₱${baseMv.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            }
             const pct = parseFloat(row.querySelector('.adj-pct-input').value) || 0;
+            const pctLabel = row.querySelector('.adj-pct-label');
+            if (pctLabel) {
+                pctLabel.textContent = `${pct}%`;
+            }
             const valAdj = Math.round((baseMv * (pct / 100)) * 100) / 100;
             const finalAdj = Math.round((baseMv + valAdj) * 100) / 100;
 
@@ -451,6 +484,10 @@
             row.querySelector('.adj-final-cell').textContent = `₱${finalAdj.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
             row.setAttribute('data-adjmv', finalAdj);
             row.setAttribute('data-pct', pct);
+        }
+
+        function recomputeLandAdjRow(row) {
+            updateLandAdjRowValues(row);
             recomputeAllLandValuation();
         }
 
@@ -472,8 +509,7 @@
             Object.keys(classMap).forEach(k => {
                 addLandAdjustmentRow({
                     ClassificationName: k,
-                    BaseMarketValue: classMap[k],
-                    PercentAdjustment: 0
+                    BaseMarketValue: classMap[k]
                 });
             });
         }
@@ -490,7 +526,7 @@
 
             const kind = data ? (data.Kinds || data.kinds || 'LAND') : 'LAND';
             const selActual = data ? (data.ActualUseName || data.actualUseName || 'RESIDENTIAL') : 'RESIDENTIAL';
-            const mv = data ? (data.MarketValue || data.marketValue || 78000) : 78000;
+            const mv = data ? (data.MarketValue ?? data.marketValue ?? 0) : 0;
             const lvl = data ? (data.AssessmentLevelPercent || data.assessmentLevelPercent || 20) : 20;
             const av = data ? (data.AssessmentValue || data.assessmentValue || (mv * (lvl / 100))) : (mv * (lvl / 100));
 
@@ -545,23 +581,28 @@
             if (window.lucide) lucide.createIcons();
         }
 
-        function recomputeLandRollRow(row) {
+        function updateLandRollRowValues(row) {
             const mv = parseFloat(row.querySelector('.roll-mv-input').value) || 0;
             const lvl = parseFloat(row.querySelector('.roll-lvl-input').value) || 0;
             const av = Math.round((mv * (lvl / 100)) * 100) / 100;
             row.querySelector('.roll-av-cell').textContent = `₱${av.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
             row.setAttribute('data-mv', mv);
             row.setAttribute('data-av', av);
+        }
+
+        function recomputeLandRollRow(row) {
+            updateLandRollRowValues(row);
             recomputeAllLandValuation();
         }
 
         function autoGeneratePropertyAssessmentRoll() {
             let totalAdjLandMv = 0;
-            document.querySelectorAll('.land-adj-row').forEach(r => {
+            const adjRows = document.querySelectorAll('.land-adj-row');
+            adjRows.forEach(r => {
                 totalAdjLandMv += parseFloat(r.getAttribute('data-adjmv')) || 0;
             });
 
-            if (totalAdjLandMv === 0) {
+            if (adjRows.length === 0) {
                 document.querySelectorAll('.land-class-row').forEach(r => {
                     totalAdjLandMv += parseFloat(r.getAttribute('data-mv')) || 0;
                 });
@@ -572,17 +613,19 @@
                 totalImpMv += parseFloat(r.getAttribute('data-mv')) || 0;
             });
 
+            const firstActual = document.querySelector('.land-class-row .actualuse-dropdown')?.value || 'RESIDENTIAL';
+            const lvlMatch = (window.landAssessmentLevels || []).find(l => l.ActualUseName.toUpperCase() === firstActual.toUpperCase());
+            const landLvl = lvlMatch ? lvlMatch.AssessmentLevel : 20;
+
             const tbody = document.getElementById('landPropertyAssessmentTableBody');
             if (tbody) tbody.innerHTML = '';
 
-            if (totalAdjLandMv > 0) {
-                addLandPropertyAssessmentRow({
-                    Kinds: 'LAND',
-                    ActualUseName: 'RESIDENTIAL',
-                    MarketValue: totalAdjLandMv,
-                    AssessmentLevelPercent: 20
-                });
-            }
+            addLandPropertyAssessmentRow({
+                Kinds: 'LAND',
+                ActualUseName: firstActual,
+                MarketValue: totalAdjLandMv,
+                AssessmentLevelPercent: landLvl
+            });
 
             if (totalImpMv > 0) {
                 addLandPropertyAssessmentRow({
@@ -597,9 +640,26 @@
         function recomputeAllLandValuation() {
             let totalArea = 0;
             let totalBaseMv = 0;
+            const classMvMap = {};
             document.querySelectorAll('.land-class-row').forEach(r => {
                 totalArea += parseFloat(r.getAttribute('data-area')) || 0;
-                totalBaseMv += parseFloat(r.getAttribute('data-mv')) || 0;
+                const mv = parseFloat(r.getAttribute('data-mv')) || 0;
+                totalBaseMv += mv;
+                const sel = r.querySelector('.class-dropdown');
+                const cName = (sel?.options[sel.selectedIndex]?.text || 'RESIDENTIAL').trim().toUpperCase();
+                classMvMap[cName] = (classMvMap[cName] || 0) + mv;
+            });
+
+            // Sync Table 3 Base Market Value labels from Table 1
+            const adjRowsForSync = document.querySelectorAll('.land-adj-row');
+            adjRowsForSync.forEach(r => {
+                const cName = (r.querySelector('.adj-class-input')?.value || '').trim().toUpperCase();
+                const syncedMv = Object.prototype.hasOwnProperty.call(classMvMap, cName)
+                    ? classMvMap[cName]
+                    : (adjRowsForSync.length === 1 ? totalBaseMv : 0);
+                const inp = r.querySelector('.adj-basemv-input');
+                if (inp) inp.value = syncedMv;
+                updateLandAdjRowValues(r);
             });
 
             const dispArea = document.getElementById('displayTotalLandArea');
@@ -623,6 +683,54 @@
             });
             const dispAdjMv = document.getElementById('displayTotalAdjustedMarketValue');
             if (dispAdjMv) dispAdjMv.textContent = `₱${totalAdjMv.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+            // Auto-sync Table 4 Property Assessment Roll from Tables 1-3
+            const rollBodyEl = document.getElementById('landPropertyAssessmentTableBody');
+            if (rollBodyEl && !window._isSyncingRollTable) {
+                window._isSyncingRollTable = true;
+                try {
+                    const landMv = adjRows.length > 0 ? totalAdjMv : totalBaseMv;
+                    let landRollRow = null;
+                    let impRollRow = null;
+                    rollBodyEl.querySelectorAll('.land-roll-row').forEach(r => {
+                        const k = r.querySelector('.roll-kind-select')?.value;
+                        if (k === 'LAND' && !landRollRow) landRollRow = r;
+                        else if (k === 'PLANTS / TREES' && !impRollRow) impRollRow = r;
+                    });
+                    if (!landRollRow) {
+                        const firstActual = document.querySelector('.land-class-row .actualuse-dropdown')?.value || 'RESIDENTIAL';
+                        const lvlMatch = (window.landAssessmentLevels || []).find(l => l.ActualUseName.toUpperCase() === firstActual.toUpperCase());
+                        addLandPropertyAssessmentRow({
+                            Kinds: 'LAND',
+                            ActualUseName: firstActual,
+                            MarketValue: landMv,
+                            AssessmentLevelPercent: lvlMatch ? lvlMatch.AssessmentLevel : 20
+                        });
+                    } else {
+                        const mvInp = landRollRow.querySelector('.roll-mv-input');
+                        if (mvInp) mvInp.value = landMv;
+                        updateLandRollRowValues(landRollRow);
+                    }
+                    if (totalImpMv > 0) {
+                        if (!impRollRow) {
+                            addLandPropertyAssessmentRow({
+                                Kinds: 'PLANTS / TREES',
+                                ActualUseName: 'AGRICULTURAL',
+                                MarketValue: totalImpMv,
+                                AssessmentLevelPercent: 40
+                            });
+                        } else {
+                            const mvInp = impRollRow.querySelector('.roll-mv-input');
+                            if (mvInp) mvInp.value = totalImpMv;
+                            updateLandRollRowValues(impRollRow);
+                        }
+                    } else if (impRollRow) {
+                        impRollRow.remove();
+                    }
+                } finally {
+                    window._isSyncingRollTable = false;
+                }
+            }
             const dispPctAdj = document.getElementById('displayTotalPercentAdjustment');
             if (dispPctAdj) dispPctAdj.textContent = `${totalPctAdj.toFixed(2)}%`;
 
@@ -771,8 +879,8 @@
                 } catch (e) { }
             }
             if (!hasClassRows) {
-                const area = partitionData ? (partitionData.areaSqMeters || partitionData.area || 150) : (parseFloat($('#inputAssessedArea').val()) || 150);
-                const unitVal = partitionData ? (partitionData.unitValue || 520) : (parseFloat($('#inputUnitValue').val()) || 520);
+                const area = partitionData ? (partitionData.areaSqMeters || partitionData.area || 0) : (parseFloat($('#inputAssessedArea').val()) || 0);
+                const unitVal = partitionData ? (partitionData.unitValue || 0) : (parseFloat($('#inputUnitValue').val()) || 0);
                 const actual = partitionData ? (partitionData.actualUse || 'Residential') : 'Residential';
                 addLandClassificationRow({
                     ClassificationId: 1,

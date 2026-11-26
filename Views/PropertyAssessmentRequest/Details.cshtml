@@ -37,6 +37,10 @@
                 <i data-lucide="printer" class="w-4 h-4"></i>
                 <span>Print TD</span>
             </a>
+            <a asp-controller="AuditLog" asp-action="Index" asp-route-search="@Model.Id" class="px-4 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 font-bold hover:bg-amber-100 transition-all flex items-center gap-1.5" title="View Field-Level Audit Logs for this Request">
+                <i data-lucide="history" class="w-4 h-4"></i>
+                <span>Audit Logs</span>
+            </a>
             <a asp-action="Edit" asp-route-id="@Model.Id" class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold transition-all flex items-center gap-1.5">
                 <i data-lucide="edit" class="w-4 h-4"></i>
                 <span>Edit Request</span>

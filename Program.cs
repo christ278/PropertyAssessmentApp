@@ -20,6 +20,7 @@ builder.Services.AddControllersWithViews(options =>
 {
     options.Filters.Add<PropertyAssessmentApp.Filters.ModuleAccessFilter>();
 });
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddHttpClient();
 builder.Services.AddSignalR();
 

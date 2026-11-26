@@ -215,11 +215,58 @@ public class UserRoleService : IUserRoleService
             });
         }
 
+        if (!_context.SystemModules.Any(m => m.ModuleCode == "AUDIT_LOGS"))
+        {
+            _context.SystemModules.Add(new SystemModule
+            {
+                ModuleCode = "AUDIT_LOGS",
+                ModuleName = "System Audit Logs (All Users)",
+                Category = "System Administration",
+                ControllerName = "AuditLog",
+                ActionName = "Index",
+                Icon = "history",
+                SortOrder = 43,
+                IsActive = true
+            });
+        }
+
+        if (!_context.SystemModules.Any(m => m.ModuleCode == "AUDIT_LOGS_SELF"))
+        {
+            _context.SystemModules.Add(new SystemModule
+            {
+                ModuleCode = "AUDIT_LOGS_SELF",
+                ModuleName = "System Audit Logs (Self Logs Only)",
+                Category = "System Administration",
+                ControllerName = "AuditLog",
+                ActionName = "Self",
+                Icon = "user-check",
+                SortOrder = 44,
+                IsActive = true
+            });
+        }
+
         _context.SaveChanges();
 
         var landRefMod = _context.SystemModules.FirstOrDefault(m => m.ModuleCode == "LAND_REFERENCE");
+        var auditLogMod = _context.SystemModules.FirstOrDefault(m => m.ModuleCode == "AUDIT_LOGS");
         var printTdMod = _context.SystemModules.FirstOrDefault(m => m.ModuleCode == "ASSESSMENT_PRINT_TD");
         var adminRole = _context.UserRoleSettings.FirstOrDefault(r => r.RoleName == "System Administrator");
+        if (auditLogMod != null && adminRole != null &&
+            !_context.RoleModulePermissions.Any(p => p.RoleId == adminRole.Id && p.ModuleId == auditLogMod.ModuleId))
+        {
+            _context.RoleModulePermissions.Add(new RoleModulePermission
+            {
+                RoleId = adminRole.Id,
+                ModuleId = auditLogMod.ModuleId,
+                CanView = true,
+                CanCreate = true,
+                CanEdit = true,
+                CanDelete = true,
+                CanApprove = true,
+                UpdatedDate = DateTime.Now
+            });
+            _context.SaveChanges();
+        }
         if (landRefMod != null && adminRole != null &&
             !_context.RoleModulePermissions.Any(p => p.RoleId == adminRole.Id && p.ModuleId == landRefMod.ModuleId))
         {

@@ -1,14 +1,26 @@
+using System.Security.Claims;
+using System.Text.Json;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using PropertyAssessmentApp.Models;
 
 namespace PropertyAssessmentApp.Data;
 
 public class ApplicationDbContext : DbContext
 {
-    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
+    private readonly IHttpContextAccessor? _httpContextAccessor;
+    private bool _isWritingAuditLogs;
+
+    public ApplicationDbContext(
+        DbContextOptions<ApplicationDbContext> options,
+        IHttpContextAccessor? httpContextAccessor = null)
         : base(options)
     {
+        _httpContextAccessor = httpContextAccessor;
     }
+
+    public DbSet<AuditLog> AuditLogs { get; set; } = null!;
 
     public DbSet<UserAccount> UserAccounts { get; set; } = null!;
     public DbSet<Owner> TaxpayerOwners { get; set; } = null!;
@@ -756,5 +768,278 @@ public class ApplicationDbContext : DbContext
                 }
             );
         });
+    }
+
+    private sealed class PendingAuditEntry
+    {
+        public EntityEntry Entry { get; init; } = null!;
+        public AuditLog Log { get; init; } = null!;
+        public Dictionary<string, object?> OldValues { get; } = new();
+        public Dictionary<string, object?> NewValues { get; } = new();
+        public List<string> ChangedColumns { get; } = new();
+    }
+
+    public override int SaveChanges()
+    {
+        if (_isWritingAuditLogs) return base.SaveChanges();
+        var pending = PrepareAuditEntries();
+        var result = base.SaveChanges();
+        FinalizeAuditEntries(pending, async: false).GetAwaiter().GetResult();
+        return result;
+    }
+
+    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        if (_isWritingAuditLogs) return await base.SaveChangesAsync(cancellationToken);
+        var pending = PrepareAuditEntries();
+        var result = await base.SaveChangesAsync(cancellationToken);
+        await FinalizeAuditEntries(pending, async: true, cancellationToken);
+        return result;
+    }
+
+    private List<PendingAuditEntry> PrepareAuditEntries()
+    {
+        ChangeTracker.DetectChanges();
+        var httpContext = _httpContextAccessor?.HttpContext;
+        var user = httpContext?.User;
+        var username = user?.Identity?.IsAuthenticated == true ? (user.Identity.Name ?? "System") : "System";
+        var fullName = user?.FindFirst(ClaimTypes.GivenName)?.Value ?? username;
+        var ipAddress = httpContext?.Connection.RemoteIpAddress?.ToString();
+        var now = DateTime.Now;
+
+        var auditedEntityNames = new HashSet<string>(StringComparer.Ordinal)
+        {
+            nameof(PropertyAssessmentRequest),
+            nameof(RequestForInspection),
+            nameof(TaxMappingRequest),
+            nameof(TaxDeclarationRequest),
+            nameof(LandHoldingRequest),
+            nameof(TaxDeclaration),
+            nameof(OrderPayment),
+            nameof(Owner),
+            nameof(UserAccount),
+            nameof(UserRoleSetting),
+            nameof(PropertyTagging),
+            nameof(LandClassification),
+            nameof(LandSubClassification),
+            nameof(LandActualUse),
+            nameof(LandAssessmentLevel),
+            nameof(LandAdjustmentFactor),
+            nameof(LandImprovementType)
+        };
+
+        bool hasParentRequestInBatch = ChangeTracker.Entries().Any(e =>
+            e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted &&
+            (e.Entity is PropertyAssessmentRequest || e.Entity is RequestForInspection));
+
+        var pending = new List<PendingAuditEntry>();
+        foreach (var entry in ChangeTracker.Entries())
+        {
+            if (entry.Entity is AuditLog || entry.State is EntityState.Detached or EntityState.Unchanged)
+                continue;
+
+            var entityName = entry.Entity.GetType().Name;
+            if (!auditedEntityNames.Contains(entityName))
+                continue;
+
+            // Avoid logging placeholder/unapproved TaxDeclaration rows created by workflow requests (already captured in PropertyAssessmentRequest.GeneratedPartitionsJson)
+            if (entry.Entity is TaxDeclaration tdEntity &&
+                (hasParentRequestInBatch ||
+                 tdEntity.Status == AssessmentStatus.Pending ||
+                 (!string.IsNullOrWhiteSpace(tdEntity.TaxDeclarationNumber) && tdEntity.TaxDeclarationNumber.EndsWith("-00000", StringComparison.Ordinal))))
+                continue;
+
+            var item = new PendingAuditEntry
+            {
+                Entry = entry,
+                Log = new AuditLog
+                {
+                    EntityName = entityName,
+                    Action = entry.State switch
+                    {
+                        EntityState.Added => "Created",
+                        EntityState.Modified => "Updated",
+                        EntityState.Deleted => "Deleted",
+                        _ => entry.State.ToString()
+                    },
+                    ChangedBy = username,
+                    ChangedByName = fullName,
+                    IpAddress = ipAddress,
+                    ChangedAt = now
+                }
+            };
+
+            foreach (var prop in entry.Properties)
+            {
+                if (prop.IsTemporary) continue;
+                var propName = prop.Metadata.Name;
+                bool isSensitive = propName.Contains("Password", StringComparison.OrdinalIgnoreCase);
+
+                object? SafeVal(object? val)
+                {
+                    if (isSensitive && val != null) return "[REDACTED]";
+                    if (val is string s &&
+                        propName.EndsWith("Json", StringComparison.OrdinalIgnoreCase) &&
+                        !string.IsNullOrWhiteSpace(s))
+                    {
+                        var trimmed = s.TrimStart();
+                        if (trimmed.StartsWith('[') || trimmed.StartsWith('{'))
+                        {
+                            try
+                            {
+                                using var doc = JsonDocument.Parse(s);
+                                return doc.RootElement.Clone();
+                            }
+                            catch { }
+                        }
+                    }
+                    return val;
+                }
+
+                switch (entry.State)
+                {
+                    case EntityState.Added:
+                        item.NewValues[propName] = SafeVal(prop.CurrentValue);
+                        break;
+                    case EntityState.Deleted:
+                        item.OldValues[propName] = SafeVal(prop.OriginalValue);
+                        break;
+                    case EntityState.Modified:
+                        if (prop.IsModified && !Equals(prop.OriginalValue, prop.CurrentValue))
+                        {
+                            if (propName == nameof(PropertyAssessmentRequest.GeneratedPartitionsJson))
+                            {
+                                if (!AppendPartitionFieldSummary(item, prop.OriginalValue as string, prop.CurrentValue as string))
+                                {
+                                    item.ChangedColumns.Add(propName);
+                                    item.OldValues[propName] = SafeVal(prop.OriginalValue);
+                                    item.NewValues[propName] = SafeVal(prop.CurrentValue);
+                                }
+                            }
+                            else
+                            {
+                                item.ChangedColumns.Add(propName);
+                                item.OldValues[propName] = SafeVal(prop.OriginalValue);
+                                item.NewValues[propName] = SafeVal(prop.CurrentValue);
+                            }
+                        }
+                        break;
+                }
+            }
+
+            if (entry.State == EntityState.Modified && item.ChangedColumns.Count == 0)
+                continue;
+
+            pending.Add(item);
+        }
+
+        return pending;
+    }
+
+    private static bool AppendPartitionFieldSummary(PendingAuditEntry item, string? oldJson, string? newJson)
+    {
+        bool anyAdded = false;
+        try
+        {
+            var oldList = PropertyAssessmentApp.Services.PartitionJsonHelper.ParseList(oldJson);
+            var newList = PropertyAssessmentApp.Services.PartitionJsonHelper.ParseList(newJson);
+            if (oldList.Count == 0 && newList.Count == 0) return false;
+
+            var props = typeof(AssessmentPartitionItem)
+                .GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+            int max = Math.Max(oldList.Count, newList.Count);
+
+            for (int i = 0; i < max; i++)
+            {
+                var oldP = i < oldList.Count ? oldList[i] : null;
+                var newP = i < newList.Count ? newList[i] : null;
+                var label = newP?.PartitionIndex ?? oldP?.PartitionIndex ?? ((char)('A' + i)).ToString();
+
+                foreach (var p in props)
+                {
+                    var ov = oldP != null ? p.GetValue(oldP) : null;
+                    var nv = newP != null ? p.GetValue(newP) : null;
+                    var oStr = FormatAuditVal(ov, p.Name);
+                    var nStr = FormatAuditVal(nv, p.Name);
+                    if (!string.Equals(oStr, nStr, StringComparison.Ordinal))
+                    {
+                        var fieldKey = $"Partition {label} • {p.Name}";
+                        item.ChangedColumns.Add(fieldKey);
+                        item.OldValues[fieldKey] = oStr;
+                        item.NewValues[fieldKey] = nStr;
+                        anyAdded = true;
+                    }
+                }
+            }
+        }
+        catch { }
+        return anyAdded;
+    }
+
+    private static string? FormatAuditVal(object? val, string propName)
+    {
+        if (val == null) return null;
+        var s = val is decimal d ? d.ToString("0.####") : val.ToString();
+        if (string.IsNullOrWhiteSpace(s)) return null;
+        if (propName.Contains("Base64", StringComparison.OrdinalIgnoreCase) && s.Length > 64)
+            return $"[Base64 Image ({s.Length} chars)]";
+        return s;
+    }
+
+    private async Task FinalizeAuditEntries(List<PendingAuditEntry> pending, bool async, CancellationToken ct = default)
+    {
+        if (pending.Count == 0) return;
+
+        foreach (var item in pending)
+        {
+            string? GetPropStr(string name)
+            {
+                var p = item.Entry.Properties.FirstOrDefault(x => x.Metadata.Name == name);
+                return p?.CurrentValue?.ToString() ?? p?.OriginalValue?.ToString();
+            }
+
+            var txNo = GetPropStr("TransactionNo");
+            var trackingNo = GetPropStr("TrackingNumber");
+            var tdn = GetPropStr("TaxDeclarationNumber");
+            var opNo = GetPropStr("OrderPaymentNumber");
+            var uname = GetPropStr("Username");
+
+            string? humanRef = !string.IsNullOrWhiteSpace(trackingNo) ? trackingNo
+                : (!string.IsNullOrWhiteSpace(txNo) ? txNo
+                : (!string.IsNullOrWhiteSpace(tdn) ? tdn
+                : (!string.IsNullOrWhiteSpace(opNo) ? opNo
+                : (!string.IsNullOrWhiteSpace(uname) ? uname : null))));
+
+            if (!string.IsNullOrWhiteSpace(humanRef))
+            {
+                item.Log.RecordId = humanRef.Length > 120 ? humanRef[..120] : humanRef;
+            }
+            else
+            {
+                var pkParts = item.Entry.Properties
+                    .Where(p => p.Metadata.IsPrimaryKey())
+                    .Select(p => $"{p.CurrentValue ?? p.OriginalValue}")
+                    .ToList();
+                item.Log.RecordId = pkParts.Count > 0 ? string.Join(",", pkParts) : Guid.NewGuid().ToString();
+            }
+            var auditJsonOpts = new JsonSerializerOptions { WriteIndented = true };
+            item.Log.ChangedColumnsJson = item.ChangedColumns.Count > 0 ? JsonSerializer.Serialize(item.ChangedColumns) : null;
+            item.Log.OldValuesJson = item.OldValues.Count > 0 ? JsonSerializer.Serialize(item.OldValues, auditJsonOpts) : null;
+            item.Log.NewValuesJson = item.NewValues.Count > 0 ? JsonSerializer.Serialize(item.NewValues, auditJsonOpts) : null;
+            AuditLogs.Add(item.Log);
+        }
+
+        _isWritingAuditLogs = true;
+        try
+        {
+            if (async)
+                await base.SaveChangesAsync(ct);
+            else
+                base.SaveChanges();
+        }
+        finally
+        {
+            _isWritingAuditLogs = false;
+        }
     }
 }

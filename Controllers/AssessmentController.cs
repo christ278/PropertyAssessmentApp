@@ -85,7 +85,7 @@ public class AssessmentController : Controller
     }
 
     // GET: /Assessment
-    public IActionResult Index(string? search, PropertyKind? kind, string? status, int limit = 10, int page = 1)
+    public IActionResult Index(string? search, PropertyKind? kind, string? status, string? barangay, string? actualUse, int limit = 10, int page = 1)
     {
         int safeLimit = (limit is 5 or 10 or 25 or 50 or 100) ? limit : 10;
         int safePage = page < 1 ? 1 : page;
@@ -93,13 +93,34 @@ public class AssessmentController : Controller
         ViewBag.Search = search;
         ViewBag.Kind = kind;
         ViewBag.Status = status;
+        ViewBag.Barangay = barangay;
+        ViewBag.ActualUse = actualUse;
+
+        var barangayList = _context.Barangays.AsNoTracking()
+            .Where(b => b.IsActive && !string.IsNullOrWhiteSpace(b.Name))
+            .Select(b => b.Name.Trim())
+            .Distinct()
+            .OrderBy(b => b)
+            .ToList();
+        ViewBag.Barangays = barangayList;
+
+        var actualUseList = _context.LandActualUses.AsNoTracking()
+            .Where(a => a.IsActive && !string.IsNullOrWhiteSpace(a.ActualUseName))
+            .Select(a => a.ActualUseName.Trim())
+            .Concat(_context.MachineryActualUses.AsNoTracking()
+                .Where(a => a.IsActive && !string.IsNullOrWhiteSpace(a.ActualUseName))
+                .Select(a => a.ActualUseName.Trim()))
+            .Distinct()
+            .OrderBy(a => a)
+            .ToList();
+        ViewBag.ActualUses = actualUseList;
 
         ViewBag.TotalMarketValue = _assessmentService.GetTotalMarketValue();
         ViewBag.TotalAssessedValue = _assessmentService.GetTotalAssessedValue();
         ViewBag.TotalRevenue = _assessmentService.GetTotalEstimatedTaxRevenue();
         ViewBag.TotalProperties = _assessmentService.GetTotalActivePropertiesCount();
 
-        var (records, totalCount) = _assessmentService.GetPaged(search, kind, status, safePage, safeLimit);
+        var (records, totalCount) = _assessmentService.GetPaged(search, kind, status, barangay, actualUse, safePage, safeLimit);
         int totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)safeLimit));
         if (safePage > totalPages) safePage = totalPages;
 
